@@ -78,8 +78,8 @@ float bnldev(float pp, int n, long *seed);
 function bracketed by x1 and x2. Returns root within accuracy +/-xacc
 funcd is function of interest, returning both function value and first deriv.*/
 
-float rtsafe(void (*funcd)(float, float, float *, float[][], int, int[], float *, float *), 
-  float x, float *rates, float konvalues[][], int nkon, int nkonsum[], float x1, float x2, float xacc)
+float rtsafe(void (*funcd)(float, float, float *, float **, int, int[], float *, float *), 
+  float x, float *rates, float **konvalues, int nkon, int nkonsum[], float x1, float x2, float xacc)
 {
   int j,done;
   float df,dx,dxold,f,fh,fl,xtemp;
@@ -133,7 +133,7 @@ float rtsafe(void (*funcd)(float, float, float *, float[][], int, int[], float *
   return 0.0;
 }
 
-InitializeSeq(Seq,len)
+void InitializeSeq(Seq,len)
   char Seq[];
   int len;
 {
@@ -172,7 +172,13 @@ struct Genotype
   float PICdisassembly[NGenes];
 };
 
-InitializeGenotype(indiv,kdis)
+void CalcG(char [NGenes][reglen],
+	   char [NGenes][elementlen],
+	   int *,
+	   int (**)[5]);
+
+
+void InitializeGenotype(indiv,kdis)
   struct Genotype *indiv;
   float kdis[];
 {
@@ -205,7 +211,7 @@ InitializeGenotype(indiv,kdis)
   fprintf(fperrors,"\n");
 }
 
-Mutate(struct Genotype *old,struct Genotype *new,float m)
+void Mutate(struct Genotype *old,struct Genotype *new,float m)
 {
   int i,k;
   char x;
@@ -229,7 +235,7 @@ Mutate(struct Genotype *old,struct Genotype *new,float m)
   CalcG(new->C,new->O,&(new->y),&(new->G));
 }
 
-CalcG(C,O,py,G)
+void CalcG(C,O,py,G)
   char C[NGenes][reglen];
   char O[NGenes][elementlen];
   int *py;
@@ -457,7 +463,7 @@ void display(struct FixedEvent *start)
   }
 }
 
-AddFixedEvent(int i,float t,struct FixedEvent **start,struct FixedEvent **last)
+void AddFixedEvent(int i,float t,struct FixedEvent **start,struct FixedEvent **last)
 {
   struct FixedEvent *newtime;
   
@@ -471,7 +477,7 @@ AddFixedEvent(int i,float t,struct FixedEvent **start,struct FixedEvent **last)
   sls_store(newtime,start,last);
 }
 
-AddTimePoint(float time,float conc,struct TimeCourse **start,struct TimeCourse **last)
+void AddTimePoint(float time,float conc,struct TimeCourse **start,struct TimeCourse **last)
 {
   struct TimeCourse *newtime;
   
@@ -485,7 +491,7 @@ AddTimePoint(float time,float conc,struct TimeCourse **start,struct TimeCourse *
   sls_store_end2(newtime,start,last);
 }
 
-AddFixedEventEnd(int i,float t,struct FixedEvent **start,struct FixedEvent **last)
+void AddFixedEventEnd(int i,float t,struct FixedEvent **start,struct FixedEvent **last)
 {
   struct FixedEvent *newtime;
   
@@ -499,7 +505,7 @@ AddFixedEventEnd(int i,float t,struct FixedEvent **start,struct FixedEvent **las
   sls_store_end(newtime,start,last);
 }
 
-DeleteFixedEvent(int geneID,int i,struct FixedEvent **start,struct FixedEvent **last)
+void DeleteFixedEvent(int geneID,int i,struct FixedEvent **start,struct FixedEvent **last)
 {
   struct FixedEvent *info,*lastinfo;
   int j,done;
@@ -534,7 +540,7 @@ DeleteFixedEvent(int geneID,int i,struct FixedEvent **start,struct FixedEvent **
   free(info);
 }
 
-DeleteFixedEventStart(struct FixedEvent **start,struct FixedEvent **last)
+void DeleteFixedEventStart(struct FixedEvent **start,struct FixedEvent **last)
 {
   struct FixedEvent *info;
   
@@ -544,7 +550,7 @@ DeleteFixedEventStart(struct FixedEvent **start,struct FixedEvent **last)
   free(info);
 }
 
-InitializeCell(indiv,y,mRNAdecay,meanmRNA,protein)
+void InitializeCell(indiv,y,mRNAdecay,meanmRNA,protein)
   struct CellState *indiv;
   int y[NGenes];
   float mRNAdecay[NGenes],meanmRNA[NGenes],protein[NGenes];
@@ -625,8 +631,8 @@ void calckonrate (float t,float konvalues[NGenes][3],int nkon,int nkonsum[],floa
 }
 
 // must have already updated L first
-ChangeSCyto(int i,struct Genotype *genes,struct CellState *state,
-  int nkon,float nkonsumi,float rates[],float konvalues[NGenes][3],int konIDs[][])
+void ChangeSCyto(int i,struct Genotype *genes,struct CellState *state,
+  int nkon,float nkonsumi,float rates[],float konvalues[NGenes][3],int **konIDs)
 {
   float salphc; 
 
@@ -638,7 +644,7 @@ ChangeSCyto(int i,struct Genotype *genes,struct CellState *state,
   konvalues[i][2] = salphc;
 }
 
-Calckoff(int k,int (*G)[5],struct CellState *state,float *koff,
+void Calckoff(int k,int (*G)[5],struct CellState *state,float *koff,
   float RTlnKr,float temperature)
 {
   float Gibbs; /*free energy in kJ/mol*/
@@ -668,7 +674,7 @@ Calckoff(int k,int (*G)[5],struct CellState *state,float *koff,
 }
 
 /* when TF binding changes, adjust cooperativity at neighbouring sites */
-ScanNearby(int k,int (*G)[5],struct CellState *state,float rates[],float koffvalues[],
+void ScanNearby(int k,int (*G)[5],struct CellState *state,float rates[],float koffvalues[],
   float RTlnKr,float temperature)
 {
   int posdiff,j,i;
@@ -692,7 +698,7 @@ ScanNearby(int k,int (*G)[5],struct CellState *state,float rates[],float koffval
   }
 }
 
-Removekon(int siteID,int TFID,float rates[],float salphc,int *nkon,int nkonsum[],
+void Removekon(int siteID,int TFID,float rates[],float salphc,int *nkon,int nkonsum[],
   int (*konIDs)[2],float Li)
 {
   int i,k;
@@ -711,7 +717,7 @@ Removekon(int siteID,int TFID,float rates[],float salphc,int *nkon,int nkonsum[]
 //else do nothing: there is likely a redundancy in steric hindrance, hence no site to remove
 }
 
-Addkon(float Li,float salphc,int *nkon,int nkonsum[],int TFID,
+void Addkon(float Li,float salphc,int *nkon,int nkonsum[],int TFID,
   int siteID,float rates[],int (*konIDs)[2])
 {
   rates[4] += kon*salphc;
@@ -752,7 +758,7 @@ int IsOneActivator(int geneID,int *B2,int y2,int (*G)[5],int activating[])
 /* only appropriate if nothing is  bound ie CalcFromInitialState and everything is in state 2
 v31 and earlier have some parts of code needed with prebound stuff,
 rates[2] and [7] are done in CalcDt*/
-CalcFromState(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsum[],
+void CalcFromState(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsum[],
   float rates[],float konvalues[NGenes][3],int (*konIDs)[2],float transport[],
   float mRNAdecay[],float RTlnKr,float temperature,int rates2[],int statechangeIDs[][NGenes])
 /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit*/
@@ -815,7 +821,7 @@ int DoesFixedEventEnd(struct FixedEvent *tStranslating,struct FixedEvent *tStran
   }
 }
 
-CalcDt(float *x,float *dt,int nkon,int nkonsum[],float rates[8],int rates2[],
+void CalcDt(float *x,float *dt,int nkon,int nkonsum[],float rates[8],int rates2[],
   float konvalues[NGenes][3],float mRNAdecay[],float mRNAdecayrates[],int Scyto[],
   int Stranslating[])
 {
@@ -844,7 +850,7 @@ CalcDt(float *x,float *dt,int nkon,int nkonsum[],float rates[8],int rates2[],
   } else *dt = rtsafe(&calct, *x, rates, konvalues, nkon, nkonsum, tbound1, tbound2, (float) 1e-6); 
 }
 
-EndTranscription(float *dt,float t,struct CellState *state,float transport[NGenes],float rates[8])
+void EndTranscription(float *dt,float t,struct CellState *state,float transport[NGenes],float rates[8])
 {
   int i,total;
 
@@ -861,7 +867,7 @@ EndTranscription(float *dt,float t,struct CellState *state,float transport[NGene
   rates[1] += kRNA;
 }
 
-TransportEvent(float x,float transport[NGenes],struct CellState *state,
+void TransportEvent(float x,float transport[NGenes],struct CellState *state,
   float endtime,float rates[8])
 {
   int i;
@@ -883,7 +889,7 @@ TransportEvent(float x,float transport[NGenes],struct CellState *state,
   if(rates[1]<0.1*kRNA) rates[1]=0.0;
 }
 
-RemoveFromArray(int toberemoved,int a[],int *len,int force)
+void RemoveFromArray(int toberemoved,int a[],int *len,int force)
 {
   int i;
   
@@ -897,7 +903,7 @@ RemoveFromArray(int toberemoved,int a[],int *len,int force)
 // don't always print because with a 4->3 transition PIC assembly is not there to be removed
 }
 
-DisassemblePIC(int *activestate,int geneID,float rates[],int rates2[],
+void DisassemblePIC(int *activestate,int geneID,float rates[],int rates2[],
   int statechangeIDs[][NGenes],float disassembly)
 {
   RemoveFromArray(geneID,statechangeIDs[3],&(rates2[3]),(int) 1);
@@ -911,7 +917,7 @@ DisassemblePIC(int *activestate,int geneID,float rates[],int rates2[],
   if(*activestate==6) (*activestate) = 4;
 }
 
-ReviseActivityState(int geneID,struct Genotype *genes,struct CellState *state,
+void ReviseActivityState(int geneID,struct Genotype *genes,struct CellState *state,
   float rates[],int rates2[],int statechangeIDs[][NGenes])
 
 {
@@ -952,8 +958,8 @@ ReviseActivityState(int geneID,struct Genotype *genes,struct CellState *state,
     fprintf(fperrors,"state change from %d to %d in gene %d\n",oldstate,state->active[geneID],geneID);
 }
 
-RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalues[NGenes][3],
-  int *nkon,int nkonsum[],float rates[],int rates2[],int konIDs[][],int site,
+void RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalues[NGenes][3],
+  int *nkon,int nkonsum[],float rates[],int rates2[],int **konIDs,int site,
   float koffvalues[],float RTlnKr,float temperature,int statechangeIDs[][NGenes])
 {
   int i,j,k,bound,siteID,geneID,transcriptrule,oldstate,numactive;
@@ -1002,7 +1008,7 @@ RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalues[NGe
   }
 }
 
-TFbinds(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsum[],
+void TFbinds(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsum[],
     float rates[],int rates2[],float konvalues[NGenes][3],float **koffvalues,
     int (*konIDs)[2],int *maxbound2,int *maxbound3,int site,
     float RTlnKr,float temperature,int statechangeIDs[][NGenes])
@@ -1060,7 +1066,7 @@ redundancy in steric hindrance*/
 /*time course of [TF]s represented as array of TimeCourse lists.
 */
 
-AddTimePoints(float time,float L[NGenes],
+void AddTimePoints(float time,float L[NGenes],
   struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast)
 {
   int i;
@@ -1069,7 +1075,7 @@ AddTimePoints(float time,float L[NGenes],
     AddTimePoint(time,L[i],&(timecoursestart[i]),&(timecourselast[i]));
 }
 
-AddIntTimePoints(float time,int L[NGenes],
+void AddIntTimePoints(float time,int L[NGenes],
   struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast)
 {
   int i;
@@ -1081,7 +1087,7 @@ AddIntTimePoints(float time,int L[NGenes],
 /* need some sort of control in case it declines to essentially zero.
 Add in discrete, stochastic and/or zero values, but this may create false attractor
 if time steps are small and rising tide keeps getting rounded down*/
-UpdateL(float L[],float dt,float konvalues[NGenes][3],float rates[],int nkonsum[],
+void UpdateL(float L[],float dt,float konvalues[NGenes][3],float rates[],int nkonsum[],
   float t,struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast,
   float otherdata[])
 {
@@ -1105,7 +1111,7 @@ UpdateL(float L[],float dt,float konvalues[NGenes][3],float rates[],int nkonsum[
     AddTimePoints(t+dt,otherdata/*L*/,timecoursestart,timecourselast);
 }
 
-CalcNumBound(float L[],int nkoff)
+void CalcNumBound(float L[],int nkoff)
 {
   float sum;
   int i;
@@ -1115,7 +1121,7 @@ CalcNumBound(float L[],int nkoff)
   if(verbose) fprintf(fperrors,"%d bound %g expected\n",nkoff,0.0003*sum);
 }
 
-Develop(genes,state,temperature,timecoursestart,timecourselast)
+void Develop(genes,state,temperature,timecoursestart,timecourselast)
   struct Genotype *genes; 
   struct CellState *state;
   float temperature; //in Kelvin
@@ -1396,7 +1402,7 @@ probably a bit vulnerable to rounding error
   free(konIDs);
 }
 
-DevStabilityOnlyLOpt(float lopt[],struct TimeCourse **timecoursestart)
+void DevStabilityOnlyLOpt(float lopt[],struct TimeCourse **timecoursestart)
 {
   int i;
   struct TimeCourse *start;
@@ -1418,7 +1424,7 @@ DevStabilityOnlyLOpt(float lopt[],struct TimeCourse **timecoursestart)
   }
 }
 
-CalcFitness(float lopt[],float *w,struct TimeCourse **timecoursestart,float s)
+void CalcFitness(float lopt[],float *w,struct TimeCourse **timecoursestart,float s)
 {
   float d,dt1,dt2,x;
   int i;
@@ -1445,7 +1451,7 @@ CalcFitness(float lopt[],float *w,struct TimeCourse **timecoursestart,float s)
   fprintf(fperrors,"s=%g w=%g\n",s,*w);
 }
 
-PrintTimeCourse(struct TimeCourse *start,int i,float lopt[])
+void PrintTimeCourse(struct TimeCourse *start,int i,float lopt[])
 {
   FILE *fpout;
   char filename[80];
@@ -1461,7 +1467,7 @@ PrintTimeCourse(struct TimeCourse *start,int i,float lopt[])
   fclose(fpout);  
 }
 
-main()
+int main()
 {
   FILE *fpout,*fpkdis;
   int i,j,k,gen;
