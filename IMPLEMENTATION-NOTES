@@ -1,0 +1,15 @@
+Definitions:
+
+CellState->y2 ?  number of TFs bound (check ??)
+CellState->B2 =  list of bound TFs
+CellState->y3   number of binding sites that have steric hindrances (check??)
+CellState->B3 = list of binding sites that can't be bound due steric hindrance
+CellState->L  = protein concentrations
+ 
+
+statechangeIDs ?
+
+Addkon, Removekon ?
+
+Genotype->G
+- what do the 5 elements really mean?
