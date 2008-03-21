@@ -1,3 +1,4 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -10,21 +11,21 @@
 //#include "list.h"
 
 /*
-version27: each founding indiv has a different genotype, CopyGenotype is obsolete
-version28: add selection (wrong sort)
-v29: transcription initiation quenching rule, take selection out
-v30reject: add delays to quenching and unquenching
-v30: redo selection based on v29, buggy
-v30alt: redo selection based on v27, free up memory of CellState and TimeCourse
-v31: based on v30alt, replace stability only selection with selection for specific opt.
-    Hopefully this helps avoid evolution from always-on to always-off (not sufficient yet).
-    Move meanmRNA and protein initial states from InitializeCell to be universal
-v32: koffIDs and nkoff have the same info as B2 and y2: remove them
-v33: implement transcription initiation scheme with bursting, PIC assembly & H2A.Z
-v34: disassembly rates bootstrapped from constitutively on Garcia-Martinez subset, not TF subset distribution
-v35: output only a subset of timecourse measurements to prevent excessive output
-    change NumSitesInGenome value
-v36: reglen changed to 150
+  version27: each founding indiv has a different genotype, CopyGenotype is obsolete
+  version28: add selection (wrong sort)
+  v29: transcription initiation quenching rule, take selection out
+  v30reject: add delays to quenching and unquenching
+  v30: redo selection based on v29, buggy
+  v30alt: redo selection based on v27, free up memory of CellState and TimeCourse
+  v31: based on v30alt, replace stability only selection with selection for specific opt.
+  Hopefully this helps avoid evolution from always-on to always-off (not sufficient yet).
+  Move meanmRNA and protein initial states from InitializeCell to be universal
+  v32: koffIDs and nkoff have the same info as B2 and y2: remove them
+  v33: implement transcription initiation scheme with bursting, PIC assembly & H2A.Z
+  v34: disassembly rates bootstrapped from constitutively on Garcia-Martinez subset, not TF subset distribution
+  v35: output only a subset of timecourse measurements to prevent excessive output
+  change NumSitesInGenome value
+  v36: reglen changed to 150
 */
 #define MAXIT 100
 
@@ -41,7 +42,7 @@ int nmin=4;
 float tdevelopment=120.0;
 float kon=1e-4; // lower value is so things run faster
 /*kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
-and 89% of the proteins being in the nucleus*/
+  and 89% of the proteins being in the nucleus*/
 float kRNA=618.0;
 float ttranslation=1.0;
 float ttranscription=1.0;
@@ -78,13 +79,13 @@ float bnldev(float pp, int n, long *seed);
 function bracketed by x1 and x2. Returns root within accuracy +/-xacc
 funcd is function of interest, returning both function value and first deriv.*/
 
-float rtsafe(void (*funcd)(float, float, float *, float **, int, int[], float *, float *), 
-  float x, float *rates, float **konvalues, int nkon, int nkonsum[], float x1, float x2, float xacc)
+float rtsafe(void (*funcd)(float, float, float *, float [NGenes][3], int, int[], float *, float *), 
+             float x, float *rates, float konvalues[NGenes][3], int nkon, int nkonsum[], float x1, float x2, float xacc)
 {
   int j,done;
   float df,dx,dxold,f,fh,fl,xtemp;
   float temp,xh,xl,rts;
-
+  
   (*funcd)(x1,x,rates,konvalues,nkon,nkonsum,&fl,&df);
   (*funcd)(x2,x,rates,konvalues,nkon,nkonsum,&fh,&df); /* note df isn't used here*/
   if (fabs(fl) < 1e-9) return x1;
@@ -112,30 +113,30 @@ float rtsafe(void (*funcd)(float, float, float *, float **, int, int[], float *,
       dx=0.5*(xh-xl);
       rts=xl+dx;      
       if (xl == rts) return rts;
-     } else {
-       dxold=dx;
-       dx=f/df;
-       temp=rts;
-       rts -= dx;
-       if (temp == rts) return rts;
-     }
-     if (fabs(dx) < xacc) return rts;
-     if(rts==0.0){
-       if(x1<x2) rts = fminf(2.0*x1,(xl+xh)/2.0);
-       else rts = fminf(2.0*x2,(xl+xh)/2.0);
-       fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
-     }
-     if (j>1 || done==0) (*funcd)(rts,x,rates,konvalues,nkon,nkonsum,&f,&df);
-     if (f < 0.0) xl=rts;
-     else xh=rts;   
+    } else {
+      dxold=dx;
+      dx=f/df;
+      temp=rts;
+      rts -= dx;
+      if (temp == rts) return rts;
+    }
+    if (fabs(dx) < xacc) return rts;
+    if(rts==0.0){
+      if(x1<x2) rts = fminf(2.0*x1,(xl+xh)/2.0);
+      else rts = fminf(2.0*x2,(xl+xh)/2.0);
+      fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
+    }
+    if (j>1 || done==0) (*funcd)(rts,x,rates,konvalues,nkon,nkonsum,&f,&df);
+    if (f < 0.0) xl=rts;
+    else xh=rts;   
   }
   fprintf(fperrors,"error in rtsafe: too many iterations\n");
   return 0.0;
 }
 
 void InitializeSeq(Seq,len)
-  char Seq[];
-  int len;
+     char Seq[];
+     int len;
 {
   float x;
   int i;
@@ -173,17 +174,17 @@ struct Genotype
 };
 
 void CalcG(char [NGenes][reglen],
-	   char [NGenes][elementlen],
-	   int *,
-	   int (**)[5]);
+           char [NGenes][elementlen],
+           int *,
+           int (**)[5]);
 
 
 void InitializeGenotype(indiv,kdis)
-  struct Genotype *indiv;
-  float kdis[];
+     struct Genotype *indiv;
+     float kdis[];
 {
   int i,j;
-
+  
   InitializeSeq(indiv->C,reglen*NGenes);
   InitializeSeq(indiv->O,elementlen*NGenes);
   CalcG(indiv->C,indiv->O,&(indiv->y),&(indiv->G));
@@ -236,13 +237,13 @@ void Mutate(struct Genotype *old,struct Genotype *new,float m)
 }
 
 void CalcG(C,O,py,G)
-  char C[NGenes][reglen];
-  char O[NGenes][elementlen];
-  int *py;
-  int (**G)[5];
+     char C[NGenes][reglen];
+     char O[NGenes][elementlen];
+     int *py;
+     int (**G)[5];
 {
   int i,j,geneind,tfind,match,maxy,y;
-
+  
   maxy = maxelements;
   *G = malloc(maxy*5*sizeof(int));
   if(!(*G)){
@@ -282,11 +283,11 @@ void CalcG(C,O,py,G)
         match=0;
         for(j=i; j>i-elementlen; j--)
           if(
-            (C[geneind][j]=='a' && O[tfind][i-j]=='t')
-            || (C[geneind][j]=='t' && O[tfind][i-j]=='a')
-            || (C[geneind][j]=='c' && O[tfind][i-j]=='g')
-            || (C[geneind][j]=='g' && O[tfind][i-j]=='c')            
-            ) match++;
+             (C[geneind][j]=='a' && O[tfind][i-j]=='t')
+             || (C[geneind][j]=='t' && O[tfind][i-j]=='a')
+             || (C[geneind][j]=='c' && O[tfind][i-j]=='g')
+             || (C[geneind][j]=='g' && O[tfind][i-j]=='c')            
+             ) match++;
         if(match>=nmin){
           if(y+1>=maxy){
             maxy = 2*maxy;
@@ -315,42 +316,42 @@ void CalcG(C,O,py,G)
 }
 
 /* transcription/translation delays are sorted linked lists.
-Deleting the head each time, and tack new stuff on the end
-Linked lists are easy to create pre-sorted.
+   Deleting the head each time, and tack new stuff on the end
+   Linked lists are easy to create pre-sorted.
 */
 
 struct FixedEvent
 {
-int geneID;
-float time;
-struct FixedEvent *next;
+  int geneID;
+  float time;
+  struct FixedEvent *next;
 };
 
 struct CellState
 {
-   int Scyto[NGenes];
-   int Snuclear[NGenes];
-   int Stranslating[NGenes]; //these are in the cytoplasm, but only recently
-   struct FixedEvent *tStranslating; //times when they move to Scyto
-   struct FixedEvent *lasttStranslating;
-   int Stranscribing[NGenes]; //these haven't finished transcription yet
-   struct FixedEvent *tStranscribing; //times when they move to Snuclear
-   struct FixedEvent *lasttStranscribing;
-   float L[NGenes];
-   int y2;
-   int *B2;
-/* B2 lists just bound TFs according to binding site index in G */
-   int y3;
-   int (*B3)[2];
-/*1st elem B3 lists binding site indices that cannot be bound due to steric hindrance
-2nd elem gives corresponding index of inhibiting TF in G
-*/
-   int active[NGenes];
-/* gives the state of each of the genes, according to figure
-1 is fully off, 2 meets TF criteria
-3 is off but w/o nucleosome, 4 is on but w/o PIC
-5 is on but w/o TF criteria, 6 is fully on
-*/
+  int Scyto[NGenes];
+  int Snuclear[NGenes];
+  int Stranslating[NGenes]; //these are in the cytoplasm, but only recently
+  struct FixedEvent *tStranslating; //times when they move to Scyto
+  struct FixedEvent *lasttStranslating;
+  int Stranscribing[NGenes]; //these haven't finished transcription yet
+  struct FixedEvent *tStranscribing; //times when they move to Snuclear
+  struct FixedEvent *lasttStranscribing;
+  float L[NGenes];
+  int y2;
+  int *B2;
+  /* B2 lists just bound TFs according to binding site index in G */
+  int y3;
+  int (*B3)[2];
+  /*1st elem B3 lists binding site indices that cannot be bound due to steric hindrance
+    2nd elem gives corresponding index of inhibiting TF in G
+  */
+  int active[NGenes];
+  /* gives the state of each of the genes, according to figure
+     1 is fully off, 2 meets TF criteria
+     3 is off but w/o nucleosome, 4 is on but w/o PIC
+     5 is on but w/o TF criteria, 6 is fully on
+  */
 };
 
 void FreeMemCellState(struct CellState *state)
@@ -408,15 +409,15 @@ void sls_store(struct FixedEvent *i, struct FixedEvent **start, struct FixedEven
 
 struct TimeCourse
 {
-float concentration;
-float time;
-struct TimeCourse *next;
+  float concentration;
+  float time;
+  struct TimeCourse *next;
 };     
 
 void DeleteTimeCourse(struct TimeCourse *start2)
 {
   struct TimeCourse *info,*start;
-
+  
   start = start2; 
   while(start){
     info = start;
@@ -536,7 +537,7 @@ void DeleteFixedEvent(int geneID,int i,struct FixedEvent **start,struct FixedEve
   }
   if(done==0)
     fprintf(fperrors,
-      "error: In %d elements, couldn't find element %d to delete in gene %d\n",j+1,i,geneID);
+            "error: In %d elements, couldn't find element %d to delete in gene %d\n",j+1,i,geneID);
   free(info);
 }
 
@@ -551,13 +552,13 @@ void DeleteFixedEventStart(struct FixedEvent **start,struct FixedEvent **last)
 }
 
 void InitializeCell(indiv,y,mRNAdecay,meanmRNA,protein)
-  struct CellState *indiv;
-  int y[NGenes];
-  float mRNAdecay[NGenes],meanmRNA[NGenes],protein[NGenes];
+     struct CellState *indiv;
+     int y[NGenes];
+     float mRNAdecay[NGenes],meanmRNA[NGenes],protein[NGenes];
 {
   int i,k,totalmRNA;
   float t;
- 
+  
   indiv->tStranscribing = indiv->lasttStranscribing = NULL;
   indiv->tStranslating = indiv->lasttStranslating = NULL;
   indiv->y2 = 0;  /*initialize with nothing bound */
@@ -585,13 +586,13 @@ void InitializeCell(indiv,y,mRNAdecay,meanmRNA,protein)
   }
 }
 
-/*could perhaps be a little faster with option to skip *df calculation for first 2 calls*/
+/* could perhaps be a little faster with option to skip *df calculation for first 2 calls */
 void calct (float t, float x, float *rates, float konvalues[NGenes][3],
-  int nkon, int nkonsum[], float *f, float *df)
+            int nkon, int nkonsum[], float *f, float *df)
 {
   float r,denom,numer,ct,ect;
   int i,j;
-
+  
   r = numer = 0.0;
   for(i=0; i<NGenes; i++){
     if(nkonsum[i]>0){
@@ -616,7 +617,7 @@ void calckonrate (float t,float konvalues[NGenes][3],int nkon,int nkonsum[],floa
 {
   float r,ct,ect;
   int i;
-
+  
   r = 0.0;
   for(i=0; i<NGenes; i++){
     if(nkonsum[i]>0){
@@ -630,12 +631,12 @@ void calckonrate (float t,float konvalues[NGenes][3],int nkon,int nkonsum[],floa
   if(verbose) fprintf(fperrors,"r=%g t=%g konrate=%g\n",r,t,*konrate);
 }
 
-// must have already updated L first
+/* must have already updated L first */
 void ChangeSCyto(int i,struct Genotype *genes,struct CellState *state,
-  int nkon,float nkonsumi,float rates[],float konvalues[NGenes][3],int **konIDs)
+                 int nkon,float nkonsumi,float rates[],float konvalues[NGenes][3],int (*konIDs)[2])
 {
   float salphc; 
-
+  
   salphc = (float) (state->Scyto[i]) * genes->translation[i] / genes->proteindecay[i];
   rates[4] += nkonsumi*kon*(salphc-konvalues[i][2]);
   rates[5] += nkonsumi*kon*(fmaxf(state->L[i],salphc)-fmaxf(state->L[i],konvalues[i][2]));
@@ -645,7 +646,7 @@ void ChangeSCyto(int i,struct Genotype *genes,struct CellState *state,
 }
 
 void Calckoff(int k,int (*G)[5],struct CellState *state,float *koff,
-  float RTlnKr,float temperature)
+              float RTlnKr,float temperature)
 {
   float Gibbs; /*free energy in kJ/mol*/
   int posdiff,front,back,i,j;
@@ -658,7 +659,7 @@ void Calckoff(int k,int (*G)[5],struct CellState *state,float *koff,
       if(abs(posdiff)<6){
         fprintf(fperrors,
           "error: steric hindrance has been breached with site %d %d away from site %d\n"
-          ,k,posdiff,state->B2[j]);
+                ,k,posdiff,state->B2[j]);
       }
       if (abs(posdiff)<20){
         if(posdiff>0) front++; else back++;
@@ -669,13 +670,13 @@ void Calckoff(int k,int (*G)[5],struct CellState *state,float *koff,
   if (front>0) Gibbs -= cooperativity*RTlnKr/3;
   if (back>0) Gibbs -= cooperativity*RTlnKr/3;
   *koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
-//  fprintf(fperrors,"RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",RTlnKr,front,back,G[k][4],Gibbs,*koff);
-/* 25% protein in nucleus is implicit in formula above */
+  //  fprintf(fperrors,"RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",RTlnKr,front,back,G[k][4],Gibbs,*koff);
+  /* 25% protein in nucleus is implicit in formula above */
 }
 
 /* when TF binding changes, adjust cooperativity at neighbouring sites */
 void ScanNearby(int k,int (*G)[5],struct CellState *state,float rates[],float koffvalues[],
-  float RTlnKr,float temperature)
+                float RTlnKr,float temperature)
 {
   int posdiff,j,i;
   float diff;
@@ -685,8 +686,8 @@ void ScanNearby(int k,int (*G)[5],struct CellState *state,float rates[],float ko
       posdiff = G[k][2]-G[state->B2[j]][2];
       if(abs(posdiff)<6){
         fprintf(fperrors,
-          "error: steric hindrance 2 has been breached with site %d %d away from site %d\n"
-          ,k,posdiff,state->B2[j]);
+                "error: steric hindrance 2 has been breached with site %d %d away from site %d\n"
+                ,k,posdiff,state->B2[j]);
       }
       if (abs(posdiff)<20){
         diff = -koffvalues[j];
@@ -699,7 +700,7 @@ void ScanNearby(int k,int (*G)[5],struct CellState *state,float rates[],float ko
 }
 
 void Removekon(int siteID,int TFID,float rates[],float salphc,int *nkon,int nkonsum[],
-  int (*konIDs)[2],float Li)
+               int (*konIDs)[2],float Li)
 {
   int i,k;
   
@@ -714,11 +715,11 @@ void Removekon(int siteID,int TFID,float rates[],float salphc,int *nkon,int nkon
     konIDs[k][0] = konIDs[*nkon][0];
     konIDs[k][1] = konIDs[*nkon][1];
   }
-//else do nothing: there is likely a redundancy in steric hindrance, hence no site to remove
+  //else do nothing: there is likely a redundancy in steric hindrance, hence no site to remove
 }
 
 void Addkon(float Li,float salphc,int *nkon,int nkonsum[],int TFID,
-  int siteID,float rates[],int (*konIDs)[2])
+            int siteID,float rates[],int (*konIDs)[2])
 {
   rates[4] += kon*salphc;
   rates[5] += fmaxf(Li,salphc);
@@ -733,7 +734,7 @@ void Addkon(float Li,float salphc,int *nkon,int nkonsum[],int TFID,
 int CalcTranscription(int geneID,int *B2,int y2,int (*G)[5],int activating[],int *on)
 {
   int i,off;
-
+  
   *on=off=0;
   for(i=0;i<y2;i++){
     if(geneID==G[B2[i]][0]){
@@ -756,12 +757,12 @@ int IsOneActivator(int geneID,int *B2,int y2,int (*G)[5],int activating[])
 }
 
 /* only appropriate if nothing is  bound ie CalcFromInitialState and everything is in state 2
-v31 and earlier have some parts of code needed with prebound stuff,
-rates[2] and [7] are done in CalcDt*/
+   v31 and earlier have some parts of code needed with prebound stuff,
+   rates[2] and [7] are done in CalcDt*/
 void CalcFromState(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsum[],
-  float rates[],float konvalues[NGenes][3],int (*konIDs)[2],float transport[],
-  float mRNAdecay[],float RTlnKr,float temperature,int rates2[],int statechangeIDs[][NGenes])
-/* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit*/
+                   float rates[],float konvalues[NGenes][3],int (*konIDs)[2],float transport[],
+                   float mRNAdecay[],float RTlnKr,float temperature,int rates2[],int statechangeIDs[][NGenes])
+/* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit */
 {
   int i,k;
   float salphc,Li; 
@@ -822,12 +823,12 @@ int DoesFixedEventEnd(struct FixedEvent *tStranslating,struct FixedEvent *tStran
 }
 
 void CalcDt(float *x,float *dt,int nkon,int nkonsum[],float rates[8],int rates2[],
-  float konvalues[NGenes][3],float mRNAdecay[],float mRNAdecayrates[],int Scyto[],
-  int Stranslating[])
+            float konvalues[NGenes][3],float mRNAdecay[],float mRNAdecayrates[],int Scyto[],
+            int Stranslating[])
 {
   float tbound1,tbound2;
   int i;
-
+  
   rates[2]=rates[7]=0.0;
   for(i=0;i<NGenes;i++){
     mRNAdecay[i] = mRNAdecayrates[i] * ((float) Scyto[i] + (float) Stranslating[i]);
@@ -845,8 +846,8 @@ void CalcDt(float *x,float *dt,int nkon,int nkonsum[],float rates[8],int rates2[
   if(tbound1==tbound2){
     if (nkon!=0)
       fprintf(fperrors,
-        "error: nkon=%d when it should be zero x=%f rates[5]=%g rates[6]=%g rates[7]=%g\n",
-        nkon,*x,rates[5],rates[6],rates[7]);
+              "error: nkon=%d when it should be zero x=%f rates[5]=%g rates[6]=%g rates[7]=%g\n",
+              nkon,*x,rates[5],rates[6],rates[7]);
     *dt = tbound1;
   } else *dt = rtsafe(&calct, *x, rates, konvalues, nkon, nkonsum, tbound1, tbound2, (float) 1e-6); 
 }
@@ -854,12 +855,12 @@ void CalcDt(float *x,float *dt,int nkon,int nkonsum[],float rates[8],int rates2[
 void EndTranscription(float *dt,float t,struct CellState *state,float transport[NGenes],float rates[8])
 {
   int i,total;
-
+  
   *dt = state->tStranscribing->time - t;
   total=0;
   for(i=0;i<NGenes;i++) total += state->Stranscribing[i];
   if(verbose) fprintf(fperrors,"\ntranscription event finishes out of %d possible t=%g dt=%g\n",
-    total,t,*dt);
+                      total,t,*dt);
   i=state->tStranscribing->geneID;
   (state->Snuclear[i])++;
   (state->Stranscribing[i])--;
@@ -869,11 +870,11 @@ void EndTranscription(float *dt,float t,struct CellState *state,float transport[
 }
 
 void TransportEvent(float x,float transport[NGenes],struct CellState *state,
-  float endtime,float rates[8])
+                    float endtime,float rates[8])
 {
   int i;
   float konrate2;
-          
+  
   i = -1;
   konrate2 = 0.0;
   while(i<NGenes && x>konrate2){
@@ -901,11 +902,11 @@ void RemoveFromArray(int toberemoved,int a[],int *len,int force)
     a[i]=a[*len];
   }
   else if(force) fprintf(fperrors,"error removing %d from array of length %d\n",toberemoved,*len);
-// don't always print because with a 4->3 transition PIC assembly is not there to be removed
+  // don't always print because with a 4->3 transition PIC assembly is not there to be removed
 }
 
 void DisassemblePIC(int *activestate,int geneID,float rates[],int rates2[],
-  int statechangeIDs[][NGenes],float disassembly)
+                    int statechangeIDs[][NGenes],float disassembly)
 {
   RemoveFromArray(geneID,statechangeIDs[3],&(rates2[3]),(int) 1);
   RemoveFromArray(geneID,statechangeIDs[4],&(rates2[4]),(int) 1);
@@ -919,14 +920,13 @@ void DisassemblePIC(int *activestate,int geneID,float rates[],int rates2[],
 }
 
 void ReviseActivityState(int geneID,struct Genotype *genes,struct CellState *state,
-  float rates[],int rates2[],int statechangeIDs[][NGenes])
-
+                         float rates[],int rates2[],int statechangeIDs[][NGenes])
 {
   int transcriptrule,oldstate,numactive;
 
   transcriptrule = CalcTranscription(geneID,state->B2,state->y2,genes->G,genes->activating,&numactive);
   oldstate = state->active[geneID];
-/* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4-PIC disassembly*/
+  /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4-PIC disassembly*/
   if((transcriptrule) && oldstate==1){
     state->active[geneID] = 2;
     statechangeIDs[0][rates2[0]] = geneID;
@@ -954,14 +954,14 @@ void ReviseActivityState(int geneID,struct Genotype *genes,struct CellState *sta
   if(!(transcriptrule) && oldstate==6) state->active[geneID] = 5;
   if((state->active[geneID]==5 || state->active[geneID]==6) && numactive==0)
     DisassemblePIC(&(state->active[geneID]),geneID,rates,rates2,statechangeIDs,
-      genes->PICdisassembly[geneID]);
+                   genes->PICdisassembly[geneID]);
   if(verbose && (oldstate!=state->active[geneID]))
     fprintf(fperrors,"state change from %d to %d in gene %d\n",oldstate,state->active[geneID],geneID);
 }
 
 void RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalues[NGenes][3],
-  int *nkon,int nkonsum[],float rates[],int rates2[],int **konIDs,int site,
-  float koffvalues[],float RTlnKr,float temperature,int statechangeIDs[][NGenes])
+                   int *nkon,int nkonsum[],float rates[],int rates2[],int (*konIDs)[2],int site,
+                   float koffvalues[],float RTlnKr,float temperature,int statechangeIDs[][NGenes])
 {
   int i,j,k,bound,siteID,geneID,transcriptrule,oldstate,numactive;
 
@@ -969,7 +969,7 @@ void RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalue
   while((state->B2[i] != site) && (i<state->y2)) i++;
   if(i==state->y2){
     fprintf(fperrors,"error: RemoveBinding could not find site %d with %d possibilities\n Bound sites are\n",
-      site,state->y2);
+            site,state->y2);
     for(j=0;j<state->y2;j++) fprintf(fperrors,"%d\n",state->B2[j]);
   }
   else {
@@ -984,9 +984,9 @@ void RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalue
         if(bound==0){
           siteID = state->B3[j][0];
           if(verbose) fprintf(fperrors,"Site %d pos %d on gene %d freed from steric hindrance\n",
-            siteID,genes->G[siteID][2],genes->G[siteID][0]);
+                              siteID,genes->G[siteID][2],genes->G[siteID][0]);
           Addkon(state->L[genes->G[siteID][1]],konvalues[genes->G[siteID][1]][2],
-            nkon,nkonsum,genes->G[siteID][1],siteID,rates,konIDs);
+                 nkon,nkonsum,genes->G[siteID][1],siteID,rates,konIDs);
         }
         (state->y3)--;
         if(j<state->y3){
@@ -1001,24 +1001,24 @@ void RemoveBinding(struct Genotype *genes,struct CellState *state,float konvalue
     koffvalues[i] = koffvalues[state->y2];
     geneID = genes->G[site][0];
     if(verbose) fprintf(fperrors,"Add site %d at pos %d on gene %d freed by unbinding\n",
-      site,genes->G[site][2],geneID);
+                        site,genes->G[site][2],geneID);
     Addkon(state->L[genes->G[site][1]],konvalues[genes->G[site][1]][2],nkon,
-      nkonsum,genes->G[site][1],site,rates,konIDs);
+           nkonsum,genes->G[site][1],site,rates,konIDs);
     ReviseActivityState(geneID,genes,state,rates,rates2,statechangeIDs);
     ScanNearby(site,genes->G,state,rates,koffvalues,RTlnKr,temperature);        
   }
 }
 
 void TFbinds(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsum[],
-    float rates[],int rates2[],float konvalues[NGenes][3],float **koffvalues,
-    int (*konIDs)[2],int *maxbound2,int *maxbound3,int site,
-    float RTlnKr,float temperature,int statechangeIDs[][NGenes])
+             float rates[],int rates2[],float konvalues[NGenes][3],float **koffvalues,
+             int (*konIDs)[2],int *maxbound2,int *maxbound3,int site,
+             float RTlnKr,float temperature,int statechangeIDs[][NGenes])
 {
   int geneID,k,posdiff,site2;
 
   if(verbose) fprintf(fperrors,
-    "kon1 event at site %d out of %d possible, %d TFs previously bound y=%d\n",
-    site,*nkon,state->y2,genes->y);
+                      "kon1 event at site %d out of %d possible, %d TFs previously bound y=%d\n",
+                      site,*nkon,state->y2,genes->y);
   if(state->y2 >= *maxbound2){
     (*maxbound2) *= 2;
     state->B2 = realloc(state->B2,(*maxbound2)*sizeof(int));
@@ -1031,17 +1031,17 @@ void TFbinds(struct Genotype *genes,struct CellState *state,int *nkon,int nkonsu
   state->B2[state->y2] = site;
   if(verbose) fprintf(fperrors,"remove site %d\n",site);
   Removekon(site,genes->G[site][1],rates,konvalues[genes->G[site][1]][2],nkon,
-    nkonsum,konIDs,state->L[genes->G[site][1]]);
+            nkonsum,konIDs,state->L[genes->G[site][1]]);
   Calckoff(site,genes->G,state,&((*koffvalues)[state->y2]),RTlnKr,temperature);
   if(verbose) fprintf(fperrors,"new koff = %g is number %d\n",
-    (*koffvalues)[state->y2],(state->y2+1));
+                      (*koffvalues)[state->y2],(state->y2+1));
   rates[0] += (*koffvalues)[state->y2];
   state->B2[state->y2]=site;
   (state->y2)++;
   ScanNearby(site,genes->G,state,rates,*koffvalues,RTlnKr,temperature);
   geneID=genes->G[site][0];
-/* this cycles over all sites, not just bound ones, in order to record
-redundancy in steric hindrance*/
+  /* this cycles over all sites, not just bound ones, in order to record
+     redundancy in steric hindrance*/
   for(k=0; k<genes->y; k++){
     if(geneID==genes->G[k][0] && !(k==site)){
       posdiff = genes->G[site][2]-genes->G[k][2];
@@ -1055,20 +1055,20 @@ redundancy in steric hindrance*/
         (state->y3)++;
         if(verbose) fprintf(fperrors,"%d steric hindrance sites after %d blocks site %d\n",state->y3,site,k);
         Removekon(k,genes->G[k][1],rates,konvalues[genes->G[k][1]][2],nkon,nkonsum,
-          konIDs,state->L[genes->G[k][1]]);
+                  konIDs,state->L[genes->G[k][1]]);
       }
     }
   }
   if(verbose) fprintf(fperrors,"y2=%d y3=%d maxbound2=%d maxbound3=%d\n",
-    state->y2,state->y3,*maxbound2,*maxbound3);
+                      state->y2,state->y3,*maxbound2,*maxbound3);
   ReviseActivityState(geneID,genes,state,rates,rates2,statechangeIDs);
 }
 
 /*time course of [TF]s represented as array of TimeCourse lists.
-*/
+ */
 
 void AddTimePoints(float time,float L[NGenes],
-  struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast)
+                   struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast)
 {
   int i;
   
@@ -1077,7 +1077,7 @@ void AddTimePoints(float time,float L[NGenes],
 }
 
 void AddIntTimePoints(float time,int L[NGenes],
-  struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast)
+                      struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast)
 {
   int i;
   
@@ -1086,11 +1086,11 @@ void AddIntTimePoints(float time,int L[NGenes],
 }
 
 /* need some sort of control in case it declines to essentially zero.
-Add in discrete, stochastic and/or zero values, but this may create false attractor
-if time steps are small and rising tide keeps getting rounded down*/
+   Add in discrete, stochastic and/or zero values, but this may create false attractor
+   if time steps are small and rising tide keeps getting rounded down*/
 void UpdateL(float L[],float dt,float konvalues[NGenes][3],float rates[],int nkonsum[],
-  float t,struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast,
-  float otherdata[])
+             float t,struct TimeCourse **timecoursestart,struct TimeCourse **timecourselast,
+             float otherdata[])
 {
   int i;
   float ct,ect,ect1;
@@ -1123,20 +1123,20 @@ void CalcNumBound(float L[],int nkoff)
 }
 
 void Develop(genes,state,temperature,timecoursestart,timecourselast)
-  struct Genotype *genes; 
-  struct CellState *state;
-  float temperature; //in Kelvin
-  struct TimeCourse **timecoursestart;
-  struct TimeCourse **timecourselast;
+     struct Genotype *genes; 
+     struct CellState *state;
+     float temperature; //in Kelvin
+     struct TimeCourse **timecoursestart;
+     struct TimeCourse **timecourselast;
 {
   float t;
   int i,j,k,nkon,posdiff,maxbound2,maxbound3,site,geneID,event;
   float konvalues[NGenes][3];
-/*element 0 is other funny term
-  element 1 is c
-  element 2 is salphc
-Other index is which TF binds 
-The kon term is left out of all of them for computational efficiency*/
+  /*element 0 is other funny term
+    element 1 is c
+    element 2 is salphc
+    Other index is which TF binds 
+    The kon term is left out of all of them for computational efficiency*/
   int (*konIDs)[2]; //elem 0 is siteID, elem 1 is TF that binds
   int nkonsum[NGenes];
   float *koffvalues;
@@ -1144,15 +1144,15 @@ The kon term is left out of all of them for computational efficiency*/
   float transport[NGenes],mRNAdecay[NGenes];  
   float x,dt;
   float rates[8]; 
-/*total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
- 4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
-3-PIC disassembly used to be 3-transcriptinit
- */
+  /*total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
+    4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
+    3-PIC disassembly used to be 3-transcriptinit
+  */
   int rates2[5];
-/* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4=PIC disassembly*/
+  /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4=PIC disassembly*/
   int statechangeIDs[5][NGenes]; //corresponding geneIDs for rates2
   float f,df,konrate,konrate2,diff,RTlnKr,sum,ct,ect;
-
+  
   for(i=0; i<NGenes; i++){
     timecoursestart[i] = NULL;
     timecourselast[i] = NULL;
@@ -1170,7 +1170,7 @@ The kon term is left out of all of them for computational efficiency*/
     exit(1);
   }
   CalcFromState(genes,state,&nkon,nkonsum,rates,konvalues,
-    konIDs,transport,mRNAdecay,RTlnKr,temperature,rates2,statechangeIDs);
+                konIDs,transport,mRNAdecay,RTlnKr,temperature,rates2,statechangeIDs);
   t=0.0;
   while(t<tdevelopment){
     x=expdev(&seed);
@@ -1179,16 +1179,16 @@ The kon term is left out of all of them for computational efficiency*/
       for(i=0;i<state->y2;i++) konrate2 += koffvalues[i];
       if((verbose) || konrate2>0.0)
         fprintf(fperrors,"warning: koffvalues add up to %g rates[0]=%g < 0\n",
-          konrate2,rates[0]);
+                konrate2,rates[0]);
       rates[0] = konrate2;
     }
     CalcDt(&x,&dt,nkon,nkonsum,rates,rates2,konvalues,mRNAdecay,genes->mRNAdecay,
-      state->Scyto,state->Stranslating);
+           state->Scyto,state->Stranslating);
     if(verbose) fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n",
-      t+dt,dt,x);
+                        t+dt,dt,x);
     if(!(state->lasttStranscribing)){
       for(i=0;i<NGenes;i++)
-      if(verbose) fprintf(fperrors,"%d transcription events\n",state->Stranscribing[i]);
+        if(verbose) fprintf(fperrors,"%d transcription events\n",state->Stranscribing[i]);
     }
     event=DoesFixedEventEnd(state->tStranslating,state->tStranscribing,fminf(t+dt,tdevelopment));
     while (event>0){
@@ -1201,7 +1201,7 @@ The kon term is left out of all of them for computational efficiency*/
         total=0;
         for(i=0;i<NGenes;i++) total += state->Stranslating[i];
         if(verbose) fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
-          total,t,dt); // bug: dt can be negative
+                            total,t,dt); // bug: dt can be negative
         fflush(fperrors);
         i=state->tStranslating->geneID;   
         (state->Stranslating[i])--;   
@@ -1214,7 +1214,7 @@ The kon term is left out of all of them for computational efficiency*/
       x -= dt*konrate;
       if(verbose) fprintf(fperrors,"dt=%g t=%g fixed event old x=%g new x=%g\n",dt,t,x+dt*konrate,x);
       CalcDt(&x,&dt,nkon,nkonsum,rates,rates2,konvalues,mRNAdecay,genes->mRNAdecay,
-        state->Scyto,state->Stranslating);
+             state->Scyto,state->Stranslating);
       if(verbose) fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n",t+dt,dt,x);
       event=DoesFixedEventEnd(state->tStranslating,state->tStranscribing,fminf(tdevelopment,t+dt));
     } 
@@ -1224,17 +1224,17 @@ The kon term is left out of all of them for computational efficiency*/
       x = ran1(&seed)*(rates[7]+konrate);
       if(verbose){
         fprintf(fperrors,"\nx=%g\nkoff=%g = %d * %g\ntransport=%g\ndecay=%g\n",
-          x,rates[0],state->y2,rates[0]/(float)state->y2,rates[1],rates[2]);
+                x,rates[0],state->y2,rates[0]/(float)state->y2,rates[1],rates[2]);
         fprintf(fperrors,"PICdisassembly=%g\nkon=%g = %d * %g\n",
-          rates[3],rates[4]+konrate,nkon,(rates[4]+konrate)/(float)nkon);
+                rates[3],rates[4]+konrate,nkon,(rates[4]+konrate)/(float)nkon);
         fprintf(fperrors,"acetylation=%g\ndeacetylation=%g\nPIC assembly=%g\ntranscriptinit=%g\n",
-          (float)rates2[0]*acetylate,(float)rates2[1]*deacetylate,(float)rates2[2]*PICassembly,
-          (float)rates2[3]*transcriptinit);
+                (float)rates2[0]*acetylate,(float)rates2[1]*deacetylate,(float)rates2[2]*PICassembly,
+                (float)rates2[3]*transcriptinit);
         fprintf(fperrors,"total=%g=%g+%g\n\n",rates[7]+konrate,rates[7],konrate);
       }
-/*kon generally could be handled better, with more direct references to nkonsum, 
-probably a bit vulnerable to rounding error
-*/
+      /*kon generally could be handled better, with more direct references to nkonsum, 
+        probably a bit vulnerable to rounding error
+      */
       if (x<rates[0]){
         j = -1;
         while(j<state->y2 && x>0){
@@ -1245,17 +1245,17 @@ probably a bit vulnerable to rounding error
           konrate2 = 0.0;
           for(i=0;i<state->y2;i++) konrate2 += koffvalues[i];
           fprintf(fperrors,"warning: koffvalues add up to %g instead of rates[0]=%g\n",
-            konrate2,rates[0]);
+                  konrate2,rates[0]);
           rates[0] = konrate2;
           j--; // a bit of a fudge for rounding error, really should move on to rates[1], but too complicated for something so minor
         } 
         site=state->B2[j];
         if(verbose) fprintf(fperrors,"koff event %d of %d at site %d\n",
-          j,state->y2,site);
+                            j,state->y2,site);
         if(j<0) fprintf(fperrors,"error: koff event %d of %d at site %d\n",j,state->y2,site);
         UpdateL(state->L,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->L);
         RemoveBinding(genes,state,konvalues,&nkon,nkonsum,rates,rates2,konIDs,site,
-          koffvalues,RTlnKr,temperature,statechangeIDs);
+                      koffvalues,RTlnKr,temperature,statechangeIDs);
         CalcNumBound(state->L,state->y2);
       } else {
         x -= rates[0];
@@ -1273,28 +1273,28 @@ probably a bit vulnerable to rounding error
             }
             if(x>konrate2){//had some rounding errors with rates[2]. Calculate in CalcDt, hopefully fixed now
               fprintf(fperrors,"warning: x=%g > konrate2=%g out of rates[2]=%g\n",
-                x,konrate2,rates[2]);
+                      x,konrate2,rates[2]);
             }
             x = ran1(&seed)*((float) (state->Scyto[i]+state->Stranslating[i]));
             UpdateL(state->L,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->L);
             if(x<(float)state->Scyto[i]){
               if(verbose){
                 fprintf(fperrors,"mRNA decay event gene %d from %d copies in cytoplasm not %d copies translating\n",
-                  i,state->Scyto[i],state->Stranslating[i]);
+                        i,state->Scyto[i],state->Stranslating[i]);
               }
               (state->Scyto[i])--;  
-              ChangeSCyto(i,genes,state,nkon,(float) nkonsum[i],rates,konvalues,konIDs);                                                                                              
+              ChangeSCyto(i,genes,state,nkon,(float) nkonsum[i],rates,konvalues,konIDs); 
             } else {
               x = ran1(&seed)*((float) state->Stranslating[i]);
               if(verbose){
                 fprintf(fperrors,
-                  "mRNA decay event gene %d not from %d copies in cytoplasm but %f from %d copies translating\n",
-                  i,state->Scyto[i],trunc(x),state->Stranslating[i]);
+                        "mRNA decay event gene %d not from %d copies in cytoplasm but %f from %d copies translating\n",
+                        i,state->Scyto[i],trunc(x),state->Stranslating[i]);
               }
               DeleteFixedEvent(i,(int) trunc(x),&(state->tStranslating),&(state->lasttStranslating));
               (state->Stranslating[i])--;
               if(verbose) for(j=0;j<NGenes;j++)
-                fprintf(fperrors,"%d copies of gene %d translating\n",state->Stranslating[j],j);                  
+                            fprintf(fperrors,"%d copies of gene %d translating\n",state->Stranslating[j],j);                  
             }
           } else {
             x -= rates[2];
@@ -1308,7 +1308,7 @@ probably a bit vulnerable to rounding error
               j=statechangeIDs[4][j];
               if(verbose) fprintf(fperrors,"PIC disassembly event in gene %d\n",j);
               DisassemblePIC(&(state->active[j]),j,rates,rates2,statechangeIDs,
-                genes->PICdisassembly[j]);
+                             genes->PICdisassembly[j]);
             } else {
               x -= rates[3];
               if (x<rates[4]+konrate){
@@ -1323,7 +1323,7 @@ probably a bit vulnerable to rounding error
                 }
                 UpdateL(state->L,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->L);
                 TFbinds(genes,state,&nkon,nkonsum,rates,rates2,konvalues,&koffvalues,
-                  konIDs,&maxbound2,&maxbound3,konIDs[j][0],RTlnKr,temperature,statechangeIDs);
+                        konIDs,&maxbound2,&maxbound3,konIDs[j][0],RTlnKr,temperature,statechangeIDs);
                 CalcNumBound(state->L,state->y2);
               } else {
                 x -= (rates[4]+konrate);
@@ -1331,7 +1331,7 @@ probably a bit vulnerable to rounding error
                   x = ran1(&seed)*((float) rates2[0]);
                   geneID = statechangeIDs[0][(int)trunc(x)];
                   if(verbose) fprintf(fperrors,"acetylation event gene %d\nstate change from %d to 4\n",
-                    geneID,state->active[geneID]);
+                                      geneID,state->active[geneID]);
                   if(state->active[geneID]!=2)
                     fprintf(fperrors,"error: acetylation event attempted from state %d\n",state->active[geneID]);
                   UpdateL(state->L,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->L);
@@ -1347,7 +1347,7 @@ probably a bit vulnerable to rounding error
                     x = ran1(&seed)*((float) rates2[1]);
                     geneID = statechangeIDs[1][(int)trunc(x)];
                     if(verbose) fprintf(fperrors,"deacetylation event gene %d\nstate change from %d to 1\n",
-                      geneID,state->active[geneID]);
+                                        geneID,state->active[geneID]);
                     if(state->active[geneID]!=3)
                       fprintf(fperrors,"error: deacetylation event attempted from state %d\n",state->active[geneID]);
                     UpdateL(state->L,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->L);
@@ -1359,7 +1359,7 @@ probably a bit vulnerable to rounding error
                       x = ran1(&seed)*((float) rates2[2]);
                       geneID = statechangeIDs[2][(int)trunc(x)];
                       if(verbose) fprintf(fperrors,"PIC assembly event gene %d\nstate change from %d to 6\n",
-                        geneID,state->active[geneID]);
+                                          geneID,state->active[geneID]);
                       if(state->active[geneID]!=4)
                         fprintf(fperrors,"error: PIC assembly event attempted from state %d\n",state->active[geneID]);
                       UpdateL(state->L,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->L);
@@ -1430,7 +1430,7 @@ void CalcFitness(float lopt[],float *w,struct TimeCourse **timecoursestart,float
   float d,dt1,dt2,x;
   int i;
   struct TimeCourse *start[NGenes];
-
+  
   for(i=0;i<NGenes;i++) start[i]=timecoursestart[i];
   dt1=0.0;
   *w=0.0;
@@ -1456,7 +1456,7 @@ void PrintTimeCourse(struct TimeCourse *start,int i,float lopt[])
 {
   FILE *fpout;
   char filename[80];
-
+  
   sprintf(filename,"output/protein%d.dat",i);
   if ((fpout = fopen(filename,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n",filename);
@@ -1464,7 +1464,7 @@ void PrintTimeCourse(struct TimeCourse *start,int i,float lopt[])
     fprintf(fpout,"%g %g\n",start->time,start->concentration);
     start = start->next;
   }
-//  fprintf(fpout,"%g %g\n",tdevelopment,lopt[i]);
+  //  fprintf(fpout,"%g %g\n",tdevelopment,lopt[i]);
   fclose(fpout);  
 }
 
@@ -1478,7 +1478,7 @@ int main()
   struct TimeCourse *timecourselast[NGenes];
   struct TimeCourse *start;
   float fitness[PopSize],sumfit,lopt[NGenes],initmRNA[NGenes],initprotein[NGenes],x,kdis[Nkdis];
-    
+  
   fperrors = fopen("netsimerrors.txt","w");
   sumfit = 0.0;
   for(j=0;j<dummyrun;j++) ran1(&seed);
@@ -1496,10 +1496,10 @@ int main()
     InitializeGenotype(&indivs[j],kdis);
     InitializeCell(&state,indivs[j].y,indivs[j].mRNAdecay,initmRNA,initprotein);
     Develop(&indivs[j],&state,(float) 293.0,timecoursestart,timecourselast);
-//    DevStabilityOnlyLOpt(lopt,timecoursestart);
+    //    DevStabilityOnlyLOpt(lopt,timecoursestart);
     fprintf(fperrors,"indiv %d\n",j);
-/*    CalcFitness(lopt,&(fitness[j]),timecoursestart,selection);
-    sumfit += fitness[j];*/
+    /*    CalcFitness(lopt,&(fitness[j]),timecoursestart,selection);
+          sumfit += fitness[j];*/
     for(i=0; i<NGenes; i++){
       if((output) && j==PopSize-1) PrintTimeCourse(timecoursestart[i],i,lopt);
       if(verbose) fprintf(fperrors,"deleting gene %d\n",i);
@@ -1508,8 +1508,9 @@ int main()
     }
     FreeMemCellState(&state);
   }
-/*
-  for(gen=1;gen<=Generations*PopSize;gen++){
+
+  /*
+    for(gen=1;gen<=Generations*PopSize;gen++){
     fprintf(fperrors,"meanfit = %g\n",sumfit / (float) PopSize);
     x = ran1(&seed) * sumfit;
     j = -1;
@@ -1526,7 +1527,7 @@ int main()
     InitializeCell(&state,indivs[k].y,indivs[k].mRNAdecay,initmRNA,initprotein);
     Develop(&indivs[k],&state,(float) 293.0,timecoursestart,timecourselast);
     fprintf(fperrors,"finished development\n");fflush(fperrors);
-//    DevStabilityOnlyLOpt(lopt,timecoursestart);
+    //    DevStabilityOnlyLOpt(lopt,timecoursestart);
     sumfit -= fitness[k];
     CalcFitness(lopt,&(fitness[k]),timecoursestart,selection);
     fflush(fperrors);
