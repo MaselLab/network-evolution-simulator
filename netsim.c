@@ -177,10 +177,10 @@ struct Genotype
   float PICdisassembly[NGenes];
 };
 
-void CalcG(char [NGenes][reglen],
-           char [NGenes][elementlen],
-           int *,
-           int (**)[5]);
+void CalcInteractionMatrix(char [NGenes][reglen],
+                           char [NGenes][elementlen],
+                           int *,
+                           int (**)[5]);
 
 
 void InitializeGenotype(struct Genotype *indiv, 
@@ -190,7 +190,7 @@ void InitializeGenotype(struct Genotype *indiv,
   
   InitializeSeq((char *)indiv->cisRegSeq,reglen*NGenes);
   InitializeSeq((char *)indiv->transcriptionFactorSeq,elementlen*NGenes);
-  CalcG(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->y),&(indiv->interactionMatrix));
+  CalcInteractionMatrix(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->y),&(indiv->interactionMatrix));
   fprintf(fperrors,"activators vs repressors ");
   for(i=0; i<NGenes; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -238,13 +238,13 @@ void Mutate(struct Genotype *old,
     new->activating[i]=old->activating[i];
     new->PICdisassembly[i]=old->PICdisassembly[i];
   }
-  CalcG(new->cisRegSeq,new->transcriptionFactorSeq,&(new->y),&(new->interactionMatrix));
+  CalcInteractionMatrix(new->cisRegSeq,new->transcriptionFactorSeq,&(new->y),&(new->interactionMatrix));
 }
 
-void CalcG(char cisRegSeq[NGenes][reglen],
-           char transcriptionFactorSeq[NGenes][elementlen],
-           int *py,
-           int (**interactionMatrix)[5])
+void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
+                           char transcriptionFactorSeq[NGenes][elementlen],
+                           int *py,
+                           int (**interactionMatrix)[5])
 {
   int i,j,geneind,tfind,match,maxy,y;
   
