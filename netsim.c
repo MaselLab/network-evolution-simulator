@@ -194,7 +194,7 @@ void CalcInteractionMatrix(char [NGenes][reglen],
                            int *,
                            struct TFInteractionMatrix **);
 
-/* void PrintInteractionMatrix(int (*interactionMatrix)[5], 
+void PrintInteractionMatrix(struct TFInteractionMatrix *interactionMatrix, 
                             int numElements,
                             char transcriptionFactorSeq[NGenes][elementlen],
                             char cisRegSeq[NGenes][reglen])
@@ -208,17 +208,15 @@ void CalcInteractionMatrix(char [NGenes][reglen],
   
   for (i=0; i<numElements; i++) {
     printf("binding site %3d:\n", i);
-    printf("       cis-reg region: %3d", interactionMatrix[i][0]);
-    printf(" (sequence %.*s\n)", reglen, cisRegSeq[interactionMatrix[i][0]]);
-    printf(" transcription-factor: %3d", interactionMatrix[i][1]);
-    printf(" (sequence: %.*s)\n", elementlen, transcriptionFactorSeq[interactionMatrix[i][1]]);
-    printf("             position: %3d\n", interactionMatrix[i][2]);
-    printf("               strand: %3d\n", interactionMatrix[i][3]);
-    printf("         Hamming dist: %3d\n", interactionMatrix[i][4]);
+    printf("       cis-reg region: %3d", interactionMatrix[i].cisregID);
+    printf(" (sequence %.*s\n)", reglen, cisRegSeq[interactionMatrix[i].cisregID]);
+    printf(" transcription-factor: %3d", interactionMatrix[i].tfID);
+    printf(" (sequence: %.*s)\n", elementlen, transcriptionFactorSeq[interactionMatrix[i].tfID]);
+    printf("             position: %3d\n", interactionMatrix[i].sitePos);
+    printf("               strand: %3d\n", interactionMatrix[i].strand);
+    printf("         Hamming dist: %3d\n", interactionMatrix[i].hammingDist);
   }
 }
-*/
-
 
 void InitializeGenotype(struct Genotype *indiv, 
                         float kdis[])
@@ -228,7 +226,7 @@ void InitializeGenotype(struct Genotype *indiv,
   InitializeSeq((char *)indiv->cisRegSeq,reglen*NGenes);
   InitializeSeq((char *)indiv->transcriptionFactorSeq,elementlen*NGenes); 
   CalcInteractionMatrix(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->bindSiteCount),&(indiv->interactionMatrix));
-  /* PrintInteractionMatrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
+  /* PrintInteractionMatrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);  */
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGenes; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
