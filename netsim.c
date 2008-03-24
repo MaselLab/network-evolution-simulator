@@ -961,7 +961,10 @@ void CalcDt(float *x,
     mRNAdecay[i] = mRNAdecayrates[i] * ((float) Scyto[i] + (float) Stranslating[i]);
     rates[2] += mRNAdecay[i];
   }
-  /* AKL: should this go from 1-6 ? rather than 1-5? */
+  /* AKL: should this go from 1-6 ? rather than 1-5?  Answer: no
+   * because 5, 6 are cached values, not part of rates used by
+   * Gillespie algorithm.
+   */
   for (i=0; i<5; i++) rates[7] += rates[i];
   rates[7] += (float) rates2[0] * acetylate;
   rates[7] += (float) rates2[1] * deacetylate;
