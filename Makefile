@@ -6,7 +6,7 @@ all: netsim
 
 check:	netsim
 	./netsim
-	@diff -r --exclude=.svn --exclude=NOTES output check && echo -e "************\nPassed regression\n***********"
+	@diff -r --exclude=.svn --exclude=NOTES output test && echo -e "************\nPassed regression\n***********"
 
 clean:
 	rm netsim
