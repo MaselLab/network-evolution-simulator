@@ -162,7 +162,7 @@ struct Genotype
 {
   char cisRegSeq[NGenes][reglen];
   char transcriptionFactorSeq[NGenes][elementlen];
-  int y;
+  int bindSiteCount;
   int (*interactionMatrix)[5];
 /* 5 elements are
     identity of cis-regulatory region
@@ -215,8 +215,8 @@ void InitializeGenotype(struct Genotype *indiv,
   
   InitializeSeq((char *)indiv->cisRegSeq,reglen*NGenes);
   InitializeSeq((char *)indiv->transcriptionFactorSeq,elementlen*NGenes); 
-  CalcInteractionMatrix(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->y),&(indiv->interactionMatrix));
-  /* PrintInteractionMatrix(indiv->interactionMatrix, indiv->y, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
+  CalcInteractionMatrix(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->bindSiteCount),&(indiv->interactionMatrix));
+  /* PrintInteractionMatrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
   fprintf(fperrors,"activators vs repressors ");
   for(i=0; i<NGenes; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -264,7 +264,7 @@ void Mutate(struct Genotype *old,
     new->activating[i]=old->activating[i];
     new->PICdisassembly[i]=old->PICdisassembly[i];
   }
-  CalcInteractionMatrix(new->cisRegSeq,new->transcriptionFactorSeq,&(new->y),&(new->interactionMatrix));
+  CalcInteractionMatrix(new->cisRegSeq,new->transcriptionFactorSeq,&(new->bindSiteCount),&(new->interactionMatrix));
 }
 
 
@@ -273,7 +273,7 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
                            int *py,
                            int (**interactionMatrix)[5])
 {
-  int i,j,geneind,tfind,match,maxy,y;
+  int i,j,geneind,tfind,match,maxy,bindSiteCount;
   
   maxy = maxelements;
   *interactionMatrix = malloc(maxy*5*sizeof(int));
@@ -281,7 +281,7 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
     fprintf(fperrors,"initial setting of G failed.\n");
     exit(1);
   }
-  y = 0;
+  bindSiteCount = 0;
   for(geneind=0; geneind<NGenes; geneind++){ // which cis-reg region
     for(i=0; i<reglen-elementlen; i++){ /*scan forwards*/
       for(tfind=0; tfind<NGenes; tfind++){
@@ -291,21 +291,21 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
             match++;
         }
         if(match>=nmin){
-          if(y+1>=maxy){
+          if(bindSiteCount+1>=maxy){
             maxy = 2*maxy;
             *interactionMatrix = realloc(*interactionMatrix, maxy*5*sizeof(int));
             if(!(*interactionMatrix)){
-              fprintf(fperrors,"realloc of G to y = %d failed.\n",maxy);
+              fprintf(fperrors,"realloc of G to bindSiteCount = %d failed.\n",maxy);
               exit(1);
             }
-            else if(verbose) fprintf(fperrors,"realloc of G to y = %d succeeded\n",maxy);
+            else if(verbose) fprintf(fperrors,"realloc of G to bindSiteCount = %d succeeded\n",maxy);
           }
-          (*interactionMatrix)[y][0] = geneind;
-          (*interactionMatrix)[y][1] = tfind;
-          (*interactionMatrix)[y][2] = i;
-          (*interactionMatrix)[y][3] = 0;
-          (*interactionMatrix)[y][4] = elementlen-match;
-          y++;
+          (*interactionMatrix)[bindSiteCount][0] = geneind;
+          (*interactionMatrix)[bindSiteCount][1] = tfind;
+          (*interactionMatrix)[bindSiteCount][2] = i;
+          (*interactionMatrix)[bindSiteCount][3] = 0;
+          (*interactionMatrix)[bindSiteCount][4] = elementlen-match;
+          bindSiteCount++;
         }
       }
     }
@@ -320,30 +320,30 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
              || (cisRegSeq[geneind][j]=='g' && transcriptionFactorSeq[tfind][i-j]=='c')            
              ) match++;
         if(match>=nmin){
-          if(y+1>=maxy){
+          if(bindSiteCount+1>=maxy){
             maxy = 2*maxy;
             *interactionMatrix = realloc(*interactionMatrix, maxy*5*sizeof(int));
             if(!(*interactionMatrix)){
-              fprintf(fperrors,"realloc of G to y = %d failed.\n",maxy);
+              fprintf(fperrors,"realloc of G to bindSiteCount = %d failed.\n",maxy);
               exit(1);
             }
           }
-          (*interactionMatrix)[y][0] = geneind;
-          (*interactionMatrix)[y][1] = tfind;
-          (*interactionMatrix)[y][2] = i-elementlen+1;
-          (*interactionMatrix)[y][3] = 1;
-          (*interactionMatrix)[y][4] = elementlen-match;
-          y++;
+          (*interactionMatrix)[bindSiteCount][0] = geneind;
+          (*interactionMatrix)[bindSiteCount][1] = tfind;
+          (*interactionMatrix)[bindSiteCount][2] = i-elementlen+1;
+          (*interactionMatrix)[bindSiteCount][3] = 1;
+          (*interactionMatrix)[bindSiteCount][4] = elementlen-match;
+          bindSiteCount++;
         }
       }
     }
   }
-  *interactionMatrix = realloc(*interactionMatrix, y*5*sizeof(int));
+  *interactionMatrix = realloc(*interactionMatrix, bindSiteCount*5*sizeof(int));
   if(!(*interactionMatrix)){
-    fprintf(fperrors,"realloc of G down to y = %d failed.\n",y);
+    fprintf(fperrors,"realloc of G down to bindSiteCount = %d failed.\n",bindSiteCount);
     exit(1);
   }
-  *py = y;
+  *py = bindSiteCount;
 }
 
 /* transcription/translation delays are sorted linked lists.
@@ -369,12 +369,12 @@ struct CellState
   struct FixedEvent *tStranscribing; //times when they move to Snuclear
   struct FixedEvent *lasttStranscribing;
   float proteinConc[NGenes];
-  int y2;
-  int *B2;
-  /* B2 lists just bound TFs according to binding site index in G */
-  int y3;
-  int (*B3)[2];
-  /*1st elem B3 lists binding site indices that cannot be bound due to steric hindrance
+  int tfBoundCount;
+  int *tfBoundIndexes;
+  /* tfBoundIndexes lists just bound TFs according to binding site index in G */
+  int tfHinderedCount;
+  int (*tfHinderedIndexes)[2];
+  /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
     2nd elem gives corresponding index of inhibiting TF in G
   */
   int active[NGenes];
@@ -401,8 +401,8 @@ void FreeMemCellState(struct CellState *state)
     start = start->next;
     free(info);  
   }
-  free(state->B2);
-  free(state->B3);
+  free(state->tfBoundIndexes);
+  free(state->tfHinderedIndexes);
 }
 
 void sls_store(struct FixedEvent *i, 
@@ -612,10 +612,10 @@ void InitializeCell(struct CellState *indiv,
   
   indiv->tStranscribing = indiv->lasttStranscribing = NULL;
   indiv->tStranslating = indiv->lasttStranslating = NULL;
-  indiv->y2 = 0;  /*initialize with nothing bound */
-  indiv->y3 = 0;
-  indiv->B2 = NULL;
-  indiv->B3 = NULL;
+  indiv->tfBoundCount = 0;  /*initialize with nothing bound */
+  indiv->tfHinderedCount = 0;
+  indiv->tfBoundIndexes = NULL;
+  indiv->tfHinderedIndexes = NULL;
   for(i=0; i<NGenes; i++){
     indiv->active[i] = 2;
     totalmRNA = (int) poidev(meanmRNA[i],&seed);
@@ -724,19 +724,19 @@ void Calckoff(int k,
   
   front=back=0;
   Gibbs = (((float) interactionMatrix[k][4])/3.0 - 1.0) * RTlnKr;/*subject to revision of elementlen*/
-  for(j=0; j<state->y2; j++){
-    if(interactionMatrix[k][0]==interactionMatrix[state->B2[j]][0] && !(k==state->B2[j])){
-      posdiff = interactionMatrix[k][2]-interactionMatrix[state->B2[j]][2];
+  for(j=0; j<state->tfBoundCount; j++){
+    if(interactionMatrix[k][0]==interactionMatrix[state->tfBoundIndexes[j]][0] && !(k==state->tfBoundIndexes[j])){
+      posdiff = interactionMatrix[k][2]-interactionMatrix[state->tfBoundIndexes[j]][2];
       if(abs(posdiff)<6){
         fprintf(fperrors,
           "error: steric hindrance has been breached with site %d %d away from site %d\n"
-                ,k,posdiff,state->B2[j]);
+                ,k,posdiff,state->tfBoundIndexes[j]);
       }
       if (abs(posdiff)<20){
         if(posdiff>0) front++; else back++;
       }
     }
-    if ((front) && (back)) j=state->y2;
+    if ((front) && (back)) j=state->tfBoundCount;
   }
   if (front>0) Gibbs -= cooperativity*RTlnKr/3;
   if (back>0) Gibbs -= cooperativity*RTlnKr/3;
@@ -757,17 +757,17 @@ void ScanNearby(int k,
   int posdiff,j,i;
   float diff;
   
-  for(j=0; j<state->y2; j++){
-    if(interactionMatrix[k][0]==interactionMatrix[state->B2[j]][0] && !(k==state->B2[j])){
-      posdiff = interactionMatrix[k][2]-interactionMatrix[state->B2[j]][2];
+  for(j=0; j<state->tfBoundCount; j++){
+    if(interactionMatrix[k][0]==interactionMatrix[state->tfBoundIndexes[j]][0] && !(k==state->tfBoundIndexes[j])){
+      posdiff = interactionMatrix[k][2]-interactionMatrix[state->tfBoundIndexes[j]][2];
       if(abs(posdiff)<6){
         fprintf(fperrors,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n"
-                ,k,posdiff,state->B2[j]);
+                ,k,posdiff,state->tfBoundIndexes[j]);
       }
       if (abs(posdiff)<20){
         diff = -koffvalues[j];
-        Calckoff(state->B2[j],interactionMatrix,state,&(koffvalues[j]),RTlnKr,temperature);
+        Calckoff(state->tfBoundIndexes[j],interactionMatrix,state,&(koffvalues[j]),RTlnKr,temperature);
         diff += koffvalues[j];
         rates[0] += diff;
       }
@@ -820,8 +820,8 @@ void Addkon(float Li,
 
 // tests whether criterion for transcription is met
 int CalcTranscription(int geneID,
-                      int *B2,
-                      int y2,
+                      int *tfBoundIndexes,
+                      int tfBoundCount,
                       int (*interactionMatrix)[5],
                       int activating[],
                       int *on)
@@ -829,9 +829,9 @@ int CalcTranscription(int geneID,
   int i,off;
   
   *on=off=0;
-  for(i=0;i<y2;i++){
-    if(geneID==interactionMatrix[B2[i]][0]){
-      if(activating[interactionMatrix[B2[i]][1]]) (*on)++;
+  for(i=0;i<tfBoundCount;i++){
+    if(geneID==interactionMatrix[tfBoundIndexes[i]][0]){
+      if(activating[interactionMatrix[tfBoundIndexes[i]][1]]) (*on)++;
       else off++;
     }
   }
@@ -841,15 +841,15 @@ int CalcTranscription(int geneID,
 
 // 
 int IsOneActivator(int geneID,
-                   int *B2,
-                   int y2,
+                   int *tfBoundIndexes,
+                   int tfBoundCount,
                    int (*interactionMatrix)[5],
                    int activating[])
 {
   int i;
   
-  for(i=0;i<y2;i++)
-    if(geneID==interactionMatrix[B2[i]][0] && (activating[interactionMatrix[B2[i]][1]])) return(1);
+  for(i=0;i<tfBoundCount;i++)
+    if(geneID==interactionMatrix[tfBoundIndexes[i]][0] && (activating[interactionMatrix[tfBoundIndexes[i]][1]])) return(1);
   return(0);
 }
 
@@ -881,9 +881,9 @@ void CalcFromState(struct Genotype *genes,
     konvalues[i][2] = salphc;
     nkonsum[i]=0;  
   }
-  state->y2=0;
+  state->tfBoundCount=0;
   for(i=0; i<7; i++) rates[i]=0.0;    
-  for(k=0; k<genes->y; k++){
+  for(k=0; k<genes->bindSiteCount; k++){
     i = genes->interactionMatrix[k][1];
     Li = state->proteinConc[i];
     salphc = konvalues[i][2];
@@ -894,7 +894,7 @@ void CalcFromState(struct Genotype *genes,
     konIDs[k][1]=i;
     (nkonsum[i])++;
   }
-  *nkon = genes->y;
+  *nkon = genes->bindSiteCount;
   for(i=0; i<NGenes; i++){
     transport[i] = kRNA * (float) (state->Snuclear[i]);
     rates[1] += transport[i];
@@ -1059,7 +1059,7 @@ void ReviseActivityState(int geneID,
 {
   int transcriptrule,oldstate,numactive;
 
-  transcriptrule = CalcTranscription(geneID,state->B2,state->y2,genes->interactionMatrix,genes->activating,&numactive);
+  transcriptrule = CalcTranscription(geneID,state->tfBoundIndexes,state->tfBoundCount,genes->interactionMatrix,genes->activating,&numactive);
   oldstate = state->active[geneID];
   /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4-PIC disassembly*/
   if((transcriptrule) && oldstate==1){
@@ -1111,39 +1111,39 @@ void RemoveBinding(struct Genotype *genes,
   int i,j,k,bound,siteID,geneID,transcriptrule,oldstate,numactive;
 
   i=0;
-  while((state->B2[i] != site) && (i<state->y2)) i++;
-  if(i==state->y2){
+  while((state->tfBoundIndexes[i] != site) && (i<state->tfBoundCount)) i++;
+  if(i==state->tfBoundCount){
     fprintf(fperrors,"error: RemoveBinding could not find site %d with %d possibilities\n Bound sites are\n",
-            site,state->y2);
-    for(j=0;j<state->y2;j++) fprintf(fperrors,"%d\n",state->B2[j]);
+            site,state->tfBoundCount);
+    for(j=0;j<state->tfBoundCount;j++) fprintf(fperrors,"%d\n",state->tfBoundIndexes[j]);
   }
   else {
     j=0;
-    while(j<state->y3){
-      if(state->B3[j][1]==site){
+    while(j<state->tfHinderedCount){
+      if(state->tfHinderedIndexes[j][1]==site){
         k=bound=0;
-        while(bound==0 && k<state->y3){
-          if(state->B3[j][0]==state->B3[k][0] && j!=k) bound=1;
+        while(bound==0 && k<state->tfHinderedCount){
+          if(state->tfHinderedIndexes[j][0]==state->tfHinderedIndexes[k][0] && j!=k) bound=1;
           k++;
         }
         if(bound==0){
-          siteID = state->B3[j][0];
+          siteID = state->tfHinderedIndexes[j][0];
           if(verbose) fprintf(fperrors,"Site %d pos %d on gene %d freed from steric hindrance\n",
                               siteID,genes->interactionMatrix[siteID][2],genes->interactionMatrix[siteID][0]);
           Addkon(state->proteinConc[genes->interactionMatrix[siteID][1]],konvalues[genes->interactionMatrix[siteID][1]][2],
                  nkon,nkonsum,genes->interactionMatrix[siteID][1],siteID,rates,konIDs);
         }
-        (state->y3)--;
-        if(j<state->y3){
-          state->B3[j][0]=state->B3[state->y3][0];
-          state->B3[j][1]=state->B3[state->y3][1];
+        (state->tfHinderedCount)--;
+        if(j<state->tfHinderedCount){
+          state->tfHinderedIndexes[j][0]=state->tfHinderedIndexes[state->tfHinderedCount][0];
+          state->tfHinderedIndexes[j][1]=state->tfHinderedIndexes[state->tfHinderedCount][1];
         }
       } else j++;
     }    
     rates[0] -= koffvalues[i];
-    (state->y2)--;
-    state->B2[i] = state->B2[state->y2];
-    koffvalues[i] = koffvalues[state->y2];
+    (state->tfBoundCount)--;
+    state->tfBoundIndexes[i] = state->tfBoundIndexes[state->tfBoundCount];
+    koffvalues[i] = koffvalues[state->tfBoundCount];
     geneID = genes->interactionMatrix[site][0];
     if(verbose) fprintf(fperrors,"Add site %d at pos %d on gene %d freed by unbinding\n",
                         site,genes->interactionMatrix[site][2],geneID);
@@ -1173,50 +1173,50 @@ void TFbinds(struct Genotype *genes,
   int geneID,k,posdiff,site2;
 
   if(verbose) fprintf(fperrors,
-                      "kon1 event at site %d out of %d possible, %d TFs previously bound y=%d\n",
-                      site,*nkon,state->y2,genes->y);
-  if(state->y2 >= *maxbound2){
+                      "kon1 event at site %d out of %d possible, %d TFs previously bound bindSiteCount=%d\n",
+                      site,*nkon,state->tfBoundCount,genes->bindSiteCount);
+  if(state->tfBoundCount >= *maxbound2){
     (*maxbound2) *= 2;
-    state->B2 = realloc(state->B2,(*maxbound2)*sizeof(int));
+    state->tfBoundIndexes = realloc(state->tfBoundIndexes,(*maxbound2)*sizeof(int));
     *koffvalues = realloc(*koffvalues,(*maxbound2)*sizeof(float));
-    if(!state->B2 || !(*koffvalues)){
+    if(!state->tfBoundIndexes || !(*koffvalues)){
       fprintf(fperrors,"memory allocation error resetting maxbound2=%d\n",*maxbound2);
       exit(1);
     }
   }
-  state->B2[state->y2] = site;
+  state->tfBoundIndexes[state->tfBoundCount] = site;
   if(verbose) fprintf(fperrors,"remove site %d\n",site);
   Removekon(site,genes->interactionMatrix[site][1],rates,konvalues[genes->interactionMatrix[site][1]][2],nkon,
             nkonsum,konIDs,state->proteinConc[genes->interactionMatrix[site][1]]);
-  Calckoff(site,genes->interactionMatrix,state,&((*koffvalues)[state->y2]),RTlnKr,temperature);
+  Calckoff(site,genes->interactionMatrix,state,&((*koffvalues)[state->tfBoundCount]),RTlnKr,temperature);
   if(verbose) fprintf(fperrors,"new koff = %g is number %d\n",
-                      (*koffvalues)[state->y2],(state->y2+1));
-  rates[0] += (*koffvalues)[state->y2];
-  state->B2[state->y2]=site;
-  (state->y2)++;
+                      (*koffvalues)[state->tfBoundCount],(state->tfBoundCount+1));
+  rates[0] += (*koffvalues)[state->tfBoundCount];
+  state->tfBoundIndexes[state->tfBoundCount]=site;
+  (state->tfBoundCount)++;
   ScanNearby(site,genes->interactionMatrix,state,rates,*koffvalues,RTlnKr,temperature);
   geneID=genes->interactionMatrix[site][0];
   /* this cycles over all sites, not just bound ones, in order to record
      redundancy in steric hindrance*/
-  for(k=0; k<genes->y; k++){
+  for(k=0; k<genes->bindSiteCount; k++){
     if(geneID==genes->interactionMatrix[k][0] && !(k==site)){
       posdiff = genes->interactionMatrix[site][2]-genes->interactionMatrix[k][2];
       if(abs(posdiff)<6){
-        if(state->y3 > *maxbound3-1){
+        if(state->tfHinderedCount > *maxbound3-1){
           (*maxbound3) *= 2;
-          state->B3 = realloc(state->B3,2*(*maxbound3)*sizeof(int));
+          state->tfHinderedIndexes = realloc(state->tfHinderedIndexes,2*(*maxbound3)*sizeof(int));
         }
-        state->B3[state->y3][0]=k;
-        state->B3[state->y3][1]=site;
-        (state->y3)++;
-        if(verbose) fprintf(fperrors,"%d steric hindrance sites after %d blocks site %d\n",state->y3,site,k);
+        state->tfHinderedIndexes[state->tfHinderedCount][0]=k;
+        state->tfHinderedIndexes[state->tfHinderedCount][1]=site;
+        (state->tfHinderedCount)++;
+        if(verbose) fprintf(fperrors,"%d steric hindrance sites after %d blocks site %d\n",state->tfHinderedCount,site,k);
         Removekon(k,genes->interactionMatrix[k][1],rates,konvalues[genes->interactionMatrix[k][1]][2],nkon,nkonsum,
                   konIDs,state->proteinConc[genes->interactionMatrix[k][1]]);
       }
     }
   }
-  if(verbose) fprintf(fperrors,"y2=%d y3=%d maxbound2=%d maxbound3=%d\n",
-                      state->y2,state->y3,*maxbound2,*maxbound3);
+  if(verbose) fprintf(fperrors,"tfBoundCount=%d tfHinderedCount=%d maxbound2=%d maxbound3=%d\n",
+                      state->tfBoundCount,state->tfHinderedCount,*maxbound2,*maxbound3);
   ReviseActivityState(geneID,genes,state,rates,rates2,statechangeIDs);
 }
 
@@ -1325,13 +1325,13 @@ void Develop(struct Genotype *genes,
   }
   AddTimePoints((float) 0.0,state->proteinConc,timecoursestart,timecourselast);
   RTlnKr = GasConstant * temperature * log(Kr);  
-  konIDs = malloc(2*genes->y*sizeof(int));
+  konIDs = malloc(2*genes->bindSiteCount*sizeof(int));
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
-  state->B2 = realloc(state->B2,maxbound2*sizeof(int));
+  state->tfBoundIndexes = realloc(state->tfBoundIndexes,maxbound2*sizeof(int));
   koffvalues = malloc(maxbound2*sizeof(float));
-  state->B3 = realloc(state->B3,2*maxbound3*sizeof(int));
-  if(!konvalues || !state->B2 || !state->B3 || !konIDs){
+  state->tfHinderedIndexes = realloc(state->tfHinderedIndexes,2*maxbound3*sizeof(int));
+  if(!konvalues || !state->tfBoundIndexes || !state->tfHinderedIndexes || !konIDs){
     fprintf(fperrors,"memory allocation error at start of Develop\n");
     exit(1);
   }
@@ -1342,7 +1342,7 @@ void Develop(struct Genotype *genes,
     x=expdev(&seed);
     if(rates[0]<0.0){
       konrate2 = 0.0;
-      for(i=0;i<state->y2;i++) konrate2 += koffvalues[i];
+      for(i=0;i<state->tfBoundCount;i++) konrate2 += koffvalues[i];
       if((verbose) || konrate2>0.0)
         fprintf(fperrors,"warning: koffvalues add up to %g rates[0]=%g < 0\n",
                 konrate2,rates[0]);
@@ -1390,7 +1390,7 @@ void Develop(struct Genotype *genes,
       x = ran1(&seed)*(rates[7]+konrate);
       if(verbose){
         fprintf(fperrors,"\nx=%g\nkoff=%g = %d * %g\ntransport=%g\ndecay=%g\n",
-                x,rates[0],state->y2,rates[0]/(float)state->y2,rates[1],rates[2]);
+                x,rates[0],state->tfBoundCount,rates[0]/(float)state->tfBoundCount,rates[1],rates[2]);
         fprintf(fperrors,"PICdisassembly=%g\nkon=%g = %d * %g\n",
                 rates[3],rates[4]+konrate,nkon,(rates[4]+konrate)/(float)nkon);
         fprintf(fperrors,"acetylation=%g\ndeacetylation=%g\nPIC assembly=%g\ntranscriptinit=%g\n",
@@ -1403,26 +1403,26 @@ void Develop(struct Genotype *genes,
       */
       if (x<rates[0]){
         j = -1;
-        while(j<state->y2 && x>0){
+        while(j<state->tfBoundCount && x>0){
           j++;
           x -= koffvalues[j];
         }
-        if(j==state->y2){
+        if(j==state->tfBoundCount){
           konrate2 = 0.0;
-          for(i=0;i<state->y2;i++) konrate2 += koffvalues[i];
+          for(i=0;i<state->tfBoundCount;i++) konrate2 += koffvalues[i];
           fprintf(fperrors,"warning: koffvalues add up to %g instead of rates[0]=%g\n",
                   konrate2,rates[0]);
           rates[0] = konrate2;
           j--; // a bit of a fudge for rounding error, really should move on to rates[1], but too complicated for something so minor
         } 
-        site=state->B2[j];
+        site=state->tfBoundIndexes[j];
         if(verbose) fprintf(fperrors,"koff event %d of %d at site %d\n",
-                            j,state->y2,site);
-        if(j<0) fprintf(fperrors,"error: koff event %d of %d at site %d\n",j,state->y2,site);
+                            j,state->tfBoundCount,site);
+        if(j<0) fprintf(fperrors,"error: koff event %d of %d at site %d\n",j,state->tfBoundCount,site);
         UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
         RemoveBinding(genes,state,konvalues,&nkon,nkonsum,rates,rates2,konIDs,site,
                       koffvalues,RTlnKr,temperature,statechangeIDs);
-        CalcNumBound(state->proteinConc,state->y2);
+        CalcNumBound(state->proteinConc,state->tfBoundCount);
       } else {
         x -= rates[0];
         if (x<rates[1]){
@@ -1490,7 +1490,7 @@ void Develop(struct Genotype *genes,
                 UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
                 TFbinds(genes,state,&nkon,nkonsum,rates,rates2,konvalues,&koffvalues,
                         konIDs,&maxbound2,&maxbound3,konIDs[j][0],RTlnKr,temperature,statechangeIDs);
-                CalcNumBound(state->proteinConc,state->y2);
+                CalcNumBound(state->proteinConc,state->tfBoundCount);
               } else {
                 x -= (rates[4]+konrate);
                 if(x<(float) rates2[0] * acetylate){
@@ -1503,7 +1503,7 @@ void Develop(struct Genotype *genes,
                   UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
                   state->active[geneID] = 4;
                   RemoveFromArray(geneID,statechangeIDs[0],&(rates2[0]),(int) 1);
-                  if(IsOneActivator(geneID,state->B2,state->y2,genes->interactionMatrix,genes->activating)){
+                  if(IsOneActivator(geneID,state->tfBoundIndexes,state->tfBoundCount,genes->interactionMatrix,genes->activating)){
                     statechangeIDs[2][rates2[2]] = geneID; 
                     (rates2[2])++;
                   }
