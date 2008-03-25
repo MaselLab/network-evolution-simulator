@@ -1451,7 +1451,7 @@ void Develop(struct Genotype *genes,
   float konvalues[NGenes][3];
 
   int (*konIDs)[2];    /* elem 0 is siteID, elem 1 is TF that binds */
-  int nkonsum[NGenes]; /* TODO: check */
+  int nkonsum[NGenes]; /* number of available binding sites for a given TF */
   float *koffvalues;   /* rates of unbinding */
   int total;           /* total possible translation events, TODO: rename */
   float transport[NGenes];  /* transport rates of each mRNA */
