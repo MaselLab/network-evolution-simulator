@@ -81,7 +81,15 @@ float expdev(long *seed);
 float bnldev(float pp, int n, long *seed);
 
 /*
- * New data structure for keeping track of rates for Gillespie algorithm
+ * New data structure for keeping track of rates for Gillespie
+ * algorithm 
+ *
+ * Events with exponentially-distributed waiting times are:
+ * - TF association and dissociation, 
+ * - transcription initiation
+ * - mRNA transport and decay
+ * - acetylation and deacetylation, 
+ * - and PIC assembly and disassembly.
  */
 struct GillespieRates
 {
@@ -108,10 +116,10 @@ struct GillespieRates
 };
 
 
-/*Newton-Raphson root-finding method with bisection steps, out of Numerical Recipes
-function bracketed by x1 and x2. Returns root within accuracy +/-xacc
-funcd is function of interest, returning both function value and first deriv.*/
-
+/* Newton-Raphson root-finding method with bisection steps, out of
+ * Numerical Recipes function bracketed by x1 and x2. Returns root
+ * within accuracy +/-xacc funcd is function of interest, returning
+ * both function value and first deriv.*/
 float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ float [NGenes][3], int, int[], float *, float *), 
              float x, struct GillespieRates *rates,/*float *rates,*/ float konvalues[NGenes][3], int nkon, int nkonsum[], float x1, float x2, float xacc)
 {
@@ -119,8 +127,8 @@ float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ fl
   float df,dx,dxold,f,fh,fl,xtemp;
   float temp,xh,xl,rts;
   
-  (*funcd)(x1,x,rates,konvalues,nkon,nkonsum,&fl,&df);
-  (*funcd)(x2,x,rates,konvalues,nkon,nkonsum,&fh,&df); /* note df isn't used here*/
+  (*funcd)(x1, x, rates, konvalues, nkon, nkonsum, &fl, &df);
+  (*funcd)(x2, x, rates, konvalues, nkon, nkonsum, &fh, &df); /* note df isn't used here */
   if (fabs(fl) < 1e-9) return x1;
   if (fabs(fh) < 1e-9) return x2;
   if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0)){
@@ -159,7 +167,7 @@ float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ fl
       else rts = fminf(2.0*x2,(xl+xh)/2.0);
       fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
     }
-    if (j>1 || done==0) (*funcd)(rts,x,rates,konvalues,nkon,nkonsum,&f,&df);
+    if (j>1 || done==0) (*funcd)(rts, x, rates, konvalues, nkon, nkonsum, &f, &df);
     if (f < 0.0) xl=rts;
     else xh=rts;   
   }
@@ -398,13 +406,13 @@ struct FixedEvent
 
 struct CellState
 {
-  int Scyto[NGenes];
-  int Snuclear[NGenes];
-  int Stranslating[NGenes]; //these are in the cytoplasm, but only recently
-  struct FixedEvent *tStranslating; //times when they move to Scyto
-  struct FixedEvent *lasttStranslating;
-  int Stranscribing[NGenes]; //these haven't finished transcription yet
-  struct FixedEvent *tStranscribing; //times when they move to Snuclear
+  int Scyto[NGenes];        /* mRNAs in cytoplasm */
+  int Snuclear[NGenes];     /* mRNAs in nucleus */
+  int Stranslating[NGenes]; /* mRNAs are in the cytoplasm, but only recently */
+  struct FixedEvent *tStranslating;     /* times when mRNAs move to cytoplasm (Scyto) */
+  struct FixedEvent *lasttStranslating; 
+  int Stranscribing[NGenes];            /* mRNAs which haven't finished transcription yet */
+  struct FixedEvent *tStranscribing;    /* times when transcripts ? move to nucleus (Snuclear) */
   struct FixedEvent *lasttStranscribing;
   float proteinConc[NGenes];
   int tfBoundCount;
@@ -676,7 +684,7 @@ void InitializeCell(struct CellState *indiv,
 }
 
 /* could perhaps be a little faster with option to skip *df calculation for first 2 calls */
-void calct (float t, 
+void CalcT (float t, 
             float x, 
             /* float *rates, */
             struct GillespieRates *rates,
@@ -686,30 +694,39 @@ void calct (float t,
             float *f, 
             float *df)
 {
-  float r,denom,numer,ct,ect;
-  int i,j;
+  float r, denom, numer, ct, ect;
+  int i, j;
   
   r = numer = 0.0;
-  for (i=0; i<NGenes; i++){
-    if (nkonsum[i]>0){
-      ct = konvalues[i][1]*t;
+
+  /* loop over all genes */
+  for (i=0; i < NGenes; i++) {
+    /* if currently transcribing add it to the rates */
+    /* TODO: check my interpretation of nkonsum */
+    if (nkonsum[i]>0) {
+      ct = konvalues[i][1] * t;
       if (fabs(ct)<10^-6) ect=ct;
       else ect = 1-exp(-ct);
-      r += ((float) nkonsum[i])*konvalues[i][0]*ect;
-      numer += ((float) nkonsum[i])*konvalues[i][0]*(ect-ct*exp(-ct));
+      r += ((float) nkonsum[i]) * konvalues[i][0] * ect;
+      numer += ((float) nkonsum[i]) * konvalues[i][0] * (ect-ct*exp(-ct));
     }
   }
   numer *= kon;
   r *= kon;
-  denom = r+t*(rates->total+rates->salphc);
-  denom = denom*denom;
+  denom = r + t*(rates->total + rates->salphc);
+  denom = denom * denom;
   r /= t;
-  *f = x/(r+rates->total+rates->salphc)-t;
+
+  /* compute delta-t */
+  *f = x/(r + rates->total + rates->salphc) - t;
+
+  /* compute derivative of equation */
   *df = x*numer/denom - 1.0;
-  if (verbose) fprintf(fperrors,"t=%g f=%g df=%g\n",t,*f,*df);
+
+  if (verbose) fprintf(fperrors,"t=%g f=%g df=%g\n", t, *f, *df);
 }
 
-void calckonrate (float t,
+void CalckonRate (float t,
                   float konvalues[NGenes][3],
                   int nkon,
                   int nkonsum[],
@@ -1003,9 +1020,16 @@ void CalcDt(float *x,
 {
   float tbound1,tbound2;
   int i;
-  
-  rates->mRNAdecay=0.0;
+
+  /* reset the total rate for current step */
   rates->total=0.0;
+  
+  /* reset mRNA decay rate */
+  rates->mRNAdecay=0.0;
+
+  /* update mRNAdecay rate based on the total number of mRNAs in both
+     cytoplasm (Scyto) and ones that have only just recently arrived
+     (Stranslating) */
   for (i=0;i<NGenes;i++){
     mRNAdecay[i] = mRNAdecayrates[i] * ((float) Scyto[i] + (float) Stranslating[i]);
     rates->mRNAdecay += mRNAdecay[i];
@@ -1015,27 +1039,40 @@ void CalcDt(float *x,
    * Gillespie algorithm.
    */
 
-  /* for (i=0; i<5; i++) rates->total += rates[i]; */
+  /* recompute and cache the total rate in data structure */
   rates->total += rates->koff;
   rates->total += rates->transport;
   rates->total += rates->mRNAdecay;
   rates->total += rates->picDisassembly;
   rates->total += rates->salphc;
+  /* OLD, was: for (i=0; i<5; i++) rates->total += rates[i]; */
 
+  /* 
+   * convert the counts back into rates using the constants 
+   * TODO: check
+   */
   rates->total += (float) rates->acetylationCount * acetylate;
   rates->total += (float) rates->deacetylationCount * deacetylate;
   rates->total += (float) rates->picAssemblyCount * PICassembly;
   rates->total += (float) rates->transcriptInitCount * transcriptinit;    
-  tbound1 = *x/(rates->total+rates->maxSalphc);
-  tbound2 = *x/(rates->total+rates->minSalphc);
-  if (verbose) fprintf(fperrors,"bounds %g %g\n",tbound1,tbound2);
+
+  /* TODO: check logic here of tbound1,2 */  
+  tbound1 = *x/(rates->total + rates->maxSalphc);
+  tbound2 = *x/(rates->total + rates->minSalphc);
+  if (verbose) 
+    fprintf(fperrors,"bounds %g %g\n",tbound1,tbound2);
+
+  /* if bounds are the same, simply choose tbound1 */
   if (tbound1==tbound2){
     if (nkon!=0)
       fprintf(fperrors,
               "error: nkon=%d when it should be zero x=%f rates->maxSalphc=%g rates->minSalphc=%g rates->total=%g\n",
               nkon, *x, rates->maxSalphc, rates->minSalphc, rates->total);
     *dt = tbound1;
-  } else *dt = rtsafe(&calct, *x, rates, konvalues, nkon, nkonsum, tbound1, tbound2, (float) 1e-6); 
+  } else {
+    /* otherwise get delta t by solving the equation using Newton-Raphson method */
+    *dt = rtsafe(&CalcT, *x, rates, konvalues, nkon, nkonsum, tbound1, tbound2, (float) 1e-6); 
+  }
 }
 
 void EndTranscription(float *dt,
@@ -1386,45 +1423,66 @@ void CalcNumBound(float proteinConc[],
 
 void Develop(struct Genotype *genes,
              struct CellState *state,
-             float temperature, //in Kelvin
+             float temperature, /* in Kelvin */
              struct TimeCourse **timecoursestart,
              struct TimeCourse **timecourselast)
 {
   float t;
-  int i,j,k,nkon,posdiff,maxbound2,maxbound3,site,geneID,event;
-  float konvalues[NGenes][3];
-  /*element 0 is other funny term
-    element 1 is c
-    element 2 is salphc
-    Other index is which TF binds 
-    The kon term is left out of all of them for computational efficiency*/
+  int i, j, k;
+  int nkon;   /* TODO: I think this is the the index of the currently transcribing gene? */
 
-  int (*konIDs)[2]; //elem 0 is siteID, elem 1 is TF that binds
-  int nkonsum[NGenes];
-  float *koffvalues;
-  int total;
-  float transport[NGenes], mRNAdecay[NGenes];  
-  float x, dt;
+  /* UNUSED here remove: int posdiff; */
+
+  int maxbound2, maxbound3;  /* TODO: check these */
+  int site;      /* site where TF gets removed (TODO: check)  */
+  int geneID;    /* ID of gene which is undergoing transitions in transcription state */
+  int event;     /* boolean to keep track of whether FixedEvent has ended */
+
+  /* konvalues are rates of binding with:
+   * element 0 is other funny term (TODO ?)
+   * element 1 is c
+   * element 2 is salphc
+   * Other index is which TF binds 
+   * The kon term is left out of all of them for computational efficiency
+   */
+  float konvalues[NGenes][3];
+
+  int (*konIDs)[2];    /* elem 0 is siteID, elem 1 is TF that binds */
+  int nkonsum[NGenes]; /* TODO: check */
+  float *koffvalues;   /* rates of unbinding */
+  int total;           /* total possible translation events, TODO: rename */
+  float transport[NGenes];  /* transport rates of each mRNA */
+  float mRNAdecay[NGenes];  /* mRNA decay rates */
+  float x;                  /* random number */
+  float dt;                 /* delta-t */
   struct GillespieRates *rates = malloc(sizeof(struct GillespieRates));
-  /* float rates[8];  */
-  /*total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
-    4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
-    3-PIC disassembly used to be 3-transcriptinit
-  */
-  /* int rates2[5]; */
-  /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4=PIC disassembly*/
-  int statechangeIDs[5][NGenes]; //corresponding geneIDs for rates2
+  /* 
+   * was formerly float rates[8];  and int rates2[5] 
+   * rates: total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
+   *  4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
+   *  3-PIC disassembly used to be 3-transcriptinit
+   * rates2: #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 
+   *  3-transcriptinit, 4=PIC disassembly
+   */
+  int statechangeIDs[5][NGenes]; /* corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
+
   float f, df, konrate, konrate2, diff, RTlnKr, sum, ct, ect;
-  
+
+  /* initialize time courses */
   for (i=0; i<NGenes; i++){
     timecoursestart[i] = NULL;
     timecourselast[i] = NULL;
   }
   AddTimePoints((float) 0.0,state->proteinConc,timecoursestart,timecourselast);
-  RTlnKr = GasConstant * temperature * log(Kr);  
+
+  RTlnKr = GasConstant * temperature * log(Kr);     /* compute constant */
+
   konIDs = malloc(2*genes->bindSiteCount*sizeof(int));
+
+  /* TODO: ? */
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
+
   state->tfBoundIndexes = realloc(state->tfBoundIndexes,maxbound2*sizeof(int));
   koffvalues = malloc(maxbound2*sizeof(float));
   state->tfHinderedIndexes = realloc(state->tfHinderedIndexes,2*maxbound3*sizeof(int));
@@ -1432,29 +1490,44 @@ void Develop(struct Genotype *genes,
     fprintf(fperrors,"memory allocation error at start of Develop\n");
     exit(1);
   }
-  CalcFromState(genes,state,&nkon,nkonsum,rates,konvalues,
-                konIDs,transport,mRNAdecay,RTlnKr,temperature,/*rates2,*/statechangeIDs);
-  t=0.0;
-  while (t<tdevelopment){
-    x=expdev(&seed);
-    if (rates->koff<0.0){
+
+  /* initialize transcriptional state of genes */
+  CalcFromState(genes, state, &nkon, nkonsum, rates, konvalues,
+                konIDs, transport, mRNAdecay, RTlnKr, temperature,
+                /*rates2,*/
+                statechangeIDs);
+
+  t=0.0;  /* time starts at zero */
+
+  while (t<tdevelopment) {  /* run until development stops */
+    x=expdev(&seed);        /* draw random number */
+
+    /* TODO: what is this doing? */
+    if (rates->koff < 0.0){
       konrate2 = 0.0;
-      for (i=0;i<state->tfBoundCount;i++) konrate2 += koffvalues[i];
+      for (i=0; i < state->tfBoundCount; i++) konrate2 += koffvalues[i];
       if ((verbose) || konrate2>0.0)
         fprintf(fperrors,"warning: koffvalues add up to %g rates->koff=%g < 0\n",
-                konrate2,rates->koff);
+                konrate2, rates->koff);
       rates->koff = konrate2;
     }
-    CalcDt(&x,&dt,nkon,nkonsum,rates,/*rates2,*/konvalues,mRNAdecay,genes->mRNAdecay,
-           state->Scyto,state->Stranslating);
-    if (verbose) fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n",
-                        t+dt,dt,x);
+
+    /* do first Gillespie step to chose next event */
+
+    CalcDt(&x, &dt, nkon, nkonsum, rates,/*rates2,*/ konvalues, mRNAdecay, genes->mRNAdecay,
+           state->Scyto, state->Stranslating);
+
+    if (verbose) 
+      fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", t+dt, dt, x);
+
     if (!(state->lasttStranscribing)){
       for (i=0;i<NGenes;i++)
         if (verbose) fprintf(fperrors,"%d transcription events\n",state->Stranscribing[i]);
     }
+    
+    /* first check to see if a fixed event occurs in current t->dt window */
     event=DoesFixedEventEnd(state->tStranslating,state->tStranscribing,fminf(t+dt,tdevelopment));
-    while (event>0){
+    while (event > 0) {
       konrate = x/dt;
       if (event==1){
         EndTranscription(&dt,t,state,transport,rates);
@@ -1465,7 +1538,6 @@ void Develop(struct Genotype *genes,
         for (i=0;i<NGenes;i++) total += state->Stranslating[i];
         if (verbose) fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
                             total,t,dt); // bug: dt can be negative
-        fflush(fperrors);
         i=state->tStranslating->geneID;   
         (state->Stranslating[i])--;   
         DeleteFixedEventStart(&(state->tStranslating),&(state->lasttStranslating));
@@ -1481,10 +1553,20 @@ void Develop(struct Genotype *genes,
       if (verbose) fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n",t+dt,dt,x);
       event=DoesFixedEventEnd(state->tStranslating,state->tStranscribing,fminf(tdevelopment,t+dt));
     } 
-    if (t+dt<tdevelopment){
+
+    /* if we haven't already reached end of development with last delta-t */
+    if (t+dt < tdevelopment) {  
+
+      /* compute total konrate (which is constant over the Gillespie step) */
       if (nkon==0) konrate = (-rates->salphc);
-      else calckonrate(dt, konvalues, nkon, nkonsum, &konrate); 
-      x = ran1(&seed)*(rates->total+konrate);
+      else CalckonRate(dt, konvalues, nkon, nkonsum, &konrate); 
+
+      /* choose a new uniform?? (TODO) random number weighted by the
+         probability of all Gillespie events, note that konrate is
+         *not* included in rates->total, so it needs to be added
+         here */
+      x = ran1(&seed)*(rates->total + konrate);  
+
       if (verbose){
         fprintf(fperrors,"\nx=%g\tfBoundCount=%g = %d * %g\ntransport=%g\ndecay=%g\n",
                 x,rates->koff,state->tfBoundCount,rates->koff/(float)state->tfBoundCount,rates->transport,rates->mRNAdecay);
@@ -1495,10 +1577,11 @@ void Develop(struct Genotype *genes,
                 (float)rates->transcriptInitCount*transcriptinit);
         fprintf(fperrors,"total=%g=%g+%g\n\n",rates->total+konrate,rates->total,konrate);
       }
-      /*kon generally could be handled better, with more direct references to nkonsum, 
-        probably a bit vulnerable to rounding error
-      */
-      if (x<rates->koff){
+      /* JM: kon generally could be handled better, with more direct
+       * references to nkonsum, probably a bit vulnerable to rounding
+       * error
+       */
+      if (x < rates->koff){
         j = -1;
         while (j<state->tfBoundCount && x>0){
           j++;
