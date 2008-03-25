@@ -931,7 +931,7 @@ void CalcFromState(struct Genotype *genes,
   int i,k;
   float salphc,Li; 
 
-  for (i=0;i<NGenes;i++){
+  for (i=0;i<NGenes;i++) {
     salphc = (float) (state->Scyto[i]) * genes->translation[i] / genes->proteindecay[i];
     konvalues[i][0] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
     konvalues[i][1] = genes->proteindecay[i];
@@ -949,7 +949,7 @@ void CalcFromState(struct Genotype *genes,
   rates->maxSalphc=0.0;
   rates->minSalphc=0.0;
 
-  for (k=0; k<genes->bindSiteCount; k++){
+  for (k=0; k < genes->bindSiteCount; k++) {
     i = genes->interactionMatrix[k].tfID;
     Li = state->proteinConc[i];
     salphc = konvalues[i][2];
@@ -960,8 +960,9 @@ void CalcFromState(struct Genotype *genes,
     konIDs[k][1]=i;
     (nkonsum[i])++;
   }
+
   *nkon = genes->bindSiteCount;
-  for (i=0; i<NGenes; i++){
+  for (i=0; i<NGenes; i++) {
     transport[i] = kRNA * (float) (state->Snuclear[i]);
     rates->transport += transport[i];
     statechangeIDs[0][i] = i;
