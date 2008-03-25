@@ -120,15 +120,15 @@ struct GillespieRates
  * Numerical Recipes function bracketed by x1 and x2. Returns root
  * within accuracy +/-xacc funcd is function of interest, returning
  * both function value and first deriv.*/
-float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ float [NGenes][3], int, int[], float *, float *), 
-             float x, struct GillespieRates *rates,/*float *rates,*/ float konvalues[NGenes][3], int nkon, int nkonsum[], float x1, float x2, float xacc)
+float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ float [NGenes][3], /*int,*/ int[], float *, float *), 
+             float x, struct GillespieRates *rates,/*float *rates,*/ float konvalues[NGenes][3], /*int nkon,*/ int nkonsum[], float x1, float x2, float xacc)
 {
   int j,done;
   float df,dx,dxold,f,fh,fl,xtemp;
   float temp,xh,xl,rts;
   
-  (*funcd)(x1, x, rates, konvalues, nkon, nkonsum, &fl, &df);
-  (*funcd)(x2, x, rates, konvalues, nkon, nkonsum, &fh, &df); /* note df isn't used here */
+  (*funcd)(x1, x, rates, konvalues, /*nkon,*/ nkonsum, &fl, &df);
+  (*funcd)(x2, x, rates, konvalues, /*nkon,*/ nkonsum, &fh, &df); /* note df isn't used here */
   if (fabs(fl) < 1e-9) return x1;
   if (fabs(fh) < 1e-9) return x2;
   if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0)){
@@ -145,7 +145,7 @@ float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ fl
   rts=0.5*(x1+x2);
   dxold=fabs(x2-x1);
   dx=dxold;
-  (*funcd)(rts,x,rates,konvalues,nkon,nkonsum,&f,&df);
+  (*funcd)(rts, x, rates, konvalues, /*nkon,*/ nkonsum, &f, &df);
   done = 0;
   for (j=1;j<=MAXIT;j++){
     if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0) || (fabs(2.0*f) > fabs(dxold*df))) {
@@ -167,7 +167,7 @@ float rtsafe(void (*funcd)(float, float, struct GillespieRates *,/*float *,*/ fl
       else rts = fminf(2.0*x2,(xl+xh)/2.0);
       fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
     }
-    if (j>1 || done==0) (*funcd)(rts, x, rates, konvalues, nkon, nkonsum, &f, &df);
+    if (j>1 || done==0) (*funcd)(rts, x, rates, konvalues, /*nkon,*/ nkonsum, &f, &df);
     if (f < 0.0) xl=rts;
     else xh=rts;   
   }
@@ -689,7 +689,7 @@ void CalcT (float t,
             /* float *rates, */
             struct GillespieRates *rates,
             float konvalues[NGenes][3],
-            int nkon, 
+            /* int nkon, */
             int nkonsum[], 
             float *f, 
             float *df)
@@ -728,7 +728,7 @@ void CalcT (float t,
 
 void CalckonRate (float t,
                   float konvalues[NGenes][3],
-                  int nkon,
+                  /* int nkon, */
                   int nkonsum[],
                   float *konrate)
 {
@@ -752,7 +752,7 @@ void CalckonRate (float t,
 void ChangeSCyto(int i,
                  struct Genotype *genes,
                  struct CellState *state,
-                 int nkon,
+                 /* int nkon, */
                  float nkonsumi,
                  struct GillespieRates *rates,
                  float konvalues[NGenes][3],
@@ -963,6 +963,7 @@ void CalcFromState(struct Genotype *genes,
 
   /* initialize nkon as the total number of binding sites */
   *nkon = genes->bindSiteCount;
+
   for (i=0; i<NGenes; i++) {
     transport[i] = kRNA * (float) (state->Snuclear[i]);
     rates->transport += transport[i];
@@ -1073,7 +1074,7 @@ void CalcDt(float *x,
     *dt = tbound1;
   } else {
     /* otherwise get delta t by solving the equation using Newton-Raphson method */
-    *dt = rtsafe(&CalcT, *x, rates, konvalues, nkon, nkonsum, tbound1, tbound2, (float) 1e-6); 
+    *dt = rtsafe(&CalcT, *x, rates, konvalues, /*nkon,*/ nkonsum, tbound1, tbound2, (float) 1e-6); 
   }
 }
 
@@ -1431,7 +1432,7 @@ void Develop(struct Genotype *genes,
 {
   float t;
   int i, j, k;
-  int nkon;   /* TODO: I think this is the the index of the currently transcribing gene? */
+  int nkon;   /* number of *available* binding sites */
 
   /* UNUSED here remove: int posdiff; */
 
@@ -1551,7 +1552,7 @@ void Develop(struct Genotype *genes,
                           konvalues, rates, nkonsum,t,
                           timecoursestart, timecourselast,
                           state->proteinConc);
-        ChangeSCyto(i, genes, state, nkon, (float) nkonsum[i], rates, konvalues, konIDs);
+        ChangeSCyto(i, genes, state, /*nkon,*/ (float) nkonsum[i], rates, konvalues, konIDs);
       }
       t += dt;
       x -= dt*konrate;
@@ -1567,7 +1568,7 @@ void Develop(struct Genotype *genes,
 
       /* compute total konrate (which is constant over the Gillespie step) */
       if (nkon==0) konrate = (-rates->salphc);
-      else CalckonRate(dt, konvalues, nkon, nkonsum, &konrate); 
+      else CalckonRate(dt, konvalues, /* nkon, */ nkonsum, &konrate); 
 
       /* choose a new uniform?? (TODO) random number weighted by the
          probability of all Gillespie events, note that konrate is
@@ -1638,7 +1639,7 @@ void Develop(struct Genotype *genes,
                         i,state->Scyto[i],state->Stranslating[i]);
               }
               (state->Scyto[i])--;  
-              ChangeSCyto(i,genes,state,nkon,(float) nkonsum[i],rates,konvalues,konIDs); 
+              ChangeSCyto(i, genes, state, /*nkon,*/ (float) nkonsum[i], rates, konvalues, konIDs); 
             } else {
               x = ran1(&seed)*((float) state->Stranslating[i]);
               if (verbose){
