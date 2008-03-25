@@ -961,6 +961,7 @@ void CalcFromState(struct Genotype *genes,
     (nkonsum[i])++;
   }
 
+  /* initialize nkon as the total number of binding sites */
   *nkon = genes->bindSiteCount;
   for (i=0; i<NGenes; i++) {
     transport[i] = kRNA * (float) (state->Snuclear[i]);
@@ -1532,7 +1533,10 @@ void Develop(struct Genotype *genes,
       konrate = x/dt;
       if (event==1){
         EndTranscription(&dt,t,state,transport,rates);
-        UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
+        UpdateProteinConc(state->proteinConc, dt,
+                          konvalues, rates, nkonsum, t,
+                          timecoursestart, timecourselast,
+                          state->proteinConc);
       } else {
         dt = state->tStranslating->time - t;
         total=0;
@@ -1541,18 +1545,21 @@ void Develop(struct Genotype *genes,
                             total,t,dt); // bug: dt can be negative
         i=state->tStranslating->geneID;   
         (state->Stranslating[i])--;   
-        DeleteFixedEventStart(&(state->tStranslating),&(state->lasttStranslating));
+        DeleteFixedEventStart(&(state->tStranslating), &(state->lasttStranslating));
         (state->Scyto[i])++;
-        UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
-        ChangeSCyto(i,genes,state,nkon,(float) nkonsum[i],rates,konvalues,konIDs);
+        UpdateProteinConc(state->proteinConc,dt,
+                          konvalues, rates, nkonsum,t,
+                          timecoursestart, timecourselast,
+                          state->proteinConc);
+        ChangeSCyto(i, genes, state, nkon, (float) nkonsum[i], rates, konvalues, konIDs);
       }
       t += dt;
       x -= dt*konrate;
       if (verbose) fprintf(fperrors,"dt=%g t=%g fixed event old x=%g new x=%g\n",dt,t,x+dt*konrate,x);
-      CalcDt(&x,&dt,nkon,nkonsum,rates,/*rates2,*/konvalues,mRNAdecay,genes->mRNAdecay,
-             state->Scyto,state->Stranslating);
+      CalcDt(&x, &dt, nkon, nkonsum, rates,/*rates2,*/ konvalues, 
+             mRNAdecay, genes->mRNAdecay, state->Scyto, state->Stranslating);
       if (verbose) fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n",t+dt,dt,x);
-      event=DoesFixedEventEnd(state->tStranslating,state->tStranscribing,fminf(tdevelopment,t+dt));
+      event=DoesFixedEventEnd(state->tStranslating, state->tStranscribing, fminf(tdevelopment,t+dt));
     } 
 
     /* if we haven't already reached end of development with last delta-t */
@@ -1570,13 +1577,14 @@ void Develop(struct Genotype *genes,
 
       if (verbose){
         fprintf(fperrors,"\nx=%g\tfBoundCount=%g = %d * %g\ntransport=%g\ndecay=%g\n",
-                x,rates->koff,state->tfBoundCount,rates->koff/(float)state->tfBoundCount,rates->transport,rates->mRNAdecay);
+                x, rates->koff, state->tfBoundCount, rates->koff/(float)state->tfBoundCount, 
+                rates->transport, rates->mRNAdecay);
         fprintf(fperrors,"PICdisassembly=%g\nkon=%g = %d * %g\n",
-                rates->picDisassembly,rates->salphc+konrate,nkon,(rates->salphc+konrate)/(float)nkon);
+                rates->picDisassembly, rates->salphc+konrate, nkon, (rates->salphc+konrate)/(float)nkon);
         fprintf(fperrors,"acetylation=%g\ndeacetylation=%g\nPIC assembly=%g\ntranscriptinit=%g\n",
-                (float)rates->acetylationCount*acetylate,(float)rates->deacetylationCount*deacetylate,(float)rates->picAssemblyCount*PICassembly,
-                (float)rates->transcriptInitCount*transcriptinit);
-        fprintf(fperrors,"total=%g=%g+%g\n\n",rates->total+konrate,rates->total,konrate);
+                (float)rates->acetylationCount*acetylate, (float)rates->deacetylationCount*deacetylate, 
+                (float)rates->picAssemblyCount*PICassembly, (float)rates->transcriptInitCount*transcriptinit);
+        fprintf(fperrors,"total=%g=%g+%g\n\n", rates->total + konrate, rates->total, konrate);
       }
       /* JM: kon generally could be handled better, with more direct
        * references to nkonsum, probably a bit vulnerable to rounding
