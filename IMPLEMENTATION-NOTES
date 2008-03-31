@@ -1,17 +1,37 @@
-Definitions:
+Variable definitions:
 
-CellState->y2 ?  number of TFs bound (check ??)
-CellState->B2 =  list of bound TFs
-CellState->y3   number of binding sites that have steric hindrances (check??)
-CellState->B3 = list of binding sites that can't be bound due steric hindrance
-CellState->L  = protein concentrations
- 
+Old name          New name                    Meaning
+
+Genotype->y       Genotype->bindSiteCount     total number of binding sites
+Genotype->G       Genotype->interactionMatrix interaction matrix
+Genotype->C       Genotype->cisRegSeq
+Genotype->O       Genotype->transcriptionFactorSeq
+
+CellState->y2     CellState->tfBoundCount      current number of TFs bound
+CellState->B2     CellState->tfBoundIndexes    list of indices of bound TFs
+CellState->y3     CellState->tfHinderedCount   number of binding sites that have steric hindrances
+CellState->B3     CellState->tfHinderedIndexes list of binding sites that can't be bound due steric hindrance
+CellState->L      CellState->proteinConc       protein concentrations
+CellState->Scyto  CellState->mRNACytoCount     number of mRNA in cytoplasm
+CellState->Snuclear          CellState->mRNANuclearCount
+CellState->Stranslating      CellState->mRNATranslCytoCount
+CellState->tStranslating     CellState->mRNATranslTimeEnd
+CellState->lasttStranslating CellState->mRNATranslTimeEndLast
+CellState->Stranscribing      CellState->mRNATranscrCount
+CellState->tStranscribing     CellState->mRNATranscrTimeEnd
+CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
+
+rates, rates2     GillespieRates
+
+Function/Structs:
+
+G                 TFInteractionMatrix 
+UpdateL           UpdateProteinConc
+CalcG             CalcInteractionMatrix
+
+To check
 
 statechangeIDs ?
-
 Addkon, Removekon ?
 
-Genotype->G
-- what do the 5 elements really mean?
 
-Genotype->y  = number of binding sites for a particular gene ??

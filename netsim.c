@@ -406,14 +406,14 @@ struct FixedEvent
 
 struct CellState
 {
-  int Scyto[NGenes];        /* mRNAs in cytoplasm */
-  int Snuclear[NGenes];     /* mRNAs in nucleus */
-  int Stranslating[NGenes]; /* mRNAs are in the cytoplasm, but only recently */
-  struct FixedEvent *tStranslating;     /* times when mRNAs move to cytoplasm (Scyto) */
-  struct FixedEvent *lasttStranslating; 
-  int Stranscribing[NGenes];            /* mRNAs which haven't finished transcription yet */
-  struct FixedEvent *tStranscribing;    /* times when transcripts ? move to nucleus (Snuclear) */
-  struct FixedEvent *lasttStranscribing;
+  int mRNACytoCount[NGenes];          /* mRNAs in cytoplasm */
+  int mRNANuclearCount[NGenes];       /* mRNAs in nucleus */
+  int mRNATranslCytoCount[NGenes];    /* mRNAs are in the cytoplasm, but only recently */
+  struct FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs move to cytoplasm (mRNACytoCount) */
+  struct FixedEvent *mRNATranslTimeEndLast; 
+  int mRNATranscrCount[NGenes];             /* mRNAs which haven't finished transcription yet */
+  struct FixedEvent *mRNATranscrTimeEnd;    /* times when transcripts ? move to nucleus (mRNANuclearCount) */
+  struct FixedEvent *mRNATranscrTimeEndLast;
   float proteinConc[NGenes];
   int tfBoundCount;
   int *tfBoundIndexes;
@@ -435,13 +435,13 @@ void FreeMemCellState(struct CellState *state)
 {
   struct FixedEvent *start,*info;
 
-  start = state->tStranslating;  
+  start = state->mRNATranslTimeEnd;  
   while (start){
     info = start;
     start = start->next;
     free(info);  
   }
-  start = state->tStranscribing;  
+  start = state->mRNATranscrTimeEnd;  
   while (start){
     info = start;
     start = start->next;
@@ -656,8 +656,8 @@ void InitializeCell(struct CellState *indiv,
   int i,k,totalmRNA;
   float t;
   
-  indiv->tStranscribing = indiv->lasttStranscribing = NULL;
-  indiv->tStranslating = indiv->lasttStranslating = NULL;
+  indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
+  indiv->mRNATranslTimeEnd = indiv->mRNATranslTimeEndLast = NULL;
   indiv->tfBoundCount = 0;  /*initialize with nothing bound */
   indiv->tfHinderedCount = 0;
   indiv->tfBoundIndexes = NULL;
@@ -665,20 +665,20 @@ void InitializeCell(struct CellState *indiv,
   for (i=0; i<NGenes; i++){
     indiv->active[i] = 2;
     totalmRNA = (int) poidev(meanmRNA[i],&seed);
-    indiv->Snuclear[i] = (int) bnldev(startnucleus, totalmRNA, &seed);
-    indiv->Scyto[i] = totalmRNA - indiv->Snuclear[i];
-    indiv->Stranslating[i] = 0;
-    for (k=0; k<indiv->Scyto[i]; k++){
+    indiv->mRNANuclearCount[i] = (int) bnldev(startnucleus, totalmRNA, &seed);
+    indiv->mRNACytoCount[i] = totalmRNA - indiv->mRNANuclearCount[i];
+    indiv->mRNATranslCytoCount[i] = 0;
+    for (k=0; k<indiv->mRNACytoCount[i]; k++){
       t = expdev(&seed) / mRNAdecay[i];
       if (t<ttranslation){
-        (indiv->Scyto[i])--;
-        (indiv->Stranslating[i])++;
-        AddFixedEvent(i,ttranslation-t,&(indiv->tStranslating),&(indiv->lasttStranslating));
+        (indiv->mRNACytoCount[i])--;
+        (indiv->mRNATranslCytoCount[i])++;
+        AddFixedEvent(i,ttranslation-t,&(indiv->mRNATranslTimeEnd),&(indiv->mRNATranslTimeEndLast));
       }
     } 
-    indiv->Stranscribing[i] = (int) poidev(meanmRNA[i]*ttranscription*mRNAdecay[i],&seed);
-    for (k=0; k<indiv->Stranscribing[i]; k++)
-      AddFixedEvent(i,ran1(&seed)*ttranscription,&(indiv->tStranscribing),&(indiv->lasttStranscribing));
+    indiv->mRNATranscrCount[i] = (int) poidev(meanmRNA[i]*ttranscription*mRNAdecay[i],&seed);
+    for (k=0; k<indiv->mRNATranscrCount[i]; k++)
+      AddFixedEvent(i,ran1(&seed)*ttranscription,&(indiv->mRNATranscrTimeEnd),&(indiv->mRNATranscrTimeEndLast));
     indiv->proteinConc[i] = initProteinConc[i];
   }
 }
@@ -760,7 +760,7 @@ void ChangeSCyto(int i,
 {
   float salphc; 
   
-  salphc = (float) (state->Scyto[i]) * genes->translation[i] / genes->proteindecay[i];
+  salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
   rates->salphc += nkonsumi*kon*(salphc-konvalues[i][2]);
   rates->maxSalphc += nkonsumi*kon*(fmaxf(state->proteinConc[i],salphc)-fmaxf(state->proteinConc[i],konvalues[i][2]));
   rates->minSalphc += nkonsumi*kon*(fminf(state->proteinConc[i],salphc)-fminf(state->proteinConc[i],konvalues[i][2]));    
@@ -932,7 +932,7 @@ void CalcFromState(struct Genotype *genes,
   float salphc,Li; 
 
   for (i=0;i<NGenes;i++) {
-    salphc = (float) (state->Scyto[i]) * genes->translation[i] / genes->proteindecay[i];
+    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
     konvalues[i][0] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
     konvalues[i][1] = genes->proteindecay[i];
     konvalues[i][2] = salphc;
@@ -965,7 +965,7 @@ void CalcFromState(struct Genotype *genes,
   *nkon = genes->bindSiteCount;
 
   for (i=0; i<NGenes; i++) {
-    transport[i] = kRNA * (float) (state->Snuclear[i]);
+    transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
     statechangeIDs[0][i] = i;
   }
@@ -983,26 +983,26 @@ void CalcFromState(struct Genotype *genes,
   rates->picDisassemblyCount=0;
 }
 
-int DoesFixedEventEnd(struct FixedEvent *tStranslating,
-                      struct FixedEvent *tStranscribing,
+int DoesFixedEventEnd(struct FixedEvent *mRNATranslTimeEnd,
+                      struct FixedEvent *mRNATranscrTimeEnd,
                       float t)
 {
-  if (tStranslating==NULL) {
-    if (tStranscribing==NULL) return(0);
+  if (mRNATranslTimeEnd==NULL) {
+    if (mRNATranscrTimeEnd==NULL) return(0);
     else{
-      if (tStranscribing->time<t) return(1);
+      if (mRNATranscrTimeEnd->time<t) return(1);
       else return(0);
     }
   } else {
-    if (tStranscribing==NULL){
-      if (tStranslating->time<t) return(2);
+    if (mRNATranscrTimeEnd==NULL){
+      if (mRNATranslTimeEnd->time<t) return(2);
       else return(0);
     } else {
-      if (tStranscribing->time < tStranslating->time){
-        if (tStranscribing->time < t) return(1);
+      if (mRNATranscrTimeEnd->time < mRNATranslTimeEnd->time){
+        if (mRNATranscrTimeEnd->time < t) return(1);
         else return(0);
       } else {
-        if (tStranslating->time < t) return(2);
+        if (mRNATranslTimeEnd->time < t) return(2);
         else return(0);
       }
     }
@@ -1018,8 +1018,8 @@ void CalcDt(float *x,
             float konvalues[NGenes][3],
             float mRNAdecay[],
             float mRNAdecayrates[],
-            int Scyto[],
-            int Stranslating[])
+            int mRNACytoCount[],
+            int mRNATranslCytoCount[])
 {
   float tbound1,tbound2;
   int i;
@@ -1031,10 +1031,10 @@ void CalcDt(float *x,
   rates->mRNAdecay=0.0;
 
   /* update mRNAdecay rate based on the total number of mRNAs in both
-     cytoplasm (Scyto) and ones that have only just recently arrived
-     (Stranslating) */
+     cytoplasm (mRNACytoCount) and ones that have only just recently arrived
+     (mRNATranslCytoCount) */
   for (i=0;i<NGenes;i++){
-    mRNAdecay[i] = mRNAdecayrates[i] * ((float) Scyto[i] + (float) Stranslating[i]);
+    mRNAdecay[i] = mRNAdecayrates[i] * ((float) mRNACytoCount[i] + (float) mRNATranslCytoCount[i]);
     rates->mRNAdecay += mRNAdecay[i];
   }
   /* AKL: should this go from 1-6 ? rather than 1-5?  Answer: no
@@ -1086,15 +1086,15 @@ void EndTranscription(float *dt,
 {
   int i,total;
   
-  *dt = state->tStranscribing->time - t;
+  *dt = state->mRNATranscrTimeEnd->time - t;
   total=0;
-  for (i=0;i<NGenes;i++) total += state->Stranscribing[i];
+  for (i=0;i<NGenes;i++) total += state->mRNATranscrCount[i];
   if (verbose) fprintf(fperrors,"\ntranscription event finishes out of %d possible t=%g dt=%g\n",
                       total,t,*dt);
-  i=state->tStranscribing->geneID;
-  (state->Snuclear[i])++;
-  (state->Stranscribing[i])--;
-  DeleteFixedEventStart(&(state->tStranscribing),&(state->lasttStranscribing));
+  i=state->mRNATranscrTimeEnd->geneID;
+  (state->mRNANuclearCount[i])++;
+  (state->mRNATranscrCount[i])--;
+  DeleteFixedEventStart(&(state->mRNATranscrTimeEnd),&(state->mRNATranscrTimeEndLast));
   transport[i] += kRNA;
   rates->transport += kRNA;
 }
@@ -1114,10 +1114,10 @@ void TransportEvent(float x,
     i++;
     x -= transport[i];
   }
-  if (verbose) fprintf(fperrors,"transport event gene %d from %d copies\n",i,state->Snuclear[i]);
-  (state->Snuclear[i])--;
-  (state->Stranslating[i])++;
-  AddFixedEventEnd(i,endtime,&(state->tStranslating),&(state->lasttStranslating));
+  if (verbose) fprintf(fperrors,"transport event gene %d from %d copies\n",i,state->mRNANuclearCount[i]);
+  (state->mRNANuclearCount[i])--;
+  (state->mRNATranslCytoCount[i])++;
+  AddFixedEventEnd(i,endtime,&(state->mRNATranslTimeEnd),&(state->mRNATranslTimeEndLast));
   transport[i] -= kRNA;
   if (transport[i]<0.1*kRNA) transport[i]=0.0;
   rates->transport -= kRNA;
@@ -1518,18 +1518,20 @@ void Develop(struct Genotype *genes,
     /* do first Gillespie step to chose next event */
 
     CalcDt(&x, &dt, nkon, nkonsum, rates,/*rates2,*/ konvalues, mRNAdecay, genes->mRNAdecay,
-           state->Scyto, state->Stranslating);
+           state->mRNACytoCount, state->mRNATranslCytoCount);
 
     if (verbose) 
       fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", t+dt, dt, x);
 
-    if (!(state->lasttStranscribing)){
+    if (!(state->mRNATranscrTimeEndLast)){
       for (i=0;i<NGenes;i++)
-        if (verbose) fprintf(fperrors,"%d transcription events\n",state->Stranscribing[i]);
+        if (verbose) fprintf(fperrors,"%d transcription events\n", state->mRNATranscrCount[i]);
     }
     
     /* first check to see if a fixed event occurs in current t->dt window */
-    event=DoesFixedEventEnd(state->tStranslating,state->tStranscribing,fminf(t+dt,tdevelopment));
+    event=DoesFixedEventEnd(state->mRNATranslTimeEnd,
+                            state->mRNATranscrTimeEnd,
+                            fminf(t+dt, tdevelopment));
     while (event > 0) {
       konrate = x/dt;
       if (event==1){
@@ -1539,15 +1541,15 @@ void Develop(struct Genotype *genes,
                           timecoursestart, timecourselast,
                           state->proteinConc);
       } else {
-        dt = state->tStranslating->time - t;
+        dt = state->mRNATranslTimeEnd->time - t;
         total=0;
-        for (i=0;i<NGenes;i++) total += state->Stranslating[i];
+        for (i=0;i<NGenes;i++) total += state->mRNATranslCytoCount[i];
         if (verbose) fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
                             total,t,dt); // bug: dt can be negative
-        i=state->tStranslating->geneID;   
-        (state->Stranslating[i])--;   
-        DeleteFixedEventStart(&(state->tStranslating), &(state->lasttStranslating));
-        (state->Scyto[i])++;
+        i=state->mRNATranslTimeEnd->geneID;   
+        (state->mRNATranslCytoCount[i])--;   
+        DeleteFixedEventStart(&(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
+        (state->mRNACytoCount[i])++;
         UpdateProteinConc(state->proteinConc,dt,
                           konvalues, rates, nkonsum,t,
                           timecoursestart, timecourselast,
@@ -1558,9 +1560,9 @@ void Develop(struct Genotype *genes,
       x -= dt*konrate;
       if (verbose) fprintf(fperrors,"dt=%g t=%g fixed event old x=%g new x=%g\n",dt,t,x+dt*konrate,x);
       CalcDt(&x, &dt, nkon, nkonsum, rates,/*rates2,*/ konvalues, 
-             mRNAdecay, genes->mRNAdecay, state->Scyto, state->Stranslating);
+             mRNAdecay, genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
       if (verbose) fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n",t+dt,dt,x);
-      event=DoesFixedEventEnd(state->tStranslating, state->tStranscribing, fminf(tdevelopment,t+dt));
+      event=DoesFixedEventEnd(state->mRNATranslTimeEnd, state->mRNATranscrTimeEnd, fminf(tdevelopment,t+dt));
     } 
 
     /* if we haven't already reached end of development with last delta-t */
@@ -1599,7 +1601,8 @@ void Develop(struct Genotype *genes,
         }
         if (j==state->tfBoundCount){
           konrate2 = 0.0;
-          for (i=0;i<state->tfBoundCount;i++) konrate2 += koffvalues[i];
+          for (i=0; i<state->tfBoundCount; i++) 
+            konrate2 += koffvalues[i];
           fprintf(fperrors,"warning: koffvalues add up to %g instead of rates->koff=%g\n",
                   konrate2,rates->koff);
           rates->koff = konrate2;
@@ -1609,15 +1612,15 @@ void Develop(struct Genotype *genes,
         if (verbose) fprintf(fperrors,"koff event %d of %d at site %d\n",
                             j,state->tfBoundCount,site);
         if (j<0) fprintf(fperrors,"error: koff event %d of %d at site %d\n",j,state->tfBoundCount,site);
-        UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
-        RemoveBinding(genes,state,konvalues,&nkon,nkonsum,rates,/*rates2,*/konIDs,site,
-                      koffvalues,RTlnKr,temperature,statechangeIDs);
-        CalcNumBound(state->proteinConc,state->tfBoundCount);
+        UpdateProteinConc(state->proteinConc, dt, konvalues, rates, nkonsum, t, timecoursestart, timecourselast, state->proteinConc);
+        RemoveBinding(genes, state, konvalues, &nkon, nkonsum, rates,/*rates2,*/ konIDs, site,
+                      koffvalues, RTlnKr, temperature, statechangeIDs);
+        CalcNumBound(state->proteinConc, state->tfBoundCount);
       } else {
         x -= rates->koff;
         if (x<rates->transport){
-          UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
-          TransportEvent(x,transport,state,t+dt+ttranslation,rates);
+          UpdateProteinConc(state->proteinConc, dt, konvalues, rates, nkonsum, t, timecoursestart, timecourselast, state->proteinConc);
+          TransportEvent(x, transport, state, t+dt+ttranslation, rates);
         } else {
           x -= rates->transport;
           if (x<rates->mRNAdecay){
@@ -1631,26 +1634,26 @@ void Develop(struct Genotype *genes,
               fprintf(fperrors,"warning: x=%g > konrate2=%g out of rates->mRNAdecay=%g\n",
                       x,konrate2,rates->mRNAdecay);
             }
-            x = ran1(&seed)*((float) (state->Scyto[i]+state->Stranslating[i]));
+            x = ran1(&seed)*((float) (state->mRNACytoCount[i]+state->mRNATranslCytoCount[i]));
             UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
-            if (x<(float)state->Scyto[i]){
+            if (x<(float)state->mRNACytoCount[i]){
               if (verbose){
                 fprintf(fperrors,"mRNA decay event gene %d from %d copies in cytoplasm not %d copies translating\n",
-                        i,state->Scyto[i],state->Stranslating[i]);
+                        i,state->mRNACytoCount[i],state->mRNATranslCytoCount[i]);
               }
-              (state->Scyto[i])--;  
+              (state->mRNACytoCount[i])--;  
               ChangeSCyto(i, genes, state, /*nkon,*/ (float) nkonsum[i], rates, konvalues, konIDs); 
             } else {
-              x = ran1(&seed)*((float) state->Stranslating[i]);
+              x = ran1(&seed)*((float) state->mRNATranslCytoCount[i]);
               if (verbose){
                 fprintf(fperrors,
                         "mRNA decay event gene %d not from %d copies in cytoplasm but %f from %d copies translating\n",
-                        i,state->Scyto[i],trunc(x),state->Stranslating[i]);
+                        i,state->mRNACytoCount[i],trunc(x),state->mRNATranslCytoCount[i]);
               }
-              DeleteFixedEvent(i,(int) trunc(x),&(state->tStranslating),&(state->lasttStranslating));
-              (state->Stranslating[i])--;
+              DeleteFixedEvent(i,(int) trunc(x),&(state->mRNATranslTimeEnd),&(state->mRNATranslTimeEndLast));
+              (state->mRNATranslCytoCount[i])--;
               if (verbose) for (j=0;j<NGenes;j++)
-                            fprintf(fperrors,"%d copies of gene %d translating\n",state->Stranslating[j],j);                  
+                            fprintf(fperrors,"%d copies of gene %d translating\n",state->mRNATranslCytoCount[j],j);                  
             }
           } else {
             x -= rates->mRNAdecay;
@@ -1736,8 +1739,8 @@ void Develop(struct Genotype *genes,
                         if (state->active[geneID]!=6 && state->active[geneID]!=5)
                           fprintf(fperrors,"error: transcription event attempted from state %d\n",state->active[geneID]);
                         UpdateProteinConc(state->proteinConc,dt,konvalues,rates,nkonsum,t,timecoursestart,timecourselast,state->proteinConc);
-                        AddFixedEventEnd(geneID,t+dt+ttranscription,&(state->tStranscribing),&(state->lasttStranscribing));
-                        (state->Stranscribing[geneID])++;                      
+                        AddFixedEventEnd(geneID,t+dt+ttranscription,&(state->mRNATranscrTimeEnd),&(state->mRNATranscrTimeEndLast));
+                        (state->mRNATranscrCount[geneID])++;                      
                       } else fprintf(fperrors,"error: no event assigned\n");
                     }
                   }
