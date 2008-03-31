@@ -1,7 +1,7 @@
 Variable definitions:
 
 Old name          New name                    Meaning
-
+---------         ---------                   ---------
 Genotype->y       Genotype->bindSiteCount     total number of binding sites
 Genotype->G       Genotype->interactionMatrix interaction matrix
 Genotype->C       Genotype->cisRegSeq
@@ -13,7 +13,7 @@ CellState->y3     CellState->tfHinderedCount   number of binding sites that have
 CellState->B3     CellState->tfHinderedIndexes list of binding sites that can't be bound due steric hindrance
 CellState->L      CellState->proteinConc       protein concentrations
 CellState->Scyto  CellState->mRNACytoCount     number of mRNA in cytoplasm
-CellState->Snuclear          CellState->mRNANuclearCount
+bCellState->Snuclear          CellState->mRNANuclearCount
 CellState->Stranslating      CellState->mRNATranslCytoCount
 CellState->tStranslating     CellState->mRNATranslTimeEnd
 CellState->lasttStranslating CellState->mRNATranslTimeEndLast
@@ -28,8 +28,12 @@ Function/Structs:
 G                 TFInteractionMatrix 
 UpdateL           UpdateProteinConc
 CalcG             CalcInteractionMatrix
+ChangeSCyto       ChangemRNACyto
 
 To check
+--------
+nkon       total number of *available* binding sites
+nkonsum    total number of available binding sites on cis-reg sequence for a given TF
 
 statechangeIDs ?
 Addkon, Removekon ?
