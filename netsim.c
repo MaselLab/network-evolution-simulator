@@ -1174,7 +1174,7 @@ void ReviseActivityState(int geneID,
                          /* int rates2[], */
                          int statechangeIDs[][NGenes])
 {
-  int transcriptrule,oldstate,numactive;
+  int transcriptrule, oldstate, numactive;
 
   transcriptrule = CalcTranscription(geneID,state->tfBoundIndexes,state->tfBoundCount,genes->interactionMatrix,genes->activating,&numactive);
   oldstate = state->active[geneID];
@@ -1303,7 +1303,7 @@ void TFbinds(struct Genotype *genes,
              float temperature,
              int statechangeIDs[][NGenes])
 {
-  int geneID,k,posdiff,site2;
+  int geneID, k, posdiff, site2;
 
   if (verbose) fprintf(fperrors,
                       "kon1 event at site %d out of %d possible, %d TFs previously bound bindSiteCount=%d\n",
