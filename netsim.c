@@ -1534,7 +1534,9 @@ void Develop(struct Genotype *genes,
    * rates2: #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 
    *  3-transcriptinit, 4=PIC disassembly
    */
-  int statechangeIDs[5][NGenes]; /* corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
+
+  /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
+  int statechangeIDs[5][NGenes]; 
 
   float f, df, konrate, konrate2, diff, RTlnKr, sum, ct, ect;
 
@@ -1547,6 +1549,7 @@ void Develop(struct Genotype *genes,
 
   RTlnKr = GasConstant * temperature * log(Kr);     /* compute constant */
 
+  /* number of possible binding sites */
   konIDs = malloc(2*genes->bindSiteCount*sizeof(int));
 
   /* TODO: ? */
@@ -1820,10 +1823,13 @@ void Develop(struct Genotype *genes,
                * STOCHASTIC EVENT: TF binding event
                */
               if (x <rates->salphc + konrate) {   /* add variable (salphc) and constant (konrate) */
-                x = ran1(&seed)*(rates->salphc + konrate)/kon;
+                x = ran1(&seed) * (rates->salphc + konrate)/kon;
                 j = -1;
                 konrate2 = 0.0;               
-                while (j < nkon-1 && x > konrate2){
+                /* loop through all *available* binding sites to
+                 * choose one, the interval is weighted by the
+                 * frequency of rates */
+                while (j < nkon-1 && x > konrate2) {
                   j++;
                   i = konIDs[j][1];
                   konrate2 = konvalues[i][KON_SALPHC_INDEX] + konvalues[i][KON_DIFF_INDEX]*(1-exp(-konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
