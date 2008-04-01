@@ -1980,9 +1980,11 @@ void Develop(struct Genotype *genes,
                * STOCHASTIC EVENT: TF binding event
                */
               if (x <rates->salphc + konrate) {   /* add variable (salphc) and constant (konrate) */
+
                 x = ran1(&seed) * (rates->salphc + konrate)/kon;
                 j = -1;
                 konrate2 = 0.0;               
+
                 /* loop through all *available* binding sites to
                  * choose one, the interval is weighted by the
                  * frequency of rates */
