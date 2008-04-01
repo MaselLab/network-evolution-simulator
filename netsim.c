@@ -80,7 +80,7 @@ float poidev(float xm, long *seed);
 float expdev(long *seed);
 float bnldev(float pp, int n, long *seed);
 
-/* enum for indices in konvalues array
+/* enum for 'konvalues' indices
  * are rates of binding with:
  * element KON_DIFF          is (proteinConc - salphc)/proteindecay
  * element KON_PROTEIN_DECAY is proteindecay
@@ -88,12 +88,20 @@ float bnldev(float pp, int n, long *seed);
  */
 enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
 
+/*
+ * enum for 'CellState'->active indices
+ */
 enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
        ON_WITH_NUCLEOSOME = 2, /* activ>repr, still nucleosome */
        OFF_NO_PIC = 3,         /* repr>activ, no nucleosome, but no PIC */
        ON_NO_PIC = 4,          /* activ>repr, no nucleosome, but no PIC  */
        OFF_PIC = 5,            /* repr>activ, no nucleosome, and PIC */
        ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
+
+/*
+ * enum for konIDs
+ */
+enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
 
 /*
  * New data structure for keeping track of rates for Gillespie
@@ -862,15 +870,15 @@ void Removekon(int siteID,
   int i,k;
   
   k=0;
-  while (!(konIDs[k][0]==siteID) && k<*nkon) k++;
+  while (!(konIDs[k][SITEID_INDEX]==siteID) && k<*nkon) k++;
   if (k<*nkon){   
     rates->salphc -= kon*salphc;
     rates->maxSalphc -= kon*fmaxf(Li,salphc);
     rates->minSalphc -= kon*fminf(Li,salphc);
     (*nkon)--;
     (nkonsum[TFID])--;
-    konIDs[k][0] = konIDs[*nkon][0];
-    konIDs[k][1] = konIDs[*nkon][1];
+    konIDs[k][SITEID_INDEX] = konIDs[*nkon][SITEID_INDEX];
+    konIDs[k][TFID_INDEX] = konIDs[*nkon][TFID_INDEX];
   }
   //else do nothing: there is likely a redundancy in steric hindrance, hence no site to remove
 }
@@ -887,8 +895,8 @@ void Addkon(float Li,
   rates->salphc += kon*salphc;
   rates->maxSalphc += fmaxf(Li,salphc);
   rates->minSalphc += fminf(Li,salphc);
-  konIDs[*nkon][0]=siteID;
-  konIDs[*nkon][1]=TFID;
+  konIDs[*nkon][SITEID_INDEX]=siteID;
+  konIDs[*nkon][TFID_INDEX]=TFID;
   (nkonsum[TFID])++;
   (*nkon)++;
 }
@@ -974,8 +982,8 @@ void CalcFromState(struct Genotype *genes,
     rates->salphc += salphc;
     rates->maxSalphc += fmaxf(Li,salphc);
     rates->minSalphc += fminf(Li,salphc);
-    konIDs[k][0]=k;
-    konIDs[k][1]=i;
+    konIDs[k][SITEID_INDEX]=k;
+    konIDs[k][TFID_INDEX]=i;
     (nkonsum[i])++;
   }
 
@@ -1831,7 +1839,7 @@ void Develop(struct Genotype *genes,
                  * frequency of rates */
                 while (j < nkon-1 && x > konrate2) {
                   j++;
-                  i = konIDs[j][1];
+                  i = konIDs[j][TFID_INDEX];
                   konrate2 = konvalues[i][KON_SALPHC_INDEX] + konvalues[i][KON_DIFF_INDEX]*(1-exp(-konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
                   x -= konrate2;
                 }
@@ -1842,7 +1850,7 @@ void Develop(struct Genotype *genes,
                 if (verbose) fflush(fperrors);
                 TFbinds(genes, state, &nkon, nkonsum, rates,/*rates2,*/ 
                         konvalues, &koffvalues, konIDs, &maxbound2, &maxbound3, 
-                        konIDs[j][0], RTlnKr, temperature, statechangeIDs);
+                        konIDs[j][SITEID_INDEX], RTlnKr, temperature, statechangeIDs);
                 CalcNumBound(state->proteinConc,state->tfBoundCount);
               } else {
                 x -= (rates->salphc + konrate);
