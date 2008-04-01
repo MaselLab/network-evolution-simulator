@@ -88,6 +88,13 @@ float bnldev(float pp, int n, long *seed);
  */
 enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
 
+enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
+       ON_WITH_NUCLEOSOME = 2, /* activ>repr, still nucleosome */
+       OFF_NO_PIC = 3,         /* repr>activ, no nucleosome, but no PIC */
+       ON_NO_PIC = 4,          /* activ>repr, no nucleosome, but no PIC  */
+       OFF_PIC = 5,            /* repr>activ, no nucleosome, and PIC */
+       ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
+
 /*
  * New data structure for keeping track of rates for Gillespie
  * algorithm 
@@ -1164,15 +1171,20 @@ void DisassemblePIC(int *activestate,
                     int statechangeIDs[][NGenes],
                     float disassembly)
 {
-  RemoveFromArray(geneID,statechangeIDs[3],&(rates->transcriptInitCount),(int) 1);
-  RemoveFromArray(geneID,statechangeIDs[4],&(rates->picDisassemblyCount),(int) 1);
+  RemoveFromArray(geneID, statechangeIDs[3], &(rates->transcriptInitCount), (int) 1);
+  RemoveFromArray(geneID, statechangeIDs[4], &(rates->picDisassemblyCount), (int) 1);
   rates->picDisassembly -= disassembly;
-  if (*activestate==5){
-    (*activestate) = 3;
+  
+  /* disassemble PIC in OFF state */
+  if (*activestate == OFF_PIC) {
+    (*activestate) = OFF_NO_PIC;
     statechangeIDs[1][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
-  if (*activestate==6) (*activestate) = 4;
+  /* disassemble PIC in ON state */
+  if (*activestate == ON_FULL) {
+    (*activestate) = ON_NO_PIC;
+  }
 }
 
 void ReviseActivityState(int geneID,
@@ -1184,39 +1196,76 @@ void ReviseActivityState(int geneID,
 {
   int transcriptrule, oldstate, numactive;
 
-  transcriptrule = CalcTranscription(geneID,state->tfBoundIndexes,state->tfBoundCount,genes->interactionMatrix,genes->activating,&numactive);
+  transcriptrule = CalcTranscription(geneID, state->tfBoundIndexes, 
+                                     state->tfBoundCount,
+                                     genes->interactionMatrix,
+                                     genes->activating,
+                                     &numactive);
+
+  /* get last state of transcription initiation */
   oldstate = state->active[geneID];
+
   /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4-PIC disassembly*/
-  if ((transcriptrule) && oldstate==1){
-    state->active[geneID] = 2;
+
+  /*
+   * first set of rules:
+   * ACTIVATING TFs exceed REPRESSING TFs 
+   */
+
+  /* OFF_FULL -> ON_WITH_NUCLEOSOME */
+  if ((transcriptrule) && oldstate==OFF_FULL){
+    state->active[geneID] = ON_WITH_NUCLEOSOME;
     statechangeIDs[0][rates->acetylationCount] = geneID;
     (rates->acetylationCount)++;      
   }
-  if ((transcriptrule) && oldstate==3){
-    state->active[geneID] = 4;
-    RemoveFromArray(geneID,statechangeIDs[1],&(rates->deacetylationCount),(int) 1);
+  /* OFF_NO_PIC -> ON_NO_PIC */
+  if ((transcriptrule) && oldstate==OFF_NO_PIC) {
+    state->active[geneID] = ON_NO_PIC;
+    RemoveFromArray(geneID, statechangeIDs[1], &(rates->deacetylationCount), (int) 1);
     if (numactive){
       statechangeIDs[2][rates->picAssemblyCount] = geneID;
       (rates->picAssemblyCount)++;
     }
   }
-  if ((transcriptrule) && oldstate==5) state->active[geneID] = 6;
-  if (!(transcriptrule) && oldstate==2){
-    state->active[geneID] = 1;
-    RemoveFromArray(geneID,statechangeIDs[0],&(rates->acetylationCount),(int) 1);
+  /* OFF_PIC -> ON_FULL */
+  if ((transcriptrule) && oldstate==OFF_PIC) {
+    state->active[geneID] = ON_FULL;
   }
-  if (!(transcriptrule) && oldstate==4){          
-    state->active[geneID] = 3;
-    RemoveFromArray(geneID,statechangeIDs[2],&(rates->picAssemblyCount),(int) 0);
+
+  /*
+   * second set of rules:
+   * REPRESSING TFs exceed ACTIVATING TFs 
+   */
+
+  /* ON_WITH_NUCLEOSOME -> OFF_FULL */
+  if (!(transcriptrule) && oldstate==ON_WITH_NUCLEOSOME) {
+    state->active[geneID] = OFF_FULL;
+    RemoveFromArray(geneID, statechangeIDs[0], &(rates->acetylationCount), (int) 1);
+  }
+  
+  /* ON_NO_PIC -> OFF_NO_PIC */
+  if (!(transcriptrule) && oldstate==ON_NO_PIC){          
+    state->active[geneID] = OFF_NO_PIC;
+    RemoveFromArray(geneID, statechangeIDs[2], &(rates->picAssemblyCount), (int) 0);
     statechangeIDs[1][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
-  if (!(transcriptrule) && oldstate==6) state->active[geneID] = 5;
-  if ((state->active[geneID]==5 || state->active[geneID]==6) && numactive==0)
-    DisassemblePIC(&(state->active[geneID]),geneID,rates,/*rates2,*/statechangeIDs,
+  /* ON_FULL -> OFF_PIC  */
+  if (!(transcriptrule) && oldstate==ON_FULL) {
+    state->active[geneID] = OFF_PIC;
+  }
+
+  /* do remaining transitions:
+   * OFF_PIC -> OFF_NO_PIC
+   * ON_FULL -> ON_NO_PIC 
+   */
+  if ((state->active[geneID]==OFF_PIC || state->active[geneID]==ON_FULL) && numactive==0)
+    DisassemblePIC(&(state->active[geneID]), geneID, rates,/*rates2,*/ statechangeIDs,
                    genes->PICdisassembly[geneID]);
-  if (verbose && (oldstate!=state->active[geneID]))
-    fprintf(fperrors,"state change from %d to %d in gene %d\n",oldstate,state->active[geneID],geneID);
+
+  if (verbose && (oldstate!=state->active[geneID])) {
+    fprintf(fperrors, "state change from %d to %d in gene %d\n", oldstate, state->active[geneID], geneID);
+  }
 }
 
 void RemoveBinding(struct Genotype *genes,

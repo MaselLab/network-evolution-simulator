@@ -24,15 +24,27 @@ CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
 rates, rates2     GillespieRates
 
 Function/Structs:
+----------------
 
 G                 TFInteractionMatrix 
 UpdateL           UpdateProteinConc
 CalcG             CalcInteractionMatrix
 ChangeSCyto       ChangemRNACyto
 
+New enum indices
+-----------------
+
 konvalues: enum KON_DIFF_INDEX = 0
                 KON_PROTEIN_DECAY_INDEX = 1
                 KON_SALPHC_INDEX = 2 
+
+CellState->active    OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
+                     ON_WITH_NUCLEOSOME = 2, /* activ>repr, still nucleosome */
+                     OFF_NO_PIC = 3,         /* repr>activ, no nucleosome, but no PIC */
+                     ON_NO_PIC = 4,          /* activ>repr, no nucleosome, but no PIC  */
+                     OFF_PIC = 5,            /* repr>activ, no nucleosome, and PIC */
+                     ON_FULL = 6             /* activ>repr, no nucleosome, and a PIC: ready to go!  */
+
 
 To check
 --------
