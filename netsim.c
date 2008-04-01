@@ -444,7 +444,7 @@ struct CellState
   int tfHinderedCount;
   int (*tfHinderedIndexes)[2];
   /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
-    2nd elem gives corresponding index of inhibiting TF in G
+    2nd elem gives corresponding index of inhibiting TF in G (TODO: what is this?)
   */
   int active[NGenes];
   /* gives the state of each of the genes, according to figure
@@ -806,7 +806,7 @@ void Calckoff(int k,
   
   front=back=0;
   Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * RTlnKr; /* subject to revision of elementlen */
-  for (j=0; j<state->tfBoundCount; j++){
+  for (j=0; j < state->tfBoundCount; j++){
     if (interactionMatrix[k].cisregID==interactionMatrix[state->tfBoundIndexes[j]].cisregID && !(k==state->tfBoundIndexes[j])) {
       posdiff = interactionMatrix[k].sitePos-interactionMatrix[state->tfBoundIndexes[j]].sitePos;
       if (abs(posdiff)<6){
@@ -828,7 +828,7 @@ void Calckoff(int k,
 }
 
 /* when TF binding changes, adjust cooperativity at neighbouring sites */
-void ScanNearby(int k,
+void ScanNearby(int indexChanged,
                 struct TFInteractionMatrix *interactionMatrix,
                 struct CellState *state,
                 struct GillespieRates *rates,
@@ -840,18 +840,31 @@ void ScanNearby(int k,
   int posdiff,j,i;
   float diff;
   
-  for (j=0; j<state->tfBoundCount; j++){
-    if (interactionMatrix[k].cisregID==interactionMatrix[state->tfBoundIndexes[j]].cisregID && !(k==state->tfBoundIndexes[j])){
-      posdiff = interactionMatrix[k].sitePos-interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff)<6){
+  /* for all the currently bound sites */
+  for (j = 0; j < state->tfBoundCount; j++){
+    
+    /* we are on the same cisreg sequence and we aren't the same TF binding  */
+    if (interactionMatrix[indexChanged].cisregID == interactionMatrix[state->tfBoundIndexes[j]].cisregID && !(indexChanged==state->tfBoundIndexes[j])) {
+
+      /* how close are we on the sequence */
+      posdiff = interactionMatrix[indexChanged].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
+      if (abs(posdiff) < 6) { /* within 6: bad: shouldn't happen */
         fprintf(fperrors,
-                "error: steric hindrance 2 has been breached with site %d %d away from site %d\n"
-                ,k,posdiff,state->tfBoundIndexes[j]);
+                "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
+                indexChanged, posdiff, state->tfBoundIndexes[j]);
       }
-      if (abs(posdiff)<20){
+      if (abs(posdiff)<20) {  /* within 20, adjust koff */
+
+        /* TODO: check */
         diff = -koffvalues[j];
+
+        /* recompute koffvalues */
         Calckoff(state->tfBoundIndexes[j], interactionMatrix, state, &(koffvalues[j]), RTlnKr, temperature);
+
+        /* TODO: check */
         diff += koffvalues[j];
+
+        /* adjust rates */
         rates->koff += diff;
       }
     }
@@ -869,14 +882,28 @@ void Removekon(int siteID,
 {
   int i,k;
   
-  k=0;
-  while (!(konIDs[k][SITEID_INDEX]==siteID) && k<*nkon) k++;
-  if (k<*nkon){   
+  k = 0;
+  /* TODO: check ! */
+  /* find the index of the site that binds in konIDs  */
+  while (!(konIDs[k][SITEID_INDEX]==siteID) && k < *nkon) {
+    k++;
+  }
+
+  /* make sure that we have enough unoccupied sites left */
+  if (k < *nkon) {   
+    /* adjust rates */
     rates->salphc -= kon*salphc;
     rates->maxSalphc -= kon*fmaxf(Li,salphc);
     rates->minSalphc -= kon*fminf(Li,salphc);
+
+    /* one less site available for binding of total */
     (*nkon)--;
+
+    /* also per gene */
     (nkonsum[TFID])--;
+
+    /* TODO: check */
+    /* move the last element end of array into space vacated by site k */
     konIDs[k][SITEID_INDEX] = konIDs[*nkon][SITEID_INDEX];
     konIDs[k][TFID_INDEX] = konIDs[*nkon][TFID_INDEX];
   }
@@ -892,11 +919,17 @@ void Addkon(float Li,
             struct GillespieRates *rates,
             int (*konIDs)[2])
 {
+
+  /* update rates because new site is now available */
   rates->salphc += kon*salphc;
   rates->maxSalphc += fmaxf(Li,salphc);
   rates->minSalphc += fminf(Li,salphc);
+
+  /* add back siteID to pool of available sites */
   konIDs[*nkon][SITEID_INDEX]=siteID;
   konIDs[*nkon][TFID_INDEX]=TFID;
+
+  /* one more site available */
   (nkonsum[TFID])++;
   (*nkon)++;
 }
@@ -912,8 +945,8 @@ int CalcTranscription(int geneID,
   int i,off;
   
   *on=off=0;
-  for (i=0;i<tfBoundCount;i++){
-    if (geneID==interactionMatrix[tfBoundIndexes[i]].cisregID){
+  for (i=0; i < tfBoundCount; i++) {
+    if (geneID==interactionMatrix[tfBoundIndexes[i]].cisregID) {
       if (activating[interactionMatrix[tfBoundIndexes[i]].tfID]) (*on)++;
       else off++;
     }
@@ -1064,7 +1097,7 @@ void CalcDt(float *x,
   /* update mRNAdecay rate based on the total number of mRNAs in both
      cytoplasm (mRNACytoCount) and ones that have only just recently arrived
      (mRNATranslCytoCount) */
-  for (i=0;i<NGenes;i++){
+  for (i=0; i<NGenes; i++){
     mRNAdecay[i] = mRNAdecayrates[i] * ((float) mRNACytoCount[i] + (float) mRNATranslCytoCount[i]);
     rates->mRNAdecay += mRNAdecay[i];
   }
@@ -1292,29 +1325,43 @@ void RemoveBinding(struct Genotype *genes,
 {
   int i, j, k, bound, siteID, geneID, transcriptrule, oldstate, numactive;
 
-  i=0;
-  while ((state->tfBoundIndexes[i] != site) && (i<state->tfBoundCount)) 
+  i = 0;
+
+  /* given site 'site', look for the index in the list of bound sites */
+  while ((state->tfBoundIndexes[i] != site) && (i < state->tfBoundCount)) 
     i++;
-  if (i==state->tfBoundCount) {
+  if (i == state->tfBoundCount) {  /* couldn't find the site */
     fprintf(fperrors,"error: RemoveBinding could not find site %d with %d possibilities\n Bound sites are\n",
             site,state->tfBoundCount);
-    for (j=0;j<state->tfBoundCount;j++) fprintf(fperrors,"%d\n",state->tfBoundIndexes[j]);
+    for (j = 0; j < state->tfBoundCount; j++)  {
+      fprintf(fperrors,"%d\n",state->tfBoundIndexes[j]);
+    }
   }
   else {
-    j=0;
-    while (j<state->tfHinderedCount){
-      if (state->tfHinderedIndexes[j][1]==site) {
-        k=bound=0;
-        while (bound==0 && k<state->tfHinderedCount) {
-          if (state->tfHinderedIndexes[j][0]==state->tfHinderedIndexes[k][0] && j!=k) 
+    j = 0;
+    /* loop through the sterically hindered sites */
+    while (j < state->tfHinderedCount) {
+
+      /* TODO: check logic here */
+      /* got the index of the site */
+      if (state->tfHinderedIndexes[j][1] == site) {
+        k = bound = 0;
+
+        /* look for the next site bound with same index (TODO: ???) */
+        while (bound == 0 && k < state->tfHinderedCount) {
+          if (state->tfHinderedIndexes[j][0] == state->tfHinderedIndexes[k][0] && j != k) 
             bound=1;
           k++;
         }
+
+        /* if nothing else bound??? */
         if (bound==0) {
           siteID = state->tfHinderedIndexes[j][0];
           if (verbose) 
             fprintf(fperrors,"Site %d pos %d on gene %d freed from steric hindrance\n",
                     siteID, genes->interactionMatrix[siteID].sitePos, genes->interactionMatrix[siteID].cisregID);
+
+          /* adjust rates by return kon to pool */
           Addkon(state->proteinConc[genes->interactionMatrix[siteID].tfID],
                  konvalues[genes->interactionMatrix[siteID].tfID][KON_SALPHC_INDEX],
                  nkon,
@@ -1324,21 +1371,38 @@ void RemoveBinding(struct Genotype *genes,
                  rates,
                  konIDs);
         }
+        /* now we have one less sterically hindered site */
         (state->tfHinderedCount)--;
-        if (j<state->tfHinderedCount){
-          state->tfHinderedIndexes[j][0]=state->tfHinderedIndexes[state->tfHinderedCount][0];
-          state->tfHinderedIndexes[j][1]=state->tfHinderedIndexes[state->tfHinderedCount][1];
+        if (j < state->tfHinderedCount) {
+          /* shorten array by moving the end of the array to the hole opened up by removed site */
+          state->tfHinderedIndexes[j][0] = state->tfHinderedIndexes[state->tfHinderedCount][0];
+          state->tfHinderedIndexes[j][1] = state->tfHinderedIndexes[state->tfHinderedCount][1];
         }
-      } else j++;
+      } else {
+        /* didn't find the site, increment j */
+        j++;
+      }
     }    
+
+    /* reduce the koff rate by the mount */
     rates->koff -= koffvalues[i];
+
+    /* one less bound site */
     (state->tfBoundCount)--;
+
+    /* shift end of array to hole opened up */
     state->tfBoundIndexes[i] = state->tfBoundIndexes[state->tfBoundCount];
+
+    /* likewise with koffvalues */
     koffvalues[i] = koffvalues[state->tfBoundCount];
+
+    /* find the gene whose cisreg region has an unbinding event */
     geneID = genes->interactionMatrix[site].cisregID;
     if (verbose) 
       fprintf(fperrors,"Add site %d at pos %d on gene %d freed by unbinding\n",
               site, genes->interactionMatrix[site].sitePos, geneID);
+
+    /* adjust kon */
     Addkon(state->proteinConc[genes->interactionMatrix[site].tfID],
            konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
            nkon,
@@ -1347,7 +1411,11 @@ void RemoveBinding(struct Genotype *genes,
            site,
            rates,
            konIDs);
-    ReviseActivityState(geneID,genes,state,rates,/*rates2,*/statechangeIDs);
+
+    /* adjust the state of the gene */
+    ReviseActivityState(geneID, genes, state, rates,/*rates2,*/ statechangeIDs);
+
+    /* when TF unbinds adjust the co-operativity at close sites */
     ScanNearby(site, genes->interactionMatrix, state, rates, koffvalues, RTlnKr, temperature);        
   }
 }
@@ -1373,17 +1441,27 @@ void TFbinds(struct Genotype *genes,
   if (verbose) fprintf(fperrors,
                       "kon1 event at site %d out of %d possible, %d TFs previously bound bindSiteCount=%d\n",
                       site,*nkon,state->tfBoundCount,genes->bindSiteCount);
+
+  /* if we have run out of space, double memory  */
   if (state->tfBoundCount >= *maxbound2){
     (*maxbound2) *= 2;
     state->tfBoundIndexes = realloc(state->tfBoundIndexes,(*maxbound2)*sizeof(int));
+
+    /* do the copy */
     *koffvalues = realloc(*koffvalues,(*maxbound2)*sizeof(float));
+
+    /* check return value */
     if (!state->tfBoundIndexes || !(*koffvalues)){
       fprintf(fperrors,"memory allocation error resetting maxbound2=%d\n",*maxbound2);
       exit(1);
     }
   }
+
+  /* append the site to end of indexes */
   state->tfBoundIndexes[state->tfBoundCount] = site;
-  if (verbose) fprintf(fperrors,"remove site %d\n",site);
+  if (verbose) fprintf(fperrors,"remove site %d\n", site);
+
+  /* remove the site from the kon pool */
   Removekon(site,
             genes->interactionMatrix[site].tfID,
             rates, konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
@@ -1391,41 +1469,74 @@ void TFbinds(struct Genotype *genes,
             nkonsum,
             konIDs,
             state->proteinConc[genes->interactionMatrix[site].tfID]);
-  Calckoff(site,genes->interactionMatrix,state,&((*koffvalues)[state->tfBoundCount]),RTlnKr,temperature);
+
+  /* recompute the koffvalues */
+  Calckoff(site, genes->interactionMatrix, state, &((*koffvalues)[state->tfBoundCount]), RTlnKr, temperature);
   if (verbose) fprintf(fperrors,"new koff = %g is number %d\n",
-                      (*koffvalues)[state->tfBoundCount],(state->tfBoundCount+1));
+                       (*koffvalues)[state->tfBoundCount],(state->tfBoundCount+1));
+
+  /* adjust rates by adding the new koffvalue to rates->koff */
   rates->koff += (*koffvalues)[state->tfBoundCount];
-  state->tfBoundIndexes[state->tfBoundCount]=site;
+
+  /* TODO: check, this seems the same as above ???  maybe remove?? */
+  state->tfBoundIndexes[state->tfBoundCount] = site;
+
+  /* increment number of bound TFs */
   (state->tfBoundCount)++;
-  ScanNearby(site,genes->interactionMatrix,state,rates,*koffvalues,RTlnKr,temperature);
-  geneID=genes->interactionMatrix[site].cisregID;
-  /* this cycles over all sites, not just bound ones, in order to record
-     redundancy in steric hindrance*/
-  for (k=0; k<genes->bindSiteCount; k++){
-    if (geneID==genes->interactionMatrix[k].cisregID && !(k==site)){
-      posdiff = genes->interactionMatrix[site].sitePos-genes->interactionMatrix[k].sitePos;
-      if (abs(posdiff)<6){
-        if (state->tfHinderedCount > *maxbound3-1){
+
+  /* adjust co-operative binding in context of new TF */
+  ScanNearby(site, genes->interactionMatrix, state, rates, *koffvalues, RTlnKr, temperature);
+
+  /* get the gene that the TF is binding to */
+  geneID = genes->interactionMatrix[site].cisregID;
+
+  /* update steric hindrance data structures */
+  /* JM: this cycles over all sites, not just bound ones, in order to
+     record redundancy in steric hindrance*/
+  for (k = 0; k < genes->bindSiteCount; k++) {
+
+    /* if we are on the same gene and not the same binding site */
+    if (geneID == genes->interactionMatrix[k].cisregID && !(k==site)) {
+
+      /* check distance from current binding site (k) to the original (site) */
+      posdiff = genes->interactionMatrix[site].sitePos - genes->interactionMatrix[k].sitePos;
+
+      /* if within 6, we prevent binding by adding to steric hindrance */
+      if (abs(posdiff) < 6) {
+
+        /* if not enough memory, reallocate */
+        if (state->tfHinderedCount > *maxbound3 - 1) {
           (*maxbound3) *= 2;
           state->tfHinderedIndexes = realloc(state->tfHinderedIndexes,2*(*maxbound3)*sizeof(int));
         }
-        state->tfHinderedIndexes[state->tfHinderedCount][0]=k;
-        state->tfHinderedIndexes[state->tfHinderedCount][1]=site;
+        
+        /* record hindrance: 'site' blocks 'k' */
+        state->tfHinderedIndexes[state->tfHinderedCount][0] = k;
+        state->tfHinderedIndexes[state->tfHinderedCount][1] = site;
+
+        /* update list of hindered count */
         (state->tfHinderedCount)++;
-        if (verbose) fprintf(fperrors,"%d steric hindrance sites after %d blocks site %d\n",state->tfHinderedCount,site,k);
+        if (verbose) {
+          fprintf(fperrors,"%d steric hindrance sites after %d blocks site %d\n", state->tfHinderedCount, site, k);
+        }
+
+        /* remove the kon from pool */
         Removekon(k,
                   genes->interactionMatrix[k].tfID,
                   rates,
                   konvalues[genes->interactionMatrix[k].tfID][KON_SALPHC_INDEX],
                   nkon,
                   nkonsum,
-                  konIDs,state->proteinConc[genes->interactionMatrix[k].tfID]);
+                  konIDs, 
+                  state->proteinConc[genes->interactionMatrix[k].tfID]);
       }
     }
   }
   if (verbose) fprintf(fperrors,"tfBoundCount=%d tfHinderedCount=%d maxbound2=%d maxbound3=%d\n",
                       state->tfBoundCount,state->tfHinderedCount,*maxbound2,*maxbound3);
-  ReviseActivityState(geneID,genes,state,rates,/*rates2,*/statechangeIDs);
+
+  /* gene activity may change as a result of binding */
+  ReviseActivityState(geneID, genes, state, rates,/*rates2,*/ statechangeIDs);
 }
 
 /*time course of [TF]s represented as array of TimeCourse lists.
@@ -1838,20 +1949,37 @@ void Develop(struct Genotype *genes,
                  * choose one, the interval is weighted by the
                  * frequency of rates */
                 while (j < nkon-1 && x > konrate2) {
+
+                  /* this will record the last binding site before we
+                     reach the appropriate binding site  */
                   j++;
+
+                  /* get ID of TF */
                   i = konIDs[j][TFID_INDEX];
+
+                  /* compute the kon rate  */
                   konrate2 = konvalues[i][KON_SALPHC_INDEX] + konvalues[i][KON_DIFF_INDEX]*(1-exp(-konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
+
+                  /* adjust random number */
                   x -= konrate2;
                 }
+                
+                /* update protein concentration before doing the binding */
                 UpdateProteinConc(state->proteinConc, dt, 
                                   konvalues, rates, nkonsum,
                                   t, timecoursestart, timecourselast,
                                   state->proteinConc);
                 if (verbose) fflush(fperrors);
+
+                /* bind the j-th konID in the list which happens to be the binding site in SITEID_INDEX */
                 TFbinds(genes, state, &nkon, nkonsum, rates,/*rates2,*/ 
                         konvalues, &koffvalues, konIDs, &maxbound2, &maxbound3, 
                         konIDs[j][SITEID_INDEX], RTlnKr, temperature, statechangeIDs);
-                CalcNumBound(state->proteinConc,state->tfBoundCount);
+
+                /* calculate the number of TFs bound
+                 * TODO: check this seems to be purely diagnostic
+                 */
+                CalcNumBound(state->proteinConc, state->tfBoundCount);
               } else {
                 x -= (rates->salphc + konrate);
                 /* 

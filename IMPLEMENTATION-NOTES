@@ -13,7 +13,7 @@ CellState->y3     CellState->tfHinderedCount   number of binding sites that have
 CellState->B3     CellState->tfHinderedIndexes list of binding sites that can't be bound due steric hindrance
 CellState->L      CellState->proteinConc       protein concentrations
 CellState->Scyto  CellState->mRNACytoCount     number of mRNA in cytoplasm
-bCellState->Snuclear          CellState->mRNANuclearCount
+CellState->Snuclear          CellState->mRNANuclearCount
 CellState->Stranslating      CellState->mRNATranslCytoCount
 CellState->tStranslating     CellState->mRNATranslTimeEnd
 CellState->lasttStranslating CellState->mRNATranslTimeEndLast
