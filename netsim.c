@@ -80,6 +80,14 @@ float poidev(float xm, long *seed);
 float expdev(long *seed);
 float bnldev(float pp, int n, long *seed);
 
+/* enum for indices in konvalues array
+ * are rates of binding with:
+ * element KON_DIFF          is (proteinConc - salphc)/proteindecay
+ * element KON_PROTEIN_DECAY is proteindecay
+ * element KON_SALPHC        is salphc
+ */
+enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
+
 /*
  * New data structure for keeping track of rates for Gillespie
  * algorithm 
@@ -257,7 +265,7 @@ void PrintInteractionMatrix(struct TFInteractionMatrix *interactionMatrix,
 void InitializeGenotype(struct Genotype *indiv, 
                         float kdis[])
 {
-  int i,j;
+  int i, j;
   
   InitializeSeq((char *)indiv->cisRegSeq,reglen*NGenes);
   InitializeSeq((char *)indiv->transcriptionFactorSeq,elementlen*NGenes); 
@@ -704,11 +712,11 @@ void CalcT (float t,
     /* if currently transcribing add it to the rates */
     /* TODO: check my interpretation of nkonsum */
     if (nkonsum[i]>0) {
-      ct = konvalues[i][1] * t;
+      ct = konvalues[i][KON_PROTEIN_DECAY_INDEX] * t;
       if (fabs(ct)<10^-6) ect=ct;
       else ect = 1-exp(-ct);
-      r += ((float) nkonsum[i]) * konvalues[i][0] * ect;
-      numer += ((float) nkonsum[i]) * konvalues[i][0] * (ect-ct*exp(-ct));
+      r += ((float) nkonsum[i]) * konvalues[i][KON_DIFF_INDEX] * ect;
+      numer += ((float) nkonsum[i]) * konvalues[i][KON_DIFF_INDEX] * (ect-ct*exp(-ct));
     }
   }
   numer *= kon;
@@ -738,10 +746,10 @@ void CalckonRate (float t,
   r = 0.0;
   for (i=0; i<NGenes; i++){
     if (nkonsum[i]>0){
-      ct = konvalues[i][1]*t;
+      ct = konvalues[i][KON_PROTEIN_DECAY_INDEX]*t;
       if (fabs(ct)<10^-6) ect=ct;
       else ect = 1-exp(-ct);
-      r += ((float) nkonsum[i])*konvalues[i][0]*ect;
+      r += ((float) nkonsum[i])*konvalues[i][KON_DIFF_INDEX]*ect;
     }
   }
   *konrate = kon*r/t;
@@ -764,11 +772,11 @@ void ChangemRNACyto(int i,
 
   /* number of mRNAs in cytoplasm affects ?? */
   salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
-  rates->salphc += nkonsumi*kon*(salphc-konvalues[i][2]);
-  rates->maxSalphc += nkonsumi*kon*(fmaxf(state->proteinConc[i],salphc) - fmaxf(state->proteinConc[i],konvalues[i][2]));
-  rates->minSalphc += nkonsumi*kon*(fminf(state->proteinConc[i],salphc) - fminf(state->proteinConc[i],konvalues[i][2]));    
-  konvalues[i][0] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
-  konvalues[i][2] = salphc;
+  rates->salphc += nkonsumi*kon*(salphc-konvalues[i][KON_SALPHC_INDEX]);
+  rates->maxSalphc += nkonsumi*kon*(fmaxf(state->proteinConc[i],salphc) - fmaxf(state->proteinConc[i],konvalues[i][KON_SALPHC_INDEX]));
+  rates->minSalphc += nkonsumi*kon*(fminf(state->proteinConc[i],salphc) - fminf(state->proteinConc[i],konvalues[i][KON_SALPHC_INDEX]));    
+  konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
+  konvalues[i][KON_SALPHC_INDEX] = salphc;
 }
 
 void Calckoff(int k,
@@ -782,7 +790,7 @@ void Calckoff(int k,
   int posdiff,front,back,i,j;
   
   front=back=0;
-  Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * RTlnKr;/*subject to revision of elementlen*/
+  Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * RTlnKr; /* subject to revision of elementlen */
   for (j=0; j<state->tfBoundCount; j++){
     if (interactionMatrix[k].cisregID==interactionMatrix[state->tfBoundIndexes[j]].cisregID && !(k==state->tfBoundIndexes[j])) {
       posdiff = interactionMatrix[k].sitePos-interactionMatrix[state->tfBoundIndexes[j]].sitePos;
@@ -931,14 +939,14 @@ void CalcFromState(struct Genotype *genes,
                    int statechangeIDs[][NGenes])
 /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit */
 {
-  int i,k;
-  float salphc,Li; 
+  int i, k;
+  float salphc, Li; 
 
-  for (i=0;i<NGenes;i++) {
+  for (i=0; i<NGenes; i++) {
     salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
-    konvalues[i][0] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
-    konvalues[i][1] = genes->proteindecay[i];
-    konvalues[i][2] = salphc;
+    konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
+    konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i];
+    konvalues[i][KON_SALPHC_INDEX] = salphc;
     nkonsum[i]=0;  
   }
   state->tfBoundCount=0;
@@ -955,7 +963,7 @@ void CalcFromState(struct Genotype *genes,
   for (k=0; k < genes->bindSiteCount; k++) {
     i = genes->interactionMatrix[k].tfID;
     Li = state->proteinConc[i];
-    salphc = konvalues[i][2];
+    salphc = konvalues[i][KON_SALPHC_INDEX];
     rates->salphc += salphc;
     rates->maxSalphc += fmaxf(Li,salphc);
     rates->minSalphc += fminf(Li,salphc);
@@ -1251,7 +1259,7 @@ void RemoveBinding(struct Genotype *genes,
             fprintf(fperrors,"Site %d pos %d on gene %d freed from steric hindrance\n",
                     siteID, genes->interactionMatrix[siteID].sitePos, genes->interactionMatrix[siteID].cisregID);
           Addkon(state->proteinConc[genes->interactionMatrix[siteID].tfID],
-                 konvalues[genes->interactionMatrix[siteID].tfID][2],
+                 konvalues[genes->interactionMatrix[siteID].tfID][KON_SALPHC_INDEX],
                  nkon,
                  nkonsum,
                  genes->interactionMatrix[siteID].tfID,
@@ -1275,7 +1283,7 @@ void RemoveBinding(struct Genotype *genes,
       fprintf(fperrors,"Add site %d at pos %d on gene %d freed by unbinding\n",
               site, genes->interactionMatrix[site].sitePos, geneID);
     Addkon(state->proteinConc[genes->interactionMatrix[site].tfID],
-           konvalues[genes->interactionMatrix[site].tfID][2],
+           konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
            nkon,
            nkonsum,
            genes->interactionMatrix[site].tfID,
@@ -1321,7 +1329,7 @@ void TFbinds(struct Genotype *genes,
   if (verbose) fprintf(fperrors,"remove site %d\n",site);
   Removekon(site,
             genes->interactionMatrix[site].tfID,
-            rates,konvalues[genes->interactionMatrix[site].tfID][2],
+            rates, konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
             nkon,
             nkonsum,
             konIDs,
@@ -1351,7 +1359,7 @@ void TFbinds(struct Genotype *genes,
         Removekon(k,
                   genes->interactionMatrix[k].tfID,
                   rates,
-                  konvalues[genes->interactionMatrix[k].tfID][2],
+                  konvalues[genes->interactionMatrix[k].tfID][KON_SALPHC_INDEX],
                   nkon,
                   nkonsum,
                   konIDs,state->proteinConc[genes->interactionMatrix[k].tfID]);
@@ -1402,18 +1410,18 @@ void UpdateProteinConc(float proteinConc[],
              float otherdata[])
 {
   int i;
-  float ct,ect,ect1;
+  float ct, ect, ect1;
   
   rates->maxSalphc=rates->minSalphc=0.0;
-  for (i=0;i<NGenes;i++){
-    ct = konvalues[i][1]*dt;
+  for (i=0; i<NGenes; i++){
+    ct = konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
     if (fabs(ct)<10^-6) ect1=ct;
     else ect1 = 1-ect;   
-    proteinConc[i] = konvalues[i][2]*ect1 + ect*proteinConc[i];
-    konvalues[i][0] = (proteinConc[i] - konvalues[i][2]) / konvalues[i][1];
-    rates->maxSalphc += ((float) nkonsum[i])*fmaxf(proteinConc[i],konvalues[i][2]);
-    rates->minSalphc += ((float) nkonsum[i])*fminf(proteinConc[i],konvalues[i][2]);
+    proteinConc[i] = konvalues[i][KON_SALPHC_INDEX]*ect1 + ect*proteinConc[i];
+    konvalues[i][KON_DIFF_INDEX] = (proteinConc[i] - konvalues[i][KON_SALPHC_INDEX]) / konvalues[i][KON_PROTEIN_DECAY_INDEX];
+    rates->maxSalphc += ((float) nkonsum[i]) * fmaxf(proteinConc[i], konvalues[i][KON_SALPHC_INDEX]);
+    rates->minSalphc += ((float) nkonsum[i]) * fminf(proteinConc[i], konvalues[i][KON_SALPHC_INDEX]);
   }
   rates->maxSalphc *= kon;
   rates->minSalphc *= kon;
@@ -1769,7 +1777,7 @@ void Develop(struct Genotype *genes,
                 while (j < nkon-1 && x > konrate2){
                   j++;
                   i = konIDs[j][1];
-                  konrate2 = konvalues[i][2] + konvalues[i][0]*(1-exp(-konvalues[i][1]*dt))/dt;
+                  konrate2 = konvalues[i][KON_SALPHC_INDEX] + konvalues[i][KON_DIFF_INDEX]*(1-exp(-konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
                   x -= konrate2;
                 }
                 UpdateProteinConc(state->proteinConc, dt, 

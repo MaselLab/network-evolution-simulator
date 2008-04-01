@@ -30,6 +30,10 @@ UpdateL           UpdateProteinConc
 CalcG             CalcInteractionMatrix
 ChangeSCyto       ChangemRNACyto
 
+konvalues: enum KON_DIFF_INDEX = 0
+                KON_PROTEIN_DECAY_INDEX = 1
+                KON_SALPHC_INDEX = 2 
+
 To check
 --------
 nkon       total number of *available* binding sites
