@@ -8,9 +8,9 @@ Genotype->C       Genotype->cisRegSeq
 Genotype->O       Genotype->transcriptionFactorSeq
 
 CellState->y2     CellState->tfBoundCount      current number of TFs bound
-CellState->B2     CellState->tfBoundIndexes    list of indices of bound TFs
+CellState->B2     CellState->tfBoundIndexes    array of indices of bound TFs
 CellState->y3     CellState->tfHinderedCount   number of binding sites that have steric hindrances
-CellState->B3     CellState->tfHinderedIndexes list of binding sites that can't be bound due steric hindrance
+CellState->B3     CellState->tfHinderedIndexes array of binding sites that can't be bound due steric hindrance
 CellState->L      CellState->proteinConc       protein concentrations
 CellState->Scyto  CellState->mRNACytoCount     number of mRNA in cytoplasm
 CellState->Snuclear          CellState->mRNANuclearCount

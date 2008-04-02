@@ -727,7 +727,7 @@ void CalcT (float t,
   /* loop over all genes */
   for (i=0; i < NGenes; i++) {
     /* if currently transcribing add it to the rates */
-    /* TODO: check my interpretation of nkonsum */
+    /* TODO-DONE: check my interpretation of nkonsum */
     if (nkonsum[i]>0) {
       ct = konvalues[i][KON_PROTEIN_DECAY_INDEX] * t;
       if (fabs(ct)<10^-6) ect=ct;
@@ -856,18 +856,18 @@ void ScanNearby(int indexChanged,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
                 indexChanged, posdiff, state->tfBoundIndexes[j]);
       }
-      if (abs(posdiff)<20) {  /* within 20, adjust koff */
+      if (abs(posdiff) < 20) {  /* within 20, adjust koff */
 
-        /* TODO: check */
+        /* save old value */
         diff = -koffvalues[j];
 
         /* recompute koffvalues */
         Calckoff(state->tfBoundIndexes[j], interactionMatrix, state, &(koffvalues[j]), RTlnKr, temperature);
 
-        /* TODO: check */
+        /* calculating how koff changes  */
         diff += koffvalues[j];
 
-        /* adjust rates */
+        /* adjust rates by difference */
         rates->koff += diff;
       }
     }
@@ -1117,7 +1117,7 @@ void CalcDt(float *x,
 
   /* 
    * convert the counts back into rates using the constants 
-   * TODO: check
+   * TODO-DONE: check
    */
   rates->total += (float) rates->acetylationCount * acetylate;
   rates->total += (float) rates->deacetylationCount * deacetylate;
@@ -1190,7 +1190,7 @@ void TransportEvent(float x,
   float konrate2;
   
   i = -1;
-  konrate2 = 0.0;  /* TODO: check, why is this set to zero? */
+  konrate2 = 0.0;  /* TODO-DONE: check, why is this set to zero?, should be set to zero fixed */
 
   /* choose gene product (mRNA) that gets transported to cytoplasm
      based on weighting in transport[] array */
@@ -1376,22 +1376,23 @@ void RemoveBinding(struct Genotype *genes,
   }
   else {
     j = 0;
+
     /* loop through the sterically hindered sites */
     while (j < state->tfHinderedCount) {
 
       /* TODO: check logic here */
-      /* got the index of the site */
+      /* check all sites hindered by binding to location 'site' */
       if (state->tfHinderedIndexes[j][1] == site) {
         k = bound = 0;
 
-        /* look for the next site bound with same index (TODO: ???) */
+        /* is anything else hindering the same site? */
         while (bound == 0 && k < state->tfHinderedCount) {
           if (state->tfHinderedIndexes[j][0] == state->tfHinderedIndexes[k][0] && j != k) 
             bound=1;
           k++;
         }
 
-        /* if nothing else bound??? */
+        /* if nothing else is hindering this site then allow site to be bound */
         if (bound==0) {
           siteID = state->tfHinderedIndexes[j][0];
           if (verbose) 
@@ -1417,8 +1418,7 @@ void RemoveBinding(struct Genotype *genes,
           state->tfHinderedIndexes[j][0] = state->tfHinderedIndexes[state->tfHinderedCount][0];
           state->tfHinderedIndexes[j][1] = state->tfHinderedIndexes[state->tfHinderedCount][1];
         }
-      } else {
-        /* didn't find the site, increment j */
+      } else { /* only increment if we haven't shortened array (TODO: cleanup)  */
         j++;
       }
     }    
@@ -1646,7 +1646,10 @@ void CalcNumBound(float proteinConc[],
   for (i=0; i < NGenes; i++) 
     sum += proteinConc[i];
   if (verbose) 
-    fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, 0.0003*sum);
+    /* fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, 0.0003*sum);*/
+    /* TODO: check! */
+    /* if this is wrong for random sequences adjust Kr accordingly */
+    fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, (reglen*NGenes*sum)/NumSitesInGenome);
 }
 
 void Develop(struct Genotype *genes,
