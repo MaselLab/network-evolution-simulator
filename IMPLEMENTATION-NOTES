@@ -21,7 +21,11 @@ CellState->Stranscribing      CellState->mRNATranscrCount
 CellState->tStranscribing     CellState->mRNATranscrTimeEnd
 CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
 
-rates, rates2     GillespieRates
+rates, rates2                 merged into new GillespieRates struct
+
+nkon, nkonsum             }   merged into new KonStates struct   
+konIDs, konvalues         }
+
 
 Function/Structs:
 ----------------
