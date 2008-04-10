@@ -977,8 +977,10 @@ int CalcTranscription(int geneID,
       else off++;
     }
   }
-  if ((float)off<=0.33442*(float)(*on)+0.31303) return(1);
-  else return(0);
+  if ((float)off <= 0.33442*(float)(*on) + 0.31303) 
+    return(1);
+  else 
+    return(0);
 }
 
 int IsOneActivator(int geneID,
@@ -1009,7 +1011,7 @@ void CalcFromState(struct Genotype *genes,
 /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit */
 {
   int i, k;
-  float salphc, Li; 
+  float salphc, proteinConcTFID; 
 
   for (i=0; i<NGenes; i++) {
     salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
@@ -1031,11 +1033,11 @@ void CalcFromState(struct Genotype *genes,
 
   for (k=0; k < genes->bindSiteCount; k++) {
     i = genes->interactionMatrix[k].tfID;
-    Li = state->proteinConc[i];
+    proteinConcTFID = state->proteinConc[i];
     salphc = konStates->konvalues[i][KON_SALPHC_INDEX];
     rates->salphc += salphc;
-    rates->maxSalphc += fmaxf(Li, salphc);
-    rates->minSalphc += fminf(Li,  salphc);
+    rates->maxSalphc += fmaxf(proteinConcTFID, salphc);
+    rates->minSalphc += fminf(proteinConcTFID, salphc);
     konStates->konIDs[k][SITEID_INDEX] = k;
     konStates->konIDs[k][TFID_INDEX] = i;
     (konStates->nkonsum[i])++;
@@ -1471,13 +1473,9 @@ void RemoveBinding(struct Genotype *genes,
 
 void TFbinds(struct Genotype *genes,
              struct CellState *state,
-             /* int *nkon,
-                int nkonsum[], */
              struct GillespieRates *rates,
-             /* float konvalues[NGenes][3], */
              float **koffvalues,
              struct KonStates *konStates,
-             /* int (*konIDs)[2], */
              int *maxbound2,
              int *maxbound3,
              int site,
@@ -1595,8 +1593,8 @@ void AddTimePoints(float time,
 {
   int i;
   
-  for (i=0;i<NGenes;i++)
-    AddTimePoint(time,proteinConc[i],&(timecoursestart[i]),&(timecourselast[i]));
+  for (i=0; i<NGenes; i++)
+    AddTimePoint(time, proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
 void AddIntTimePoints(float time,
@@ -1606,8 +1604,8 @@ void AddIntTimePoints(float time,
 {
   int i;
   
-  for (i=0;i<NGenes;i++)
-    AddTimePoint(time,(float) proteinConc[i],&(timecoursestart[i]),&(timecourselast[i]));
+  for (i=0; i<NGenes; i++)
+    AddTimePoint(time, (float) proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
 /* need some sort of control in case it declines to essentially zero.
@@ -1625,8 +1623,8 @@ void UpdateProteinConc(float proteinConc[],
   int i;
   float ct, ect, ect1;
   
-  rates->maxSalphc=rates->minSalphc=0.0;
-  for (i=0; i<NGenes; i++){
+  rates->maxSalphc = rates->minSalphc = 0.0;
+  for (i=0; i<NGenes; i++) {
     ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
     if (fabs(ct)<10^-6) ect1=ct;
@@ -1666,7 +1664,6 @@ void Develop(struct Genotype *genes,
 {
   float t;
   int i, j, k;
-  /* int nkon;    number of *available* binding sites */
 
   /* UNUSED here remove: int posdiff; */
 
