@@ -724,7 +724,7 @@ void InitializeCell(struct CellState *indiv,
   indiv->tfBoundIndexes = NULL;
   indiv->tfHinderedIndexes = NULL;
   for (i=0; i<NGenes; i++) {
-    indiv->active[i] = 2;
+    indiv->active[i] = ON_WITH_NUCLEOSOME;
     totalmRNA = (int) poidev(meanmRNA[i],&seed);
     indiv->mRNANuclearCount[i] = (int) bnldev(startnucleus, totalmRNA, &seed);
     indiv->mRNACytoCount[i] = totalmRNA - indiv->mRNANuclearCount[i];
@@ -2027,16 +2027,16 @@ void Develop(struct Genotype *genes,
                   /* choose a particular gene to change state */
                   geneID = statechangeIDs[0][(int)trunc(x)];
                   if (verbose) fprintf(fperrors,"acetylation event gene %d\nstate change from %d to 4\n",
-                                      geneID, state->active[geneID]);
-                  if (state->active[geneID] != 2)
-                    fprintf(fperrors,"error: acetylation event attempted from state %d\n",state->active[geneID]);
+                                       geneID, state->active[geneID]);
+                  if (state->active[geneID] != ON_WITH_NUCLEOSOME)
+                    fprintf(fperrors, "error: acetylation event attempted from state %d\n", state->active[geneID]);
                   UpdateProteinConc(state->proteinConc,dt,
                                     rates, konStates, 
                                     t, timecoursestart, timecourselast,
                                     state->proteinConc);
 
-                  /* set state */
-                  state->active[geneID] = 4;
+                  /* set state: eject nucleosome, but there is no PIC yet */
+                  state->active[geneID] = ON_NO_PIC;
                   RemoveFromArray(geneID, statechangeIDs[0], &(rates->acetylationCount), (int) 1);
                   if (IsOneActivator(geneID, state->tfBoundIndexes, state->tfBoundCount, 
                                      genes->interactionMatrix, genes->activating)) {
@@ -2053,14 +2053,14 @@ void Develop(struct Genotype *genes,
                     geneID = statechangeIDs[1][(int)trunc(x)];
                     if (verbose) fprintf(fperrors,"deacetylation event gene %d\nstate change from %d to 1\n",
                                          geneID,state->active[geneID]);
-                    if (state->active[geneID]!=3)
-                      fprintf(fperrors,"error: deacetylation event attempted from state %d\n", state->active[geneID]);
+                    if (state->active[geneID] != OFF_NO_PIC)
+                      fprintf(fperrors, "error: deacetylation event attempted from state %d\n", state->active[geneID]);
                     UpdateProteinConc(state->proteinConc, dt, 
                                       rates, konStates, 
                                       t, timecoursestart, timecourselast,
                                       state->proteinConc);
-                    /* set state */
-                    state->active[geneID] = 1;
+                    /* set state: nucleosome returns */
+                    state->active[geneID] = OFF_FULL;
                     RemoveFromArray(geneID, statechangeIDs[1], &(rates->deacetylationCount), (int) 1);
                   } else {
                     x -= (float) rates->deacetylationCount * deacetylate;
@@ -2072,13 +2072,15 @@ void Develop(struct Genotype *genes,
                       geneID = statechangeIDs[2][(int)trunc(x)];
                       if (verbose) fprintf(fperrors,"PIC assembly event gene %d\nstate change from %d to 6\n",
                                           geneID,state->active[geneID]);
-                      if (state->active[geneID]!=4)
-                        fprintf(fperrors,"error: PIC assembly event attempted from state %d\n", state->active[geneID]);
+                      if (state->active[geneID] != ON_NO_PIC)
+                        fprintf(fperrors, "error: PIC assembly event attempted from state %d\n", state->active[geneID]);
                       UpdateProteinConc(state->proteinConc, dt,
                                         rates, konStates, 
                                         t, timecoursestart, timecourselast,
                                         state->proteinConc);
-                      state->active[geneID] = 6;
+
+                      /* turn gene fully on: ready for transcription */
+                      state->active[geneID] = ON_FULL;
                       RemoveFromArray(geneID, statechangeIDs[2], &(rates->picAssemblyCount), (int) 1);                      
                       statechangeIDs[3][rates->transcriptInitCount] = geneID;
                       (rates->transcriptInitCount)++;
@@ -2094,12 +2096,13 @@ void Develop(struct Genotype *genes,
                         x /= transcriptinit;
                         geneID = statechangeIDs[3][(int)trunc(x)];
                         if (verbose) fprintf(fperrors,"transcription event gene %d\n",geneID);
-                        if (state->active[geneID]!=6 && state->active[geneID]!=5)
+                        if (state->active[geneID] != ON_FULL && state->active[geneID] != OFF_PIC)
                           fprintf(fperrors,"error: transcription event attempted from state %d\n", state->active[geneID]);
                         UpdateProteinConc(state->proteinConc,dt,
                                           rates, konStates, 
                                           t, timecoursestart, timecourselast,
                                           state->proteinConc);
+
                         /* now that transcription of gene has been initiated, 
                          * we add the time it will end transcription, 
                          * which is dt+time of transcription from now */
