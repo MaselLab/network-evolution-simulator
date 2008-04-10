@@ -121,7 +121,7 @@ enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
  * rates2: #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 
  *  3-transcriptinit, 4=PIC disassembly
  */
-struct GillespieRates
+typedef struct
 {
   float koff;              /* rates[0] */
   float transport;         /* rates[1] */
@@ -143,7 +143,7 @@ struct GillespieRates
 
   /* total, including rates2 */
   float total;                /* rates[7] */
-};
+} GillespieRates;
 
 /*
  * konStates : new composite data structure to cache information about
@@ -154,7 +154,7 @@ struct GillespieRates
  *
  * but will ultimately be refactored again for greater efficiency
  */
-struct KonStates {
+typedef struct {
   /* number of currently *available* binding sites */
   int nkon;
 
@@ -172,15 +172,15 @@ struct KonStates {
    * The kon term is left out of all of them for computational efficiency
    */
   float konvalues[NGenes][3];
-};
+} KonStates;
 
 
 /* Newton-Raphson root-finding method with bisection steps, out of
  * Numerical Recipes function bracketed by x1 and x2. Returns root
  * within accuracy +/-xacc funcd is function of interest, returning
  * both function value and first deriv.*/
-float rtsafe(void (*funcd)(float, float, struct GillespieRates *, struct KonStates *, float *, float *), 
-             float x, struct GillespieRates *rates, struct KonStates *konStates, float x1, float x2, float xacc)
+float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *, float *), 
+             float x, GillespieRates *rates, KonStates *konStates, float x1, float x2, float xacc)
 {
   int j,done;
   float df,dx,dxold,f,fh,fl,xtemp;
@@ -253,12 +253,21 @@ void InitializeSeq(char Seq[],
   /* printf("length: %d, sequence is %s\n", strlen(Seq), Seq); */
 }
 
-struct Genotype
+typedef struct
+{
+  int cisregID;     /* 0 */
+  int tfID;         /* 1 */
+  int sitePos;      /* 2 */
+  int strand;       /* 3 */
+  int hammingDist;  /* 4 */
+} TFInteractionMatrix;
+
+typedef struct
 {
   char cisRegSeq[NGenes][reglen];
   char transcriptionFactorSeq[NGenes][elementlen];
   int bindSiteCount;
-  struct TFInteractionMatrix *interactionMatrix;
+  TFInteractionMatrix *interactionMatrix;
 /* int (*interactionMatrix)[5];
  5 elements are
     identity of cis-regulatory region
@@ -272,24 +281,15 @@ struct Genotype
   float translation[NGenes];
   int activating[NGenes]; // 1 is activating, 0 is repressing
   float PICdisassembly[NGenes];
-};
-
-struct TFInteractionMatrix
-{
-  int cisregID;     /* 0 */
-  int tfID;         /* 1 */
-  int sitePos;      /* 2 */
-  int strand;       /* 3 */
-  int hammingDist;  /* 4 */
-};
+} Genotype;
 
 
 void CalcInteractionMatrix(char [NGenes][reglen],
                            char [NGenes][elementlen],
                            int *,
-                           struct TFInteractionMatrix **);
+                           TFInteractionMatrix **);
 
-void PrintInteractionMatrix(struct TFInteractionMatrix *interactionMatrix, 
+void PrintInteractionMatrix(TFInteractionMatrix *interactionMatrix, 
                             int numElements,
                             char transcriptionFactorSeq[NGenes][elementlen],
                             char cisRegSeq[NGenes][reglen])
@@ -313,7 +313,7 @@ void PrintInteractionMatrix(struct TFInteractionMatrix *interactionMatrix,
   }
 }
 
-void InitializeGenotype(struct Genotype *indiv, 
+void InitializeGenotype(Genotype *indiv, 
                         float kdis[])
 {
   int i, j;
@@ -346,8 +346,8 @@ void InitializeGenotype(struct Genotype *indiv,
   fprintf(fperrors,"\n");
 }
 
-void Mutate(struct Genotype *old,
-            struct Genotype *new,
+void Mutate(Genotype *old,
+            Genotype *new,
             float m)
 {
   int i,k;
@@ -377,12 +377,12 @@ void Mutate(struct Genotype *old,
 void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
                            char transcriptionFactorSeq[NGenes][elementlen],
                            int *newBindSiteCount,
-                           struct TFInteractionMatrix **interactionMatrix)
+                           TFInteractionMatrix **interactionMatrix)
 {
   int i,j,geneind,tfind,match,maxy,bindSiteCount;
   
   maxy = maxelements;
-  *interactionMatrix = malloc(maxy*sizeof(struct TFInteractionMatrix));
+  *interactionMatrix = malloc(maxy*sizeof(TFInteractionMatrix));
   if (!(*interactionMatrix)){
     fprintf(fperrors,"initial setting of G failed.\n");
     exit(1);
@@ -399,7 +399,7 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
         if (match>=nmin){
           if (bindSiteCount+1 >= maxy) {
             maxy = 2*maxy;
-            *interactionMatrix = realloc(*interactionMatrix, maxy*sizeof(struct TFInteractionMatrix));
+            *interactionMatrix = realloc(*interactionMatrix, maxy*sizeof(TFInteractionMatrix));
             if (!(*interactionMatrix)) {
               fprintf(fperrors,"realloc of G to bindSiteCount = %d failed.\n",maxy);
               exit(1);
@@ -428,7 +428,7 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
         if (match>=nmin){
           if (bindSiteCount+1>=maxy){
             maxy = 2*maxy;
-            *interactionMatrix = realloc(*interactionMatrix, maxy*sizeof(struct TFInteractionMatrix));
+            *interactionMatrix = realloc(*interactionMatrix, maxy*sizeof(TFInteractionMatrix));
             if (!(*interactionMatrix)){
               fprintf(fperrors,"realloc of G to bindSiteCount = %d failed.\n",maxy);
               exit(1);
@@ -456,24 +456,24 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
    Deleting the head each time, and tack new stuff on the end
    Linked lists are easy to create pre-sorted.
 */
+typedef struct FixedEvent FixedEvent;
 
-struct FixedEvent
-{
+struct FixedEvent {
   int geneID;
   float time;
-  struct FixedEvent *next;
+  FixedEvent *next;
 };
 
-struct CellState
+typedef struct
 {
   int mRNACytoCount[NGenes];          /* mRNAs in cytoplasm */
   int mRNANuclearCount[NGenes];       /* mRNAs in nucleus */
   int mRNATranslCytoCount[NGenes];    /* mRNAs are in the cytoplasm, but only recently */
-  struct FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs move to cytoplasm (mRNACytoCount) */
-  struct FixedEvent *mRNATranslTimeEndLast; 
+  FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs move to cytoplasm (mRNACytoCount) */
+  FixedEvent *mRNATranslTimeEndLast; 
   int mRNATranscrCount[NGenes];             /* mRNAs which haven't finished transcription yet */
-  struct FixedEvent *mRNATranscrTimeEnd;    /* times when transcripts ? move to nucleus (mRNANuclearCount) */
-  struct FixedEvent *mRNATranscrTimeEndLast;
+  FixedEvent *mRNATranscrTimeEnd;    /* times when transcripts ? move to nucleus (mRNANuclearCount) */
+  FixedEvent *mRNATranscrTimeEndLast;
   float proteinConc[NGenes];
   int tfBoundCount;
   int *tfBoundIndexes;
@@ -489,11 +489,11 @@ struct CellState
      3 is off but w/o nucleosome, 4 is on but w/o PIC
      5 is on but w/o TF criteria, 6 is fully on
   */
-};
+} CellState;
 
-void FreeMemCellState(struct CellState *state)
+void FreeMemCellState(CellState *state)
 {
-  struct FixedEvent *start,*info;
+  FixedEvent *start,*info;
 
   start = state->mRNATranslTimeEnd;  
   while (start){
@@ -511,11 +511,11 @@ void FreeMemCellState(struct CellState *state)
   free(state->tfHinderedIndexes);
 }
 
-void sls_store(struct FixedEvent *i, 
-               struct FixedEvent **start, 
-               struct FixedEvent **last)
+void sls_store(FixedEvent *i, 
+               FixedEvent **start, 
+               FixedEvent **last)
 {
-  struct FixedEvent *old, *p;
+  FixedEvent *old, *p;
   
   p= *start;
   if (!*last) { /*first element in list*/
@@ -546,16 +546,18 @@ void sls_store(struct FixedEvent *i,
   *last = i;
 }
 
+typedef struct TimeCourse TimeCourse;
+
 struct TimeCourse
 {
   float concentration;
   float time;
-  struct TimeCourse *next;
+  TimeCourse *next;
 };     
 
-void DeleteTimeCourse(struct TimeCourse *start2)
+void DeleteTimeCourse(TimeCourse *start2)
 {
-  struct TimeCourse *info,*start;
+  TimeCourse *info,*start;
   
   start = start2; 
   while (start){
@@ -565,9 +567,9 @@ void DeleteTimeCourse(struct TimeCourse *start2)
   }
 }
 
-void display2(struct TimeCourse *start)
+void display2(TimeCourse *start)
 {
-  struct TimeCourse *info;
+  TimeCourse *info;
 
   info = start;
   while (info){
@@ -576,9 +578,9 @@ void display2(struct TimeCourse *start)
   }
 }
       
-void sls_store_end(struct FixedEvent *i, 
-                   struct FixedEvent **start, 
-                   struct FixedEvent **last)
+void sls_store_end(FixedEvent *i, 
+                   FixedEvent **start, 
+                   FixedEvent **last)
 {
   i->next = NULL;
   if (!*last) *start = i;
@@ -586,9 +588,9 @@ void sls_store_end(struct FixedEvent *i,
   *last = i;
 }
 
-void sls_store_end2(struct TimeCourse *i, 
-                    struct TimeCourse **start, 
-                    struct TimeCourse **last)
+void sls_store_end2(TimeCourse *i, 
+                    TimeCourse **start, 
+                    TimeCourse **last)
 {
   i->next = NULL;
   if (!*last) *start = i;
@@ -596,9 +598,9 @@ void sls_store_end2(struct TimeCourse *i,
   *last = i;
 }
 
-void display(struct FixedEvent *start)
+void display(FixedEvent *start)
 {
-  struct FixedEvent *info;
+  FixedEvent *info;
 
   info = start;
   while (info){
@@ -609,12 +611,12 @@ void display(struct FixedEvent *start)
 
 void AddFixedEvent(int i,
                    float t,
-                   struct FixedEvent **start,
-                   struct FixedEvent **last)
+                   FixedEvent **start,
+                   FixedEvent **last)
 {
-  struct FixedEvent *newtime;
+  FixedEvent *newtime;
   
-  newtime = (struct FixedEvent *)malloc(sizeof(struct FixedEvent));
+  newtime = (FixedEvent *)malloc(sizeof(FixedEvent));
   if (!newtime) {
     printf("Out of memory\n");
     exit(1);
@@ -626,12 +628,12 @@ void AddFixedEvent(int i,
 
 void AddTimePoint(float time,
                   float conc,
-                  struct TimeCourse **start,
-                  struct TimeCourse **last)
+                  TimeCourse **start,
+                  TimeCourse **last)
 {
-  struct TimeCourse *newtime;
+  TimeCourse *newtime;
   
-  newtime = (struct TimeCourse *)malloc(sizeof(struct TimeCourse));
+  newtime = (TimeCourse *)malloc(sizeof(TimeCourse));
   if (!newtime) {
     printf("Out of memory\n");
     exit(1);
@@ -643,12 +645,12 @@ void AddTimePoint(float time,
 
 void AddFixedEventEnd(int i,
                       float t,
-                      struct FixedEvent **start,
-                      struct FixedEvent **last)
+                      FixedEvent **start,
+                      FixedEvent **last)
 {
-  struct FixedEvent *newtime;
+  FixedEvent *newtime;
   
-  newtime = (struct FixedEvent *)malloc(sizeof(struct FixedEvent));
+  newtime = (FixedEvent *)malloc(sizeof(FixedEvent));
   if (!newtime) {
     printf("Out of memory\n");
     exit(1);
@@ -660,10 +662,10 @@ void AddFixedEventEnd(int i,
 
 void DeleteFixedEvent(int geneID,
                       int i,
-                      struct FixedEvent **start,
-                      struct FixedEvent **last)
+                      FixedEvent **start,
+                      FixedEvent **last)
 {
-  struct FixedEvent *info,*lastinfo;
+  FixedEvent *info,*lastinfo;
   int j,done;
   
   j = -1;
@@ -697,10 +699,10 @@ void DeleteFixedEvent(int geneID,
   free(info);
 }
 
-void DeleteFixedEventStart(struct FixedEvent **start,
-                           struct FixedEvent **last)
+void DeleteFixedEventStart(FixedEvent **start,
+                           FixedEvent **last)
 {
-  struct FixedEvent *info;
+  FixedEvent *info;
   
   info = *start;
   *start = info->next;
@@ -708,7 +710,7 @@ void DeleteFixedEventStart(struct FixedEvent **start,
   free(info);
 }
 
-void InitializeCell(struct CellState *indiv,
+void InitializeCell(CellState *indiv,
                     /*  int y[NGenes]: AKL 2008-03-21: removed wasn't being used */
                     float mRNAdecay[NGenes],
                     float meanmRNA[NGenes],
@@ -747,8 +749,8 @@ void InitializeCell(struct CellState *indiv,
 /* could perhaps be a little faster with option to skip *df calculation for first 2 calls */
 void CalcT (float t, 
             float x, 
-            struct GillespieRates *rates,
-            struct KonStates *konStates,
+            GillespieRates *rates,
+            KonStates *konStates,
             float *f, 
             float *df)
 {
@@ -785,7 +787,7 @@ void CalcT (float t,
 }
 
 void CalckonRate (float t,
-                  struct KonStates *konStates,
+                  KonStates *konStates,
                   float *konrate)
 {
   float r,ct,ect;
@@ -806,10 +808,10 @@ void CalckonRate (float t,
 
 /* must have already updated proteinConc first */
 void ChangemRNACyto(int i,
-                    struct Genotype *genes,
-                    struct CellState *state,
-                    struct GillespieRates *rates,
-                    struct KonStates *konStates)
+                    Genotype *genes,
+                    CellState *state,
+                    GillespieRates *rates,
+                    KonStates *konStates)
 {
   float salphc; 
   
@@ -825,8 +827,8 @@ void ChangemRNACyto(int i,
 }
 
 void Calckoff(int k,
-              struct TFInteractionMatrix *interactionMatrix,
-              struct CellState *state,
+              TFInteractionMatrix *interactionMatrix,
+              CellState *state,
               float *koff,
               float RTlnKr,
               float temperature)
@@ -860,9 +862,9 @@ void Calckoff(int k,
 
 /* when TF binding changes, adjust cooperativity at neighbouring sites */
 void ScanNearby(int indexChanged,
-                struct TFInteractionMatrix *interactionMatrix,
-                struct CellState *state,
-                struct GillespieRates *rates,
+                TFInteractionMatrix *interactionMatrix,
+                CellState *state,
+                GillespieRates *rates,
                 float koffvalues[],
                 float RTlnKr,
                 float temperature)
@@ -903,9 +905,9 @@ void ScanNearby(int indexChanged,
 
 void Removekon(int siteID,
                int TFID,
-               struct GillespieRates *rates,
+               GillespieRates *rates,
                float salphc,
-               struct KonStates *konStates,
+               KonStates *konStates,
                float proteinConcTFID)
 {
   int i, k;
@@ -942,8 +944,8 @@ void Addkon(float proteinConcTFID,
             float salphc,
             int TFID,
             int siteID,
-            struct GillespieRates *rates,
-            struct KonStates *konStates)
+            GillespieRates *rates,
+            KonStates *konStates)
 {
 
   /* update rates because new site is now available */
@@ -964,7 +966,7 @@ void Addkon(float proteinConcTFID,
 int CalcTranscription(int geneID,
                       int *tfBoundIndexes,
                       int tfBoundCount,
-                      struct TFInteractionMatrix *interactionMatrix,
+                      TFInteractionMatrix *interactionMatrix,
                       int activating[],
                       int *on)
 {
@@ -986,7 +988,7 @@ int CalcTranscription(int geneID,
 int IsOneActivator(int geneID,
                    int *tfBoundIndexes,
                    int tfBoundCount,
-                   struct TFInteractionMatrix *interactionMatrix,
+                   TFInteractionMatrix *interactionMatrix,
                    int activating[])
 {
   int i;
@@ -999,10 +1001,10 @@ int IsOneActivator(int geneID,
 /* only appropriate if nothing is  bound ie CalcFromInitialState and everything is in state 2
    v31 and earlier have some parts of code needed with prebound stuff,
    rates->mRNAdecay and [7] are done in CalcDt*/
-void CalcFromState(struct Genotype *genes,
-                   struct CellState *state,
-                   struct GillespieRates *rates,
-                   struct KonStates *konStates,
+void CalcFromState(Genotype *genes,
+                   CellState *state,
+                   GillespieRates *rates,
+                   KonStates *konStates,
                    float transport[],
                    float mRNAdecay[],
                    float RTlnKr,
@@ -1070,8 +1072,8 @@ void CalcFromState(struct Genotype *genes,
  *  1 if a transcription event happens before time t
  *  2 if a translation event happens before time t
  */
-int DoesFixedEventEnd(struct FixedEvent *mRNATranslTimeEnd,
-                      struct FixedEvent *mRNATranscrTimeEnd,
+int DoesFixedEventEnd(FixedEvent *mRNATranslTimeEnd,
+                      FixedEvent *mRNATranscrTimeEnd,
                       float t)
 {
   if (mRNATranslTimeEnd==NULL) {
@@ -1098,8 +1100,8 @@ int DoesFixedEventEnd(struct FixedEvent *mRNATranslTimeEnd,
 
 void CalcDt(float *x,
             float *dt,
-            struct GillespieRates *rates,
-            struct KonStates *konStates,
+            GillespieRates *rates,
+            KonStates *konStates,
             float mRNAdecay[],
             float mRNAdecayrates[],
             int mRNACytoCount[],
@@ -1164,9 +1166,9 @@ void CalcDt(float *x,
 
 void EndTranscription(float *dt,
                       float t,
-                      struct CellState *state,
+                      CellState *state,
                       float transport[NGenes],
-                      struct GillespieRates *rates)
+                      GillespieRates *rates)
 {
   int i, total;
   
@@ -1201,9 +1203,9 @@ void EndTranscription(float *dt,
 
 void TransportEvent(float x,
                     float transport[NGenes],
-                    struct CellState *state,
+                    CellState *state,
                     float endtime,
-                    struct GillespieRates *rates)
+                    GillespieRates *rates)
 {
   int i;
   float konrate2;
@@ -1266,7 +1268,7 @@ void RemoveFromArray(int toberemoved,
 
 void DisassemblePIC(int *activestate,
                     int geneID,
-                    struct GillespieRates *rates,
+                    GillespieRates *rates,
                     int statechangeIDs[][NGenes],
                     float disassembly)
 {
@@ -1287,9 +1289,9 @@ void DisassemblePIC(int *activestate,
 }
 
 void ReviseActivityState(int geneID,
-                         struct Genotype *genes,
-                         struct CellState *state,
-                         struct GillespieRates *rates,
+                         Genotype *genes,
+                         CellState *state,
+                         GillespieRates *rates,
                          int statechangeIDs[][NGenes])
 {
   int transcriptrule, oldstate, numactive;
@@ -1366,10 +1368,10 @@ void ReviseActivityState(int geneID,
   }
 }
 
-void RemoveBinding(struct Genotype *genes,
-                   struct CellState *state,
-                   struct GillespieRates *rates,
-                   struct KonStates *konStates,
+void RemoveBinding(Genotype *genes,
+                   CellState *state,
+                   GillespieRates *rates,
+                   KonStates *konStates,
                    int site,
                    float koffvalues[],
                    float RTlnKr,
@@ -1471,11 +1473,11 @@ void RemoveBinding(struct Genotype *genes,
   }
 }
 
-void TFbinds(struct Genotype *genes,
-             struct CellState *state,
-             struct GillespieRates *rates,
+void TFbinds(Genotype *genes,
+             CellState *state,
+             GillespieRates *rates,
              float **koffvalues,
-             struct KonStates *konStates,
+             KonStates *konStates,
              int *maxbound2,
              int *maxbound3,
              int site,
@@ -1588,8 +1590,8 @@ void TFbinds(struct Genotype *genes,
 
 void AddTimePoints(float time,
                    float proteinConc[NGenes],
-                   struct TimeCourse **timecoursestart,
-                   struct TimeCourse **timecourselast)
+                   TimeCourse **timecoursestart,
+                   TimeCourse **timecourselast)
 {
   int i;
   
@@ -1599,8 +1601,8 @@ void AddTimePoints(float time,
 
 void AddIntTimePoints(float time,
                       int proteinConc[NGenes],
-                      struct TimeCourse **timecoursestart,
-                      struct TimeCourse **timecourselast)
+                      TimeCourse **timecoursestart,
+                      TimeCourse **timecourselast)
 {
   int i;
   
@@ -1613,11 +1615,11 @@ void AddIntTimePoints(float time,
    if time steps are small and rising tide keeps getting rounded down*/
 void UpdateProteinConc(float proteinConc[],
                        float dt,
-                       struct GillespieRates *rates,
-                       struct KonStates *konStates,
+                       GillespieRates *rates,
+                       KonStates *konStates,
                        float t,
-                       struct TimeCourse **timecoursestart,
-                       struct TimeCourse **timecourselast,
+                       TimeCourse **timecoursestart,
+                       TimeCourse **timecourselast,
                        float otherdata[])
 {
   int i;
@@ -1656,11 +1658,11 @@ void CalcNumBound(float proteinConc[],
     fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, (reglen*NGenes*sum)/NumSitesInGenome);
 }
 
-void Develop(struct Genotype *genes,
-             struct CellState *state,
+void Develop(Genotype *genes,
+             CellState *state,
              float temperature, /* in Kelvin */
-             struct TimeCourse **timecoursestart,
-             struct TimeCourse **timecourselast)
+             TimeCourse **timecoursestart,
+             TimeCourse **timecourselast)
 {
   float t;
   int i, j, k;
@@ -1680,9 +1682,9 @@ void Develop(struct Genotype *genes,
   float dt;                 /* delta-t */
 
   /* cached information about available binding sites for efficiency */
-  struct KonStates *konStates =  malloc(sizeof(struct KonStates));
+  KonStates *konStates =  malloc(sizeof(KonStates));
 
-  struct GillespieRates *rates = malloc(sizeof(struct GillespieRates));
+  GillespieRates *rates = malloc(sizeof(GillespieRates));
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
   int statechangeIDs[5][NGenes]; 
@@ -2149,10 +2151,10 @@ void Develop(struct Genotype *genes,
 }
 
 void DevStabilityOnlyLOpt(float lopt[],
-                          struct TimeCourse **timecoursestart)
+                          TimeCourse **timecoursestart)
 {
   int i;
-  struct TimeCourse *start;
+  TimeCourse *start;
   float dt1,dt2;
   
   for (i=0;i<NGenes;i++){
@@ -2173,12 +2175,12 @@ void DevStabilityOnlyLOpt(float lopt[],
 
 void CalcFitness(float lopt[],
                  float *w,
-                 struct TimeCourse **timecoursestart,
+                 TimeCourse **timecoursestart, 
                  float s)
 {
   float d,dt1,dt2,x;
   int i;
-  struct TimeCourse *start[NGenes];
+  TimeCourse *start[NGenes];
   
   for (i=0;i<NGenes;i++) start[i]=timecoursestart[i];
   dt1=0.0;
@@ -2201,7 +2203,7 @@ void CalcFitness(float lopt[],
   fprintf(fperrors,"s=%g w=%g\n",s,*w);
 }
 
-void PrintTimeCourse(struct TimeCourse *start,
+void PrintTimeCourse(TimeCourse *start,
                      int i,
                      float lopt[])
 {
@@ -2223,11 +2225,11 @@ int main(int argc, char *argv[])
 {
   FILE *fpout, *fpkdis;
   int i, j, k, gen;
-  struct CellState state;
-  struct Genotype indivs[PopSize];
-  struct TimeCourse *timecoursestart[NGenes]; // array of pointers to list starts
-  struct TimeCourse *timecourselast[NGenes];
-  struct TimeCourse *start;
+  CellState state;
+  Genotype indivs[PopSize];
+  TimeCourse *timecoursestart[NGenes]; /* array of pointers to list starts */
+  TimeCourse *timecourselast[NGenes];
+  TimeCourse *start;
   float fitness[PopSize], sumfit, lopt[NGenes], initmRNA[NGenes], initProteinConc[NGenes], x, kdis[Nkdis];
   
   fperrors = fopen("netsimerrors.txt", "w");
