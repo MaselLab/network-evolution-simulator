@@ -179,15 +179,15 @@ struct KonStates {
  * Numerical Recipes function bracketed by x1 and x2. Returns root
  * within accuracy +/-xacc funcd is function of interest, returning
  * both function value and first deriv.*/
-float rtsafe(void (*funcd)(float, float, struct GillespieRates *, struct KonStates *, /*float *, float [NGenes][3], int, int[], */ float *, float *), 
-             float x, struct GillespieRates *rates, struct KonStates *konStates, /*float *rates, float konvalues[NGenes][3], int nkon,* int nkonsum[],*/ float x1, float x2, float xacc)
+float rtsafe(void (*funcd)(float, float, struct GillespieRates *, struct KonStates *, float *, float *), 
+             float x, struct GillespieRates *rates, struct KonStates *konStates, float x1, float x2, float xacc)
 {
   int j,done;
   float df,dx,dxold,f,fh,fl,xtemp;
   float temp,xh,xl,rts;
   
-  (*funcd)(x1, x, rates, konStates, /* konvalues, *nkon, nkonsum, */ &fl, &df);
-  (*funcd)(x2, x, rates, konStates, /*konvalues, *nkon, nkonsum, */ &fh, &df); /* note df isn't used here */
+  (*funcd)(x1, x, rates, konStates, &fl, &df);
+  (*funcd)(x2, x, rates, konStates, &fh, &df); /* note df isn't used here */
   if (fabs(fl) < 1e-9) return x1;
   if (fabs(fh) < 1e-9) return x2;
   if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0)){
@@ -204,7 +204,7 @@ float rtsafe(void (*funcd)(float, float, struct GillespieRates *, struct KonStat
   rts=0.5*(x1+x2);
   dxold=fabs(x2-x1);
   dx=dxold;
-  (*funcd)(rts, x, rates, konStates, /*konvalues, *nkon, nkonsum,*/ &f, &df);
+  (*funcd)(rts, x, rates, konStates, &f, &df);
   done = 0;
   for (j=1;j<=MAXIT;j++){
     if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0) || (fabs(2.0*f) > fabs(dxold*df))) {
@@ -226,7 +226,7 @@ float rtsafe(void (*funcd)(float, float, struct GillespieRates *, struct KonStat
       else rts = fminf(2.0*x2,(xl+xh)/2.0);
       fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
     }
-    if (j>1 || done==0) (*funcd)(rts, x, rates, konStates, /*konvalues, *nkon, nkonsum, */ &f, &df);
+    if (j>1 || done==0) (*funcd)(rts, x, rates, konStates, &f, &df);
     if (f < 0.0) xl=rts;
     else xh=rts;   
   }
@@ -389,7 +389,7 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
   }
   bindSiteCount = 0;
   for (geneind=0; geneind<NGenes; geneind++) { /* which cis-reg region */
-    for (i=0; i<reglen-elementlen; i++) {      /*scan forwards*/
+    for (i=0; i<reglen-elementlen; i++) {      /* scan forwards */
       for (tfind=0; tfind<NGenes; tfind++) {
         match=0;
         for (j=i; j<i+elementlen; j++) {
@@ -415,7 +415,7 @@ void CalcInteractionMatrix(char cisRegSeq[NGenes][reglen],
         }
       }
     }
-    for (i=reglen-1; i>=elementlen-1; i--) {  /*scan backwards*/
+    for (i=reglen-1; i>=elementlen-1; i--) {  /* scan backwards */
       for (tfind=0; tfind<NGenes; tfind++) {
         match=0;
         for (j=i; j>i-elementlen; j--)
@@ -719,27 +719,27 @@ void InitializeCell(struct CellState *indiv,
   
   indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
   indiv->mRNATranslTimeEnd = indiv->mRNATranslTimeEndLast = NULL;
-  indiv->tfBoundCount = 0;  /*initialize with nothing bound */
+  indiv->tfBoundCount = 0;  /* initialize with nothing bound */
   indiv->tfHinderedCount = 0;
   indiv->tfBoundIndexes = NULL;
   indiv->tfHinderedIndexes = NULL;
-  for (i=0; i<NGenes; i++){
+  for (i=0; i<NGenes; i++) {
     indiv->active[i] = 2;
     totalmRNA = (int) poidev(meanmRNA[i],&seed);
     indiv->mRNANuclearCount[i] = (int) bnldev(startnucleus, totalmRNA, &seed);
     indiv->mRNACytoCount[i] = totalmRNA - indiv->mRNANuclearCount[i];
     indiv->mRNATranslCytoCount[i] = 0;
-    for (k=0; k<indiv->mRNACytoCount[i]; k++){
+    for (k=0; k<indiv->mRNACytoCount[i]; k++) {
       t = expdev(&seed) / mRNAdecay[i];
-      if (t<ttranslation){
+      if (t < ttranslation) {
         (indiv->mRNACytoCount[i])--;
         (indiv->mRNATranslCytoCount[i])++;
-        AddFixedEvent(i,ttranslation-t,&(indiv->mRNATranslTimeEnd),&(indiv->mRNATranslTimeEndLast));
+        AddFixedEvent(i, ttranslation-t, &(indiv->mRNATranslTimeEnd), &(indiv->mRNATranslTimeEndLast));
       }
     } 
     indiv->mRNATranscrCount[i] = (int) poidev(meanmRNA[i]*ttranscription*mRNAdecay[i],&seed);
-    for (k=0; k<indiv->mRNATranscrCount[i]; k++)
-      AddFixedEvent(i,ran1(&seed)*ttranscription,&(indiv->mRNATranscrTimeEnd),&(indiv->mRNATranscrTimeEndLast));
+    for (k=0; k < indiv->mRNATranscrCount[i]; k++)
+      AddFixedEvent(i, ran1(&seed)*ttranscription, &(indiv->mRNATranscrTimeEnd), &(indiv->mRNATranscrTimeEndLast));
     indiv->proteinConc[i] = initProteinConc[i];
   }
 }
@@ -808,7 +808,6 @@ void CalckonRate (float t,
 void ChangemRNACyto(int i,
                     struct Genotype *genes,
                     struct CellState *state,
-                    float nkonsumi,
                     struct GillespieRates *rates,
                     struct KonStates *konStates)
 {
@@ -818,9 +817,9 @@ void ChangemRNACyto(int i,
 
   /* number of mRNAs in cytoplasm affects ?? */
   salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
-  rates->salphc += nkonsumi*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
-  rates->maxSalphc += nkonsumi*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
-  rates->minSalphc += nkonsumi*kon*(fminf(state->proteinConc[i], salphc) - fminf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));    
+  rates->salphc += konStates->nkonsum[i]*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
+  rates->maxSalphc += konStates->nkonsum[i]*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
+  rates->minSalphc += konStates->nkonsum[i]*kon*(fminf(state->proteinConc[i], salphc) - fminf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));    
   konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
   konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
 }
@@ -907,7 +906,7 @@ void Removekon(int siteID,
                struct GillespieRates *rates,
                float salphc,
                struct KonStates *konStates,
-               float Li)
+               float proteinConcTFID)
 {
   int i, k;
   
@@ -922,8 +921,8 @@ void Removekon(int siteID,
   if (k < konStates->nkon) {   
     /* adjust rates */
     rates->salphc -= kon*salphc;
-    rates->maxSalphc -= kon*fmaxf(Li, salphc);
-    rates->minSalphc -= kon*fminf(Li, salphc);
+    rates->maxSalphc -= kon*fmaxf(proteinConcTFID, salphc);
+    rates->minSalphc -= kon*fminf(proteinConcTFID, salphc);
 
     /* one less site available for binding of total */
     (konStates->nkon)--;
@@ -939,7 +938,7 @@ void Removekon(int siteID,
   //else do nothing: there is likely a redundancy in steric hindrance, hence no site to remove
 }
 
-void Addkon(float Li,
+void Addkon(float proteinConcTFID,
             float salphc,
             int TFID,
             int siteID,
@@ -949,8 +948,8 @@ void Addkon(float Li,
 
   /* update rates because new site is now available */
   rates->salphc += kon*salphc;
-  rates->maxSalphc += fmaxf(Li, salphc);
-  rates->minSalphc += fminf(Li, salphc);
+  rates->maxSalphc += fmaxf(proteinConcTFID, salphc);
+  rates->minSalphc += fminf(proteinConcTFID, salphc);
 
   /* add back siteID to pool of available sites */
   konStates->konIDs[konStates->nkon][SITEID_INDEX] = siteID;
@@ -982,7 +981,6 @@ int CalcTranscription(int geneID,
   else return(0);
 }
 
-// 
 int IsOneActivator(int geneID,
                    int *tfBoundIndexes,
                    int tfBoundCount,
@@ -1036,10 +1034,10 @@ void CalcFromState(struct Genotype *genes,
     Li = state->proteinConc[i];
     salphc = konStates->konvalues[i][KON_SALPHC_INDEX];
     rates->salphc += salphc;
-    rates->maxSalphc += fmaxf(Li,salphc);
-    rates->minSalphc += fminf(Li,salphc);
-    konStates->konIDs[k][SITEID_INDEX]=k;
-    konStates->konIDs[k][TFID_INDEX]=i;
+    rates->maxSalphc += fmaxf(Li, salphc);
+    rates->minSalphc += fminf(Li,  salphc);
+    konStates->konIDs[k][SITEID_INDEX] = k;
+    konStates->konIDs[k][TFID_INDEX] = i;
     (konStates->nkonsum[i])++;
   }
 
@@ -1098,11 +1096,8 @@ int DoesFixedEventEnd(struct FixedEvent *mRNATranslTimeEnd,
 
 void CalcDt(float *x,
             float *dt,
-            /* int nkon,
-               int nkonsum[], */
             struct GillespieRates *rates,
             struct KonStates *konStates,
-            /* float konvalues[NGenes][3], */
             float mRNAdecay[],
             float mRNAdecayrates[],
             int mRNACytoCount[],
@@ -1161,7 +1156,7 @@ void CalcDt(float *x,
     *dt = tbound1;
   } else {
     /* otherwise get delta t by solving the equation using Newton-Raphson method */
-    *dt = rtsafe(&CalcT, *x, rates, konStates, /*konvalues, *nkon,* nkonsum,*/ tbound1, tbound2, (float) 1e-6); 
+    *dt = rtsafe(&CalcT, *x, rates, konStates, tbound1, tbound2, (float) 1e-6); 
   }
 }
 
@@ -1418,14 +1413,13 @@ void RemoveBinding(struct Genotype *genes,
             fprintf(fperrors,"Site %d pos %d on gene %d freed from steric hindrance\n",
                     siteID, genes->interactionMatrix[siteID].sitePos, genes->interactionMatrix[siteID].cisregID);
 
-          /* adjust rates by return kon to pool */
+          /* adjust rates by returning kon to pool */
           Addkon(state->proteinConc[genes->interactionMatrix[siteID].tfID],
                  konStates->konvalues[genes->interactionMatrix[siteID].tfID][KON_SALPHC_INDEX],
                  genes->interactionMatrix[siteID].tfID,
                  siteID,
                  rates,
-                 konStates
-                 );
+                 konStates);
         }
 
         /* now we have one less sterically hindered site */
@@ -1465,8 +1459,7 @@ void RemoveBinding(struct Genotype *genes,
            genes->interactionMatrix[site].tfID,
            site,
            rates,
-           konStates
-           );
+           konStates);
 
     /* adjust the state of the gene */
     ReviseActivityState(geneID, genes, state, rates, statechangeIDs);
@@ -1800,12 +1793,12 @@ void Develop(struct Genotype *genes,
 
         /* update protein concentration */
         UpdateProteinConc(state->proteinConc, dt,
-                          /*konvalues, */ rates, konStates, /*nkonsum,*/ t,
+                          rates, konStates, t,
                           timecoursestart, timecourselast,
                           state->proteinConc);
         
         /* the number of mRNAs in cytoplasm affects binding, TODO: check*/
-        ChangemRNACyto(i, genes, state, (float) (konStates->nkonsum[i]), rates, konStates /*, konvalues, konIDs*/);
+        ChangemRNACyto(i, genes, state, rates, konStates);
       }
 
       /* advance time by the dt */
@@ -1939,7 +1932,7 @@ void Develop(struct Genotype *genes,
               }
               /* remove the mRNA from the cytoplasm count */
               (state->mRNACytoCount[i])--;  
-              ChangemRNACyto(i, genes, state, (float) (konStates->nkonsum[i]), rates, konStates); 
+              ChangemRNACyto(i, genes, state, rates, konStates); 
             
             } else {
               /* 
