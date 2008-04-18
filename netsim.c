@@ -105,6 +105,16 @@ enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
 enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
 
 /*
+ * enum for stateChangeIDs
+ */
+enum { ACTEYLATION = 0, 
+       DEACTEYLATION = 1, 
+       PICASSEMBLY = 2,
+       TRANSCRIPTINIT = 3, 
+       PICDISASSEMBLY = 4,
+};
+
+/*
  * New data structure for keeping track of rates for Gillespie
  * algorithm 
  *
@@ -1052,7 +1062,7 @@ void CalcFromState(Genotype *genes,
   for (i=0; i<NGenes; i++) {
     transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
-    statechangeIDs[0][i] = i;
+    statechangeIDs[ACTEYLATION][i] = i;
   }
   /* for (i=4; i<7; i++) rates[i] *= kon; */
   rates->salphc *= kon;
@@ -1273,14 +1283,14 @@ void DisassemblePIC(int *activestate,
                     int statechangeIDs[][NGenes],
                     float disassembly)
 {
-  RemoveFromArray(geneID, statechangeIDs[3], &(rates->transcriptInitCount), (int) 1);
-  RemoveFromArray(geneID, statechangeIDs[4], &(rates->picDisassemblyCount), (int) 1);
+  RemoveFromArray(geneID, statechangeIDs[TRANSCRIPTINIT], &(rates->transcriptInitCount), (int) 1);
+  RemoveFromArray(geneID, statechangeIDs[PICDISASSEMBLY], &(rates->picDisassemblyCount), (int) 1);
   rates->picDisassembly -= disassembly;
   
   /* disassemble PIC in OFF state */
   if (*activestate == OFF_PIC) {
     (*activestate) = OFF_NO_PIC;
-    statechangeIDs[1][rates->deacetylationCount] = geneID;
+    statechangeIDs[DEACTEYLATION][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
   /* disassemble PIC in ON state */
@@ -1316,15 +1326,15 @@ void ReviseActivityState(int geneID,
   /* OFF_FULL -> ON_WITH_NUCLEOSOME */
   if ((transcriptrule) && oldstate==OFF_FULL){
     state->active[geneID] = ON_WITH_NUCLEOSOME;
-    statechangeIDs[0][rates->acetylationCount] = geneID;
+    statechangeIDs[ACTEYLATION][rates->acetylationCount] = geneID;
     (rates->acetylationCount)++;      
   }
   /* OFF_NO_PIC -> ON_NO_PIC */
   if ((transcriptrule) && oldstate==OFF_NO_PIC) {
     state->active[geneID] = ON_NO_PIC;
-    RemoveFromArray(geneID, statechangeIDs[1], &(rates->deacetylationCount), (int) 1);
+    RemoveFromArray(geneID, statechangeIDs[DEACTEYLATION], &(rates->deacetylationCount), (int) 1);
     if (numactive){
-      statechangeIDs[2][rates->picAssemblyCount] = geneID;
+      statechangeIDs[PICASSEMBLY][rates->picAssemblyCount] = geneID;
       (rates->picAssemblyCount)++;
     }
   }
@@ -1341,14 +1351,14 @@ void ReviseActivityState(int geneID,
   /* ON_WITH_NUCLEOSOME -> OFF_FULL */
   if (!(transcriptrule) && oldstate==ON_WITH_NUCLEOSOME) {
     state->active[geneID] = OFF_FULL;
-    RemoveFromArray(geneID, statechangeIDs[0], &(rates->acetylationCount), (int) 1);
+    RemoveFromArray(geneID, statechangeIDs[ACTEYLATION], &(rates->acetylationCount), (int) 1);
   }
   
   /* ON_NO_PIC -> OFF_NO_PIC */
   if (!(transcriptrule) && oldstate==ON_NO_PIC){          
     state->active[geneID] = OFF_NO_PIC;
-    RemoveFromArray(geneID, statechangeIDs[2], &(rates->picAssemblyCount), (int) 0);
-    statechangeIDs[1][rates->deacetylationCount] = geneID;
+    RemoveFromArray(geneID, statechangeIDs[PICASSEMBLY], &(rates->picAssemblyCount), (int) 0);
+    statechangeIDs[DEACTEYLATION][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
   /* ON_FULL -> OFF_PIC  */
@@ -1812,7 +1822,7 @@ void HistoneActylationEvent(GillespieRates *rates, CellState *state, Genotype *g
   float x = ran1(&seed)*((float) rates->acetylationCount);
 
   /* choose a particular gene to change state */
-  int geneID = statechangeIDs[0][(int)trunc(x)];
+  int geneID = statechangeIDs[ACTEYLATION][(int)trunc(x)];
   if (verbose) fprintf(fperrors,"acetylation event gene %d\nstate change from %d to 4\n",
                        geneID, state->active[geneID]);
   if (state->active[geneID] != ON_WITH_NUCLEOSOME)
@@ -1824,10 +1834,10 @@ void HistoneActylationEvent(GillespieRates *rates, CellState *state, Genotype *g
   
   /* set state: eject nucleosome, but there is no PIC yet */
   state->active[geneID] = ON_NO_PIC;
-  RemoveFromArray(geneID, statechangeIDs[0], &(rates->acetylationCount), (int) 1);
+  RemoveFromArray(geneID, statechangeIDs[ACTEYLATION], &(rates->acetylationCount), (int) 1);
   if (IsOneActivator(geneID, state->tfBoundIndexes, state->tfBoundCount, 
                      genes->interactionMatrix, genes->activating)) {
-    statechangeIDs[2][rates->picAssemblyCount] = geneID; 
+    statechangeIDs[PICASSEMBLY][rates->picAssemblyCount] = geneID; 
     (rates->picAssemblyCount)++;
   }
 }
@@ -1837,7 +1847,7 @@ void HistoneDeactylationEvent(GillespieRates *rates, CellState *state, Genotype 
                               float dt, float t)
 {
   float x = ran1(&seed)*((float) rates->deacetylationCount);
-  int geneID = statechangeIDs[1][(int)trunc(x)];
+  int geneID = statechangeIDs[DEACTEYLATION][(int)trunc(x)];
   if (verbose) fprintf(fperrors,"deacetylation event gene %d\nstate change from %d to 1\n",
                        geneID,state->active[geneID]);
   if (state->active[geneID] != OFF_NO_PIC)
@@ -1848,7 +1858,7 @@ void HistoneDeactylationEvent(GillespieRates *rates, CellState *state, Genotype 
                     state->proteinConc);
   /* set state: nucleosome returns */
   state->active[geneID] = OFF_FULL;
-  RemoveFromArray(geneID, statechangeIDs[1], &(rates->deacetylationCount), (int) 1);
+  RemoveFromArray(geneID, statechangeIDs[DEACTEYLATION], &(rates->deacetylationCount), (int) 1);
 
 }
 
@@ -1860,7 +1870,7 @@ void PICAssemblyEvent(GillespieRates *rates, CellState *state, Genotype *genes, 
   float x;
 
   x = ran1(&seed)*((float) rates->picAssemblyCount);
-  geneID = statechangeIDs[2][(int)trunc(x)];
+  geneID = statechangeIDs[PICASSEMBLY][(int)trunc(x)];
   if (verbose) fprintf(fperrors,"PIC assembly event gene %d\nstate change from %d to 6\n",
                        geneID,state->active[geneID]);
   if (state->active[geneID] != ON_NO_PIC)
@@ -1872,10 +1882,10 @@ void PICAssemblyEvent(GillespieRates *rates, CellState *state, Genotype *genes, 
   
   /* turn gene fully on: ready for transcription */
   state->active[geneID] = ON_FULL;
-  RemoveFromArray(geneID, statechangeIDs[2], &(rates->picAssemblyCount), (int) 1);                      
-  statechangeIDs[3][rates->transcriptInitCount] = geneID;
+  RemoveFromArray(geneID, statechangeIDs[PICASSEMBLY], &(rates->picAssemblyCount), (int) 1);                      
+  statechangeIDs[TRANSCRIPTINIT][rates->transcriptInitCount] = geneID;
   (rates->transcriptInitCount)++;
-  statechangeIDs[4][rates->picDisassemblyCount] = geneID;
+  statechangeIDs[PICDISASSEMBLY][rates->picDisassemblyCount] = geneID;
   (rates->picDisassemblyCount)++;
   rates->picDisassembly += genes->PICdisassembly[geneID];                                            
 }
@@ -1888,10 +1898,10 @@ void PICDissassemblyEvent(GillespieRates *rates, CellState *state, Genotype *gen
   while (j < NGenes && x>0) {
     j++;
     /* TODO: why do we keep original rand number x, rather than choose a new one like other functions?  */
-    x -= genes->PICdisassembly[statechangeIDs[4][j]];                
+    x -= genes->PICdisassembly[statechangeIDs[PICDISASSEMBLY][j]];                
   }
   if (j==NGenes) fprintf(fperrors, "error in PIC disassembly\n");
-  j=statechangeIDs[4][j];
+  j = statechangeIDs[PICDISASSEMBLY][j];
   if (verbose) fprintf(fperrors, "PIC disassembly event in gene %d\n", j);
   DisassemblePIC(&(state->active[j]), j, rates, statechangeIDs,
                  genes->PICdisassembly[j]);
@@ -1903,7 +1913,7 @@ void TranscriptionInitEvent(GillespieRates *rates, CellState *state, Genotype *g
 {
   int geneID;
   x /= transcriptinit;
-  geneID = statechangeIDs[3][(int)trunc(x)];
+  geneID = statechangeIDs[TRANSCRIPTINIT][(int)trunc(x)];
   if (verbose) fprintf(fperrors,"transcription event gene %d\n",geneID);
   if (state->active[geneID] != ON_FULL && state->active[geneID] != OFF_PIC)
     fprintf(fperrors,"error: transcription event attempted from state %d\n", state->active[geneID]);

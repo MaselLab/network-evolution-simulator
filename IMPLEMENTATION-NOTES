@@ -52,6 +52,11 @@ CellState->active   OFF_FULL = 1,           /* repr>activ, still nuclesome, and 
 konIDs              SITEID_INDEX = 0, 
 		    TFID_INDEX = 1 
 
+stateChangeIDs      ACTEYLATION = 0, 
+                    DEACTEYLATION = 1, 
+                    PICASSEMBLY = 2,
+                    TRANSCRIPTINIT = 3, 
+                    PICDISASSEMBLY = 4
 
 To check
 --------
