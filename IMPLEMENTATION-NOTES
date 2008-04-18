@@ -1,18 +1,18 @@
 Variable definitions:
 
-Old name          New name                    Meaning
----------         ---------                   ---------
-Genotype->y       Genotype->bindSiteCount     total number of binding sites
-Genotype->G       Genotype->interactionMatrix interaction matrix
+Old name          New name                                   Meaning
+---------         ---------                                  ---------
+Genotype->y       Genotype->bindSiteCount                    total number of binding sites
+Genotype->G       Genotype->interactionMatrix                interaction matrix
 Genotype->C       Genotype->cisRegSeq
 Genotype->O       Genotype->transcriptionFactorSeq
 
-CellState->y2     CellState->tfBoundCount      current number of TFs bound
-CellState->B2     CellState->tfBoundIndexes    array of indices of bound TFs
-CellState->y3     CellState->tfHinderedCount   number of binding sites that have steric hindrances
-CellState->B3     CellState->tfHinderedIndexes array of binding sites that can't be bound due steric hindrance
-CellState->L      CellState->proteinConc       protein concentrations
-CellState->Scyto  CellState->mRNACytoCount     number of mRNA in cytoplasm
+CellState->y2     CellState->tfBoundCount                    current number of TFs bound
+CellState->B2     CellState->tfBoundIndexes                  array of indices of bound TFs
+CellState->y3     CellState->tfHinderedCount                 number of binding sites that have steric hindrances
+CellState->B3     CellState->tfHinderedIndexes               array of binding sites that can't be bound due steric hindrance
+CellState->L      CellState->proteinConc                     protein concentrations
+CellState->Scyto  CellState->mRNACytoCount                   number of mRNA in cytoplasm
 CellState->Snuclear          CellState->mRNANuclearCount
 CellState->Stranslating      CellState->mRNATranslCytoCount
 CellState->tStranslating     CellState->mRNATranslTimeEnd
@@ -21,10 +21,14 @@ CellState->Stranscribing      CellState->mRNATranscrCount
 CellState->tStranscribing     CellState->mRNATranscrTimeEnd
 CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
 
+statechangeIDs                CellState->statechangeIDs      now part of CellState structure: 
+                                                             keeps track of list of genes in each state
+
 rates, rates2                 merged into new GillespieRates struct
 
 nkon, nkonsum             }   merged into new KonStates struct   
 konIDs, konvalues         }
+
 
 
 Function/Structs:
@@ -52,18 +56,18 @@ CellState->active   OFF_FULL = 1,           /* repr>activ, still nuclesome, and 
 konIDs              SITEID_INDEX = 0, 
 		    TFID_INDEX = 1 
 
-stateChangeIDs      ACTEYLATION = 0, 
-                    DEACTEYLATION = 1, 
-                    PICASSEMBLY = 2,
-                    TRANSCRIPTINIT = 3, 
-                    PICDISASSEMBLY = 4
+CellState->statechangeIDs  ACTEYLATION = 0, 
+                           DEACTEYLATION = 1, 
+                           PICASSEMBLY = 2,
+                           TRANSCRIPTINIT = 3, 
+                           PICDISASSEMBLY = 4
 
 To check
 --------
 nkon       total number of *available* binding sites
 nkonsum    total number of available binding sites on cis-reg sequence for a given TF
 
-statechangeIDs ?
+
 Addkon, Removekon ?
 
 
