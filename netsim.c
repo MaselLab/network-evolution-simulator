@@ -1280,25 +1280,25 @@ void RemoveFromArray(int toberemoved,
   // don't always print because with a 4->3 transition PIC assembly is not there to be removed
 }
 
-void DisassemblePIC(int *activestate,
+void DisassemblePIC(CellState *state,
+                    Genotype *genes,
                     int geneID,
-                    GillespieRates *rates,
-                    int statechangeIDs[][NGenes],
-                    float disassembly)
+                    GillespieRates *rates)
 {
-  RemoveFromArray(geneID, statechangeIDs[TRANSCRIPTINIT], &(rates->transcriptInitCount), (int) 1);
-  RemoveFromArray(geneID, statechangeIDs[PICDISASSEMBLY], &(rates->picDisassemblyCount), (int) 1);
+  float disassembly = genes->PICdisassembly[geneID];
+  RemoveFromArray(geneID, state->statechangeIDs[TRANSCRIPTINIT], &(rates->transcriptInitCount), (int) 1);
+  RemoveFromArray(geneID, state->statechangeIDs[PICDISASSEMBLY], &(rates->picDisassemblyCount), (int) 1);
   rates->picDisassembly -= disassembly;
   
   /* disassemble PIC in OFF state */
-  if (*activestate == OFF_PIC) {
-    (*activestate) = OFF_NO_PIC;
-    statechangeIDs[DEACTEYLATION][rates->deacetylationCount] = geneID;
+  if (state->active[geneID] == OFF_PIC) {
+    (state->active[geneID]) = OFF_NO_PIC;
+    state->statechangeIDs[DEACTEYLATION][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
   /* disassemble PIC in ON state */
-  if (*activestate == ON_FULL) {
-    (*activestate) = ON_NO_PIC;
+  if (state->active[geneID] == ON_FULL) {
+    (state->active[geneID]) = ON_NO_PIC;
   }
 }
 
@@ -1373,8 +1373,7 @@ void ReviseActivityState(int geneID,
    * ON_FULL -> ON_NO_PIC 
    */
   if ((state->active[geneID]==OFF_PIC || state->active[geneID]==ON_FULL) && numactive==0)
-    DisassemblePIC(&(state->active[geneID]), geneID, rates, state->statechangeIDs,
-                   genes->PICdisassembly[geneID]);
+    DisassemblePIC(state, genes, geneID, rates);
 
   if (verbose && (oldstate!=state->active[geneID])) {
     fprintf(fperrors, "state change from %d to %d in gene %d\n", oldstate, state->active[geneID], geneID);
@@ -1903,8 +1902,7 @@ void PICDissassemblyEvent(GillespieRates *rates, CellState *state, Genotype *gen
   if (j==NGenes) fprintf(fperrors, "error in PIC disassembly\n");
   j = state->statechangeIDs[PICDISASSEMBLY][j];
   if (verbose) fprintf(fperrors, "PIC disassembly event in gene %d\n", j);
-  DisassemblePIC(&(state->active[j]), j, rates, state->statechangeIDs,
-                 genes->PICdisassembly[j]);
+  DisassemblePIC(state, genes, j, rates);
 }
 
 void TranscriptionInitEvent(GillespieRates *rates, CellState *state, Genotype *genes,
