@@ -13,6 +13,9 @@
 #include <float.h>
 #include <string.h>
 #include "random.h"
+#include "lib.h"
+#include "netsim.h"
+
 //#include "list.h"
 
 /*
@@ -32,218 +35,40 @@
   change NumSitesInGenome value
   v36: reglen changed to 150
 */
-#define MAXIT 100
 
 static int maxelements=500; 
 //start by allocating maxelements when initializing a genotype, double as needed, reduce at end
 static int maxbound=50;
-#define NGenes 10
-#define reglen 150
-#define elementlen 6
-#define Nkdis 133
-static int dummyrun=4; //used to change seed
+static int dummyrun=4; /* used to change seed */
 static int PopSize=1;
 static int nmin=4;
 static float tdevelopment=120.0;
-static float kon=1e-4; // lower value is so things run faster
-/*kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
-  and 89% of the proteins being in the nucleus*/
+static float kon=1e-4; /* lower value is so things run faster */
+/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
+   and 89% of the proteins being in the nucleus*/
 static float kRNA=618.0;
 static float ttranslation=1.0;
 static float ttranscription=1.0;
 static float pact=0.62;
-static float transcriptinit=8.5; //replace betaon and betaoff
+static float transcriptinit=8.5; /* replace betaon and betaoff */
 static float deacetylate=0.462;
 static float acetylate=0.1155;
 static float PICassembly=0.0277;
 
 static float startnucleus=0.1;
-static float Kr=10;//don't put this less than 1, weird things happen to koff calculation
+static float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
 static float GasConstant=8.31447;
-static float cooperativity=1.0;//dGibbs, relative to 1 additional specific nt
+static float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
 static float NumSitesInGenome = 1.8e+6;
 static float selection = 1.0;
-static int verbose = 1;
+
 static int output = 0;
 static float mN = 0.1;
 static int Generations=5;
+static long seed =  28121; /* something is wrong here: changing seed changes nothing */
 
-static long seed =  28121; //something is wrong here: changing seed changes nothing
-static FILE *fperrors;
-
-/* random number generator from Numerical Recipes */
-float ran1(long *seed);
-/* Normally distributed random number with mean zero and variance 1 */
-float gasdev(long *seed);
-float poidev(float xm, long *seed);
-/* Returns an exponentially distributed, positive, random deviate of unit mean */
-float expdev(long *seed);
-float bnldev(float pp, int n, long *seed);
-
-/* 
- * enum for 'konvalues' indices
- * are rates of binding with:
- * element KON_DIFF          is (proteinConc - salphc)/proteindecay
- * element KON_PROTEIN_DECAY is proteindecay
- * element KON_SALPHC        is salphc
- */
-enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
-
-/*
- * enum for 'CellState'->active indices
- */
-enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
-       ON_WITH_NUCLEOSOME = 2, /* activ>repr, still nucleosome */
-       OFF_NO_PIC = 3,         /* repr>activ, no nucleosome, but no PIC */
-       ON_NO_PIC = 4,          /* activ>repr, no nucleosome, but no PIC  */
-       OFF_PIC = 5,            /* repr>activ, no nucleosome, and PIC */
-       ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
-
-/*
- * enum for konIDs
- */
-enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
-
-/*
- * enum for stateChangeIDs
- */
-enum { ACTEYLATION = 0, 
-       DEACTEYLATION = 1, 
-       PICASSEMBLY = 2,
-       TRANSCRIPTINIT = 3, 
-       PICDISASSEMBLY = 4,
-};
-
-/*
- * New data structure for keeping track of rates for Gillespie
- * algorithm 
- *
- * Events with exponentially-distributed waiting times are:
- * - TF association and dissociation, 
- * - transcription initiation
- * - mRNA transport and decay
- * - acetylation and deacetylation, 
- * - and PIC assembly and disassembly.
- *
- * was formerly float rates[8];  and int rates2[5] 
- * rates: total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
- *  4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
- *  3-PIC disassembly used to be 3-transcriptinit
- * rates2: #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 
- *  3-transcriptinit, 4=PIC disassembly
- */
-typedef struct
-{
-  float koff;              /* rates[0] */
-  float transport;         /* rates[1] */
-  float mRNAdecay;         /* rates[2] */
-  float picDisassembly;    /* rates[3] */
-  float salphc;            /* rates[4] */
-
-  /* the following are cached values to avoid recomputation not
-     actually part of the Gillespie rates */
-  float maxSalphc;         /* rates[5] */
-  float minSalphc;         /* rates[6] */
-
-  /* number of genes in the following states */
-  int acetylationCount;       /* rates2[0] */
-  int deacetylationCount;     /* rates2[1] */
-  int picAssemblyCount;       /* rates2[2] */
-  int transcriptInitCount;    /* rates2[3] */
-  int picDisassemblyCount;    /* rates2[4] */
-
-  /* total, including rates2 */
-  float total;                /* rates[7] */
-} GillespieRates;
-
-/*
- * konStates : new composite data structure to cache information about
- * available binding sites to avoid re-computation.  This currently
- * just groups the previous data structures: 
- *
- * konIDs, konvalues, nkonsum
- *
- * but will ultimately be refactored again for greater efficiency
- */
-typedef struct {
-  /* number of currently *available* binding sites */
-  int nkon;
-
-  /* elem 0 is siteID, elem 1 is TF that binds */
-  int (*konIDs)[2];
-
-  /* number of available binding sites for a given TF */
-  int nkonsum[NGenes];
-
-  /* konvalues are rates of binding with:
-   * element 0 is other funny term (TODO ?)
-   * element 1 is c
-   * element 2 is salphc
-   * Other index is which TF binds 
-   * The kon term is left out of all of them for computational efficiency
-   */
-  float konvalues[NGenes][3];
-} KonStates;
-
-
-/* Newton-Raphson root-finding method with bisection steps, out of
- * Numerical Recipes function bracketed by x1 and x2. Returns root
- * within accuracy +/-xacc funcd is function of interest, returning
- * both function value and first deriv.*/
-float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *, float *), 
-             float x, GillespieRates *rates, KonStates *konStates, float x1, float x2, float xacc)
-{
-  int j,done;
-  float df,dx,dxold,f,fh,fl,xtemp;
-  float temp,xh,xl,rts;
-  
-  (*funcd)(x1, x, rates, konStates, &fl, &df);
-  (*funcd)(x2, x, rates, konStates, &fh, &df); /* note df isn't used here */
-  if (fabs(fl) < 1e-9) return x1;
-  if (fabs(fh) < 1e-9) return x2;
-  if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0)){
-    if (verbose) fprintf(fperrors,"warning in rtsafe: root should be bracketed\n");
-    if (fabs(fl) < fabs(fh)) return x1; else return x2;
-  }
-  if (fl < 0.0) {
-    xl=x1;
-    xh=x2;
-  } else {
-    xh=x1;
-    xl=x2;
-  }
-  rts=0.5*(x1+x2);
-  dxold=fabs(x2-x1);
-  dx=dxold;
-  (*funcd)(rts, x, rates, konStates, &f, &df);
-  done = 0;
-  for (j=1;j<=MAXIT;j++){
-    if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0) || (fabs(2.0*f) > fabs(dxold*df))) {
-      done = 1;// modified: otherwise this bisection can mean 2 identical function calls for j=1
-      dxold=dx;
-      dx=0.5*(xh-xl);
-      rts=xl+dx;      
-      if (xl == rts) return rts;
-    } else {
-      dxold=dx;
-      dx=f/df;
-      temp=rts;
-      rts -= dx;
-      if (temp == rts) return rts;
-    }
-    if (fabs(dx) < xacc) return rts;
-    if (rts==0.0){
-      if (x1<x2) rts = fminf(2.0*x1,(xl+xh)/2.0);
-      else rts = fminf(2.0*x2,(xl+xh)/2.0);
-      fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
-    }
-    if (j>1 || done==0) (*funcd)(rts, x, rates, konStates, &f, &df);
-    if (f < 0.0) xl=rts;
-    else xh=rts;   
-  }
-  fprintf(fperrors,"error in rtsafe: too many iterations\n");
-  return 0.0;
-}
+int verbose = 1;
+FILE *fperrors;
 
 void initialize_sequence(char Seq[], 
                          int len)
@@ -264,60 +89,25 @@ void initialize_sequence(char Seq[],
   /* printf("length: %d, sequence is %s\n", strlen(Seq), Seq); */
 }
 
-typedef struct
-{
-  int cisregID;     /* 0 */
-  int tfID;         /* 1 */
-  int sitePos;      /* 2 */
-  int strand;       /* 3 */
-  int hammingDist;  /* 4 */
-} TFInteractionMatrix;
-
-typedef struct
-{
-  char cisRegSeq[NGenes][reglen];
-  char transcriptionFactorSeq[NGenes][elementlen];
-  int bindSiteCount;
-  TFInteractionMatrix *interactionMatrix;
-/* int (*interactionMatrix)[5];
- 5 elements are
-    identity of cis-regulatory region
-    identity of TF that binds
-    position 0 to 386 (first position, always in forwards strand)  
-    strand 0 (forward) or 1 (backward)
-    Hamming distance 0 to n-n_min 
-*/ 
-  float mRNAdecay[NGenes];
-  float proteindecay[NGenes];
-  float translation[NGenes];
-  int activating[NGenes]; // 1 is activating, 0 is repressing
-  float PICdisassembly[NGenes];
-} Genotype;
-
-
-void calc_interaction_matrix(char [NGenes][reglen],
-                           char [NGenes][elementlen],
-                           int *,
-                           TFInteractionMatrix **);
 
 void print_interaction_matrix(TFInteractionMatrix *interactionMatrix, 
                             int numElements,
-                            char transcriptionFactorSeq[NGenes][elementlen],
-                            char cisRegSeq[NGenes][reglen])
+                            char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN],
+                            char cisRegSeq[NGENES][CISREG_LEN])
 {
   int i;
 
-  for (i=0; i<NGenes; i++) {
-    printf("transcriptionFactorSeq number %2d: %.*s\n", i, elementlen, transcriptionFactorSeq[i]);
-    printf("cis-reg                number %2d: %.*s\n", i, reglen, cisRegSeq[i]);
+  for (i=0; i<NGENES; i++) {
+    printf("transcriptionFactorSeq number %2d: %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i]);
+    printf("cis-reg                number %2d: %.*s\n", i, CISREG_LEN, cisRegSeq[i]);
   } 
   
   for (i=0; i<numElements; i++) {
     printf("binding site %3d:\n", i);
     printf("       cis-reg region: %3d", interactionMatrix[i].cisregID);
-    printf(" (sequence %.*s\n)", reglen, cisRegSeq[interactionMatrix[i].cisregID]);
+    printf(" (sequence %.*s\n)", CISREG_LEN, cisRegSeq[interactionMatrix[i].cisregID]);
     printf(" transcription-factor: %3d", interactionMatrix[i].tfID);
-    printf(" (sequence: %.*s)\n", elementlen, transcriptionFactorSeq[interactionMatrix[i].tfID]);
+    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[interactionMatrix[i].tfID]);
     printf("             position: %3d\n", interactionMatrix[i].sitePos);
     printf("               strand: %3d\n", interactionMatrix[i].strand);
     printf("         Hamming dist: %3d\n", interactionMatrix[i].hammingDist);
@@ -329,12 +119,12 @@ void initialize_genotype(Genotype *indiv,
 {
   int i, j;
   
-  initialize_sequence((char *)indiv->cisRegSeq,reglen*NGenes);
-  initialize_sequence((char *)indiv->transcriptionFactorSeq,elementlen*NGenes); 
+  initialize_sequence((char *)indiv->cisRegSeq,CISREG_LEN*NGENES);
+  initialize_sequence((char *)indiv->transcriptionFactorSeq,TF_ELEMENT_LEN*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->bindSiteCount),&(indiv->interactionMatrix));
   /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);  */
   fprintf(fperrors,"activators vs repressors ");
-  for (i=0; i<NGenes; i++){
+  for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
     while (indiv->mRNAdecay[i]<0.0)
       indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -351,7 +141,7 @@ void initialize_genotype(Genotype *indiv,
     if (ran1(&seed)<pact) indiv->activating[i] = 1;
     else indiv->activating[i] = 0;
     fprintf(fperrors,"%d ",indiv->activating[i]);
-    j = trunc(Nkdis * ran1(&seed));
+    j = trunc(NUM_K_DISASSEMBLY * ran1(&seed));
     indiv->PICdisassembly[i] = kdis[j];
   }
   fprintf(fperrors,"\n");
@@ -364,8 +154,8 @@ void mutate(Genotype *old,
   int i,k;
   char x;
   
-  for (i=0; i<NGenes; i++) {
-    for (k=0; k<reglen; k++) {
+  for (i=0; i<NGENES; i++) {
+    for (k=0; k<CISREG_LEN; k++) {
       new->cisRegSeq[i][k] = old->cisRegSeq[i][k];      
       if (m > ran1(&seed)) {
         x = old->cisRegSeq[i][k]; //because sometimes old and new are the same
@@ -373,7 +163,7 @@ void mutate(Genotype *old,
           initialize_sequence(&(new->cisRegSeq[i][k]),(int) 1);
       }
     }
-    for (k=0; k<elementlen; k++) 
+    for (k=0; k<TF_ELEMENT_LEN; k++) 
       new->transcriptionFactorSeq[i][k] = old->transcriptionFactorSeq[i][k];    
     new->mRNAdecay[i] = old->mRNAdecay[i];
     new->proteindecay[i] = old->proteindecay[i];
@@ -385,10 +175,10 @@ void mutate(Genotype *old,
 }
 
 
-void calc_interaction_matrix(char cisRegSeq[NGenes][reglen],
-                           char transcriptionFactorSeq[NGenes][elementlen],
-                           int *newBindSiteCount,
-                           TFInteractionMatrix **interactionMatrix)
+void calc_interaction_matrix(char cisRegSeq[NGENES][CISREG_LEN],
+                             char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN],
+                             int *newBindSiteCount,
+                             TFInteractionMatrix **interactionMatrix)
 {
   int i, j, geneind, tfind, match, maxy, bindSiteCount;
   
@@ -399,11 +189,11 @@ void calc_interaction_matrix(char cisRegSeq[NGenes][reglen],
     exit(1);
   }
   bindSiteCount = 0;
-  for (geneind=0; geneind<NGenes; geneind++) { /* which cis-reg region */
-    for (i=0; i<reglen-elementlen; i++) {      /* scan forwards */
-      for (tfind=0; tfind<NGenes; tfind++) {
+  for (geneind=0; geneind<NGENES; geneind++) { /* which cis-reg region */
+    for (i=0; i<CISREG_LEN-TF_ELEMENT_LEN; i++) {      /* scan forwards */
+      for (tfind=0; tfind<NGENES; tfind++) {
         match=0;
-        for (j=i; j<i+elementlen; j++) {
+        for (j=i; j<i+TF_ELEMENT_LEN; j++) {
           if (cisRegSeq[geneind][j] == transcriptionFactorSeq[tfind][j-i])
             match++;
         }
@@ -421,15 +211,15 @@ void calc_interaction_matrix(char cisRegSeq[NGenes][reglen],
           (*interactionMatrix)[bindSiteCount].tfID = tfind;
           (*interactionMatrix)[bindSiteCount].sitePos = i;
           (*interactionMatrix)[bindSiteCount].strand = 0;
-          (*interactionMatrix)[bindSiteCount].hammingDist = elementlen-match;
+          (*interactionMatrix)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
           bindSiteCount++;
         }
       }
     }
-    for (i=reglen-1; i>=elementlen-1; i--) {  /* scan backwards */
-      for (tfind=0; tfind<NGenes; tfind++) {
+    for (i=CISREG_LEN-1; i>=TF_ELEMENT_LEN-1; i--) {  /* scan backwards */
+      for (tfind=0; tfind<NGENES; tfind++) {
         match=0;
-        for (j=i; j>i-elementlen; j--)
+        for (j=i; j>i-TF_ELEMENT_LEN; j--)
           if (
              (cisRegSeq[geneind][j]=='a' && transcriptionFactorSeq[tfind][i-j]=='t')
              || (cisRegSeq[geneind][j]=='t' && transcriptionFactorSeq[tfind][i-j]=='a')
@@ -447,9 +237,9 @@ void calc_interaction_matrix(char cisRegSeq[NGenes][reglen],
           }
           (*interactionMatrix)[bindSiteCount].cisregID = geneind;
           (*interactionMatrix)[bindSiteCount].tfID = tfind;
-          (*interactionMatrix)[bindSiteCount].sitePos = i-elementlen+1;
+          (*interactionMatrix)[bindSiteCount].sitePos = i-TF_ELEMENT_LEN+1;
           (*interactionMatrix)[bindSiteCount].strand = 1;
-          (*interactionMatrix)[bindSiteCount].hammingDist = elementlen-match;
+          (*interactionMatrix)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
           bindSiteCount++;
         }
       }
@@ -463,166 +253,6 @@ void calc_interaction_matrix(char cisRegSeq[NGenes][reglen],
   *newBindSiteCount = bindSiteCount;
 }
 
-/* transcription/translation delays are sorted linked lists.
-   Deleting the head each time, and tack new stuff on the end
-   Linked lists are easy to create pre-sorted.
-*/
-typedef struct FixedEvent FixedEvent;
-
-struct FixedEvent {
-  int geneID;
-  float time;
-  FixedEvent *next;
-};
-
-typedef struct
-{
-  int mRNACytoCount[NGenes];          /* mRNAs in cytoplasm */
-  int mRNANuclearCount[NGenes];       /* mRNAs in nucleus */
-  int mRNATranslCytoCount[NGenes];    /* mRNAs are in the cytoplasm, but only recently */
-  FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs move to cytoplasm (mRNACytoCount) */
-  FixedEvent *mRNATranslTimeEndLast; 
-  int mRNATranscrCount[NGenes];             /* mRNAs which haven't finished transcription yet */
-  FixedEvent *mRNATranscrTimeEnd;    /* times when transcripts ? move to nucleus (mRNANuclearCount) */
-  FixedEvent *mRNATranscrTimeEndLast;
-  float proteinConc[NGenes];
-  int tfBoundCount;
-  int *tfBoundIndexes;
-  /* tfBoundIndexes lists just bound TFs according to binding site index in G */
-  int tfHinderedCount;
-  int (*tfHinderedIndexes)[2];
-  /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
-    2nd elem gives corresponding index of inhibiting TF in G (TODO: what is this?)
-  */
-  int active[NGenes];
-  /* gives the state of each of the genes, according to figure
-     1 is fully off, 2 meets TF criteria
-     3 is off but w/o nucleosome, 4 is on but w/o PIC
-     5 is on but w/o TF criteria, 6 is fully on
-  */
-
-  /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  int statechangeIDs[5][NGenes]; 
-
-} CellState;
-
-void free_mem_CellState(CellState *state)
-{
-  FixedEvent *start,*info;
-
-  start = state->mRNATranslTimeEnd;  
-  while (start){
-    info = start;
-    start = start->next;
-    free(info);  
-  }
-  start = state->mRNATranscrTimeEnd;  
-  while (start){
-    info = start;
-    start = start->next;
-    free(info);  
-  }
-  free(state->tfBoundIndexes);
-  free(state->tfHinderedIndexes);
-}
-
-void sls_store(FixedEvent *i, 
-               FixedEvent **start, 
-               FixedEvent **last)
-{
-  FixedEvent *old, *p;
-  
-  p= *start;
-  if (!*last) { /*first element in list*/
-    i->next = NULL;
-    *last = i;
-    *start = i;
-    return;
-  }
-  old=NULL;
-  while (p) {
-    if (p->time < i->time){
-      old=p;
-      p = p->next;
-    }
-    else {
-      if (old) { /*goes in the middle*/
-        old->next = i;
-        i->next =p;
-        return;
-      }
-      i->next = p; /*new first element*/
-      *start = i;
-      return;
-    }
-  }
-  (*last)->next = i; /*put on end*/
-  i->next = NULL;
-  *last = i;
-}
-
-typedef struct TimeCourse TimeCourse;
-
-struct TimeCourse
-{
-  float concentration;
-  float time;
-  TimeCourse *next;
-};     
-
-void delete_time_course(TimeCourse *start2)
-{
-  TimeCourse *info,*start;
-  
-  start = start2; 
-  while (start){
-    info = start;
-    start = start->next;
-    free(info);
-  }
-}
-
-void display2(TimeCourse *start)
-{
-  TimeCourse *info;
-
-  info = start;
-  while (info){
-    fprintf(fperrors,"time %g conc %g\n",info->time,info->concentration);
-    info = info->next;
-  }
-}
-      
-void sls_store_end(FixedEvent *i, 
-                   FixedEvent **start, 
-                   FixedEvent **last)
-{
-  i->next = NULL;
-  if (!*last) *start = i;
-  else (*last)->next = i;
-  *last = i;
-}
-
-void sls_store_end2(TimeCourse *i, 
-                    TimeCourse **start, 
-                    TimeCourse **last)
-{
-  i->next = NULL;
-  if (!*last) *start = i;
-  else (*last)->next = i;
-  *last = i;
-}
-
-void display(FixedEvent *start)
-{
-  FixedEvent *info;
-
-  info = start;
-  while (info){
-    fprintf(fperrors,"gene %d time %f\n",info->geneID,info->time);
-    info = info->next;
-  }
-}
 
 void add_fixed_event(int i,
                      float t,
@@ -726,10 +356,10 @@ void delete_fixed_event_start(FixedEvent **start,
 }
 
 void initialize_cell(CellState *indiv,
-                     /*  int y[NGenes]: AKL 2008-03-21: removed wasn't being used */
-                     float mRNAdecay[NGenes],
-                     float meanmRNA[NGenes],
-                     float initProteinConc[NGenes])
+                     /*  int y[NGENES]: AKL 2008-03-21: removed wasn't being used */
+                     float mRNAdecay[NGENES],
+                     float meanmRNA[NGENES],
+                     float initProteinConc[NGENES])
 {
   int i, k, totalmRNA;
   float t;
@@ -740,7 +370,7 @@ void initialize_cell(CellState *indiv,
   indiv->tfHinderedCount = 0;
   indiv->tfBoundIndexes = NULL;
   indiv->tfHinderedIndexes = NULL;
-  for (i=0; i<NGenes; i++) {
+  for (i=0; i<NGENES; i++) {
     indiv->active[i] = ON_WITH_NUCLEOSOME;
     totalmRNA = (int) poidev(meanmRNA[i],&seed);
     indiv->mRNANuclearCount[i] = (int) bnldev(startnucleus, totalmRNA, &seed);
@@ -775,7 +405,7 @@ void calc_time (float t,
   r = numer = 0.0;
 
   /* loop over all genes */
-  for (i=0; i < NGenes; i++) {
+  for (i=0; i < NGENES; i++) {
     /* if currently transcribing add it to the rates */
     /* TODO-DONE: check my interpretation of nkonsum */
     if (konStates->nkonsum[i]>0) {
@@ -809,7 +439,7 @@ void calc_kon_rate(float t,
   int i;
   
   r = 0.0;
-  for (i=0; i<NGenes; i++){
+  for (i=0; i<NGENES; i++){
     if (konStates->nkonsum[i]>0){
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*t;
       if (fabs(ct)<10^-6) ect=ct;
@@ -852,7 +482,7 @@ void calc_koff(int k,
   int posdiff, front, back, i, j;
   
   front = back = 0;
-  Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * RTlnKr; /* subject to revision of elementlen */
+  Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * RTlnKr; /* subject to revision of TF_ELEMENT_LEN */
   for (j=0; j < state->tfBoundCount; j++) {
     if (interactionMatrix[k].cisregID==interactionMatrix[state->tfBoundIndexes[j]].cisregID && !(k==state->tfBoundIndexes[j])) {
       posdiff = interactionMatrix[k].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
@@ -871,7 +501,7 @@ void calc_koff(int k,
   if (front>0) Gibbs -= cooperativity*RTlnKr/3;
   if (back>0) Gibbs -= cooperativity*RTlnKr/3;
   *koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
-  //  fprintf(fperrors,"RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",RTlnKr,front,back,interactionMatrix[k][4],Gibbs,*koff);
+  /*  fprintf(fperrors,"RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",RTlnKr,front,back,interactionMatrix[k][4],Gibbs,*koff); */
   /* 25% protein in nucleus is implicit in formula above */
 }
 
@@ -1029,7 +659,7 @@ void calc_from_state(Genotype *genes,
   int i, k;
   float salphc, proteinConcTFID; 
 
-  for (i=0; i<NGenes; i++) {
+  for (i=0; i<NGENES; i++) {
     salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
     konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i];
@@ -1062,7 +692,7 @@ void calc_from_state(Genotype *genes,
   /* initialize konStates->nkon as the total number of binding sites */
   konStates->nkon = genes->bindSiteCount;
 
-  for (i=0; i<NGenes; i++) {
+  for (i=0; i<NGENES; i++) {
     transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
     state->statechangeIDs[ACTEYLATION][i] = i;
@@ -1072,7 +702,7 @@ void calc_from_state(Genotype *genes,
   rates->maxSalphc *= kon;
   rates->minSalphc *= kon;
 
-  rates->acetylationCount=NGenes;
+  rates->acetylationCount=NGENES;
 
   /* for (i=1; i<5; i++) rates2[i]=0; */
   rates->deacetylationCount=0;
@@ -1133,7 +763,7 @@ void calc_dt(float *x,
   /* update mRNAdecay rate based on the total number of mRNAs in both
      cytoplasm (mRNACytoCount) and ones that have only just recently arrived
      (mRNATranslCytoCount) */
-  for (i=0; i<NGenes; i++){
+  for (i=0; i<NGENES; i++){
     mRNAdecay[i] = mRNAdecayrates[i] * ((float) mRNACytoCount[i] + (float) mRNATranslCytoCount[i]);
     rates->mRNAdecay += mRNAdecay[i];
   }
@@ -1181,7 +811,7 @@ void calc_dt(float *x,
 void end_transcription(float *dt,
                        float t,
                        CellState *state,
-                       float transport[NGenes],
+                       float transport[NGENES],
                        GillespieRates *rates)
 {
   int i, total;
@@ -1190,7 +820,7 @@ void end_transcription(float *dt,
      time of transcription end */
   *dt = state->mRNATranscrTimeEnd->time - t;
   total = 0;
-  for (i=0; i < NGenes; i++) 
+  for (i=0; i < NGENES; i++) 
     total += state->mRNATranscrCount[i];
   
   if (verbose) 
@@ -1216,7 +846,7 @@ void end_transcription(float *dt,
 }
 
 void transport_event(float x,
-                     float transport[NGenes],
+                     float transport[NGENES],
                      CellState *state,
                      float endtime,
                      GillespieRates *rates)
@@ -1229,7 +859,7 @@ void transport_event(float x,
 
   /* choose gene product (mRNA) that gets transported to cytoplasm
      based on weighting in transport[] array */
-  while (i < NGenes && x > konrate2){
+  while (i < NGENES && x > konrate2){
     i++;
     x -= transport[i];
     /* TODO: isn't konrate2 or something supposed to computed here? */
@@ -1599,24 +1229,24 @@ void attempt_tf_binding(Genotype *genes,
  * time course of [TF]s represented as array of TimeCourse lists.
  */
 void add_time_points(float time,
-                     float proteinConc[NGenes],
+                     float proteinConc[NGENES],
                      TimeCourse **timecoursestart,
                      TimeCourse **timecourselast)
 {
   int i;
   
-  for (i=0; i<NGenes; i++)
+  for (i=0; i<NGENES; i++)
     add_time_point(time, proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
 void add_integer_time_points(float time,
-                      int proteinConc[NGenes],
+                      int proteinConc[NGENES],
                       TimeCourse **timecoursestart,
                       TimeCourse **timecourselast)
 {
   int i;
   
-  for (i=0; i<NGenes; i++)
+  for (i=0; i<NGENES; i++)
     add_time_point(time, (float) proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
@@ -1636,7 +1266,7 @@ void update_protein_conc(float proteinConc[],
   float ct, ect, ect1;
   
   rates->maxSalphc = rates->minSalphc = 0.0;
-  for (i=0; i<NGenes; i++) {
+  for (i=0; i<NGENES; i++) {
     ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
     if (fabs(ct)<10^-6) ect1=ct;
@@ -1659,13 +1289,13 @@ void calc_num_bound(float proteinConc[],
   int i;
   
   sum = 0.0;
-  for (i=0; i < NGenes; i++) 
+  for (i=0; i < NGENES; i++) 
     sum += proteinConc[i];
   if (verbose) 
     /* fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, 0.0003*sum);*/
     /* TODO: check! */
     /* if this is wrong for random sequences adjust Kr accordingly */
-    fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, (reglen*NGenes*sum)/NumSitesInGenome);
+    fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, (CISREG_LEN*NGENES*sum)/NumSitesInGenome);
 }
 
 
@@ -1764,7 +1394,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genes,
 
   /* loop through mRNA products, to choose the mRNA with the
      proportionally higher decay rate */
-  while (i < NGenes-1 && x > konrate2) {
+  while (i < NGENES-1 && x > konrate2) {
     i++;
     konrate2 += mRNAdecay[i];
   }
@@ -1808,7 +1438,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genes,
     
     /* remove the mRNA from the count */
     (state->mRNATranslCytoCount[i])--;
-    if (verbose) for (j=0; j < NGenes; j++)
+    if (verbose) for (j=0; j < NGENES; j++)
                    fprintf(fperrors, "%d copies of gene %d translating\n", 
                            state->mRNATranslCytoCount[j], j);                  
   }
@@ -1894,12 +1524,12 @@ void disassemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *ge
                            float dt, float t, float x)
 {
   int j=-1;
-  while (j < NGenes && x>0) {
+  while (j < NGENES && x>0) {
     j++;
     /* TODO: why do we keep original rand number x, rather than choose a new one like other functions?  */
     x -= genes->PICdisassembly[state->statechangeIDs[PICDISASSEMBLY][j]];                
   }
-  if (j==NGenes) fprintf(fperrors, "error in PIC disassembly\n");
+  if (j==NGENES) fprintf(fperrors, "error in PIC disassembly\n");
   j = state->statechangeIDs[PICDISASSEMBLY][j];
   if (verbose) fprintf(fperrors, "PIC disassembly event in gene %d\n", j);
   disassemble_PIC(state, genes, j, rates);
@@ -1952,8 +1582,8 @@ void develop(Genotype *genes,
 
   float *koffvalues;   /* rates of unbinding */
   int total;           /* total possible translation events, TODO: rename */
-  float transport[NGenes];  /* transport rates of each mRNA */
-  float mRNAdecay[NGenes];  /* mRNA decay rates */
+  float transport[NGENES];  /* transport rates of each mRNA */
+  float mRNAdecay[NGENES];  /* mRNA decay rates */
   float x;                  /* random number */
   float dt;                 /* delta-t */
 
@@ -1963,16 +1593,16 @@ void develop(Genotype *genes,
   GillespieRates *rates = malloc(sizeof(GillespieRates));
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  /* int statechangeIDs[5][NGenes]; */
+  /* int statechangeIDs[5][NGENES]; */
 
   float f, df, konrate, konrate2, diff, RTlnKr, sum, ct, ect;
 
   /* initialize time courses */
-  for (i=0; i<NGenes; i++){
+  for (i=0; i<NGENES; i++){
     timecoursestart[i] = NULL;
     timecourselast[i] = NULL;
   }
-  add_time_points((float) 0.0,state->proteinConc,timecoursestart,timecourselast);
+  add_time_points((float) 0.0, state->proteinConc, timecoursestart, timecourselast);
 
   RTlnKr = GasConstant * temperature * log(Kr);     /* compute constant */
 
@@ -2020,7 +1650,7 @@ void develop(Genotype *genes,
       fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", t+dt, dt, x);
 
     if (!(state->mRNATranscrTimeEndLast)){
-      for (i=0;i<NGenes;i++)
+      for (i=0;i<NGENES;i++)
         if (verbose) fprintf(fperrors,"%d transcription events\n", state->mRNATranscrCount[i]);
     }
     
@@ -2047,7 +1677,7 @@ void develop(Genotype *genes,
         total=0;  /* number of translation events */
 
         /* count current number of mRNAs that have recently arrived in cytoplasm */
-        for (i=0; i<NGenes; i++) total += state->mRNATranslCytoCount[i];
+        for (i=0; i<NGENES; i++) total += state->mRNATranslCytoCount[i];
         if (verbose) fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
                              total, t, dt); // bug: dt can be negative
 
@@ -2243,7 +1873,7 @@ void dev_stability_only_lopt(float lopt[],
   TimeCourse *start;
   float dt1,dt2;
   
-  for (i=0;i<NGenes;i++){
+  for (i=0;i<NGENES;i++){
     lopt[i]=0.0;
     start = timecoursestart[i];
     dt1=0.0;
@@ -2266,16 +1896,16 @@ void calc_fitness(float lopt[],
 {
   float d,dt1,dt2,x;
   int i;
-  TimeCourse *start[NGenes];
+  TimeCourse *start[NGENES];
   
-  for (i=0;i<NGenes;i++) start[i]=timecoursestart[i];
+  for (i=0;i<NGENES;i++) start[i]=timecoursestart[i];
   dt1=0.0;
   *w=0.0;
   while (start[0]){
     d = 0.0;
     if (start[0]->next) dt2 = (start[0]->next->time - start[0]->time)/2.0;
     else dt2=0.0;
-    for (i=0;i<NGenes;i++){
+    for (i=0;i<NGENES;i++){
       x = (start[i]->concentration - lopt[i]) / lopt[i];
       d += x*x;
     }
@@ -2283,7 +1913,7 @@ void calc_fitness(float lopt[],
     *w += exp(-s*d) * (dt1+dt2);     
     if (verbose) fprintf(fperrors,"t=%g dt=%g+%g d=%g w=%g\n",start[0]->time,dt1,dt2,d,*w/tdevelopment);
     dt1=dt2;
-    for (i=0;i<NGenes;i++) start[i] = start[i]->next;
+    for (i=0;i<NGENES;i++) start[i] = start[i]->next;
   }
   *w /= tdevelopment;
   fprintf(fperrors,"s=%g w=%g\n",s,*w);
@@ -2313,21 +1943,21 @@ int main(int argc, char *argv[])
   int i, j, k, gen;
   CellState state;
   Genotype indivs[PopSize];
-  TimeCourse *timecoursestart[NGenes]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[NGenes];
+  TimeCourse *timecoursestart[NGENES]; /* array of pointers to list starts */
+  TimeCourse *timecourselast[NGENES];
   TimeCourse *start;
-  float fitness[PopSize], sumfit, lopt[NGenes], initmRNA[NGenes], initProteinConc[NGenes], x, kdis[Nkdis];
+  float fitness[PopSize], sumfit, lopt[NGENES], initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
   
   fperrors = fopen("netsimerrors.txt", "w");
   sumfit = 0.0;
   for (j=0; j<dummyrun; j++) ran1(&seed);
-  for (i=0; i<NGenes; i++) {
+  for (i=0; i<NGENES; i++) {
     lopt[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
   }
   fpkdis = fopen("kdis.txt","r");
-  for (j = 0; j < Nkdis; j++) {
+  for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
     fscanf(fpkdis,"%f",&kdis[j]);
   }
   for (j = 0; j < PopSize; j++) {
@@ -2343,7 +1973,7 @@ int main(int argc, char *argv[])
     fprintf(fperrors,"indiv %d\n",j);
     /*    calc_fitness(lopt, &(fitness[j]), timecoursestart, selection);
           sumfit += fitness[j];*/
-    for (i=0; i < NGenes; i++) {
+    for (i=0; i < NGENES; i++) {
       if ((output) && j==PopSize-1) print_time_course(timecoursestart[i], i, lopt);
       if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
       delete_time_course(timecoursestart[i]);
@@ -2375,7 +2005,7 @@ int main(int argc, char *argv[])
     calc_fitness(lopt,&(fitness[k]),timecoursestart,selection);
     fflush(fperrors);
     sumfit += fitness[k];
-    for (i=0; i<NGenes; i++){
+    for (i=0; i<NGENES; i++){
       if (output && gen==Generations*PopSize) print_time_course(timecoursestart[i],i,lopt);
       if (verbose) fprintf(fperrors,"deleting gene %d\n",i);
       delete_time_course(timecoursestart[i]);

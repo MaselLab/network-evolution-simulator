@@ -1,0 +1,216 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- 
+/* 
+ * Yeast transcriptional network simulator
+ * Authors: Joanna Masel, Alex Lancaster
+ * Copyright (c) 2007, 2008 Arizona Board of Regents (University of Arizona)
+ */
+#ifndef FILE_NETSIM_SEEN
+#define FILE_NETSIM_SEEN
+
+#include <stdio.h>
+
+#define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
+
+#define NGENES 10          /* number of genes */
+#define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
+#define TF_ELEMENT_LEN 6   /* length of binding element on TF */
+#define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
+
+extern int verbose;
+extern FILE *fperrors;
+
+/* 
+ * enum for 'konvalues' indices
+ * are rates of binding with:
+ * element KON_DIFF          is (proteinConc - salphc)/proteindecay
+ * element KON_PROTEIN_DECAY is proteindecay
+ * element KON_SALPHC        is salphc
+ */
+enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
+
+/*
+ * enum for 'CellState'->active indices
+ */
+enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
+       ON_WITH_NUCLEOSOME = 2, /* activ>repr, still nucleosome */
+       OFF_NO_PIC = 3,         /* repr>activ, no nucleosome, but no PIC */
+       ON_NO_PIC = 4,          /* activ>repr, no nucleosome, but no PIC  */
+       OFF_PIC = 5,            /* repr>activ, no nucleosome, and PIC */
+       ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
+
+/*
+ * enum for konIDs
+ */
+enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
+
+/*
+ * enum for stateChangeIDs
+ */
+enum { ACTEYLATION = 0, 
+       DEACTEYLATION = 1, 
+       PICASSEMBLY = 2,
+       TRANSCRIPTINIT = 3, 
+       PICDISASSEMBLY = 4,
+};
+
+/*
+ * New data structure for keeping track of rates for Gillespie
+ * algorithm 
+ *
+ * Events with exponentially-distributed waiting times are:
+ * - TF association and dissociation, 
+ * - transcription initiation
+ * - mRNA transport and decay
+ * - acetylation and deacetylation, 
+ * - and PIC assembly and disassembly.
+ *
+ * was formerly float rates[8];  and int rates2[5] 
+ * rates: total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
+ *  4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
+ *  3-PIC disassembly used to be 3-transcriptinit
+ * rates2: #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 
+ *  3-transcriptinit, 4=PIC disassembly
+ */
+typedef struct GillespieRates GillespieRates;
+struct GillespieRates {
+  float koff;              /* rates[0] */
+  float transport;         /* rates[1] */
+  float mRNAdecay;         /* rates[2] */
+  float picDisassembly;    /* rates[3] */
+  float salphc;            /* rates[4] */
+
+  /* the following are cached values to avoid recomputation not
+     actually part of the Gillespie rates */
+  float maxSalphc;         /* rates[5] */
+  float minSalphc;         /* rates[6] */
+
+  /* number of genes in the following states */
+  int acetylationCount;       /* rates2[0] */
+  int deacetylationCount;     /* rates2[1] */
+  int picAssemblyCount;       /* rates2[2] */
+  int transcriptInitCount;    /* rates2[3] */
+  int picDisassemblyCount;    /* rates2[4] */
+
+  /* total, including rates2 */
+  float total;                /* rates[7] */
+};
+
+/*
+ * konStates : new composite data structure to cache information about
+ * available binding sites to avoid re-computation.  This currently
+ * just groups the previous data structures: 
+ *
+ * konIDs, konvalues, nkonsum
+ *
+ * but will ultimately be refactored again for greater efficiency
+ */
+typedef struct KonStates KonStates;
+struct KonStates {
+  /* number of currently *available* binding sites */
+  int nkon;
+
+  /* elem 0 is siteID, elem 1 is TF that binds */
+  int (*konIDs)[2];
+
+  /* number of available binding sites for a given TF */
+  int nkonsum[NGENES];
+
+  /* konvalues are rates of binding with:
+   * element 0 is other funny term (TODO ?)
+   * element 1 is c
+   * element 2 is salphc
+   * Other index is which TF binds 
+   * The kon term is left out of all of them for computational efficiency
+   */
+  float konvalues[NGENES][3];
+};
+
+typedef struct TFInteractionMatrix TFInteractionMatrix;
+struct TFInteractionMatrix {
+  int cisregID;     /* 0 */
+  int tfID;         /* 1 */
+  int sitePos;      /* 2 */
+  int strand;       /* 3 */
+  int hammingDist;  /* 4 */
+};
+
+typedef struct Genotype Genotype;
+struct Genotype {
+  char cisRegSeq[NGENES][CISREG_LEN];
+  char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN];
+  int bindSiteCount;
+  TFInteractionMatrix *interactionMatrix;
+/* int (*interactionMatrix)[5];
+ 5 elements are
+    identity of cis-regulatory region
+    identity of TF that binds
+    position 0 to 386 (first position, always in forwards strand)  
+    strand 0 (forward) or 1 (backward)
+    Hamming distance 0 to n-n_min 
+*/ 
+  float mRNAdecay[NGENES];
+  float proteindecay[NGENES];
+  float translation[NGENES];
+  int activating[NGENES]; // 1 is activating, 0 is repressing
+  float PICdisassembly[NGENES];
+};
+
+/* 
+ * transcription/translation delays are sorted linked lists.  Deleting
+ * the head each time, and tack new stuff on the end.  Linked lists
+ * are easy to create pre-sorted.  */
+typedef struct FixedEvent FixedEvent;
+struct FixedEvent {
+  int geneID;
+  float time;
+  FixedEvent *next;
+};
+
+typedef struct CellState CellState;
+struct CellState {
+  int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
+  int mRNANuclearCount[NGENES];       /* mRNAs in nucleus */
+  int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
+  FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs move to cytoplasm (mRNACytoCount) */
+  FixedEvent *mRNATranslTimeEndLast; 
+  int mRNATranscrCount[NGENES];             /* mRNAs which haven't finished transcription yet */
+  FixedEvent *mRNATranscrTimeEnd;    /* times when transcripts ? move to nucleus (mRNANuclearCount) */
+  FixedEvent *mRNATranscrTimeEndLast;
+  float proteinConc[NGENES];
+  int tfBoundCount;
+  int *tfBoundIndexes;
+  /* tfBoundIndexes lists just bound TFs according to binding site index in G */
+  int tfHinderedCount;
+  int (*tfHinderedIndexes)[2];
+  /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
+    2nd elem gives corresponding index of inhibiting TF in G (TODO: what is this?)
+  */
+  int active[NGENES];
+  /* gives the state of each of the genes, according to figure
+     1 is fully off, 2 meets TF criteria
+     3 is off but w/o nucleosome, 4 is on but w/o PIC
+     5 is on but w/o TF criteria, 6 is fully on
+  */
+
+  /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
+  int statechangeIDs[5][NGENES]; 
+
+};
+
+typedef struct TimeCourse TimeCourse;
+
+struct TimeCourse
+{
+  float concentration;
+  float time;
+  TimeCourse *next;
+};     
+
+extern void calc_interaction_matrix(char [NGENES][CISREG_LEN],
+                                    char [NGENES][TF_ELEMENT_LEN],
+                                    int *,
+                                    TFInteractionMatrix **);
+
+
+
+#endif /* !FILE_NETSIM_SEEN */

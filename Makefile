@@ -1,16 +1,26 @@
 all: netsim
 
-%: %.c Makefile
-#	gcc34 -g -std=c99 -o $@ -lm $<
-	gcc -O3 -g -std=c99 -o $@ -lm $<
+CC = gcc
+CFLAGS = -g -std=c99
+OBJS = random.o lib.o
+LIBS = -lm 
+OTHER = Makefile
 
-%-check: %.c
-#	gcc34 -g -std=c99 -o $@ -lm $<
-	gcc -g -std=c99 -o $@ -lm -pg $<
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -c $<
 
-%-gprof: %.c
-#	gcc34 -g -std=c99 -o $@ -lm $<
-	gcc -g -std=c99 -o $@ -lm -pg $<
+%: %.c $(OBJS) $(OTHER)
+	$(CC) -O3 $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
+
+%-check: %.c %.h $(OBJS) $(OTHER)
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<
+
+%-gprof: %.c $(OBJS) $(OTHER)
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<
+
+netsim: $(OBJS)
+netsim-check: $(OBJS)
+netsim-gprof: $(OBJS)
 
 check:	netsim-check
 	./netsim-check
@@ -19,4 +29,4 @@ check:	netsim-check
 profiling:	netsim-gprof
 
 clean:
-	rm netsim
+	rm -f netsim netsim-check netsim-gprof $(OBJS)
