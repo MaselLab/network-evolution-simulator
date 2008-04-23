@@ -194,7 +194,8 @@ struct CellState {
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
   int statechangeIDs[5][NGENES]; 
-
+  float RTlnKr;
+  float temperature;
 };
 
 typedef struct TimeCourse TimeCourse;

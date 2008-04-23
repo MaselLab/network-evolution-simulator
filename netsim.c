@@ -477,15 +477,13 @@ void change_mRNA_cytoplasm(int i,
 void calc_koff(int k,
               TFInteractionMatrix *interactionMatrix,
               CellState *state,
-              float *koff,
-              float RTlnKr,
-              float temperature)
+              float *koff)
 {
   float Gibbs;  /*free energy in kJ/mol*/
   int posdiff, front, back, i, j;
   
   front = back = 0;
-  Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * RTlnKr; /* subject to revision of TF_ELEMENT_LEN */
+  Gibbs = (((float) interactionMatrix[k].hammingDist)/3.0 - 1.0) * state->RTlnKr; /* subject to revision of TF_ELEMENT_LEN */
   for (j=0; j < state->tfBoundCount; j++) {
     if (interactionMatrix[k].cisregID==interactionMatrix[state->tfBoundIndexes[j]].cisregID && !(k==state->tfBoundIndexes[j])) {
       posdiff = interactionMatrix[k].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
@@ -501,10 +499,10 @@ void calc_koff(int k,
     if ((front) && (back)) 
       j=state->tfBoundCount;
   }
-  if (front>0) Gibbs -= cooperativity*RTlnKr/3;
-  if (back>0) Gibbs -= cooperativity*RTlnKr/3;
-  *koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
-  /*  fprintf(fperrors,"RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",RTlnKr,front,back,interactionMatrix[k][4],Gibbs,*koff); */
+  if (front>0) Gibbs -= cooperativity*state->RTlnKr/3;
+  if (back>0) Gibbs -= cooperativity*state->RTlnKr/3;
+  *koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*state->temperature));
+  /*  fprintf(fperrors,"state->RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",state->RTlnKr,front,back,interactionMatrix[k][4],Gibbs,*koff); */
   /* 25% protein in nucleus is implicit in formula above */
 }
 
@@ -513,9 +511,7 @@ void scan_nearby_sites(int indexChanged,
                        TFInteractionMatrix *interactionMatrix,
                        CellState *state,
                        GillespieRates *rates,
-                       float koffvalues[],
-                       float RTlnKr,
-                       float temperature)
+                       float koffvalues[])
 {
   int posdiff,j,i;
   float diff;
@@ -539,7 +535,7 @@ void scan_nearby_sites(int indexChanged,
         diff = -koffvalues[j];
 
         /* recompute koffvalues */
-        calc_koff(state->tfBoundIndexes[j], interactionMatrix, state, &(koffvalues[j]), RTlnKr, temperature);
+        calc_koff(state->tfBoundIndexes[j], interactionMatrix, state, &(koffvalues[j]));
 
         /* calculating how koff changes  */
         diff += koffvalues[j];
@@ -655,9 +651,7 @@ void calc_from_state(Genotype *genes,
                      GillespieRates *rates,
                      KonStates *konStates,
                      float transport[],
-                     float mRNAdecay[],
-                     float RTlnKr,
-                     float temperature)
+                     float mRNAdecay[])
 /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit */
 {
   int i, k;
@@ -946,10 +940,10 @@ void revise_activity_state(int geneID,
   int transcriptrule, oldstate, numactive;
 
   transcriptrule = ready_to_transcribe(geneID, state->tfBoundIndexes, 
-                                     state->tfBoundCount,
-                                     genes->interactionMatrix,
-                                     genes->activating,
-                                     &numactive);
+                                       state->tfBoundCount,
+                                       genes->interactionMatrix,
+                                       genes->activating,
+                                       &numactive);
 
   /* get last state of transcription initiation */
   oldstate = state->active[geneID];
@@ -1021,9 +1015,7 @@ void remove_tf_binding(Genotype *genes,
                        GillespieRates *rates,
                        KonStates *konStates,
                        int site,
-                       float koffvalues[],
-                       float RTlnKr,
-                       float temperature)
+                       float koffvalues[])
 {
   int i, j, k, bound, siteID, geneID, transcriptrule, oldstate, numactive;
 
@@ -1116,7 +1108,7 @@ void remove_tf_binding(Genotype *genes,
     revise_activity_state(geneID, genes, state, rates);
 
     /* when TF unbinds adjust the co-operativity at close sites */
-    scan_nearby_sites(site, genes->interactionMatrix, state, rates, koffvalues, RTlnKr, temperature);        
+    scan_nearby_sites(site, genes->interactionMatrix, state, rates, koffvalues);        
   }
 }
 
@@ -1127,9 +1119,7 @@ void attempt_tf_binding(Genotype *genes,
                         KonStates *konStates,
                         int *maxbound2,
                         int *maxbound3,
-                        int site,
-                        float RTlnKr,
-                        float temperature)
+                        int site)
 {
   int geneID, k, posdiff, site2;
 
@@ -1146,15 +1136,15 @@ void attempt_tf_binding(Genotype *genes,
     *koffvalues = realloc(*koffvalues,(*maxbound2)*sizeof(float));
 
     /* check return value */
-    if (!state->tfBoundIndexes || !(*koffvalues)){
-      fprintf(fperrors,"memory allocation error resetting maxbound2=%d\n",*maxbound2);
+    if (!state->tfBoundIndexes || !(*koffvalues)) {
+      fprintf(fperrors, "memory allocation error resetting maxbound2=%d\n", *maxbound2);
       exit(1);
     }
   }
 
   /* append the site to end of indexes */
   state->tfBoundIndexes[state->tfBoundCount] = site;
-  if (verbose) fprintf(fperrors,"remove site %d\n", site);
+  if (verbose) fprintf(fperrors, "remove site %d\n", site);
 
   /* remove the site from the kon pool */
   remove_kon(site,
@@ -1165,9 +1155,10 @@ void attempt_tf_binding(Genotype *genes,
             state->proteinConc[genes->interactionMatrix[site].tfID]);
 
   /* recompute the koffvalues */
-  calc_koff(site, genes->interactionMatrix, state, &((*koffvalues)[state->tfBoundCount]), RTlnKr, temperature);
-  if (verbose) fprintf(fperrors,"new koff = %g is number %d\n",
-                       (*koffvalues)[state->tfBoundCount],(state->tfBoundCount+1));
+  calc_koff(site, genes->interactionMatrix, state, &((*koffvalues)[state->tfBoundCount]));
+  if (verbose) 
+    fprintf(fperrors,"new koff = %g is number %d\n",
+            (*koffvalues)[state->tfBoundCount],(state->tfBoundCount+1));
 
   /* adjust rates by adding the new koffvalue to rates->koff */
   rates->koff += (*koffvalues)[state->tfBoundCount];
@@ -1179,7 +1170,7 @@ void attempt_tf_binding(Genotype *genes,
   (state->tfBoundCount)++;
 
   /* adjust co-operative binding in context of new TF */
-  scan_nearby_sites(site, genes->interactionMatrix, state, rates, *koffvalues, RTlnKr, temperature);
+  scan_nearby_sites(site, genes->interactionMatrix, state, rates, *koffvalues);
 
   /* get the gene that the TF is binding to */
   geneID = genes->interactionMatrix[site].cisregID;
@@ -1256,9 +1247,12 @@ void add_integer_time_points(float time,
     add_time_point(time, (float) proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
-/* need some sort of control in case it declines to essentially zero.
-   Add in discrete, stochastic and/or zero values, but this may create false attractor
-   if time steps are small and rising tide keeps getting rounded down*/
+/* 
+ * need some sort of control in case it declines to essentially zero.
+ * Add in discrete, stochastic and/or zero values, but this may create
+ * false attractor if time steps are small and rising tide keeps
+ * getting rounded down
+ */
 void update_protein_conc(float proteinConc[],
                          float dt,
                          GillespieRates *rates,
@@ -1311,7 +1305,7 @@ void calc_num_bound(float proteinConc[],
  * ----------------------------------------------------- */
 void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes, 
                       KonStates *konStates, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
-                      float konrate, float dt, float t, int maxbound2, int maxbound3, float RTlnKr, float temperature)
+                      float konrate, float dt, float t, int maxbound2, int maxbound3)
 {
   float x = ran1(&seed) * (rates->salphc + konrate)/kon;
   int i, j = -1;
@@ -1346,7 +1340,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
   
   /* bind the j-th konID in the list which happens to be the binding site in SITEID_INDEX */
   attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, 
-                     konStates->konIDs[j][SITEID_INDEX], RTlnKr, temperature);
+                     konStates->konIDs[j][SITEID_INDEX]);
   
   /* calculate the number of TFs bound
    * TODO: check this seems to be purely diagnostic
@@ -1356,7 +1350,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
 
 void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes, 
                       KonStates *konStates, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
-                      float konrate, float dt, float t, float x, float RTlnKr, float temperature)
+                        float konrate, float dt, float t, float x)
 {
   int i, j = -1;
   int site;
@@ -1386,8 +1380,7 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
                     state->proteinConc);
   
   /* remove TF binding from 'site' */
-  remove_tf_binding(genes, state, rates, konStates, site,
-                koffvalues, RTlnKr, temperature);
+  remove_tf_binding(genes, state, rates, konStates, site, koffvalues);
   calc_num_bound(state->proteinConc, state->tfBoundCount);
 }
 
@@ -1601,7 +1594,7 @@ void develop(Genotype *genes,
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
   /* int statechangeIDs[5][NGENES]; */
 
-  float f, df, konrate, konrate2, diff, RTlnKr, sum, ct, ect;
+  float f, df, konrate, konrate2, diff, sum, ct, ect;
 
   /* initialize time courses */
   for (i=0; i<NGENES; i++){
@@ -1610,7 +1603,9 @@ void develop(Genotype *genes,
   }
   add_time_points((float) 0.0, state->proteinConc, timecoursestart, timecourselast);
 
-  RTlnKr = GasConstant * temperature * log(Kr);     /* compute constant */
+  /* set cell temperature and value of RTlnKr constant */
+  state->temperature = temperature;
+  state->RTlnKr = GasConstant * temperature * log(Kr);
 
   /* number of possible binding sites */
   konStates->konIDs = malloc(2*genes->bindSiteCount*sizeof(int));
@@ -1628,9 +1623,7 @@ void develop(Genotype *genes,
   }
 
   /* initialize transcriptional state of genes */
-  calc_from_state(genes, state, /*&nkon, nkonsum, */ rates, konStates, /* konvalues,
-                                                                        konIDs, */
-                  transport, mRNAdecay, RTlnKr, temperature);
+  calc_from_state(genes, state, rates, konStates, transport, mRNAdecay);
 
   t = 0.0;  /* time starts at zero */
 
@@ -1649,7 +1642,7 @@ void develop(Genotype *genes,
 
     /* do first Gillespie step to chose next event */
 
-    calc_dt(&x, &dt, /*nkon, nkonsum, */ rates, konStates, /*konvalues,*/ mRNAdecay, genes->mRNAdecay,
+    calc_dt(&x, &dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
            state->mRNACytoCount, state->mRNATranslCytoCount);
 
     if (verbose) 
@@ -1764,7 +1757,7 @@ void develop(Genotype *genes,
        */
       if (x < rates->koff) {  
         tf_unbinding_event(rates, state, genes, konStates, koffvalues,
-                           timecoursestart, timecourselast, konrate, dt, t, x, RTlnKr, temperature);
+                           timecoursestart, timecourselast, konrate, dt, t, x);
       } else {
         x -= rates->koff;  
         /* 
@@ -1800,7 +1793,7 @@ void develop(Genotype *genes,
               if (x < rates->salphc + konrate) {   /* add variable (salphc) and constant (konrate) */
                 tf_binding_event(rates, state, genes, konStates, koffvalues,
                                  timecoursestart, timecourselast, konrate, dt, t, 
-                                 maxbound2, maxbound3, RTlnKr, temperature);
+                                 maxbound2, maxbound3);
               } else {
                 x -= (rates->salphc + konrate);
                 /* 
