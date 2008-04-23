@@ -12,11 +12,12 @@
 #include <limits.h>
 #include <float.h>
 #include <string.h>
+
+/* local includes */
 #include "random.h"
 #include "lib.h"
 #include "netsim.h"
-
-//#include "list.h"
+/* #include "list.h" */
 
 /*
   version27: each founding indiv has a different genotype, CopyGenotype is obsolete
@@ -36,35 +37,37 @@
   v36: reglen changed to 150
 */
 
-static int maxelements=500; 
-//start by allocating maxelements when initializing a genotype, double as needed, reduce at end
-static int maxbound=50;
-static int dummyrun=4; /* used to change seed */
-static int PopSize=1;
-static int nmin=4;
-static float tdevelopment=120.0;
-static float kon=1e-4; /* lower value is so things run faster */
+/* initialize constants as static const */
+static const int maxelements=500; 
+/* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
+static const int maxbound=50;
+static const int dummyrun=4; /* used to change seed */
+static const int PopSize=1;
+static const int nmin=4;
+static const float tdevelopment=120.0;
+static const float kon=1e-4; /* lower value is so things run faster */
 /* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
    and 89% of the proteins being in the nucleus*/
-static float kRNA=618.0;
-static float ttranslation=1.0;
-static float ttranscription=1.0;
-static float pact=0.62;
-static float transcriptinit=8.5; /* replace betaon and betaoff */
-static float deacetylate=0.462;
-static float acetylate=0.1155;
-static float PICassembly=0.0277;
+static const float kRNA=618.0;
+static const float ttranslation=1.0;
+static const float ttranscription=1.0;
+static const float pact=0.62;
+static const float transcriptinit=8.5; /* replace betaon and betaoff */
+static const float deacetylate=0.462;
+static const float acetylate=0.1155;
+static const float PICassembly=0.0277;
 
-static float startnucleus=0.1;
-static float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
-static float GasConstant=8.31447;
-static float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
-static float NumSitesInGenome = 1.8e+6;
-static float selection = 1.0;
+static const float startnucleus=0.1;
+static const float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
+static const float GasConstant=8.31447;
+static const float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
+static const float NumSitesInGenome = 1.8e+6;
+static const float selection = 1.0;
+
+static const float mN = 0.1;
+static const int Generations=5;
 
 static int output = 0;
-static float mN = 0.1;
-static int Generations=5;
 static long seed =  28121; /* something is wrong here: changing seed changes nothing */
 
 int verbose = 1;
@@ -134,7 +137,7 @@ void initialize_genotype(Genotype *indiv,
         indiv->proteindecay[i] = 0.0;
       else indiv->proteindecay[i] = exp(0.7874*gasdev(&seed)-3.7665);
     }
-    indiv->proteindecay[i] += 0.00578; //dilution due to cell growth
+    indiv->proteindecay[i] += 0.00578; /* dilution due to cell growth */
     indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
     while (indiv->translation[i] < 0.0)
       indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
@@ -158,7 +161,7 @@ void mutate(Genotype *old,
     for (k=0; k<CISREG_LEN; k++) {
       new->cisRegSeq[i][k] = old->cisRegSeq[i][k];      
       if (m > ran1(&seed)) {
-        x = old->cisRegSeq[i][k]; //because sometimes old and new are the same
+        x = old->cisRegSeq[i][k]; /* because sometimes old and new are the same */
         while (new->cisRegSeq[i][k] == x)
           initialize_sequence(&(new->cisRegSeq[i][k]),(int) 1);
       }
@@ -582,7 +585,8 @@ void remove_kon(int siteID,
     konStates->konIDs[k][SITEID_INDEX] = konStates->konIDs[konStates->nkon][SITEID_INDEX];
     konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX];
   }
-  //else do nothing: there is likely a redundancy in steric hindrance, hence no site to remove
+  /* else do nothing: there is likely a redundancy in steric
+     hindrance, hence no site to remove */
 }
 
 void add_kon(float proteinConcTFID,
@@ -607,7 +611,7 @@ void add_kon(float proteinConcTFID,
   (konStates->nkon)++;
 }
 
-// tests whether criterion for transcription is met
+/* tests whether criterion for transcription is met */
 int ready_to_transcribe(int geneID,
                         int *tfBoundIndexes,
                         int tfBoundCount,
@@ -906,8 +910,10 @@ void remove_from_array(int toberemoved,
     (*len)--;
     a[i]=a[*len];
   }
-  else if (force) fprintf(fperrors, "error removing %d from array of length %d\n", toberemoved, *len);
-  // don't always print because with a 4->3 transition PIC assembly is not there to be removed
+  else 
+    if (force) 
+      /* don't always print because with a 4->3 transition PIC assembly is not there to be removed */
+      fprintf(fperrors, "error removing %d from array of length %d\n", toberemoved, *len);
 }
 
 void disassemble_PIC(CellState *state,
@@ -1366,7 +1372,7 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
     fprintf(fperrors, "warning: koffvalues add up to %g instead of rates->koff=%g\n",
             konrate2, rates->koff);
     rates->koff = konrate2;
-    j--; // a bit of a fudge for rounding error, really should move on to rates->transport, but too complicated for something so minor
+    j--; /* a bit of a fudge for rounding error, really should move on to rates->transport, but too complicated for something so minor */
   } 
   site = state->tfBoundIndexes[j];
   if (verbose) fprintf(fperrors, "koff event %d of %d at site %d\n",
@@ -1678,8 +1684,9 @@ void develop(Genotype *genes,
 
         /* count current number of mRNAs that have recently arrived in cytoplasm */
         for (i=0; i<NGENES; i++) total += state->mRNATranslCytoCount[i];
-        if (verbose) fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
-                             total, t, dt); // bug: dt can be negative
+        if (verbose) 
+          fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
+                  total, t, dt); /* bug: dt can be negative */
 
         /* get identity of gene that has just finished translating */
         i=state->mRNATranslTimeEnd->geneID;   
@@ -1920,8 +1927,8 @@ void calc_fitness(float lopt[],
 }
 
 void print_time_course(TimeCourse *start,
-                     int i,
-                     float lopt[])
+                       int i,
+                       float lopt[])
 {
   FILE *fpout;
   char filename[80];
@@ -1933,7 +1940,7 @@ void print_time_course(TimeCourse *start,
     fprintf(fpout,"%g %g\n",start->time,start->concentration);
     start = start->next;
   }
-  //  fprintf(fpout, "%g %g\n", tdevelopment, lopt[i]);
+  /*  fprintf(fpout, "%g %g\n", tdevelopment, lopt[i]); */
   fclose(fpout);  
 }
 
@@ -1969,10 +1976,10 @@ int main(int argc, char *argv[])
      *  initialize_cell(&state,indivs[j].y,indivs[j].mRNAdecay,initmRNA,initProteinConc); 
      */
     develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
-    //    dev_stability_only_lopt(lopt, timecoursestart);
+    /* dev_stability_only_lopt(lopt, timecoursestart); */
     fprintf(fperrors,"indiv %d\n",j);
-    /*    calc_fitness(lopt, &(fitness[j]), timecoursestart, selection);
-          sumfit += fitness[j];*/
+    /* calc_fitness(lopt, &(fitness[j]), timecoursestart, selection);
+       sumfit += fitness[j];*/
     for (i=0; i < NGENES; i++) {
       if ((output) && j==PopSize-1) print_time_course(timecoursestart[i], i, lopt);
       if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
