@@ -13,7 +13,7 @@ OTHER = Makefile
 	$(CC) -O3 $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
 
 %-check: %.c %.h $(OBJS) $(OTHER)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
 
 %-gprof: %.c $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<

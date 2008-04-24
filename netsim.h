@@ -11,6 +11,7 @@
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 
+#define PLOIDY 1           /* 1 = haploid, 2 = diploid */
 #define NGENES 10          /* number of genes */
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
@@ -132,12 +133,14 @@ struct TFInteractionMatrix {
   int sitePos;      /* 2 */
   int strand;       /* 3 */
   int hammingDist;  /* 4 */
+  int cisregCopy;    /* which copy of gene */
+  int tfCopy;        /* which copy of gene */ 
 };
 
 typedef struct Genotype Genotype;
 struct Genotype {
-  char cisRegSeq[NGENES][CISREG_LEN];
-  char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN];
+  char cisRegSeq[NGENES][CISREG_LEN][PLOIDY];
+  char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN][PLOIDY];
   int bindSiteCount;
   TFInteractionMatrix *interactionMatrix;
 /* int (*interactionMatrix)[5];
@@ -207,8 +210,8 @@ struct TimeCourse
   TimeCourse *next;
 };     
 
-extern void calc_interaction_matrix(char [NGENES][CISREG_LEN],
-                                    char [NGENES][TF_ELEMENT_LEN],
+extern void calc_interaction_matrix(char [NGENES][CISREG_LEN][PLOIDY],
+                                    char [NGENES][TF_ELEMENT_LEN][PLOIDY],
                                     int *,
                                     TFInteractionMatrix **);
 
