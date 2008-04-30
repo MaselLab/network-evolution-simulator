@@ -1588,14 +1588,16 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
 {
   int geneID;
   x /= transcriptinit;
+
+  /* choose the gene that gets transcribed */
   geneID = state->statechangeIDs[TRANSCRIPTINIT][(int)trunc(x)];
-  if (verbose) fprintf(fperrors,"transcription event gene %d\n",geneID);
+  if (verbose) fprintf(fperrors,"transcription event gene %d\n", geneID);
   if (state->active[geneID] != ON_FULL && state->active[geneID] != OFF_PIC)
     fprintf(fperrors,"error: transcription event attempted from state %d\n", state->active[geneID]);
-  update_protein_conc(state->proteinConc,dt,
-                    rates, konStates, 
-                    t, timecoursestart, timecourselast,
-                    state->proteinConc);
+  update_protein_conc(state->proteinConc, dt,
+                      rates, konStates, 
+                      t, timecoursestart, timecourselast,
+                      state->proteinConc);
 
   /* now that transcription of gene has been initiated, 
    * we add the time it will end transcription, 
