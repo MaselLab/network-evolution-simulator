@@ -38,7 +38,7 @@
 */
 
 /* initialize constants as static const */
-static const int maxelements=500; 
+static const int maxelements=500*PLOIDY; 
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
 static const int maxbound=50;
 static const int dummyrun=4; /* used to change seed */
@@ -78,39 +78,72 @@ void initialize_sequence(char Seq[],
 {
   float x;
   int i;
-  
-  for (i=0; i<len; i++){
-    x = ran1(&seed);
-    if (x<0.25)
-      Seq[i] = 'a';
-    else if (x<0.5)
-      Seq[i] = 'c';
-    else if (x<0.75)
-      Seq[i] = 'g';
-    else Seq[i] = 't';
+
+  if (PLOIDY == 1) {
+    for (i=0; i<len; i++){
+      x = ran1(&seed);
+      if (x<0.25)
+        Seq[i] = 'a';
+      else if (x<0.5)
+        Seq[i] = 'c';
+      else if (x<0.75)
+        Seq[i] = 'g';
+      else Seq[i] = 't';
+    }
+  } else {
+    int current_element = len/(NGENES*PLOIDY);
+    int first, second;
+    printf("current_element=%d\n", current_element);
+    for (i=0; i<len/PLOIDY; i++){
+      first = (i / current_element)*2*current_element + i % current_element;
+      second = first + current_element;
+      //first = i;
+      //second = first + len/PLOIDY;
+      //printf("first=%d, second=%d\n", first, second);
+      x = ran1(&seed);
+      if (x<0.25)
+        Seq[first] = 'a';
+      else if (x<0.5)
+        Seq[first] = 'c';
+      else if (x<0.75)
+        Seq[first] = 'g';
+      else Seq[first] = 't';
+      Seq[second] = Seq[first];
+    }
   }
+
   /* printf("length: %d, sequence is %s\n", strlen(Seq), Seq); */
 }
 
 
 void print_interaction_matrix(TFInteractionMatrix *interactionMatrix, 
                             int numElements,
-                            char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN][PLOIDY],
-                            char cisRegSeq[NGENES][CISREG_LEN][PLOIDY])
+                            char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
+                            char cisRegSeq[NGENES][PLOIDY][CISREG_LEN])
 {
   int i;
 
+  //printf("cis-reg     gene %2d (copy 0): %.*s\n", i, CISREG_LEN*NGENES*PLOIDY, cisRegSeq[i][0]);
+
   for (i=0; i < NGENES; i++) {
-    printf("transcriptionFactorSeq number %2d: %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i]);
-    printf("cis-reg                number %2d: %.*s\n", i, CISREG_LEN, cisRegSeq[i]);
+    printf("TF sequence gene %2d (copy 0): %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i][0]);
+    printf("cis-reg     gene %2d (copy 0): %.*s\n", i, CISREG_LEN, cisRegSeq[i][0]);
+    if (PLOIDY == 2) {
+      printf("TF sequence gene %2d (copy 1): %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i][1]);
+      printf("cis-reg     gene %2d (copy 1): %.*s\n", i, CISREG_LEN, cisRegSeq[i][1]);
+    }
   } 
+
+  printf("numElements: %3d\n", numElements);
   
   for (i=0; i < numElements; i++) {
     printf("binding site %3d:\n", i);
     printf("       cis-reg region: %3d", interactionMatrix[i].cisregID);
-    printf(" (sequence %.*s\n)", CISREG_LEN, cisRegSeq[interactionMatrix[i].cisregID]);
+    printf("         cis-reg copy: %3d", interactionMatrix[i].cisregCopy);
+    printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[interactionMatrix[i].cisregID][interactionMatrix[i].cisregCopy]);
     printf(" transcription-factor: %3d", interactionMatrix[i].tfID);
-    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[interactionMatrix[i].tfID]);
+    printf("              TF copy: %3d", interactionMatrix[i].tfCopy);
+    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[interactionMatrix[i].tfID][interactionMatrix[i].tfCopy]);
     printf("             position: %3d\n", interactionMatrix[i].sitePos);
     printf("               strand: %3d\n", interactionMatrix[i].strand);
     printf("         Hamming dist: %3d\n", interactionMatrix[i].hammingDist);
@@ -118,14 +151,14 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
 }
 
 void initialize_genotype(Genotype *indiv, 
-                        float kdis[])
+                         float kdis[])
 {
   int i, j;
   
-  initialize_sequence((char *)indiv->cisRegSeq,CISREG_LEN*NGENES*PLOIDY);
-  initialize_sequence((char *)indiv->transcriptionFactorSeq,TF_ELEMENT_LEN*NGENES*PLOIDY); 
-  calc_interaction_matrix(indiv->cisRegSeq,indiv->transcriptionFactorSeq,&(indiv->bindSiteCount),&(indiv->interactionMatrix));
-  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);  */
+  initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
+  initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
+  calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
+  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);  
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -177,34 +210,35 @@ void mutate(Genotype *old,
   calc_interaction_matrix(new->cisRegSeq, new->transcriptionFactorSeq, &(new->bindSiteCount), &(new->interactionMatrix));
 }
 
-int calc_interaction_matrix_sister(char cisRegSeq[NGENES][CISREG_LEN][PLOIDY],
-                                   char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN][PLOIDY],
+int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
+                                   char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
                                    int bindSiteCount,
                                    TFInteractionMatrix **interactionMatrix,
+                                   int *maxAlloc,
                                    int cisRegCopy,
                                    int tfCopy)
 {
-  int i, j, geneID, tfind, match, maxy;
+  int i, j, geneID, tfind, match, maxBindingSiteAlloc;
 
-  maxy = maxelements;
+  maxBindingSiteAlloc = *maxAlloc;
 
   for (geneID=0; geneID < NGENES; geneID++) { /* which cis-reg region */
     for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) {      /* scan forwards */
       for (tfind=0; tfind < NGENES; tfind++) {
         match=0;
         for (j=i; j < i+TF_ELEMENT_LEN; j++) {
-          if (cisRegSeq[geneID][j][cisRegCopy] == transcriptionFactorSeq[tfind][j-i][tfCopy])
+          if (cisRegSeq[geneID][cisRegCopy][j] == transcriptionFactorSeq[tfind][tfCopy][j-i])
             match++;
         }
         if (match >= nmin){
-          if (bindSiteCount+1 >= maxy) {
-            maxy = 2*maxy;
-            *interactionMatrix = realloc(*interactionMatrix, maxy*sizeof(TFInteractionMatrix));
+          if (bindSiteCount + 1 >= maxBindingSiteAlloc) {
+            maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
+            *interactionMatrix = realloc(*interactionMatrix, maxBindingSiteAlloc*sizeof(TFInteractionMatrix));
             if (!(*interactionMatrix)) {
-              fprintf(fperrors,"realloc of G to bindSiteCount = %d failed.\n",maxy);
+              fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
               exit(1);
             }
-            else if (verbose) fprintf(fperrors,"realloc of G to bindSiteCount = %d succeeded\n",maxy);
+            else if (verbose) fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
           }
           (*interactionMatrix)[bindSiteCount].cisregID = geneID;
           (*interactionMatrix)[bindSiteCount].cisregCopy = cisRegCopy; 
@@ -222,19 +256,20 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][CISREG_LEN][PLOIDY],
         match=0;
         for (j=i; j>i-TF_ELEMENT_LEN; j--)
           if (
-             (cisRegSeq[geneID][j][cisRegCopy]=='a' && transcriptionFactorSeq[tfind][i-j][tfCopy]=='t')
-             || (cisRegSeq[geneID][j][cisRegCopy]=='t' && transcriptionFactorSeq[tfind][i-j][tfCopy]=='a')
-             || (cisRegSeq[geneID][j][cisRegCopy]=='c' && transcriptionFactorSeq[tfind][i-j][tfCopy]=='g')
-             || (cisRegSeq[geneID][j][cisRegCopy]=='g' && transcriptionFactorSeq[tfind][i-j][tfCopy]=='c')            
+             (cisRegSeq[geneID][cisRegCopy][j]=='a' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='t')
+             || (cisRegSeq[geneID][cisRegCopy][j]=='t' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='a')
+             || (cisRegSeq[geneID][cisRegCopy][j]=='c' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='g')
+             || (cisRegSeq[geneID][cisRegCopy][j]=='g' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='c')            
              ) match++;
-        if (match>=nmin){
-          if (bindSiteCount+1>=maxy){
-            maxy = 2*maxy;
-            *interactionMatrix = realloc(*interactionMatrix, maxy*sizeof(TFInteractionMatrix));
+        if (match >= nmin){
+          if (bindSiteCount + 1 >= maxBindingSiteAlloc){
+            maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
+            *interactionMatrix = realloc(*interactionMatrix, maxBindingSiteAlloc*sizeof(TFInteractionMatrix));
             if (!(*interactionMatrix)){
-              fprintf(fperrors,"realloc of G to bindSiteCount = %d failed.\n",maxy);
+              fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
               exit(1);
             }
+            else if (verbose) fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
           }
           (*interactionMatrix)[bindSiteCount].cisregID = geneID;
           (*interactionMatrix)[bindSiteCount].cisregCopy = cisRegCopy; 
@@ -248,18 +283,19 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][CISREG_LEN][PLOIDY],
       }
     }
   }
+  *maxAlloc = maxBindingSiteAlloc;
   return bindSiteCount;
 }
 
-void calc_interaction_matrix(char cisRegSeq[NGENES][CISREG_LEN][PLOIDY],
-                             char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN][PLOIDY],
+void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
+                             char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
                              int *newBindSiteCount,
                              TFInteractionMatrix **interactionMatrix)
 {
-  int maxy, bindSiteCount;
+  int maxBindingSiteAlloc, bindSiteCount;
   
-  maxy = maxelements;
-  *interactionMatrix = malloc(maxy*sizeof(TFInteractionMatrix));
+  maxBindingSiteAlloc = maxelements;
+  *interactionMatrix = malloc(maxBindingSiteAlloc*sizeof(TFInteractionMatrix));
   if (!(*interactionMatrix)) {
     fprintf(fperrors,"initial setting of G failed.\n");
     exit(1);
@@ -270,6 +306,7 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][CISREG_LEN][PLOIDY],
                                                  transcriptionFactorSeq, 
                                                  bindSiteCount,
                                                  interactionMatrix,
+                                                 &maxBindingSiteAlloc,
                                                  0, 0);
 
   if (PLOIDY == 2)  {
@@ -277,24 +314,28 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][CISREG_LEN][PLOIDY],
                                                    transcriptionFactorSeq, 
                                                    bindSiteCount,
                                                    interactionMatrix,
+                                                   &maxBindingSiteAlloc,
                                                    0, 1);
 
     bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
                                                    transcriptionFactorSeq, 
                                                    bindSiteCount,
                                                    interactionMatrix,
+                                                   &maxBindingSiteAlloc,
                                                    1, 0);
 
     bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
                                                    transcriptionFactorSeq, 
                                                    bindSiteCount,
                                                    interactionMatrix,
+                                                   &maxBindingSiteAlloc,
                                                    1, 1);
   }
+  /* printf("bindSiteCount = %d\n", bindSiteCount); */
 
   *interactionMatrix = realloc(*interactionMatrix, bindSiteCount*sizeof(TFInteractionMatrix));
   if (!(*interactionMatrix)) {
-    fprintf(fperrors, "realloc of G down to bindSiteCount = %d failed.\n", bindSiteCount);
+    fprintf(fperrors, "realloc of interactionMatrix down to bindSiteCount = %d failed.\n", bindSiteCount);
     exit(1);
   }
   *newBindSiteCount = bindSiteCount;
@@ -1169,7 +1210,7 @@ void attempt_tf_binding(Genotype *genes,
                         int *maxbound3,
                         int site)
 {
-  int geneID, k, posdiff, site2;
+  int geneID, geneCopy, k, posdiff, site2;
 
   if (verbose) fprintf(fperrors,
                       "kon1 event at site %d out of %d possible, %d TFs previously bound bindSiteCount=%d\n",
@@ -1178,10 +1219,10 @@ void attempt_tf_binding(Genotype *genes,
   /* if we have run out of space, double memory  */
   if (state->tfBoundCount >= *maxbound2){
     (*maxbound2) *= 2;
-    state->tfBoundIndexes = realloc(state->tfBoundIndexes,(*maxbound2)*sizeof(int));
+    state->tfBoundIndexes = realloc(state->tfBoundIndexes, (*maxbound2)*sizeof(int));
 
     /* do the copy */
-    *koffvalues = realloc(*koffvalues,(*maxbound2)*sizeof(float));
+    *koffvalues = realloc(*koffvalues, (*maxbound2)*sizeof(float));
 
     /* check return value */
     if (!state->tfBoundIndexes || !(*koffvalues)) {
@@ -1206,7 +1247,7 @@ void attempt_tf_binding(Genotype *genes,
   calc_koff(site, genes->interactionMatrix, state, &((*koffvalues)[state->tfBoundCount]));
   if (verbose) 
     fprintf(fperrors,"new koff = %g is number %d\n",
-            (*koffvalues)[state->tfBoundCount],(state->tfBoundCount+1));
+            (*koffvalues)[state->tfBoundCount], (state->tfBoundCount+1));
 
   /* adjust rates by adding the new koffvalue to rates->koff */
   rates->koff += (*koffvalues)[state->tfBoundCount];
@@ -1223,13 +1264,18 @@ void attempt_tf_binding(Genotype *genes,
   /* get the gene that the TF is binding to */
   geneID = genes->interactionMatrix[site].cisregID;
 
+  /* get the copy that the TF is binding to */
+  geneCopy = genes->interactionMatrix[site].cisregCopy;
+  
   /* update steric hindrance data structures */
   /* JM: this cycles over all sites, not just bound ones, in order to
      record redundancy in steric hindrance*/
   for (k = 0; k < genes->bindSiteCount; k++) {
 
     /* if we are on the same gene and not the same binding site */
-    if (geneID == genes->interactionMatrix[k].cisregID && !(k==site)) {
+    if (geneID == genes->interactionMatrix[k].cisregID &&
+        geneCopy == genes->interactionMatrix[k].cisregCopy &&
+        !(k==site)) {
 
       /* check distance from current binding site (k) to the original (site) */
       posdiff = genes->interactionMatrix[site].sitePos - genes->interactionMatrix[k].sitePos;

@@ -139,8 +139,8 @@ struct TFInteractionMatrix {
 
 typedef struct Genotype Genotype;
 struct Genotype {
-  char cisRegSeq[NGENES][CISREG_LEN][PLOIDY];
-  char transcriptionFactorSeq[NGENES][TF_ELEMENT_LEN][PLOIDY];
+  char cisRegSeq[NGENES][PLOIDY][CISREG_LEN];
+  char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN];
   int bindSiteCount;
   TFInteractionMatrix *interactionMatrix;
 /* int (*interactionMatrix)[5];
@@ -210,8 +210,8 @@ struct TimeCourse
   TimeCourse *next;
 };     
 
-extern void calc_interaction_matrix(char [NGENES][CISREG_LEN][PLOIDY],
-                                    char [NGENES][TF_ELEMENT_LEN][PLOIDY],
+extern void calc_interaction_matrix(char [NGENES][PLOIDY][CISREG_LEN],
+                                    char [NGENES][PLOIDY][TF_ELEMENT_LEN],
                                     int *,
                                     TFInteractionMatrix **);
 
