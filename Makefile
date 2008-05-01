@@ -1,9 +1,10 @@
 all: netsim
 
 CC = gcc
-CFLAGS = -g -std=c99
+CFLAGS = -g -std=c99 
 OBJS = random.o lib.o
 LIBS = -lm 
+#-lefence
 OTHER = Makefile
 
 %.o: %.c %.h
