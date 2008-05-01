@@ -40,7 +40,7 @@
 /* initialize constants as static const */
 static const int maxelements=500*PLOIDY; 
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
-static const int maxbound=50;
+static const int maxbound=500*PLOIDY;
 static const int dummyrun=4; /* used to change seed */
 static const int PopSize=1;
 static const int nmin=4;
@@ -93,13 +93,13 @@ void initialize_sequence(char Seq[],
   } else {
     int current_element = len/(NGENES*PLOIDY);
     int first, second;
-    printf("current_element=%d\n", current_element);
+    /* printf("current_element=%d\n", current_element); */
     for (i=0; i<len/PLOIDY; i++){
       first = (i / current_element)*2*current_element + i % current_element;
       second = first + current_element;
-      //first = i;
-      //second = first + len/PLOIDY;
-      //printf("first=%d, second=%d\n", first, second);
+      /* first = i;
+         second = first + len/PLOIDY;
+         printf("first=%d, second=%d\n", first, second); */
       x = ran1(&seed);
       if (x<0.25)
         Seq[first] = 'a';
@@ -108,6 +108,7 @@ void initialize_sequence(char Seq[],
       else if (x<0.75)
         Seq[first] = 'g';
       else Seq[first] = 't';
+      /* clone the randomly chosen sequence */
       Seq[second] = Seq[first];
     }
   }
@@ -158,7 +159,7 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);  
+  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);   */
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -174,11 +175,28 @@ void initialize_genotype(Genotype *indiv,
     indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
     while (indiv->translation[i] < 0.0)
       indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
-    if (ran1(&seed)<pact) indiv->activating[i] = 1;
-    else indiv->activating[i] = 0;
-    fprintf(fperrors,"%d ",indiv->activating[i]);
+
+    /* make the activations the same in each copy */
+    if (ran1(&seed)<pact) {
+      indiv->activating[i][0] = 1;
+      if (PLOIDY == 2) 
+        indiv->activating[i][1] = 1;
+    }
+    else {
+      indiv->activating[i][0] = 0;
+      if (PLOIDY == 2) 
+        indiv->activating[i][1] = 0;
+    }
+    fprintf(fperrors,"%d ", indiv->activating[i][0]);
+    if (PLOIDY == 2) 
+      fprintf(fperrors,"%d ", indiv->activating[i][1]);
+
     j = trunc(NUM_K_DISASSEMBLY * ran1(&seed));
-    indiv->PICdisassembly[i] = kdis[j];
+    
+    indiv->PICdisassembly[i][0] = kdis[j];
+    if (PLOIDY == 2) 
+      indiv->PICdisassembly[i][1] = kdis[j];
+
   }
   fprintf(fperrors,"\n");
 }
@@ -192,20 +210,24 @@ void mutate(Genotype *old,
   
   for (i=0; i<NGENES; i++) {
     for (k=0; k<CISREG_LEN; k++) {
-      new->cisRegSeq[i][k][0] = old->cisRegSeq[i][k][0];      
+      new->cisRegSeq[i][0][k] = old->cisRegSeq[i][0][k];      
       if (m > ran1(&seed)) {
-        x = old->cisRegSeq[i][k][0]; /* because sometimes old and new are the same */
-        while (new->cisRegSeq[i][k][0] == x)
-          initialize_sequence(&(new->cisRegSeq[i][k][0]),(int) 1);
+        x = old->cisRegSeq[i][0][k]; /* because sometimes old and new are the same */
+        while (new->cisRegSeq[i][0][k] == x)
+          initialize_sequence(&(new->cisRegSeq[i][0][k]),(int) 1);
       }
     }
     for (k=0; k<TF_ELEMENT_LEN; k++) 
-      new->transcriptionFactorSeq[i][k][0] = old->transcriptionFactorSeq[i][k][0];    
+      new->transcriptionFactorSeq[i][0][k] = old->transcriptionFactorSeq[i][0][k];    
     new->mRNAdecay[i] = old->mRNAdecay[i];
     new->proteindecay[i] = old->proteindecay[i];
     new->translation[i] = old->translation[i];
-    new->activating[i] = old->activating[i];
-    new->PICdisassembly[i] = old->PICdisassembly[i];
+    new->activating[i][0] = old->activating[i][0];
+    if (PLOIDY == 2)
+      new->activating[i][1] = old->activating[i][1];
+    new->PICdisassembly[i][0] = old->PICdisassembly[i][0];
+    if (PLOIDY == 2)
+      new->PICdisassembly[i][1] = old->PICdisassembly[i][1];
   }
   calc_interaction_matrix(new->cisRegSeq, new->transcriptionFactorSeq, &(new->bindSiteCount), &(new->interactionMatrix));
 }
@@ -459,7 +481,9 @@ void initialize_cell(CellState *indiv,
   indiv->tfBoundIndexes = NULL;
   indiv->tfHinderedIndexes = NULL;
   for (i=0; i<NGENES; i++) {
-    indiv->active[i] = ON_WITH_NUCLEOSOME;
+    indiv->active[i][0] = ON_WITH_NUCLEOSOME;
+    if (PLOIDY == 2)
+      indiv->active[i][1] = ON_WITH_NUCLEOSOME;
     totalmRNA = (int) poidev(meanmRNA[i],&seed);
     indiv->mRNANuclearCount[i] = (int) bnldev(startnucleus, totalmRNA, &seed);
     indiv->mRNACytoCount[i] = totalmRNA - indiv->mRNANuclearCount[i];
@@ -598,7 +622,7 @@ void scan_nearby_sites(int indexChanged,
                        TFInteractionMatrix *interactionMatrix,
                        CellState *state,
                        GillespieRates *rates,
-                       float koffvalues[])
+                       float *koffvalues)
 {
   int posdiff,j,i;
   float diff;
@@ -698,38 +722,45 @@ void add_kon(float proteinConcTFID,
 
 /* tests whether criterion for transcription is met */
 int ready_to_transcribe(int geneID,
+                        int geneCopy,
                         int *tfBoundIndexes,
                         int tfBoundCount,
                         TFInteractionMatrix *interactionMatrix,
-                        int activating[],
+                        int activating[NGENES][PLOIDY],
                         int *on)
 {
   int i,off;
   
   *on=off=0;
   for (i=0; i < tfBoundCount; i++) {
-    if (geneID==interactionMatrix[tfBoundIndexes[i]].cisregID) {
-      if (activating[interactionMatrix[tfBoundIndexes[i]].tfID]) (*on)++;
-      else off++;
+    if (geneID==interactionMatrix[tfBoundIndexes[i]].cisregID &&
+        geneCopy==interactionMatrix[tfBoundIndexes[i]].cisregCopy)
+      {
+        if (activating[interactionMatrix[tfBoundIndexes[i]].tfID][geneCopy]) (*on)++;
+        else off++;
     }
   }
   if ((float)off <= 0.33442*(float)(*on) + 0.31303) 
-    return(1);
+    return (1);
   else 
-    return(0);
+    return (0);
 }
 
 int is_one_activator(int geneID,
+                     int geneCopy,
                      int *tfBoundIndexes,
                      int tfBoundCount,
                      TFInteractionMatrix *interactionMatrix,
-                     int activating[])
+                     int activating[NGENES][PLOIDY])
 {
   int i;
   
-  for (i=0;i<tfBoundCount;i++)
-    if (geneID==interactionMatrix[tfBoundIndexes[i]].cisregID && (activating[interactionMatrix[tfBoundIndexes[i]].tfID])) return(1);
-  return(0);
+  for (i=0; i < tfBoundCount; i++)
+    if (geneID==interactionMatrix[tfBoundIndexes[i]].cisregID && 
+        geneCopy==interactionMatrix[tfBoundIndexes[i]].cisregCopy &&
+        (activating[interactionMatrix[tfBoundIndexes[i]].tfID][geneCopy])) 
+      return (1);
+  return (0);
 }
 
 /* only appropriate if nothing is  bound ie CalcFromInitialState and everything is in state 2
@@ -1002,40 +1033,43 @@ void remove_from_array(int toberemoved,
 void disassemble_PIC(CellState *state,
                      Genotype *genes,
                      int geneID,
+                     int geneCopy,
                      GillespieRates *rates)
 {
-  float disassembly = genes->PICdisassembly[geneID];
+  float disassembly = genes->PICdisassembly[geneID][geneCopy];
   remove_from_array(geneID, state->statechangeIDs[TRANSCRIPTINIT], &(rates->transcriptInitCount), (int) 1);
   remove_from_array(geneID, state->statechangeIDs[PICDISASSEMBLY], &(rates->picDisassemblyCount), (int) 1);
   rates->picDisassembly -= disassembly;
   
   /* disassemble PIC in OFF state */
-  if (state->active[geneID] == OFF_PIC) {
-    (state->active[geneID]) = OFF_NO_PIC;
+  if (state->active[geneID][geneCopy] == OFF_PIC) {
+    (state->active[geneID][geneCopy]) = OFF_NO_PIC;
     state->statechangeIDs[DEACTEYLATION][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
   /* disassemble PIC in ON state */
-  if (state->active[geneID] == ON_FULL) {
-    (state->active[geneID]) = ON_NO_PIC;
+  if (state->active[geneID][geneCopy] == ON_FULL) {
+    (state->active[geneID][geneCopy]) = ON_NO_PIC;
   }
 }
 
 void revise_activity_state(int geneID,
+                           int geneCopy,
                            Genotype *genes,
                            CellState *state,
                            GillespieRates *rates)
 {
   int transcriptrule, oldstate, numactive;
 
-  transcriptrule = ready_to_transcribe(geneID, state->tfBoundIndexes, 
+  transcriptrule = ready_to_transcribe(geneID, geneCopy, 
+                                       state->tfBoundIndexes, 
                                        state->tfBoundCount,
                                        genes->interactionMatrix,
                                        genes->activating,
                                        &numactive);
 
   /* get last state of transcription initiation */
-  oldstate = state->active[geneID];
+  oldstate = state->active[geneID][geneCopy];
 
   /* #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 3-transcriptinit, 4-PIC disassembly*/
 
@@ -1046,13 +1080,13 @@ void revise_activity_state(int geneID,
 
   /* OFF_FULL -> ON_WITH_NUCLEOSOME */
   if ((transcriptrule) && oldstate==OFF_FULL){
-    state->active[geneID] = ON_WITH_NUCLEOSOME;
+    state->active[geneID][geneCopy] = ON_WITH_NUCLEOSOME;
     state->statechangeIDs[ACTEYLATION][rates->acetylationCount] = geneID;
     (rates->acetylationCount)++;      
   }
   /* OFF_NO_PIC -> ON_NO_PIC */
   if ((transcriptrule) && oldstate==OFF_NO_PIC) {
-    state->active[geneID] = ON_NO_PIC;
+    state->active[geneID][geneCopy] = ON_NO_PIC;
     remove_from_array(geneID, state->statechangeIDs[DEACTEYLATION], &(rates->deacetylationCount), (int) 1);
     if (numactive){
       state->statechangeIDs[PICASSEMBLY][rates->picAssemblyCount] = geneID;
@@ -1061,7 +1095,7 @@ void revise_activity_state(int geneID,
   }
   /* OFF_PIC -> ON_FULL */
   if ((transcriptrule) && oldstate==OFF_PIC) {
-    state->active[geneID] = ON_FULL;
+    state->active[geneID][geneCopy] = ON_FULL;
   }
 
   /*
@@ -1071,31 +1105,31 @@ void revise_activity_state(int geneID,
 
   /* ON_WITH_NUCLEOSOME -> OFF_FULL */
   if (!(transcriptrule) && oldstate==ON_WITH_NUCLEOSOME) {
-    state->active[geneID] = OFF_FULL;
+    state->active[geneID][geneCopy] = OFF_FULL;
     remove_from_array(geneID, state->statechangeIDs[ACTEYLATION], &(rates->acetylationCount), (int) 1);
   }
   
   /* ON_NO_PIC -> OFF_NO_PIC */
   if (!(transcriptrule) && oldstate==ON_NO_PIC){          
-    state->active[geneID] = OFF_NO_PIC;
+    state->active[geneID][geneCopy] = OFF_NO_PIC;
     remove_from_array(geneID, state->statechangeIDs[PICASSEMBLY], &(rates->picAssemblyCount), (int) 0);
     state->statechangeIDs[DEACTEYLATION][rates->deacetylationCount] = geneID;
     (rates->deacetylationCount)++;
   }
   /* ON_FULL -> OFF_PIC  */
   if (!(transcriptrule) && oldstate==ON_FULL) {
-    state->active[geneID] = OFF_PIC;
+    state->active[geneID][geneCopy] = OFF_PIC;
   }
 
   /* do remaining transitions:
    * OFF_PIC -> OFF_NO_PIC
    * ON_FULL -> ON_NO_PIC 
    */
-  if ((state->active[geneID]==OFF_PIC || state->active[geneID]==ON_FULL) && numactive==0)
-    disassemble_PIC(state, genes, geneID, rates);
+  if ((state->active[geneID][geneCopy]==OFF_PIC || state->active[geneID][geneCopy]==ON_FULL) && numactive==0)
+    disassemble_PIC(state, genes, geneID, geneCopy, rates);
 
-  if (verbose && (oldstate!=state->active[geneID])) {
-    fprintf(fperrors, "state change from %d to %d in gene %d\n", oldstate, state->active[geneID], geneID);
+  if (verbose && (oldstate!=state->active[geneID][geneCopy])) {
+    fprintf(fperrors, "state change from %d to %d in gene %d, copy %d\n", oldstate, state->active[geneID][geneCopy], geneID, geneCopy);
   }
 }
 
@@ -1106,7 +1140,7 @@ void remove_tf_binding(Genotype *genes,
                        int site,
                        float koffvalues[])
 {
-  int i, j, k, bound, siteID, geneID, transcriptrule, oldstate, numactive;
+  int i, j, k, bound, siteID, geneID, geneCopy, transcriptrule, oldstate, numactive;
 
   i = 0;
 
@@ -1114,15 +1148,14 @@ void remove_tf_binding(Genotype *genes,
   while ((state->tfBoundIndexes[i] != site) && (i < state->tfBoundCount)) 
     i++;
   if (i == state->tfBoundCount) {  /* couldn't find the site */
-    fprintf(fperrors,"error: remove_tf_binding could not find site %d with %d possibilities\n Bound sites are\n",
-            site,state->tfBoundCount);
+    fprintf(fperrors, "error: remove_tf_binding could not find site %d with %d possibilities\n Bound sites are\n",
+            site, state->tfBoundCount);
     for (j = 0; j < state->tfBoundCount; j++)  {
-      fprintf(fperrors,"%d\n",state->tfBoundIndexes[j]);
+      fprintf(fperrors, "%d\n", state->tfBoundIndexes[j]);
     }
   }
   else {
     j = 0;
-
     /* loop through the sterically hindered sites */
     while (j < state->tfHinderedCount) {
 
@@ -1179,22 +1212,23 @@ void remove_tf_binding(Genotype *genes,
     /* likewise with koffvalues */
     koffvalues[i] = koffvalues[state->tfBoundCount];
 
-    /* find the gene whose cisreg region has an unbinding event */
+    /* find the gene and copy whose cisreg region has an unbinding event */
     geneID = genes->interactionMatrix[site].cisregID;
+    geneCopy = genes->interactionMatrix[site].cisregCopy;
     if (verbose) 
-      fprintf(fperrors,"Add site %d at pos %d on gene %d freed by unbinding\n",
-              site, genes->interactionMatrix[site].sitePos, geneID);
+      fprintf(fperrors,"Add site %d at pos %d on gene %d copy %d freed by unbinding\n",
+              site, genes->interactionMatrix[site].sitePos, geneID, geneCopy);
 
     /* adjust kon */
     add_kon(state->proteinConc[genes->interactionMatrix[site].tfID],
-           konStates->konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
-           genes->interactionMatrix[site].tfID,
-           site,
-           rates,
-           konStates);
+            konStates->konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
+            genes->interactionMatrix[site].tfID,
+            site,
+            rates,
+            konStates);
 
     /* adjust the state of the gene */
-    revise_activity_state(geneID, genes, state, rates);
+    revise_activity_state(geneID, geneCopy, genes, state, rates);
 
     /* when TF unbinds adjust the co-operativity at close sites */
     scan_nearby_sites(site, genes->interactionMatrix, state, rates, koffvalues);        
@@ -1213,12 +1247,15 @@ void attempt_tf_binding(Genotype *genes,
   int geneID, geneCopy, k, posdiff, site2;
 
   if (verbose) fprintf(fperrors,
-                      "kon1 event at site %d out of %d possible, %d TFs previously bound bindSiteCount=%d\n",
-                      site, konStates->nkon, state->tfBoundCount, genes->bindSiteCount);
+                       "kon1 event at site %d out of %d possible, %d TFs previously bound bindSiteCount=%d\n",
+                       site, konStates->nkon, state->tfBoundCount, genes->bindSiteCount);
+
+  fflush(fperrors);
 
   /* if we have run out of space, double memory  */
   if (state->tfBoundCount >= *maxbound2){
     (*maxbound2) *= 2;
+
     state->tfBoundIndexes = realloc(state->tfBoundIndexes, (*maxbound2)*sizeof(int));
 
     /* do the copy */
@@ -1237,11 +1274,11 @@ void attempt_tf_binding(Genotype *genes,
 
   /* remove the site from the kon pool */
   remove_kon(site,
-            genes->interactionMatrix[site].tfID,
-            rates, 
-            konStates->konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
-            konStates,
-            state->proteinConc[genes->interactionMatrix[site].tfID]);
+             genes->interactionMatrix[site].tfID,
+             rates, 
+             konStates->konvalues[genes->interactionMatrix[site].tfID][KON_SALPHC_INDEX],
+             konStates,
+             state->proteinConc[genes->interactionMatrix[site].tfID]);
 
   /* recompute the koffvalues */
   calc_koff(site, genes->interactionMatrix, state, &((*koffvalues)[state->tfBoundCount]));
@@ -1296,7 +1333,7 @@ void attempt_tf_binding(Genotype *genes,
         /* update list of hindered count */
         (state->tfHinderedCount)++;
         if (verbose) {
-          fprintf(fperrors,"%d steric hindrance sites after %d blocks site %d\n", state->tfHinderedCount, site, k);
+          fprintf(fperrors, "%d steric hindrance sites after %d blocks site %d\n", state->tfHinderedCount, site, k);
         }
 
         /* remove the kon from pool */
@@ -1309,11 +1346,11 @@ void attempt_tf_binding(Genotype *genes,
       }
     }
   }
-  if (verbose) fprintf(fperrors,"tfBoundCount=%d tfHinderedCount=%d maxbound2=%d maxbound3=%d\n",
-                      state->tfBoundCount,state->tfHinderedCount,*maxbound2,*maxbound3);
+  if (verbose) fprintf(fperrors, "tfBoundCount=%d tfHinderedCount=%d maxbound2=%d maxbound3=%d\n",
+                       state->tfBoundCount, state->tfHinderedCount, *maxbound2, *maxbound3);
 
   /* gene activity may change as a result of binding */
-  revise_activity_state(geneID, genes, state, rates);
+  revise_activity_state(geneID, geneCopy, genes, state, rates);
 }
 
 /*
@@ -1331,9 +1368,9 @@ void add_time_points(float time,
 }
 
 void add_integer_time_points(float time,
-                      int proteinConc[NGENES],
-                      TimeCourse **timecoursestart,
-                      TimeCourse **timecourselast)
+                             int proteinConc[NGENES],
+                             TimeCourse **timecoursestart,
+                             TimeCourse **timecourselast)
 {
   int i;
   
@@ -1377,7 +1414,7 @@ void update_protein_conc(float proteinConc[],
 }
 
 void calc_num_bound(float proteinConc[],
-                  int tfBoundCount)
+                    int tfBoundCount)
 {
   float sum;
   int i;
@@ -1392,6 +1429,18 @@ void calc_num_bound(float proteinConc[],
     fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, (CISREG_LEN*NGENES*sum)/NumSitesInGenome);
 }
 
+int choose_gene_copy()
+{
+  if (PLOIDY == 2) {
+    float x = ran1(&seed);
+    if (x > 0.5)
+      return 1;
+    else
+      return 0;
+  } else {
+    return 0;
+  }
+}
 
 /* -----------------------------------------------------
  * START
@@ -1545,19 +1594,23 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
 
   /* choose a particular gene to change state */
   int geneID = state->statechangeIDs[ACTEYLATION][(int)trunc(x)];
+
+  /* choose a particular gene to change state */
+  int geneCopy = choose_gene_copy();
+  
   if (verbose) fprintf(fperrors,"acetylation event gene %d\nstate change from %d to 4\n",
-                       geneID, state->active[geneID]);
-  if (state->active[geneID] != ON_WITH_NUCLEOSOME)
-    fprintf(fperrors, "error: acetylation event attempted from state %d\n", state->active[geneID]);
-  update_protein_conc(state->proteinConc,dt,
-                    rates, konStates, 
-                    t, timecoursestart, timecourselast,
-                    state->proteinConc);
+                       geneID, state->active[geneID][geneCopy]);
+  if (state->active[geneID][geneCopy] != ON_WITH_NUCLEOSOME)
+    fprintf(fperrors, "error: acetylation event attempted from state %d\n", state->active[geneID][geneCopy]);
+  update_protein_conc(state->proteinConc, dt,
+                      rates, konStates, 
+                      t, timecoursestart, timecourselast,
+                      state->proteinConc);
   
   /* set state: eject nucleosome, but there is no PIC yet */
-  state->active[geneID] = ON_NO_PIC;
+  state->active[geneID][geneCopy] = ON_NO_PIC;
   remove_from_array(geneID, state->statechangeIDs[ACTEYLATION], &(rates->acetylationCount), (int) 1);
-  if (is_one_activator(geneID, state->tfBoundIndexes, state->tfBoundCount, 
+  if (is_one_activator(geneID, geneCopy, state->tfBoundIndexes, state->tfBoundCount, 
                        genes->interactionMatrix, genes->activating)) {
     state->statechangeIDs[PICASSEMBLY][rates->picAssemblyCount] = geneID; 
     (rates->picAssemblyCount)++;
@@ -1569,77 +1622,89 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
                                  float dt, float t)
 {
   float x = ran1(&seed)*((float) rates->deacetylationCount);
-  int geneID = state->statechangeIDs[DEACTEYLATION][(int)trunc(x)];
-  if (verbose) fprintf(fperrors,"deacetylation event gene %d\nstate change from %d to 1\n",
-                       geneID,state->active[geneID]);
-  if (state->active[geneID] != OFF_NO_PIC)
-    fprintf(fperrors, "error: deacetylation event attempted from state %d\n", state->active[geneID]);
-  update_protein_conc(state->proteinConc, dt, 
-                    rates, konStates, 
-                    t, timecoursestart, timecourselast,
-                    state->proteinConc);
-  /* set state: nucleosome returns */
-  state->active[geneID] = OFF_FULL;
-  remove_from_array(geneID, state->statechangeIDs[DEACTEYLATION], &(rates->deacetylationCount), (int) 1);
 
+  /* choose a particular gene and copy to change state */
+  int geneID = state->statechangeIDs[DEACTEYLATION][(int)trunc(x)];
+  int geneCopy = choose_gene_copy();
+
+  if (verbose) fprintf(fperrors,"deacetylation event gene %d, copy %d\nstate change from %d to 1\n",
+                       geneID, geneCopy, state->active[geneID]);
+  if (state->active[geneID][geneCopy] != OFF_NO_PIC)
+    fprintf(fperrors, "error: deacetylation event attempted from state %d\n", state->active[geneID][geneCopy]);
+  update_protein_conc(state->proteinConc, dt, 
+                      rates, konStates, 
+                      t, timecoursestart, timecourselast,
+                      state->proteinConc);
+  /* set state: nucleosome returns */
+  state->active[geneID][geneCopy] = OFF_FULL;
+  remove_from_array(geneID, state->statechangeIDs[DEACTEYLATION], &(rates->deacetylationCount), (int) 1);
 }
 
 void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genes, 
                       KonStates *konStates, TimeCourse **timecoursestart, TimeCourse **timecourselast,
                       float dt, float t)
 {
-  int geneID;
-  float x;
 
-  x = ran1(&seed)*((float) rates->picAssemblyCount);
-  geneID = state->statechangeIDs[PICASSEMBLY][(int)trunc(x)];
-  if (verbose) fprintf(fperrors,"PIC assembly event gene %d\nstate change from %d to 6\n",
-                       geneID,state->active[geneID]);
-  if (state->active[geneID] != ON_NO_PIC)
-    fprintf(fperrors, "error: PIC assembly event attempted from state %d\n", state->active[geneID]);
+  float x = ran1(&seed)*((float) rates->picAssemblyCount);
+
+  /* choose a particular gene and copy to change state */
+  int geneID = state->statechangeIDs[PICASSEMBLY][(int)trunc(x)];
+  int geneCopy = choose_gene_copy();
+
+  if (verbose) fprintf(fperrors, "PIC assembly event gene %d copy %d\nstate change from %d to 6\n",
+                       geneID, state->active[geneID][geneCopy]);
+
+  if (state->active[geneID][geneCopy] != ON_NO_PIC)
+    fprintf(fperrors, "error: PIC assembly event attempted from state %d\n", state->active[geneID][geneCopy]);
   update_protein_conc(state->proteinConc, dt,
-                    rates, konStates, 
-                    t, timecoursestart, timecourselast,
-                    state->proteinConc);
+                      rates, konStates, 
+                      t, timecoursestart, timecourselast,
+                      state->proteinConc);
   
   /* turn gene fully on: ready for transcription */
-  state->active[geneID] = ON_FULL;
-  remove_from_array(geneID, state->statechangeIDs[PICASSEMBLY], &(rates->picAssemblyCount), (int) 1);                      
+  state->active[geneID][geneCopy] = ON_FULL;
+  remove_from_array(geneID, state->statechangeIDs[PICASSEMBLY], &(rates->picAssemblyCount), (int) 1);
   state->statechangeIDs[TRANSCRIPTINIT][rates->transcriptInitCount] = geneID;
   (rates->transcriptInitCount)++;
   state->statechangeIDs[PICDISASSEMBLY][rates->picDisassemblyCount] = geneID;
   (rates->picDisassemblyCount)++;
-  rates->picDisassembly += genes->PICdisassembly[geneID];                                            
+  rates->picDisassembly += genes->PICdisassembly[geneID][geneCopy];
 }
 
 void disassemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genes, 
                            KonStates *konStates, TimeCourse **timecoursestart, TimeCourse **timecourselast,
                            float dt, float t, float x)
 {
+  int geneCopy;
   int j=-1;
   while (j < NGENES && x>0) {
     j++;
+    geneCopy = choose_gene_copy();
     /* TODO: why do we keep original rand number x, rather than choose a new one like other functions?  */
-    x -= genes->PICdisassembly[state->statechangeIDs[PICDISASSEMBLY][j]];                
+    x -= genes->PICdisassembly[state->statechangeIDs[PICDISASSEMBLY][j]][geneCopy];
   }
   if (j==NGENES) fprintf(fperrors, "error in PIC disassembly\n");
   j = state->statechangeIDs[PICDISASSEMBLY][j];
   if (verbose) fprintf(fperrors, "PIC disassembly event in gene %d\n", j);
-  disassemble_PIC(state, genes, j, rates);
+  disassemble_PIC(state, genes, j, geneCopy, rates);
 }
 
 void transcription_init_event(GillespieRates *rates, CellState *state, Genotype *genes,
                               KonStates *konStates, TimeCourse **timecoursestart, TimeCourse **timecourselast,
                               float dt, float t, float x)
 {
-  int geneID;
+  int geneID, geneCopy;
   x /= transcriptinit;
 
-  /* choose the gene that gets transcribed */
+  /* choose the gene and copy that gets transcribed */
   geneID = state->statechangeIDs[TRANSCRIPTINIT][(int)trunc(x)];
-  if (verbose) fprintf(fperrors,"transcription event gene %d\n", geneID);
-  if (state->active[geneID] != ON_FULL && state->active[geneID] != OFF_PIC)
-    fprintf(fperrors,"error: transcription event attempted from state %d\n", state->active[geneID]);
+  geneCopy = choose_gene_copy();
+
+  if (verbose) fprintf(fperrors,"transcription event gene %d, copy %d\n", geneID, geneCopy);
+
+  if (state->active[geneID][geneCopy] != ON_FULL && state->active[geneID][geneCopy] != OFF_PIC)
+    fprintf(fperrors, "error: transcription event attempted from state %d\n", state->active[geneID][geneCopy]);
+
   update_protein_conc(state->proteinConc, dt,
                       rates, konStates, 
                       t, timecoursestart, timecourselast,
@@ -1710,10 +1775,11 @@ void develop(Genotype *genes,
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
 
-  state->tfBoundIndexes = realloc(state->tfBoundIndexes,maxbound2*sizeof(int));
-  koffvalues = malloc(maxbound2*sizeof(float));
-  state->tfHinderedIndexes = realloc(state->tfHinderedIndexes,2*maxbound3*sizeof(int));
-  if (!konStates->konvalues || !state->tfBoundIndexes || !state->tfHinderedIndexes || !konStates->konIDs){
+  state->tfBoundIndexes = realloc(state->tfBoundIndexes, maxbound2*sizeof(int));
+  koffvalues = malloc(maxbound2*sizeof(float)); 
+  state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 2*maxbound3*sizeof(int));
+  if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
+      !state->tfHinderedIndexes || !konStates->konIDs) {
     fprintf(fperrors,"memory allocation error at start of develop\n");
     exit(1);
   }
@@ -1744,9 +1810,9 @@ void develop(Genotype *genes,
     if (verbose) 
       fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", t+dt, dt, x);
 
-    if (!(state->mRNATranscrTimeEndLast)){
+    if (!(state->mRNATranscrTimeEndLast)) {
       for (i=0;i<NGENES;i++)
-        if (verbose) fprintf(fperrors,"%d transcription events\n", state->mRNATranscrCount[i]);
+        if (verbose) fprintf(fperrors, "%d transcription events\n", state->mRNATranscrCount[i]);
     }
     
     /* first check to see if a fixed event occurs in current t->dt window */
@@ -1763,9 +1829,9 @@ void develop(Genotype *genes,
         end_transcription(&dt, t, state, transport, rates);
 
         update_protein_conc(state->proteinConc, dt,
-                          rates, konStates, t,
-                          timecoursestart, timecourselast,
-                          state->proteinConc);
+                            rates, konStates, t,
+                            timecoursestart, timecourselast,
+                            state->proteinConc);
       } else {           /* if a translation event ends */
                        /* TODO: could have else if (event==2) */
         dt = state->mRNATranslTimeEnd->time - t;         /* make dt window smaller */
@@ -1810,10 +1876,10 @@ void develop(Genotype *genes,
              genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
 
       if (verbose) 
-        fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n",t+dt,dt,x);
+        fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n", t+dt, dt, x);
 
       /* check to see there aren't more fixed events to do */
-      event = does_fixed_event_end(state->mRNATranslTimeEnd, state->mRNATranscrTimeEnd, fminf(tdevelopment,t+dt));
+      event = does_fixed_event_end(state->mRNATranslTimeEnd, state->mRNATranscrTimeEnd, fminf(tdevelopment, t+dt));
     } 
 
     /* no remaining fixed events to do in dt, now do stochastic events */
@@ -2026,10 +2092,10 @@ void print_time_course(TimeCourse *start,
   if ((fpout = fopen(filename,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n",filename);
   while (start){
-    fprintf(fpout,"%g %g\n",start->time,start->concentration);
+    fprintf(fpout,"%g %g\n", start->time, start->concentration);
     start = start->next;
   }
-  /*  fprintf(fpout, "%g %g\n", tdevelopment, lopt[i]); */
+  /* fprintf(fpout, "%g %g\n", tdevelopment, lopt[i]);  */
   fclose(fpout);  
 }
 

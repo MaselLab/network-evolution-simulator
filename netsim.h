@@ -154,8 +154,8 @@ struct Genotype {
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
-  int activating[NGENES]; // 1 is activating, 0 is repressing
-  float PICdisassembly[NGENES];
+  int activating[NGENES][PLOIDY]; /* 1 is activating, 0 is repressing */
+  float PICdisassembly[NGENES][PLOIDY];
 };
 
 /* 
@@ -188,7 +188,7 @@ struct CellState {
   /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
     2nd elem gives corresponding index of inhibiting TF in G (TODO: what is this?)
   */
-  int active[NGENES];
+  int active[NGENES][PLOIDY];
   /* gives the state of each of the genes, according to figure
      1 is fully off, 2 meets TF criteria
      3 is off but w/o nucleosome, 4 is on but w/o PIC
