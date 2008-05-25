@@ -12,6 +12,10 @@
 #include <limits.h>
 #include <float.h>
 #include <string.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 /* local includes */
 #include "random.h"
@@ -41,7 +45,6 @@
 static const int maxelements=500*PLOIDY; 
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
 static const int maxbound=500*PLOIDY;
-static const int dummyrun=4; /* used to change seed */
 static const int PopSize=1;
 static const int nmin=4;
 static const float tdevelopment=120.0;
@@ -69,8 +72,11 @@ static const int Generations=5;
 
 static int output = 0;
 static long seed =  28121; /* something is wrong here: changing seed changes nothing */
+static int dummyrun=4; /* used to change seed */
 
-int verbose = 1;
+/* file output parameters */
+static char *output_directory = "output";
+int verbose = 0;
 FILE *fperrors;
 
 void initialize_sequence(char Seq[], 
@@ -2088,7 +2094,7 @@ void print_time_course(TimeCourse *start,
   FILE *fpout;
   char filename[80];
   
-  sprintf(filename,"output/protein%d.dat",i);
+  sprintf(filename, "%s/protein%d.dat", output_directory, i);
   if ((fpout = fopen(filename,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n",filename);
   while (start){
@@ -2109,8 +2115,44 @@ int main(int argc, char *argv[])
   TimeCourse *timecourselast[NGENES];
   TimeCourse *start;
   float fitness[PopSize], sumfit, lopt[NGENES], initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
-  
+
+  int c, directory_success;
+
+  /* parse command-line options */
+  while ((c = getopt (argc, argv, "hvd:r:")) != -1) {
+    switch (c)
+      {
+      case 'd':
+        output_directory = optarg;
+        break;
+      case 'r':
+        dummyrun = atoi(optarg);
+        break;
+      case 'v':
+        verbose = 1;
+        break;
+      case 'h':
+        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h]\n", argv[0]);
+        exit(0);
+        break;
+      default:
+        abort();
+      }
+  }
+
+  /* create error output file */
   fperrors = fopen("netsimerrors.txt", "w");
+
+  /* create output directory if needed */
+  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
+  if (directory_success==-1) 
+    if (errno == EEXIST) {
+      fprintf(stderr, "directory '%s' already exists\n", output_directory);
+    } else {
+      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
+      exit(-1);
+    }
+
   sumfit = 0.0;
   for (j=0; j<dummyrun; j++) ran1(&seed);
   for (i=0; i<NGENES; i++) {
