@@ -2,6 +2,7 @@ all: netsim
 
 CC = gcc
 CFLAGS = -g -std=c99 
+#  -O3
 OBJS = random.o lib.o
 LIBS = -lm 
 #-lefence
@@ -11,7 +12,7 @@ OTHER = Makefile
 	$(CC) $(CFLAGS) -c $<
 
 %: %.c $(OBJS) $(OTHER)
-	$(CC) -O3 $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
 
 %-check: %.c %.h $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<

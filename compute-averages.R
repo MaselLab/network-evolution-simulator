@@ -1,9 +1,9 @@
 library(lattice)
 
-if (FALSE) {
+if (TRUE) {
 
   for (i in seq(00, 99)) {
-    cmd=sprintf("../netsim -r %i  -d output%02d", i, i)
+    cmd=sprintf("time ../netsim -r %i  -d output%02d", i, i)
     print(cmd)
     system(cmd)
   }
@@ -16,6 +16,9 @@ for (i in seq(0,9)) {
   ##print(fs)
   ##print(i)
   for (f in fs) {
+    if (!file.exists(f)) {
+      next
+    }
     series=read.table(f)
     names(series)=c("time", "conc")
 
@@ -34,4 +37,4 @@ for (i in seq(0,9)) {
 }
 print(df)
 
-xyplot(gene~conc.av, data=df, scales=list(x=list(log=TRUE)))
+bwplot(gene~conc.av, data=df, scales=list(x=list(log=TRUE)))

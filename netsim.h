@@ -40,11 +40,6 @@ enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
        ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
 
 /*
- * enum for konIDs
- */
-enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
-
-/*
  * enum for stateChangeIDs
  */
 enum { ACTEYLATION = 0, 
@@ -97,6 +92,20 @@ struct GillespieRates {
 };
 
 /*
+ * enum for konIDs
+ */
+enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
+
+/*
+ * enum for KonList
+ */
+/* enum { SITEID_INDEX = 0, TOTAL_AVAILABLE = 1 }; */
+typedef struct KonList KonList;
+struct KonList {
+  int *available_sites;
+  int site_count;
+};
+/*
  * konStates : new composite data structure to cache information about
  * available binding sites to avoid re-computation.  This currently
  * just groups the previous data structures: 
@@ -112,6 +121,9 @@ struct KonStates {
 
   /* elem 0 is siteID, elem 1 is TF that binds */
   int (*konIDs)[2];
+
+  /* list of structs  */
+  KonList *konList[NGENES];
 
   /* number of available binding sites for a given TF */
   int nkonsum[NGENES];

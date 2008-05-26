@@ -557,8 +557,8 @@ void calc_kon_rate(float t,
   int i;
   
   r = 0.0;
-  for (i=0; i<NGENES; i++){
-    if (konStates->nkonsum[i]>0){
+  for (i=0; i<NGENES; i++) {
+    if (konStates->nkonsum[i] > 0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*t;
       if (fabs(ct)<10^-6) ect=ct;
       else ect = 1-exp(-ct);
@@ -678,12 +678,17 @@ void remove_kon(int siteID,
   k = 0;
   /* TODO: check ! */
   /* find the index of the site that binds in konIDs  */
-  while (!(konStates->konIDs[k][SITEID_INDEX] == siteID) && k < konStates->nkon) {
+  /* while (!(konStates->konIDs[k][SITEID_INDEX] == siteID) && k < konStates->nkon) {
+    k++;
+    } */
+  
+  while (!(konStates->konList[TFID]->available_sites[k] == siteID) && k < konStates->konList[TFID]->site_count) {
     k++;
   }
 
   /* make sure that we have enough unoccupied sites left */
-  if (k < konStates->nkon) {   
+  /* if (k < konStates->nkon) {    */
+  if (k < konStates->konList[TFID]->site_count && k < konStates->nkon) { 
     /* adjust rates */
     rates->salphc -= kon*salphc;
     rates->maxSalphc -= kon*fmaxf(proteinConcTFID, salphc);
@@ -695,10 +700,16 @@ void remove_kon(int siteID,
     /* also per gene */
     (konStates->nkonsum[TFID])--;
 
+    (konStates->konList[TFID]->site_count)--;
+
     /* TODO: check */
     /* move the last element end of array into space vacated by site k */
-    konStates->konIDs[k][SITEID_INDEX] = konStates->konIDs[konStates->nkon][SITEID_INDEX];
-    konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX];
+    /* konStates->konIDs[k][SITEID_INDEX] = konStates->konIDs[konStates->nkon][SITEID_INDEX];
+       konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX]; */
+
+    konStates->konList[TFID]->available_sites[k] = konStates->konList[TFID]->available_sites[konStates->konList[TFID]->site_count];
+    /*konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX]; */
+
   }
   /* else do nothing: there is likely a redundancy in steric
      hindrance, hence no site to remove */
@@ -718,10 +729,14 @@ void add_kon(float proteinConcTFID,
   rates->minSalphc += fminf(proteinConcTFID, salphc);
 
   /* add back siteID to pool of available sites */
-  konStates->konIDs[konStates->nkon][SITEID_INDEX] = siteID;
-  konStates->konIDs[konStates->nkon][TFID_INDEX] = TFID;
+  /* konStates->konIDs[konStates->nkon][SITEID_INDEX] = siteID;
+     konStates->konIDs[konStates->nkon][TFID_INDEX] = TFID; */
+  
+  konStates->konList[TFID]->available_sites[konStates->konList[TFID]->site_count] = siteID;
+  /* konStates->konIDs[konStates->nkon][TFID_INDEX] = TFID; */
 
   /* one more site available */
+  (konStates->konList[TFID]->site_count)++;
   (konStates->nkonsum[TFID])++;
   (konStates->nkon)++;
 }
@@ -789,6 +804,7 @@ void calc_from_state(Genotype *genes,
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i];
     konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
     konStates->nkonsum[i]=0;  
+    konStates->konList[i]->site_count = 0;
   }
   state->tfBoundCount=0;
 
@@ -808,8 +824,12 @@ void calc_from_state(Genotype *genes,
     rates->salphc += salphc;
     rates->maxSalphc += fmaxf(proteinConcTFID, salphc);
     rates->minSalphc += fminf(proteinConcTFID, salphc);
-    konStates->konIDs[k][SITEID_INDEX] = k;
-    konStates->konIDs[k][TFID_INDEX] = i;
+    /* konStates->konIDs[k][SITEID_INDEX] = k;
+       konStates->konIDs[k][TFID_INDEX] = i; */
+    
+    /* update the list of sites that bind for a particular TF, i */
+    konStates->konList[i]->available_sites[konStates->konList[i]->site_count] = k;
+    (konStates->konList[i]->site_count)++;
     (konStates->nkonsum[i])++;
   }
 
@@ -1340,15 +1360,16 @@ void attempt_tf_binding(Genotype *genes,
         (state->tfHinderedCount)++;
         if (verbose) {
           fprintf(fperrors, "%d steric hindrance sites after %d blocks site %d\n", state->tfHinderedCount, site, k);
+          fflush(fperrors);
         }
 
         /* remove the kon from pool */
         remove_kon(k,
-                  genes->interactionMatrix[k].tfID,
-                  rates,
-                  konStates->konvalues[genes->interactionMatrix[k].tfID][KON_SALPHC_INDEX],
-                  konStates,
-                  state->proteinConc[genes->interactionMatrix[k].tfID]);
+                   genes->interactionMatrix[k].tfID,
+                   rates,
+                   konStates->konvalues[genes->interactionMatrix[k].tfID][KON_SALPHC_INDEX],
+                   konStates,
+                   state->proteinConc[genes->interactionMatrix[k].tfID]);
       }
     }
   }
@@ -1458,39 +1479,81 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
 {
   float x = ran1(&seed) * (rates->salphc + konrate)/kon;
   int i, j = -1;
-  float konrate2 = 0.0;               
+  int k, l = -1;  /* new */
+  float total_konrate2, konrate2_for_TF = 0.0;     
+  int siteID;
 
   /* loop through all *available* binding sites to
    * choose one, the interval is weighted by the
    * frequency of rates */
-  while (j < konStates->nkon-1 && x > konrate2) {
-    
-    /* this will record the last binding site before we
-       reach the appropriate binding site  */
-    j++;
-    
-    /* get ID of TF */
-    i = konStates->konIDs[j][TFID_INDEX];
-    
-    /* compute the kon rate  */
-    konrate2 = konStates->konvalues[i][KON_SALPHC_INDEX] + 
-      konStates->konvalues[i][KON_DIFF_INDEX]*(1-exp(-konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
-    
-    /* adjust random number */
-    x -= konrate2;
+  /* while (j < konStates->nkon-1 && x > konrate2) { */
+
+  /* loop through all TFs, then choose a particular binding site */
+  for (k=0; k < NGENES; k++) {
+
+    /* compute the total rate for all available binding sites for this
+     * particular TF: see if we are in the right range
+     */
+
+    /* first, cache the konrate2 for this particular gene */
+    konrate2_for_TF = konStates->konvalues[k][KON_SALPHC_INDEX] + 
+      konStates->konvalues[k][KON_DIFF_INDEX] * (1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
+
+    /* compute the *total* kon rate for all unbound sites for this TF  */
+    total_konrate2 = (konStates->konList[k]->site_count+1) * konrate2_for_TF;
+
+    /* printf("looking at TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); */
+
+    /* if we are already in the appropriate TF, now choose a binding site */
+    if (x < total_konrate2) {
+      float konrate2 = 0.0;
+      /* printf("selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); */
+      while (l < konStates->konList[k]->site_count && x > konrate2) {
+        /* this will record the last binding site before we
+           reach the appropriate binding site  */
+        /* j++; */
+        l++;
+
+        siteID = konStates->konList[k]->available_sites[l];
+        /* get ID of TF: now already held implictly */
+        /* i = konStates->konIDs[j][TFID_INDEX]; */
+        /* i = k; */
+        
+        /* get ID of site */
+        /* printf("l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); */
+        /* compute the kon rate  */
+        /* konrate2 = konStates->konvalues[k][KON_SALPHC_INDEX] + 
+           konStates->konvalues[k][KON_DIFF_INDEX]*(1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt; */
+        
+        /* adjust random number */
+        /* x -= konrate2; */
+        konrate2 = konrate2_for_TF;
+        x -= konrate2;
+      }
+      /* found it, so break out of the outer for loop */
+      break;
+    } else {
+      x -= total_konrate2; 
+      /* printf("progressing to the next TF: %d\n", k+1); */
+    }
+
   }
-  
+
+  /* printf("found it!!!! l: %d, site: %d, binds to TF: %d, konrate2: %g, x: %g\n", l, siteID, k, konrate2_for_TF, x);   */
   /* update protein concentration before doing the binding */
   update_protein_conc(state->proteinConc, dt, 
-                    rates, konStates, 
-                    t, timecoursestart, timecourselast,
-                    state->proteinConc);
+                      rates, konStates, 
+                      t, timecoursestart, timecourselast,
+                      state->proteinConc);
   if (verbose) fflush(fperrors);
   
   /* bind the j-th konID in the list which happens to be the binding site in SITEID_INDEX */
-  attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, 
-                     konStates->konIDs[j][SITEID_INDEX]);
+  /* attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, 
+     konStates->konIDs[j][SITEID_INDEX]); */
   
+  /* bind siteID */
+  attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, siteID);
+
   /* calculate the number of TFs bound
    * TODO: check this seems to be purely diagnostic
    */
@@ -1775,7 +1838,13 @@ void develop(Genotype *genes,
   state->RTlnKr = GasConstant * temperature * log(Kr);
 
   /* number of possible binding sites */
-  konStates->konIDs = malloc(2*genes->bindSiteCount*sizeof(int));
+  /* konStates->konIDs = malloc(2*genes->bindSiteCount*sizeof(int)); */
+  /* konStates->konList = malloc(sizeof(KonList)); */
+
+  for (i=0; i<NGENES; i++){
+    konStates->konList[i] = malloc(sizeof(KonList));
+    konStates->konList[i]->available_sites = malloc(genes->bindSiteCount*sizeof(int));
+  }
 
   /* TODO: ? */
   maxbound2 = maxbound;
@@ -1784,8 +1853,10 @@ void develop(Genotype *genes,
   state->tfBoundIndexes = realloc(state->tfBoundIndexes, maxbound2*sizeof(int));
   koffvalues = malloc(maxbound2*sizeof(float)); 
   state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 2*maxbound3*sizeof(int));
+  /*if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
+    !state->tfHinderedIndexes || !konStates->konIDs) { */
   if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
-      !state->tfHinderedIndexes || !konStates->konIDs) {
+      !state->tfHinderedIndexes || !konStates->konList) {
     fprintf(fperrors,"memory allocation error at start of develop\n");
     exit(1);
   }
@@ -2012,6 +2083,12 @@ void develop(Genotype *genes,
       /* Gillespie step: advance time to next event at dt */
       t += dt;
       if (verbose) fprintf(fperrors, "dt=%g t=%g\n", dt, t);
+
+      /* output time courses during run to capture output before segfault */
+      for (i=0; i < NGENES; i++) {
+        float *lopt;
+        /*print_time_course(timecoursestart[i], i, lopt);*/
+      }
     } else {
       /* we will reach the end of development in dt */
       if (verbose) fprintf(fperrors, "finish at t=%g dt=%g\n", t, dt);
@@ -2029,7 +2106,11 @@ void develop(Genotype *genes,
     }
   }
   free(koffvalues);
-  free(konStates->konIDs);
+  /* free(konStates->konIDs); */
+  for (i=0; i<NGENES; i++) {
+    free(konStates->konList[i]->available_sites);
+  }
+  /*free(konStates->konList); */
   free(konStates);
   free(rates);
 }
