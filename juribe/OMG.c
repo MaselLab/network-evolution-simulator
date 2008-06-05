@@ -20,6 +20,7 @@ struct Rowtype{
 struct Ttype{
     int col;
     struct Rowtype row[(TFBS+1)];//TFBS+1 is the maximum # of non zero entries in any column
+    //does the row have to be a pointer?? or a double pointer **??
 };  
          
 
@@ -47,12 +48,19 @@ void compressT(int matrixT[DIM][DIM], struct Ttype **SmallT)
             if(Tmatrix[check][i]!=0)
                 zeros++;
         }
-        if(zeros==0)
-           i++;   
+        if(zeros==0){
+           i++;
+           for(check=0; check<pow(2,TFBS); check++) {
+            if(Tmatrix[check][i]!=0)
+                zeros++;
+        }}   
+           
                 
+                          
+       printf("zeros= %d\n", zeros);
        printf("i= %d\n", i); 
        printf("k: %d\n", k);   
-       SmallT[k] = malloc(DIM*sizeof(struct Rowtype));
+       SmallT[k] = malloc(zeros*sizeof(struct Rowtype));
        SmallT[k]->col=i;
 
        m=0;  //m moves through the Rowtype array inside the Ttype structure
@@ -73,6 +81,7 @@ void compressT(int matrixT[DIM][DIM], struct Ttype **SmallT)
     SmallT[k] = NULL; 
     printf("k: %d\n", k); 
     printf("m: %d\n", m);
+    printf("\n");
  
 } 
  
@@ -116,7 +125,7 @@ int main(){
     SmallT=malloc(pow(2,TFBS)*sizeof(struct Ttype)+1);//=4 * sizeof()
 
     compressT(Tmatrix, SmallT);
-    printf("Here");
+    //printf("Here");
     
    /* int count, s;//gives the number of significant elements in T-array- same as k in compressT
     count=1;
@@ -126,7 +135,7 @@ int main(){
         s++;
     }
     printf("count: %d\n", count);*/
-     printf("here2"); 
+    // printf("here2"); 
     //SmallT=realloc(SmallT, sizeof(struct Ttype)*(count+2));//works bc same as malloc= 4* sizeof()
     /*SmallT=realloc(SmallT, sizeof(struct Ttype)*(count)); should work but doesnt...
     does realloc only work to make memeory larger??
@@ -142,7 +151,7 @@ int main(){
            printf( "Value%d: %.2f\n",q, SmallT[p]->row[q].kval);     
         }    
     }
-    printf("Here again"); 
+   // printf("Here again"); 
   /* multiplyT(SmallT, newX);
    
    int f;
