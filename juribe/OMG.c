@@ -60,7 +60,7 @@ void compressT(int matrixT[DIM][DIM], struct Ttype **SmallT)
        printf("zeros= %d\n", zeros);
        printf("i= %d\n", i); 
        printf("k: %d\n", k);   
-       SmallT[k] = malloc(zeros*sizeof(struct Rowtype));
+       SmallT[k] = malloc(zeros*sizeof(struct Rowtype)+1);
        SmallT[k]->col=i;
 
        m=0;  //m moves through the Rowtype array inside the Ttype structure
@@ -96,7 +96,8 @@ void multiplyT(struct Ttype **SmallT, float *newX)
         newX[j]=0;
     }
     //goes through Tarray
-   for (c=0; c<3; c++){/*number of elements in Tarray, k-- for some reason this is an issue...have
+    c=0;
+   while (SmallT[c]!=NULL){/*number of elements in Tarray, k-- for some reason this is an issue...have
    to adjust based on number of significant rows*/
        sum=0;
        //goes through Rowtype array
