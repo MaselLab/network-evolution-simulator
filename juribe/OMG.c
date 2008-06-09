@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define TFBS 3
-#define DIM 8
+#define TFBS 2
+#define DIM 4
 
-static float Tmatrix[4][4]={{1, 0, 0, 0}, {4, 0, 0, 6}, {7, 0, 0, 9}, {0, 0, 0, 12}};                            
+static float Tmatrix[4][4]={{1, 2, 3, 0}, {4, 5, 0, 0}, {7, 0, 8, 0}, {0, 0, 0, 0}};                            
 static float Xvector[4] = {0, 1, 1, 1};
 
 static float Fmatrix[8][8]={{.2, .2, .1, 0, .4, 0, 0, 0}, {.1, .2, 0, .3, 0, .2, 0, 0}, {.2, 0, .2, .1, 0, 0, .3, 0}, {0, .2, .2, .1, 0, 0, 0, .2},
@@ -41,7 +41,7 @@ void compressT(float matrixT[DIM][DIM], struct Ttype *arrayT, int *colCount)
     i=0;  //i, j move through T matrix
     while (i<pow(2,TFBS)) {
         zeros=0;
-        for(check=0; check<pow(2,TFBS); check++) {
+        for (check=0; check<pow(2,TFBS); check++) {
             if(matrixT[check][i] != 0)
                 zeros++;
         }
@@ -105,10 +105,10 @@ int main(){
     arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));//=4 * sizeof()
     
     for(d=0; d<pow(2,TFBS); d++){
-         newX[d] = Fvector[d];
+         newX[d] = Xvector[d];
      }    
     
-    compressT(Fmatrix, arrayT, &colCount);
+    compressT(Tmatrix, arrayT, &colCount);
    
     int p,q;
     p=0;
@@ -140,6 +140,10 @@ int main(){
     }
     printf("\n");  
    
+    int j;
+    for (j=0; j<colCount; j++){
+        free(arrayT[j].row);
+    }    
     free(arrayT);
     free(newX);
                                          
