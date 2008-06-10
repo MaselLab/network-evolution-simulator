@@ -1500,12 +1500,12 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
       konStates->konvalues[k][KON_DIFF_INDEX] * (1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
 
     /* compute the *total* kon rate for all unbound sites for this TF  */
-    total_konrate2 = (konStates->konList[k]->site_count+1) * konrate2_for_TF;
+    total_konrate2 = ((konStates->konList[k]->site_count)+1) * konrate2_for_TF;
 
     /* printf("looking at TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); */
 
     /* if we are already in the appropriate TF, now choose a binding site */
-    if (x < total_konrate2) {
+    if (!(x > total_konrate2)) {
       float konrate2 = 0.0;
       /* printf("selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); */
       while (l < konStates->konList[k]->site_count && x > konrate2) {
