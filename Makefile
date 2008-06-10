@@ -1,7 +1,7 @@
 all: netsim
 
 CC = gcc
-CFLAGS = -g -std=c99 
+CFLAGS = -g -std=c99 $(EXTRACFLAGS)
 #  -O3
 OBJS = random.o lib.o
 LIBS = -lm 
