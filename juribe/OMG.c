@@ -133,7 +133,6 @@ int main(){
     }
     printf("\n");  
    
-  
     for (d=0; d<colCount; d++){
         free(arrayT[d].row);
     }    
