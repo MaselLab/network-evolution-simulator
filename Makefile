@@ -25,7 +25,8 @@ netsim-check: $(OBJS)
 netsim-gprof: $(OBJS)
 
 ## check specific directory
-check:	netsim-check
+check:	clean
+	make EXTRACFLAGS=-m32 netsim-check
 	./netsim-check -r 4 -d output
 	@diff -r --exclude=.svn --exclude=NOTES output regression-tests/after-kon-change-r-4 && echo -e "************\nPassed regression\n***********"
 
