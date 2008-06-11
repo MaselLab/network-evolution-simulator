@@ -24,9 +24,10 @@ netsim: $(OBJS)
 netsim-check: $(OBJS)
 netsim-gprof: $(OBJS)
 
+## check specific directory
 check:	netsim-check
-	./netsim-check
-	@diff -r --exclude=.svn --exclude=NOTES output test && echo -e "************\nPassed regression\n***********"
+	./netsim-check -r 4 -d output
+	@diff -r --exclude=.svn --exclude=NOTES output regression-tests/after-kon-change-r-4 && echo -e "************\nPassed regression\n***********"
 
 profiling:	netsim-gprof
 
