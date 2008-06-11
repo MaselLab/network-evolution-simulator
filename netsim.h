@@ -81,11 +81,11 @@ struct GillespieRates {
   float minSalphc;         /* rates[6] */
 
   /* number of genes in the following states */
-  int acetylationCount;       /* rates2[0] */
-  int deacetylationCount;     /* rates2[1] */
-  int picAssemblyCount;       /* rates2[2] */
-  int transcriptInitCount;    /* rates2[3] */
-  int picDisassemblyCount;    /* rates2[4] */
+  int acetylationCount[PLOIDY];       /* rates2[0] */
+  int deacetylationCount[PLOIDY];     /* rates2[1] */
+  int picAssemblyCount[PLOIDY];       /* rates2[2] */
+  int transcriptInitCount[PLOIDY];    /* rates2[3] */
+  int picDisassemblyCount[PLOIDY];    /* rates2[4] */
 
   /* total, including rates2 */
   float total;                /* rates[7] */
@@ -208,7 +208,7 @@ struct CellState {
   */
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  int statechangeIDs[5][NGENES]; 
+  int statechangeIDs[5][PLOIDY][NGENES]; 
   float RTlnKr;
   float temperature;
 };
