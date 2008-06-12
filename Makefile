@@ -11,7 +11,7 @@ OTHER = Makefile
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c $<
 
-%: %.c $(OBJS) $(OTHER)
+%: %.c %.h $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
 
 %-check: %.c %.h $(OBJS) $(OTHER)

@@ -165,7 +165,7 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);    */
+  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -610,8 +610,10 @@ void calc_koff(int k,
       posdiff = interactionMatrix[k].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
       if (abs(posdiff) < 6) {
         fprintf(fperrors,
-                "error: steric hindrance has been breached with site %d %d away from site %d\n",
-                k, posdiff, state->tfBoundIndexes[j]);
+                "error: steric hindrance has been breached with site %d (on copy %d of gene %d), %d away from site %d (on copy %d of gene %d)\n",
+                k, interactionMatrix[k].cisregCopy, interactionMatrix[k].cisregID, posdiff, 
+                state->tfBoundIndexes[j], interactionMatrix[state->tfBoundIndexes[j]].cisregCopy, 
+                interactionMatrix[state->tfBoundIndexes[j]].cisregID);
       }
       if (abs(posdiff) < 20) {
         if (posdiff>0) front++; else back++;
@@ -690,6 +692,10 @@ void remove_kon(int siteID,
     k++;
   }
 
+  if (verbose)
+    fprintf(fperrors, ">>> remove site %d konList (k=%d of %d total sites for TF %d, grandtotal=%d)\n", 
+            siteID, k, konStates->konList[TFID]->site_count, TFID, konStates->nkon);
+
   /* make sure that we have enough unoccupied sites left */
   /* if (k < konStates->nkon) {    */
   if (k < konStates->konList[TFID]->site_count && k < konStates->nkon) { 
@@ -714,6 +720,9 @@ void remove_kon(int siteID,
     konStates->konList[TFID]->available_sites[k] = konStates->konList[TFID]->available_sites[konStates->konList[TFID]->site_count];
     /*konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX]; */
 
+  } else {
+    if (verbose)
+      fprintf(fperrors, "||| couldn't remove site %d from TF %d in konList (k=%d)\n", siteID, TFID, k);
   }
   /* else do nothing: there is likely a redundancy in steric
      hindrance, hence no site to remove */
@@ -1323,6 +1332,8 @@ void attempt_tf_binding(Genotype *genes,
   state->tfBoundIndexes[state->tfBoundCount] = site;
   if (verbose) fprintf(fperrors, "remove site %d\n", site);
 
+  fflush(fperrors);
+
   /* remove the site from the kon pool */
   remove_kon(site,
              genes->interactionMatrix[site].tfID,
@@ -1537,32 +1548,46 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
      * particular TF: see if we are in the right range
      */
 
+    /* if no sites available for this TF, skip to next gene */
+    if (konStates->konList[k]->site_count == 0) {
+      if (verbose)
+        fprintf(fperrors, "looking at TF: %d, has %d sites available, skipping\n", k, konStates->konList[k]->site_count);
+      continue;
+    }
+    
     /* first, cache the konrate2 for this particular gene */
     konrate2_for_TF = konStates->konvalues[k][KON_SALPHC_INDEX] + 
       konStates->konvalues[k][KON_DIFF_INDEX] * (1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
 
     /* compute the *total* kon rate for all unbound sites for this TF  */
-    total_konrate2 = ((konStates->konList[k]->site_count)+1) * konrate2_for_TF;
+    total_konrate2 = ((konStates->konList[k]->site_count)) * konrate2_for_TF;  /* remove +1 for the moment */
 
-    /* printf("looking at TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); */
+    if (verbose)
+      fprintf(fperrors, "looking at TF: %d, has %d sites available [konrate2: %g, total_konrate2: %g, x: %g]\n", 
+              k, konStates->konList[k]->site_count, konrate2_for_TF, total_konrate2, x); 
 
     /* if we are already in the appropriate TF, now choose a binding site */
-    if (!(x > total_konrate2)) {
+    if (!(x > total_konrate2) || (k == NGENES-1)) {
       float konrate2 = 0.0;
-      /* printf("selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); */
+      
+      if (verbose) 
+        fprintf(fperrors, "selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); 
+      
       while (l < konStates->konList[k]->site_count && x > konrate2) {
         /* this will record the last binding site before we
            reach the appropriate binding site  */
         /* j++; */
         l++;
 
+        /* get ID of site */
         siteID = konStates->konList[k]->available_sites[l];
         /* get ID of TF: now already held implictly */
         /* i = konStates->konIDs[j][TFID_INDEX]; */
         /* i = k; */
         
-        /* get ID of site */
-        /* printf("l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); */
+        if (verbose)
+          fprintf(fperrors, "l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); 
+
         /* compute the kon rate  */
         /* konrate2 = konStates->konvalues[k][KON_SALPHC_INDEX] + 
            konStates->konvalues[k][KON_DIFF_INDEX]*(1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt; */
