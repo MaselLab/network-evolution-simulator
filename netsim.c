@@ -165,7 +165,7 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);   
+  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);    */
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -2259,6 +2259,7 @@ void print_time_course(TimeCourse *start,
 int main(int argc, char *argv[])
 {
   FILE *fpout, *fpkdis;
+  char fperrors_name[80];
   int i, j, k, gen;
   CellState state;
   Genotype indivs[PopSize];
@@ -2292,7 +2293,8 @@ int main(int argc, char *argv[])
   }
 
   /* create error output file */
-  fperrors = fopen("netsimerrors.txt", "w");
+  sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
+  fperrors = fopen(fperrors_name, "w");
 
   /* create output directory if needed */
   directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
