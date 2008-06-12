@@ -1491,21 +1491,23 @@ int sum_rate_counts(int rate_array[PLOIDY])
 
 void get_gene(int rate_array[PLOIDY], int pos, int *geneLoc, int *geneCopy)
 {
-
+  
   if (PLOIDY == 2) {
     int sum = rate_array[0] + rate_array[1];
     if (pos < rate_array[0]) {
       *geneCopy = 0;
       *geneLoc = pos;
-    } else 
+    } else {
       *geneCopy = 1;
-      *geneLoc = pos - rate_array[0] ;
+      *geneLoc = pos - rate_array[0];
+    }
   } else {
     *geneCopy = 0;
     *geneLoc = pos;
   }
+  /* printf("rate_array[0]=%d, rate_array[1]=%d, pos=%d, geneCopy=%d, geneLoc=%d\n", 
+     rate_array[0], rate_array[1], pos, *geneCopy, *geneLoc); */
 }
-
 
 
 /* -----------------------------------------------------
