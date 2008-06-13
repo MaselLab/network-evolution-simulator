@@ -3,7 +3,8 @@
 
 #define TFBS 4
 
-void convertToBinary(int decimal) {
+/* this simply prints the binary representation */
+void printBinaryRepresentation(int decimal) {
    int binary = 0;
    int place = 0;
    int num = decimal;
@@ -48,7 +49,7 @@ int main(int argc, char *argv[])
     unsigned int zeros;
     int lastpos = -1;
 
-    convertToBinary(i);
+    printBinaryRepresentation(i);
     printf(" (bits = %d) ", bitCount);
 
     /* there are TFBS-bitCount zero entries, create a new binary number for each */
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
 	}
       }
       printf("[");    
-      convertToBinary(konpos);
+      printBinaryRepresentation(konpos);
       printf("] ");    
     }
     printf("\n");
