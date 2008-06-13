@@ -34,10 +34,10 @@ int getBit(unsigned int val, int pos) {
 
 /* this set the bit at position pos */
 int setBit(unsigned int val, int pos) {
-  unsigned int mask = 0 << pos;/* << means 0 shifts left pos times--NOT WORKING.
+  unsigned int mask = 1 << pos;/* << means 0 shifts left pos times--NOT WORKING.
                                     for Koff values. Ones not being changed to 0.
   printf("val: %d",mask); */
-  return mask | val; 
+  return mask ^ val;   /* here you need to keep the mask 1, but use XOR (exclusive OR) */
 }
 
 int main(int argc, char *argv[])
