@@ -17,7 +17,7 @@ void printBinaryRepresentation(int decimal) {
    }
    printf("%.*d (%*d)", TFBS, binary, TFBS-1, decimal);
 }
-
+/*counts the number of "ones" in the binary represesentation of the number*/
 int countBits(unsigned int v) {
 
   unsigned int c; // c accumulates the total bits set in v
@@ -29,13 +29,13 @@ int countBits(unsigned int v) {
 
 /* this gets the bit at position pos */
 int getBit(unsigned int val, int pos) {
-  return (val >> pos) & 1;
+  return (val >> pos) & 1; // >> means val shifts right pos times. Why the & 1??
 }
 
 /* this set the bit at position pos */
 int setBit(unsigned int val, int pos) {
-  unsigned int mask = 1 << pos;
-  return mask | val;
+  unsigned int mask = 1 << pos;// << means 1 shifts left pos times
+  return mask | val; // not sure why it returns mask or val, is val changed at all?
 }
 
 int main(int argc, char *argv[])
@@ -75,4 +75,5 @@ int main(int argc, char *argv[])
     printf("\n");
     i++;
   }
+  system("PAUSE");
 }
