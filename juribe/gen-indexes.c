@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#define TFBS 5
+#define TFBS 4
 
 /* this simply prints the binary representation */
 void printBinaryRepresentation(int decimal) {
