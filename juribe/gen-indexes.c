@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#define TFBS 4
+#define TFBS 5
 
 /* this simply prints the binary representation */
 void printBinaryRepresentation(int decimal) {
@@ -17,7 +17,11 @@ void printBinaryRepresentation(int decimal) {
    }
    printf("%.*d (%*d)", TFBS, binary, TFBS-1, decimal);
 }
-/*counts the number of "ones" in the binary represesentation of the number*/
+
+/* the following 3 functions aren't used any more as they have been absorbed 
+ * into the main() program */
+
+/* counts the number of "ones" in the binary represesentation of the number */
 int countBits(unsigned int v) {
 
   unsigned int c; // c accumulates the total bits set in v
@@ -46,32 +50,24 @@ int main(int argc, char *argv[])
   /* loop through all 2^TFBS(=N) rows */
   while (i < N) {
     unsigned int bitCount = countBits(i); 
-    unsigned int zeros;
-    int lastpos = -1;
-
+    unsigned int p;
+    
     printBinaryRepresentation(i);
     printf(" (bits = %d) ", bitCount);
-
-    /* there are TFBS-bitCount zero entries, create a new binary number for each */
-    for (zeros = 0; zeros < TFBS-bitCount; zeros++) {
-      unsigned int konpos;
-      int b;
-      konpos = i;
-
-      /* go through the binary number bitwise */
-      for (b = 0; b < TFBS; b++) {
-	/* get the last untoggled bit location where we have a zero */
-	if ((getBit(konpos, b) == 0) && b > lastpos) {
-	  lastpos = b;
-	  /* printf(" bitVal: 0 at %d ", b); */
-	  konpos = setBit(konpos, b);
-	  break;
-	}
+    unsigned int konpos;
+    
+   /* there are at most TFBS possible states accessible from current state
+      since we only bind at most one new TF, go through and check if it is
+      valid */
+    for (p = 0; p < TFBS; p++) 
+      /* if there is not already a 1 in the p-position */
+      if(!(i & (1 << p))) {
+	konpos = i | (1 << p) ;  /* then add a one there, effectively doing what the old setBit function did */
+	printf("[");    
+	printBinaryRepresentation(konpos);
+	printf("] ");    
       }
-      printf("[");    
-      printBinaryRepresentation(konpos);
-      printf("] ");    
-    }
+    //  }
     printf("\n");
     i++;
   }
