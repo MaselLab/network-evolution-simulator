@@ -48,36 +48,22 @@ int main(int argc, char *argv[])
   /* loop through all 2^TFBS(=N) rows */
   while (i < N) {
     unsigned int bitCount = countBits(i); 
-    unsigned int ones;
-    int lastpos = -1;
+    unsigned int b;
 
     printBinaryRepresentation(i);
     printf(" (bits = %d) ", bitCount);
+    unsigned int koffpos;
 
-    /* there are bitCount one entries, create a new binary number for each */
-    for (ones = 0; ones < bitCount; ones++) {
-      unsigned int koffpos;
-      int b;
-      koffpos = i;
-
-      /* go through the binary number bitwise */
-      for (b = 0; b < TFBS; b++) {
-	/* get the last untoggled bit location where we have a zero */
-	//printf("getbit: %d, b: %d", getBit(konpos, b), b);
-	if ((getBit(koffpos, b) == 1) && b > lastpos) {
-	  lastpos = b;
-	   //printf(" bitVal: 1 at %d ", b); 
-	  koffpos = setBit(koffpos, b);// not setting the 1 bits to 0s. Not sure why?
-	 // printf("konpos: %d", koffpos);
-	  break;
-	}
-      }
-      printf("[");    
-      printBinaryRepresentation(koffpos);
-      printf("] ");    
-    }
-    printf("\n");
-    i++;
+ 
+      for (b = 0; b < TFBS; b++) 
+          if((i & (1 << b))){
+              koffpos = i ^ (1 << b);//inclusive or exclusive??
+              printf("[");    
+              printBinaryRepresentation(koffpos);
+              printf("] ");    
+           }
+           printf("\n");
+           i++;
   }
   system("PAUSE");
 }
