@@ -51,27 +51,28 @@ void printKPos(int TFBSites, float *matrix[DIM][DIM], float kon[TFBS], float kof
      
     unsigned int p;
     printBinaryRepresentation(col);
-    unsigned int konpos;
-     unsigned int koffpos;
+    unsigned int rowOn;
+     unsigned int rowOff;
 
     //simplify this code
     for (p = 0; p < TFBSites; p++) 
        if ((col & (1 << p))){
-           konpos = col ^ (1 << p);
-           matrix[konpos][col] = &(kon[p]);
+           rowOn = col ^ (1 << p);
+           matrix[rowOn][col] = &(kon[p]);
            printf("[");    
-           printBinaryRepresentation(konpos);
-           printf("] ");    
+           printBinaryRepresentation(rowOn);
+           printf("] "); 
        } else {
-           koffpos = col | (1 << p) ;  /* then add a one there, effectively doing what the old setBit function did */
-    	   matrix[koffpos][col] = &(koff[p]);
-       	   printf("[");    
-    	   printBinaryRepresentation(koffpos);
-    	   printf("] "); 
-      }       
-       printf("\n");
-       col++;//make this incrementation conditional--inly increment when col not all zeros
-  }    
+           rowOff = col | (1 << p) ;  /* then add a one there, effectively doing what the old setBit function did */
+    	   matrix[rowOff][col] = &(koff[p]);
+           printf("[");    
+           printBinaryRepresentation(rowOff);
+           printf("] "); 
+      } 
+      printf("\n");
+      col++;//make this incrementation conditional--inly increment when col not all zeros
+  } 
+      
 }  
 
 
