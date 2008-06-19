@@ -1,7 +1,15 @@
 #include <stdio.h>
 #include <math.h>
 
-#define TFBS 4
+#define TFBS 2
+#define DIM 4
+
+static float *matrix[DIM][DIM] = {{NULL, NULL, NULL, NULL}, 
+			 {NULL, NULL, NULL, NULL}, 
+			 {NULL, NULL, NULL, NULL}, 
+			 {NULL, NULL, NULL, NULL}};
+static float kon[TFBS] = {0.1, 0.4};
+static float koff[5] = {0.15, 0.25, 0.35, 0.45, .55};
 
 /* this simply prints the binary representation */
 void printBinaryRepresentation(int decimal) {
@@ -15,61 +23,80 @@ void printBinaryRepresentation(int decimal) {
       num = num /2;
       place = place + 1;
    }
-   printf("%.*d (%*d)", TFBS, binary, TFBS-1, decimal);
+     //printf("%.*d (%*d)", TFBS, binary, TFBS-1, decimal);
+     printf(" %d ", decimal);
+     
 }
 
-/* the following 3 functions aren't used any more as they have been absorbed 
- * into the main() program */
-
-/* counts the number of "ones" in the binary represesentation of the number */
-int countBits(unsigned int v) {
-
-  unsigned int c; // c accumulates the total bits set in v
-  for (c = 0; v; c++) {
-      v &= v - 1; // clear the least significant bit set
+void print_matrix(float *matrix[DIM][DIM]) {
+  int i, j;
+  for (i=0; i < DIM; i++) {
+    for (j=0; j < DIM; j++) {
+      if (matrix[i][j] != NULL)
+	printf("%.4g ", *matrix[i][j]);
+      else
+	printf("NULL ");
+    }
+    printf("\n");
   }
-  return (c);
 }
 
-/* this gets the bit at position pos */
-int getBit(unsigned int val, int pos) {
-  return (val >> pos) & 1; // >> means val shifts right pos times. Why the & 1??
-}
+void printKPos(int TFBSites, float *matrix[DIM][DIM], float kon[TFBS], float koff[5]){
+  unsigned int N = pow(2, TFBSites);
+  unsigned int col = 0;
+  int i,j;
 
-/* this set the bit at position pos */
-int setBit(unsigned int val, int pos) {
-  unsigned int mask = 1 << pos;// << means 1 shifts left pos times
-  return mask | val; // not sure why it returns mask or val, is val changed at all?
-}
+  /* loop through all 2^TFBS(=N) columns */
+  while (col < N) {
+     
+    unsigned int p;
+    printBinaryRepresentation(col);
+    unsigned int konpos;
+     unsigned int koffpos;
+
+    //simplify this code
+    for (p = 0; p < TFBSites; p++) 
+       if ((col & (1 << p))){
+           konpos = col ^ (1 << p);
+           matrix[konpos][col] = &(kon[p]);
+           printf("[");    
+           printBinaryRepresentation(konpos);
+           printf("] ");    
+       } else {
+           koffpos = col | (1 << p) ;  /* then add a one there, effectively doing what the old setBit function did */
+    	   matrix[koffpos][col] = &(koff[p]);
+       	   printf("[");    
+    	   printBinaryRepresentation(koffpos);
+    	   printf("] "); 
+      }       
+       printf("\n");
+       col++;//make this incrementation conditional--inly increment when col not all zeros
+  }    
+}  
+
 
 int main(int argc, char *argv[])
 {
-  unsigned int N = pow(2, TFBS);
-  unsigned int i = 0;
+   printKPos(TFBS, matrix, kon, koff);
+  
+  printf("initial matrix:\n");
+  print_matrix(matrix);
 
-  /* loop through all 2^TFBS(=N) rows */
-  while (i < N) {
-    unsigned int bitCount = countBits(i); 
-    unsigned int p;
-    
-    printBinaryRepresentation(i);
-    printf(" (bits = %d) ", bitCount);
-    unsigned int konpos;
-    
-   /* there are at most TFBS possible states accessible from current state
-      since we only bind at most one new TF, go through and check if it is
-      valid */
-    for (p = 0; p < TFBS; p++) 
-      /* if there is not already a 1 in the p-position */
-      if(!(i & (1 << p))) {
-	konpos = i | (1 << p) ;  /* then add a one there, effectively doing what the old setBit function did */
-	printf("[");    
-	printBinaryRepresentation(konpos);
-	printf("] ");    
-      }
-    //  }
-    printf("\n");
-    i++;
-  }
+  /* modify kon */
+  kon[0] = 0.0789;
+  kon[1] = 0.9999;
+
+  printf("\nmodified matrix:\n");
+
+  /* this shows the modified kon values */
+  print_matrix(matrix);
+  
+  kon[0] = 0.034;
+  kon[1] = 0.333;
+  
+  printf("\nmodified matrix:\n");
+  print_matrix(matrix);
+  
+  
   system("PAUSE");
 }
