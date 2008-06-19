@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <math.h>
 
+#define TFBS 2
+
 /* program to test pointers to locations in kon array */
 
 void print_matrix(float *matrix[4][4]) {
@@ -18,6 +20,7 @@ void print_matrix(float *matrix[4][4]) {
 
 int main(int argc, char *argv[])
 {
+    
   int i, j;
 
   /* make each element be a NULL ptr by default */
@@ -32,8 +35,8 @@ int main(int argc, char *argv[])
     for(j=0; j < 4; j++) {
       /* put kon values along the diagonal (this is only for testing!!
 	 in reality kon values won't be along diagonal) */
-      if (i == j) {
-	matrix[i][j] = &(kon[i]);
+      if (j>i) {
+	matrix[i][j] = &(kon[j]);
       }
     }
   }
@@ -49,6 +52,8 @@ int main(int argc, char *argv[])
 
   /* this shows the modified kon values */
   print_matrix(matrix);
+  system("PAUSE");
+  
 }
 
 /* 
