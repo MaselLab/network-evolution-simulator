@@ -3,6 +3,9 @@
 
 #define TFBS 3
 
+/*this should print all the non-zero Kon values in each column based on the given 
+hinderances array*/
+
 static unsigned int hinderances[TFBS] = {2, 1, 0};
 
 /* this simply prints the binary representation */
@@ -62,18 +65,18 @@ int main(int argc, char *argv[])
   //determine impossible states
   unsigned int p;
   unsigned int check[TFBS];
-  int j;
+  int j, b;
   j=0;
   makeImpStates(TFBS, hinderances, check, &j);
   
   while (col < N) {
-    p=0;
+    b=0;
     //check that starting state is possible
-    while (p<j && ((check[p] & col) != check[p])) {
-       p++;
+    while (b<j && ((check[b] & col) != check[b])) {
+       b++;
     }
     //if starting state is valid
-    if(p==j){
+    if(b==j){
       printBinaryRepresentation(col);
     
     unsigned int konpos;
