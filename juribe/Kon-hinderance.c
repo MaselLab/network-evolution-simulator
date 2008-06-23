@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <math.h>
 
-#define TFBS 3
+#define TFBS 2
 
 /*this should print all the non-zero Kon values in each column based on the given 
 hinderances array*/
 
-static unsigned int hinderances[TFBS] = {2, 1, 0};
+static unsigned int hinderances[TFBS] = {2, 1};
 
 /* this simply prints the binary representation */
 void printBinaryRepresentation(int decimal) {
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
   /* loop through all 2^TFBS(=N) columns */
   
   //determine impossible states
-  unsigned int p;
+  
   unsigned int check[TFBS];
   int j, b;
   j=0;
@@ -79,8 +79,9 @@ int main(int argc, char *argv[])
     if(b==j){
       printBinaryRepresentation(col);
     
-    unsigned int konpos;
+    unsigned int konpos, koffpos;
     unsigned int hinderance_mask;
+    unsigned int p;
     
     for (p = 0; p < TFBS; p++)
       if ((col & (1 << p))) {
@@ -92,6 +93,15 @@ int main(int argc, char *argv[])
 	       printf("] ");    
         }	
       }
+      else{
+          koffpos = col | (1<< p);
+          hinderance_mask = hinderances[p];
+        if (!(koffpos & hinderance_mask)) {
+           printf("[");    
+	       printBinaryRepresentation(koffpos);
+	       printf("] ");    
+        }	 
+	   }    
     printf("\n");
     }
     //if starting state not valid
