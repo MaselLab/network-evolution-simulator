@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <math.h>
 
-#define TFBS 4
+#define TFBS 3
+
+static unsigned int hinderances[TFBS] = {2, 1, 0};
 
 /* this simply prints the binary representation */
 void printBinaryRepresentation(int decimal) {
@@ -15,55 +17,86 @@ void printBinaryRepresentation(int decimal) {
       num = num /2;
       place = place + 1;
    }
-   printf("%.*d (%*d)", TFBS, binary, TFBS-1, decimal);
-}
-/*counts the number of "ones" in the binary represesentation of the number*/
-int countBits(unsigned int v) {
-
-  unsigned int c; // c accumulates the total bits set in v
-  for (c = 0; v; c++) {
-      v &= v - 1; // clear the least significant bit set
-  }
-  return (c);
+     //printf("%.*d (%*d)", TFBS, binary, TFBS-1, decimal);
+     printf("%d ", decimal); 
 }
 
-/* this gets the bit at position pos */
-int getBit(unsigned int val, int pos) {
-  return (val >> pos) & 1; // >> means val shifts right pos times. Why the & 1??
+//this function checks if there are consecutive ones
+int checkConfigThree(int num) {
+    while (num!=3 && num!= 0) {
+        num=(num >> 1);
+    }
+    if (num==3)
+       return 1;
+    else
+       return 0;
 }
 
-/* this set the bit at position pos */
-int setBit(unsigned int val, int pos) {
-  unsigned int mask = 1 << pos;/* << means 0 shifts left pos times--NOT WORKING.
-                                    for Koff values. Ones not being changed to 0.
-  printf("val: %d",mask); */
-  return mask ^ val;   /* here you need to keep the mask 1, but use XOR (exclusive OR) */
+//this function makes an array of the impossible states 
+void makeImpStates(int BS, unsigned int hind[TFBS], unsigned int check[TFBS], int *size) {
+     int num[BS];
+     int i,j;
+     j=0;
+     
+     for (i=0; i<BS-1; i++) {
+        num[i]= hind[i] | hind[i+1];
+     }
+ 
+     for (i=0; i<BS-1; i++){ 
+        if (checkConfigThree(num[i])) {
+           check[j]=num[i];
+           j++;
+        }
+     }
+      *size=j;
 }
+
 
 int main(int argc, char *argv[])
 {
   unsigned int N = pow(2, TFBS);
-  unsigned int i = 0;
+  unsigned int col = 0;
 
-  /* loop through all 2^TFBS(=N) rows */
-  while (i < N) {
-    unsigned int bitCount = countBits(i); 
-    unsigned int b;
-
-    printBinaryRepresentation(i);
-    printf(" (bits = %d) ", bitCount);
-    unsigned int koffpos;
-
- 
-      for (b = 0; b < TFBS; b++) 
-          if((i & (1 << b))){
-              koffpos = i ^ (1 << b);//inclusive or exclusive??
-              printf("[");    
-              printBinaryRepresentation(koffpos);
-              printf("] ");    
-           }
-           printf("\n");
-           i++;
-  }
+  /* loop through all 2^TFBS(=N) columns */
+  
+  //determine impossible states
+  unsigned int p;
+  unsigned int check[TFBS];
+  int j;
+  j=0;
+  makeImpStates(TFBS, hinderances, check, &j);
+  
+  while (col < N) {
+    p=0;
+    //check that starting state is possible
+    while (p<j && ((check[p] & col) != check[p])) {
+       p++;
+    }
+    //if starting state is valid
+    if(p==j){
+      printBinaryRepresentation(col);
+    
+    unsigned int konpos;
+    unsigned int hinderance_mask;
+    
+    for (p = 0; p < TFBS; p++)
+      if ((col & (1 << p))) {
+    	konpos = col ^ (1 << p) ;  /* then add a one there, effectively doing what the old setBit function did */
+        hinderance_mask = hinderances[p];
+        if (!(konpos & hinderance_mask)) {
+           printf("[");    
+	       printBinaryRepresentation(konpos);
+	       printf("] ");    
+        }	
+      }
+    printf("\n");
+    }
+    //if starting state not valid
+   else{
+      printBinaryRepresentation(col); 
+      printf("\n");
+    }
+    col++;
+  }    
   system("PAUSE");
 }
