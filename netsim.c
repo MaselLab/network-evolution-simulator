@@ -483,6 +483,9 @@ void initialize_cell(CellState *indiv,
 {
   int i, k, totalmRNA;
   float t;
+
+  /* start cell size normalized at 1.0 */
+  indiv->cellSize = 1.0;
   
   indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
   indiv->mRNATranslTimeEnd = indiv->mRNATranslTimeEndLast = NULL;
@@ -1878,10 +1881,31 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
   /* increase the number mRNAs being transcribed */
   (state->mRNATranscrCount[geneID])++;                      
 }
- /* -----------------------------------------------------
-  * END
-  * Functions that handle each possible Gillespie event 
-  * ----------------------------------------------------- */
+/* -----------------------------------------------------
+ * END
+ * Functions that handle each possible Gillespie event 
+ * ----------------------------------------------------- */
+
+float compute_growth_rate(CellState *cell_state) {
+  float growth_rate;
+
+  /* temporarily hard-code some parameters and select the first TF */
+  growth_rate = 100.0/(cell_state->proteinConc[0] + 0.1) - 0.0001*cell_state->proteinConc[0];
+  return (growth_rate);
+}
+
+void update_cell_size(CellState *cell_state, float dt) {
+
+  float growth_rate = compute_growth_rate(cell_state);
+  cell_state->cellSize = (cell_state->cellSize)*exp(growth_rate*dt);
+
+  printf("size: %g\n", cell_state->cellSize);
+}
+
+
+/*
+ * develop: run the cell for a given length of time
+ */
 
 void develop(Genotype *genes,
              CellState *state,
@@ -2175,6 +2199,9 @@ void develop(Genotype *genes,
           }
         }
       }
+      /* update cell size */
+      update_cell_size(state, dt);
+      
       /* Gillespie step: advance time to next event at dt */
       t += dt;
       if (verbose) fprintf(fperrors, "dt=%g t=%g\n", dt, t);
