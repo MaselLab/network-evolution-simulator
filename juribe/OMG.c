@@ -25,14 +25,17 @@ struct Ttype {
   int rowCount;
 };
 
-/*this returns a 0 if state e is not possible and 1 if state e is possible based on
-hind array. This is a new function from last time to deal with all special cases of
-more than two binding sites hindering each other. The hinderance array holds ordered
-pairs ie. hinderances[TFBS][2] ={{0,2}, {1,2}} where the first number represents the first binding site that is
-hindered and the second number is the number of binding sites involved in the hinderance.
-So {0,2} means 0 is hindered and that there are two binding sites involved, 0 and 1. So
-the function just checks to make sure that only ONE of the number of involved positions is 
-bound at one time. SIZE is the number of hinderance occurences. */
+/* this returns a 0 if state e is not possible and 1 if state e is
+   possible based on hind array. This is a new function from last time
+   to deal with all special cases of more than two binding sites
+   hindering each other. The hinderance array holds ordered pairs
+   ie. hinderances[TFBS][2] ={{0,2}, {1,2}} where the first number
+   represents the first binding site that is hindered and the second
+   number is the number of binding sites involved in the hinderance.
+   So {0,2} means 0 is hindered and that there are two binding sites
+   involved, 0 and 1. So the function just checks to make sure that
+   only ONE of the number of involved positions is bound at one
+   time. SIZE is the number of hinderance occurences. */
 int ifPossible(unsigned int e, int hind[TFBS][2]){
     int possible, i, m , b, d;
     unsigned int s, w;
