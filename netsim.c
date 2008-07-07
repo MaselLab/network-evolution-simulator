@@ -78,6 +78,8 @@ static int dummyrun=4; /* used to change seed */
 static char *output_directory = "output";
 int verbose = 0;
 FILE *fperrors;
+FILE *fp_cellsize;
+FILE *fp_growthrate;
 
 void initialize_sequence(char Seq[], 
                          int len)
@@ -165,7 +167,7 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);
+  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -1889,19 +1891,32 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
 float compute_growth_rate(CellState *cell_state) {
   float growth_rate;
 
-  /* temporarily hard-code some parameters and select the first TF */
-  growth_rate = 100.0/(cell_state->proteinConc[0] + 0.1) - 0.0001*cell_state->proteinConc[0];
+  float Lp = 12064.28; /* mean gene expression */
+  float Lm = 1589836;  /* max gene expression */
+  //float cost = 0.00001;   /* Wagner (2005) */
+  float cost = 1/(Lm-2*Lp);
+  float gmax = ((Lm-Lp)*(Lm-Lp))/((Lm-2*Lp)*(Lm-2*Lp));
+  //float gmax = (Lm+(Lp*Lp/(Lm-2*Lp)));
+  float Kmax = Lp*Lp/(Lm-2*Lp);
+
+  /* gmax = 100, cost = 0.0001, Kmax=0.01 */
+
+  /* select the first TF */
+  growth_rate = (gmax*cell_state->proteinConc[7])/(cell_state->proteinConc[7] + Kmax) - cost*cell_state->proteinConc[7];
+
+  //printf("protein=%g gmax=%g, Kmax=%g, cost=%g, growth rate=%g\n", cell_state->proteinConc[0], gmax, Kmax, cost, growth_rate);
+
   return (growth_rate);
 }
 
-void update_cell_size(CellState *cell_state, float dt) {
-
+void update_cell_size(CellState *cell_state, float t, float dt) {
+  
   float growth_rate = compute_growth_rate(cell_state);
   cell_state->cellSize = (cell_state->cellSize)*exp(growth_rate*dt);
-
-  printf("size: %g\n", cell_state->cellSize);
+  
+  fprintf(fp_cellsize, "%g %g\n", t, cell_state->cellSize);
+  fprintf(fp_growthrate, "%g %g\n", t, growth_rate);
 }
-
 
 /*
  * develop: run the cell for a given length of time
@@ -2200,7 +2215,7 @@ void develop(Genotype *genes,
         }
       }
       /* update cell size */
-      update_cell_size(state, dt);
+      update_cell_size(state, t, dt);
       
       /* Gillespie step: advance time to next event at dt */
       t += dt;
@@ -2312,6 +2327,8 @@ int main(int argc, char *argv[])
 {
   FILE *fpout, *fpkdis;
   char fperrors_name[80];
+  char fp_cellsize_name[80];
+  char fp_growthrate_name[80];
   int i, j, k, gen;
   CellState state;
   Genotype indivs[PopSize];
@@ -2357,6 +2374,17 @@ int main(int argc, char *argv[])
       fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
       exit(-1);
     }
+
+  /* create output files for cell size */
+  sprintf(fp_cellsize_name, "%s/cellsize.dat", output_directory);
+  if ((fp_cellsize = fopen(fp_cellsize_name,"w"))==NULL)
+    fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
+
+  /* create output files for  growth rate */
+  sprintf(fp_growthrate_name, "%s/growthrate.dat", output_directory);
+  if ((fp_growthrate = fopen(fp_growthrate_name,"w"))==NULL)
+    fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
+
 
   sumfit = 0.0;
   for (j=0; j<dummyrun; j++) ran1(&seed);
@@ -2424,4 +2452,6 @@ int main(int argc, char *argv[])
   }
   */
   fclose(fperrors);
+  fclose(fp_cellsize);
+  fclose(fp_growthrate);
 }
