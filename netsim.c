@@ -1888,17 +1888,33 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
  * Functions that handle each possible Gillespie event 
  * ----------------------------------------------------- */
 
-float compute_growth_rate(CellState *cell_state) {
+float compute_growth_rate(CellState *cell_state, float dt) {
   float growth_rate;
 
   float Lp = 12064.28; /* mean gene expression */
   float Lm = 1589836;  /* max gene expression */
-  //float cost = 0.00001;   /* Wagner (2005) */
-  float cost = 1/(Lm-2*Lp);
-  float gmax = ((Lm-Lp)*(Lm-Lp))/((Lm-2*Lp)*(Lm-2*Lp));
-  //float gmax = (Lm+(Lp*Lp/(Lm-2*Lp)));
-  float Kmax = Lp*Lp/(Lm-2*Lp);
+  float gpeak = 9.627*1e-5;
 
+  //float cost = 0.00001;   /* Wagner (2005) */
+
+  /* alternative 1, assuming gpeak = 1 */
+
+  //float cost = 1/(Lm-2*Lp);
+  //float gmax = ((Lm-Lp)*(Lm-Lp))/((Lm-2*Lp)*(Lm-2*Lp));
+  //float Kmax = Lp*Lp/(Lm-2*Lp);
+
+  /* alternative 2, assuming c = -log(1-s)/L*dt */
+  //float cost = -log(1-1e-5);
+  //float gmax = cost*(Lm+(Lp*Lp/(Lm-2*Lp)));
+  //float Kmax = Lp*Lp/(Lm-2*Lp);
+
+  /* alternative 3 */
+  float cost = 1.61*1e-9;
+  float gmax = gpeak + 2*cost*Lp + (pow(cost,2)*pow(Lp,2))/gpeak;
+  float Kmax = (cost*pow(Lp,2))/gpeak;
+  //float gmax = 0.000138787;
+  //float Kmax = 2408.23;
+  
   /* gmax = 100, cost = 0.0001, Kmax=0.01 */
 
   /* select the first TF */
@@ -1911,7 +1927,7 @@ float compute_growth_rate(CellState *cell_state) {
 
 void update_cell_size(CellState *cell_state, float t, float dt) {
   
-  float growth_rate = compute_growth_rate(cell_state);
+  float growth_rate = compute_growth_rate(cell_state, dt);
   cell_state->cellSize = (cell_state->cellSize)*exp(growth_rate*dt);
   
   fprintf(fp_cellsize, "%g %g\n", t, cell_state->cellSize);
