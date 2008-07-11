@@ -2,13 +2,14 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define TFBS 5
+#define TFBS 40
 #define SIZE 1
 
 //static int hind[SIZE][2]={{0,5}};
 
-static int startPos[TFBS]= {0,0,1,4,4};
-static int record[4][2]={{0,0},{0,0},{0,0},{0,0}};
+static int startPos[TFBS]= {0,0,1,4,4,6,6,7,8,8,9,10,11,14,14,17,19,21,21,22,27,31,31,
+                            32,32,34,36,38,38,39,39,41,43,43,46,46,47,48,50,52};
+//static int record[4][2]={{0,0},{0,0},{0,0},{0,0}};
 
 
 int ifPossible(unsigned int e, int hind[SIZE][2]){
@@ -46,7 +47,6 @@ int numStates(int tfbs, int hind[SIZE][2]){
     count=0;
     for(i=0; i<pow(2, tfbs); i++){
       if(ifPossible(i, hind)==1){
-          //printf("%d\n", i);
           count++;
       }    
     }
@@ -67,116 +67,132 @@ void vectStates(int vect[], int n, int tfbs, int hind[SIZE][2]){
   }    
 }
 
-void baseCase(int *len, int **rec, int *start){
+int numHind(int start){
+    int n, b, e;
+    n=0;
+    b=startPos[n];
+    e=b+5;
+        
+    int f, count;
+      
+    count=0;
+    f=n;
+    while(f<TFBS && (startPos[f]>=b) && (startPos[f]<=e)){
+        count++;
+        f++;
+    }   
+    return(count);
+} 
+void printR(int *len, int **rec, int *start, int *reclength, int f){
+    int h,i;
+
+    printf("len=%d star=%d rlen=%d \n", *len, *start, *reclength);
+    
+    for(h=0;h<f;h++){
+        for(i=0;i<2;i++){
+           printf("%d ", rec[h][i]);
+       }
+       printf("\n");
+   }
+}    
+
+void baseCase(int *len, int **rec, int *start, int *reclength){
 
 
     int n, b, e;
     n=0;
-   // while(n<1){
-        b=startPos[n];
-        e=b+5;
-        printf("b=%d e=%d \n", b,e);
+    b=startPos[n];
+    e=b+5;
         
-        int f, count;
+    int f, count;
       
-        count=0;
-        f=n;
-        while(f<TFBS && (startPos[f]>=b) && (startPos[f]<=e)){
-            //printf("startPos=%d\n", startPos[f]);
-            count++;
-            f++;
-        }    
-        printf("b=%d e=%d count=%d\n", b,e,count);
-        
-        rec=realloc(rec,2*count*(sizeof(int)));
-        int g, num;
-        g=n;
-        num = 0;
-        while(startPos[g]==startPos[n]){
-            num++;
-            g++;
-        }
-        printf("num= %d, count=%d\n", num, count);  
-        
-        int vectSize, i,p;
-        vectSize=0;
-        int hinderances[SIZE][2]={{0,count}};
-        vectSize=numStates(count, hinderances);
-        printf("vectSize=%d\n", vectSize);
-        /*int possibleSites[vectSize];
-        
-        vectStates(possibleSites,vectSize,count,hinderances);*/
-        int possibleSites[vectSize];
+    count=0;
+    f=n;
+    while(f<TFBS && (startPos[f]>=b) && (startPos[f]<=e)){
+        count++;
+        f++;
+    }    
+    //printf("b=%d e=%d count=%d\n", b,e,count);
         
         
-        possibleSites[0]=0;
-        for(i=0; i<vectSize; i++){
-          possibleSites[i+1]= (int)pow(2,i);
-        }
+    int g, num;
+    g=n;
+    num = 0;
+    while(startPos[g]==startPos[n]){
+         num++;
+         g++;
+    }
+    //printf("num= %d, count=%d\n", num, count);  
+        
+    int vectSize, i,p;
+    vectSize=0;
+    int hinderances[SIZE][2]={{0,count}};
+    //vectSize=numStates(count, hinderances);
+    vectSize=count+1;
+   // printf("vectSize=%d\n", vectSize);
+        
+    int possibleSites[vectSize];
+        
+    possibleSites[0]=0;
+    for(i=0; i<vectSize; i++){
+         possibleSites[i+1]= (int)pow(2,i);
+    }
     
-       for(i=0;i<vectSize;i++){
-          printf("%d ", possibleSites[i]);
-       }   
+    for(i=0;i<vectSize;i++){
+         //printf("%d ", possibleSites[i]);
+    }   
       
-      int length;
-      length = count-num;
-      printf("\nlength= %d\n", length); 
+    int length;
+    length = count-num;
+    //printf("\nlength= %d\n", length); 
       
-      int m;
-      m=pow(2,length);
-      printf("m= %d\n", m);
+    int m;
+    m=pow(2,length);
+    //printf("m= %d\n", m);
       
-      printf("count= %d\n", count);
-      
-      int modSites[vectSize];
-      for(i=0;i<vectSize;i++){
-          modSites[i]= (possibleSites[i])%m;
-          printf("%d ", modSites[i]);
-      }  
+    //printf("count= %d\n", count);
+     
+     int modSites[vectSize];
+     for(i=0;i<vectSize;i++){
+         modSites[i]= (possibleSites[i])%m;
+        // printf("%d ", modSites[i]);
+     }  
   
-      printf("\n\n");
-      int check, q, r, v,u,acount;
-      //int shortRec[2];
-      q=0;
-      acount=0;
+    // printf("\n\n");
+     int check, q, r, v,u,acount;
       
-      while(q<vectSize){
-          
+     q=0;
+     acount=0;
+      
+     while(q<vectSize){
+          rec[q]=malloc(2*sizeof(int));
           check = modSites[q];
           u=0;
           if(check==-1){
               q++;
           } else{    
- 
-          printf("%d ", check);
-          v=0;
-          r=0;
-         while(r<vectSize){
-                        
-             if(check==modSites[r]){
-                 modSites[r]=-1;
-                   v++;
+              printf("%d ", check);
+              v=0;
+              r=0;
+              while(r<vectSize){       
+                  if(check==modSites[r]){
+                     modSites[r]=-1;
+                     v++;
+                  }
+                  r++; 
                }
-           r++; 
-         }
-         printf("%d\n", v);
-         //printf("q=%d\n", q);
-         record[q][0]=check;
-         //printf("recq=%d\n", rec[q][0]);
-         record[q][1]=v;
-          //printf("recq1=%d\n", rec[q][1]);
-          system("PAUSE");
-       //acount++; 
-       q++; 
-        //printf("%d ", record[q][1]); 
-      }}
-     //system("PAUSE");
-     printf("acount=%d\n", acount);
-     //find next binding site
+             printf("%d\n", v);
+             rec[q][0]=check;
+             rec[q][1]=v;
+         
+             acount++; 
+             q++; 
+           }
+      }
+
      q=1;
-     check= startPos[n];
-     //printf("%d ", check);
-     while(q<11){
+     check=startPos[n];
+     while(q<10){
          if(check==startPos[n+q]){
              q++;
          }
@@ -184,26 +200,218 @@ void baseCase(int *len, int **rec, int *start){
              break; 
          }    
      } 
-    // printf("\n%d ", q); 
         
-        n= n+q;
+     n= n+q;
      *len=length;
      *start=n;
-}    
+     *reclength=acount;
+} 
+
+void genCase(int *prevlen, int **rec, int *start, int *reclength){
+    
+    int b,e;
+    b=startPos[(*start)];
+    e=b+5;
+    
+    int f, count;
+    count=0;
+    f=*start;
+    //printf("f=%d, prevlength=%d \n",f, *prevlen); 
+    while(f<TFBS && (startPos[f]>=b) && (startPos[f]<=e)){
+        count++;
+        f++;
+    }
+    //printf("b=%d e=%d count=%d\n", b,e,count);
+    
+    int length;
+    length = count - (*prevlen);
+    //printf("length=%d\n", length);
+    
+     //system("PAUSE");  
+    int g, num;
+    g=*start;
+    num = 0;
+    while(startPos[g]==startPos[*start]){
+       num++;
+       g++;
+    }
+    //printf("num= %d, count=%d\n", num, count);  
+        
+    int vectSize, i,p;
+    vectSize=0;
+    int hinderances[SIZE][2]={{0,count}};
+    vectSize=count+1;
+    //printf("vectSize=%d\n", vectSize);
+      
+     //system("PAUSE"); 
+    int possibleSites[vectSize];
+        
+    possibleSites[0]=0;
+    for(i=0; i<vectSize; i++){
+       possibleSites[i+1]= (int)pow(2,i);
+    }
+ 
+    for(i=0;i<vectSize;i++){
+       //printf("%d ", possibleSites[i]);
+    } 
+    //printf("\n");
+    
+    int m;
+    int divSites[vectSize];
+    m=pow(2,length);
+      for(i=0;i<vectSize;i++){
+          divSites[i]= (possibleSites[i])/m;
+          //printf("%d ", divSites[i]);
+      } 
+      //printf("\n"); 
+    // system("PAUSE"); 
+    int tempRec[count+1][2];
+    int a,z,blah;
+    for(a=0; a<count+1; a++){
+        blah=possibleSites[a]/m;
+        z=0;
+        while(blah!=rec[z][0] && z < (*reclength)){
+            z++;
+        }
+        if(z<(*reclength)){
+           tempRec[a][0]=blah;
+           tempRec[a][1]=rec[z][1];
+           printf("blah=%d, num=%d ", tempRec[a][0], tempRec[a][1]);
+           printf("\n");
+           //system("PAUSE");
+       }    
+    }      
+    printf("\n");
+      //system("PAUSE");
+    int nextlen;
+    nextlen=count-num;
+    //printf("nextlen=%d\n", nextlen);
+    
+
+    int modSites[vectSize];
+    m=pow(2,nextlen);
+      for(i=0;i<vectSize;i++){
+          modSites[i]= (possibleSites[i])%m;
+          //printf("%d ", modSites[i]);
+      } 
+      //printf("\n"); 
+      
+      //system("PAUSE");
+    printf("\n");
+    int thing, sum,acount; 
+    acount=0;
+    sum=0;
+    //rec=realloc(rec,count*sizeof(int));
+    for(a=0;a<nextlen+1; a++){
+        rec[a]=malloc(2*sizeof(int));
+        thing = modSites[a];
+        sum = tempRec[a][1];
+        z=a+1;
+        while(z<count+1){
+            while(thing!=modSites[z] && z<count+1){
+                z++;
+            }
+            if(thing==modSites[z] && z<count+1){
+                sum+=tempRec[z][1];
+                z++;
+            }
+            else{
+                break;}
+                
+        }
+        rec[a][0]=possibleSites[a];
+        rec[a][1]=sum;
+        printf("%d %d\n",rec[a][0], rec[a][1]);
+        acount++;
+    } 
+    //rec=realloc(rec,acount*sizeof(int)); 
+    //printf("\n");
+    
+
+    int q, check;
+     q=1;
+     check= startPos[*start];
+     while(q<11){
+         if(check==startPos[(*start)+q]){
+             q++;
+         }
+         else{
+             break; 
+         }    
+     } 
+     
+     //printf("%d\n", length);
+    *prevlen= nextlen;
+    *start=(*start) + q;
+    *reclength=acount;          
+}                      
+
+  
 int main(int argc, char *argv[])
 {
-    int a,b;
-    int *length, *star;
+    int a,b,c,e,q,f,h, i,j,next;
+    int *length, *star, *rlen;
     int **R;
     a=0;
     b=0;
-    R=malloc(5*2*(sizeof(int)));
+    e=0;
+    
+    rlen=&e;
     length=&a;
     star=&b;
-    baseCase(length, R, star);
+    c=numHind(0);
+    R=malloc(c*(sizeof(int)));
     
-    printf("len=%d star=%d\n", *length, *star);
-    printf("R[1]=%d", *(R[1]));
+   baseCase(length, R, star, rlen);
+    
+    f=*rlen;
+    R=realloc(R,(f)*(sizeof(int)));
+    printR(length,R,star,rlen,f);
+    next=*star;
+    c=numHind(next);
+    while(next<37){
+       c=numHind(next);
+       R=realloc(R,(c)*(sizeof(int)));
+       printf("BEFORE: len=%d star=%d rlen=%d \n", *length, *star, *rlen);
+       genCase(length, R, star, rlen);
+       if(*length==0){
+          printf("gencase\n");
+          f=*rlen;
+          printR(length,R,star,rlen,f); 
+          system("PAUSE");  
+       } else{   
+          printf("gencase\n");
+          f=*rlen;
+          //R=realloc(R,(f)*(sizeof(int)));
+          printR(length,R,star,rlen,f); 
+          next=*star;
+      }    
+   }    
+    
+  
+   /*genCase(length, R, star, rlen);
+   printf("gencase\n");
+   f=*rlen;
+   R=realloc(R,(f)*(sizeof(int)));
+   printR(length,R,star,rlen,f);
+ 
+   //system("PAUSE");
+   
+   genCase(length, R, star, rlen);
+   printf("gencase\n");
+   f=*rlen;
+   printR(length,R,star,rlen,f);
+ 
+   
+   genCase(length, R, star, rlen);
+   printf("gencase\n");
+   f=*rlen;
+   printR(length,R,star,rlen,f);*/
+
+   
+   for(q=0;q<c;q++){
+       free(R[q]);
+   }            
     free(R);
     system("PAUSE");
     }
