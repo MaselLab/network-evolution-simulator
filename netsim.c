@@ -1888,12 +1888,13 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
  * Functions that handle each possible Gillespie event 
  * ----------------------------------------------------- */
 
-float compute_growth_rate(CellState *cell_state, float dt) {
+float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
   float growth_rate;
-
+  float benefit_term, cost_term_prot, cost_term_mRNA;
+  int geneID = 7;      /* select a particular TF */
   float Lp = 12064.28; /* mean gene expression */
   float Lm = 1589836;  /* max gene expression */
-  float gpeak = 9.627*1e-5;
+  float gpeak = 2*9.627*1e-5;
 
   //float cost = 0.00001;   /* Wagner (2005) */
 
@@ -1914,20 +1915,27 @@ float compute_growth_rate(CellState *cell_state, float dt) {
   float Kmax = (cost*pow(Lp,2))/gpeak;
   //float gmax = 0.000138787;
   //float Kmax = 2408.23;
-  
-  /* gmax = 100, cost = 0.0001, Kmax=0.01 */
 
-  /* select the first TF */
-  growth_rate = (gmax*cell_state->proteinConc[7])/(cell_state->proteinConc[7] + Kmax) - cost*cell_state->proteinConc[7];
+  benefit_term = (gmax*cell_state->proteinConc[geneID])/(cell_state->proteinConc[geneID] + Kmax);
+  cost_term_prot = - cost*cell_state->proteinConc[geneID];
+  cost_term_mRNA = - cost*cell_state->mRNACytoCount[geneID]*genes->translation[geneID];
 
-  //printf("protein=%g gmax=%g, Kmax=%g, cost=%g, growth rate=%g\n", cell_state->proteinConc[0], gmax, Kmax, cost, growth_rate);
+  /* alternative 4: use translation rate rather than proteinConc  */
+  growth_rate = benefit_term + cost_term_mRNA;
+
+  /* make sure growth rate can't be negative */
+  if (growth_rate < 0.0)
+    growth_rate = 0.0;
+
+  printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
+         cell_state->proteinConc[0], gmax, Kmax, cost, cost_term_prot, cost_term_mRNA, cell_state->mRNACytoCount[geneID], growth_rate);
 
   return (growth_rate);
 }
 
-void update_cell_size(CellState *cell_state, float t, float dt) {
+void update_cell_size(CellState *cell_state, Genotype *genes, float t, float dt) {
   
-  float growth_rate = compute_growth_rate(cell_state, dt);
+  float growth_rate = compute_growth_rate(cell_state, genes, dt);
   cell_state->cellSize = (cell_state->cellSize)*exp(growth_rate*dt);
   
   fprintf(fp_cellsize, "%g %g\n", t, cell_state->cellSize);
@@ -2231,7 +2239,7 @@ void develop(Genotype *genes,
         }
       }
       /* update cell size */
-      update_cell_size(state, t, dt);
+      update_cell_size(state, genes, t, dt);
       
       /* Gillespie step: advance time to next event at dt */
       t += dt;
