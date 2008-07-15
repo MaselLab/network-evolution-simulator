@@ -1565,7 +1565,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
       konStates->konvalues[k][KON_DIFF_INDEX] * (1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
 
     /* compute the *total* kon rate for all unbound sites for this TF  */
-    total_konrate2 = ((konStates->konList[k]->site_count)+1) * konrate2_for_TF;  /* readd +1 for the moment */
+    total_konrate2 = ((konStates->konList[k]->site_count)) * konrate2_for_TF;  /* remove +1 for the moment */
 
     if (verbose)
       fprintf(fperrors, "looking at TF: %d, has %d sites available [konrate2: %g, total_konrate2: %g, x: %g]\n", 
