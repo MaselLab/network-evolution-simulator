@@ -25,10 +25,16 @@ netsim-check: $(OBJS)
 netsim-gprof: $(OBJS)
 
 ## check specific directory
-check:	clean
-	make EXTRACFLAGS=-m32 netsim-check
+check-haploid:	clean
+	make EXTRACFLAGS="-m32 -DPLOIDY=1" netsim-check
 	./netsim-check -r 4 -d output
 	@diff -r --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-kon-change-haploid-after-plus1-r-4 && echo -e "************\nPassed regression\n***********"
+
+check-diploid:	clean
+	make EXTRACFLAGS="-m32 -DPLOIDY=2" netsim-check
+	./netsim-check -r 4 -d output
+	@diff -r --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-kon-change-diploid-after-plus1-r-4 && echo -e "************\nPassed regression\n***********"
+
 
 profiling:	netsim-gprof
 

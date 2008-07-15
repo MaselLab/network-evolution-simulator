@@ -11,7 +11,9 @@
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 
-#define PLOIDY 1           /* 1 = haploid, 2 = diploid */
+#ifndef PLOIDY
+#define PLOIDY 2           /* 1 = haploid, 2 = diploid */
+#endif
 #define NGENES 10          /* number of genes */
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
