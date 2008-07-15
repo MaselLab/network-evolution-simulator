@@ -6,6 +6,9 @@ if (TRUE) {
     cmd=sprintf("time ../netsim -r %i  -d output%02d", i, i)
     print(cmd)
     system(cmd)
+    cmd2=sprintf("mv netsimerrors.txt output%02d", i, i)
+    print(cmd2)
+    system(cmd2)
   }
 }
 
