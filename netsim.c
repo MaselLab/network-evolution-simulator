@@ -1565,7 +1565,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
       konStates->konvalues[k][KON_DIFF_INDEX] * (1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
 
     /* compute the *total* kon rate for all unbound sites for this TF  */
-    total_konrate2 = ((konStates->konList[k]->site_count)) * konrate2_for_TF;  /* remove +1 for the moment */
+    total_konrate2 = ((konStates->konList[k]->site_count)+1) * konrate2_for_TF;  /* readd +1 for the moment */
 
     if (verbose)
       fprintf(fperrors, "looking at TF: %d, has %d sites available [konrate2: %g, total_konrate2: %g, x: %g]\n", 
@@ -1927,8 +1927,9 @@ float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
   if (growth_rate < 0.0)
     growth_rate = 0.0;
 
-  printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
-         cell_state->proteinConc[0], gmax, Kmax, cost, cost_term_prot, cost_term_mRNA, cell_state->mRNACytoCount[geneID], growth_rate);
+  /* printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
+         cell_state->proteinConc[0], gmax, Kmax, cost, cost_term_prot, cost_term_mRNA, 
+         cell_state->mRNACytoCount[geneID], growth_rate); */
 
   return (growth_rate);
 }
