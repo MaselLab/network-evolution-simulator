@@ -2,14 +2,14 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define TFBS 52
+#define TFBS 54
 #define SIZE 1
 
 //static int hind[SIZE][2]={{0,5}};
 
 static int startPos[TFBS]= {0,0,1,4,4,6,6,7,8,8,9,10,11,14,14,17,19,21,21,22,27,31,31,
                             32,32,34,36,38,38,39,39,41,43,43,46,46,47,48,50,52,57,61,62,
-                            64,64,64,65,65,67,67,67,69};
+                            64,64,64,65,65,67,67,67,69,71,72};
 //static int record[4][2]={{0,0},{0,0},{0,0},{0,0}};
 
 
@@ -69,12 +69,11 @@ void vectStates(int vect[], int n, int tfbs, int hind[SIZE][2]){
 }
 
 int numHind(int start){
-    int n, b, e;
+    int n, b, e, f, count;
+    
     n=0;
     b=startPos[start];
     e=b+5;
-        
-    int f, count;
       
     count=0;
     f=start;
@@ -87,12 +86,13 @@ int numHind(int start){
    }       
     return(count);
 } 
+
 void printR(int *len, int (*rec)[2], int *start, int *reclength, int f){
     int h,i;
 
     printf("len=%d star=%d rlen=%d \n", *len, *start, *reclength);
     printf("f=%d\n",f);
-    //printf("rec[f]=%d\n", rec[f-1][1]);
+
     for(h=0;h<f;h++){
         for(i=0;i<2;i++){
            printf("%d ", rec[h][i]);
@@ -102,25 +102,31 @@ void printR(int *len, int (*rec)[2], int *start, int *reclength, int f){
 }    
 
 void baseCase(int *len, int (*rec)[2], int *start, int *reclength){
-
-
-    int n, b, e;
+    int n, b, e, f, g, i, p, q, r, v, u, m, count, num, vectSize, length, check, acount; 
+    //int f, count;
+    //int g, num;
+    //int vectSize, i,p;
+    int *possibleSites;
+     //int length;
+    //int m;
+    int *modSites;
+    //int check, q, r, v,u,acount;
+    
+    
     n=0;
     b=startPos[n];
     e=b+5;
-        
-    int f, count;
-      
+    
     count=0;
     f=n;
     while(f<TFBS && (startPos[f]>=b) && (startPos[f]<=e)){
         count++;
         f++;
-    }    
+    }        
     printf("b=%d e=%d count=%d\n", b,e,count);
         
         
-    int g, num;
+    
     g=n;
     num = 0;
     while(startPos[g]==startPos[n]){
@@ -128,49 +134,38 @@ void baseCase(int *len, int (*rec)[2], int *start, int *reclength){
          g++;
     }
     printf("num= %d, count= %d\n", num, count);  
-    system("PAUSE"); 
+    //system("PAUSE"); 
        
-    int vectSize, i,p;
+    
     vectSize=count+1;
     printf("vectSize=%d ", vectSize);
-   
-
-   printf("vectSize=%d\n", vectSize);
-     system("PAUSE");   
-    int *possibleSites;
-    possibleSites=malloc(vectSize*sizeof(int));
-        
+    //system("PAUSE");   
+  
+    possibleSites=malloc(vectSize*sizeof(int));      
     possibleSites[0]=0;
     for(i=0; i<count; i++){
          possibleSites[i+1]= (int)pow(2,i);
          printf("possibleSites%d = %d\n",i, possibleSites[i]);
     } 
    
-    system("PAUSE");
+    //system("PAUSE");
     
-    int length;
+   
     length = count-num;
     //printf("\nlength= %d\n", length); 
-      
-    int m;
     m=pow(2,length);
     //printf("m= %d\n", m);
-      
-    //printf("count= %d\n", count);
+    //printf("count= %d\n", count);    
      
-     int *modSites;
     modSites=malloc(vectSize*sizeof(int));
      for(i=0;i<vectSize;i++){
          modSites[i]= (possibleSites[i])%m;
         // printf("%d ", modSites[i]);
      }  
-  
     // printf("\n\n");
-     int check, q, r, v,u,acount;
       
      q=0;
      acount=0;
-      
      while(q<vectSize){
        //rec[q]=malloc(2*sizeof(int));
           check = modSites[q];
@@ -196,7 +191,7 @@ void baseCase(int *len, int (*rec)[2], int *start, int *reclength){
              q++; 
            }
       }
-      //free(hinderances);
+
       free(modSites);
       free(possibleSites);
 
@@ -218,33 +213,56 @@ void baseCase(int *len, int (*rec)[2], int *start, int *reclength){
 } 
 
 void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
+    int f,i,g,p,m,a,z,q,count,length,num,vectSize,blah,nextlen,thing,sum,acount,check;
+    //int f, count;
+    //int i;
+    //int length;
+    //int g, num;
+    //int vectSize, p;
+    int *possibleSites;
+    //int m;
+    int *divSites;
+    int (*tempRec)[2];
+    //int a,z,blah;
+    //int nextlen;
+    int *modSites;
+    //int thing, sum,acount;
+    //int q, check;
     
+    {
     int b,e;
     b=startPos[(*start)];
     e=b+5;
+    //ch=(*reclength)-1;
+    //printf("\nch=%d rec[6][0]=%d\n ",ch, rec[ch][0]);
     
-    int f, count;
+    
     count=0;
     f=*start;
-    printf("f=%d, prevlength=%d \n",f, *prevlen); 
+    //printf("f=%d, prevlength=%d reclength=%d \n",f, *prevlen,*reclength); 
     while(f<TFBS && (startPos[f]>=b) && (startPos[f]<=e)){
         count++;
         f++;
-    }
+    } 
+    }       
+    
     //printf("b=%d e=%d count=%d\n", b,e,count);
-    int i;
-    printf("REC: "); 
+    
+    
+    printf("REC: \n"); 
     for(i=0;i<(*reclength);i++){
-      printf(" %d ", rec[i][1]);
-  }    
+      printf("%d %d \n", rec[i][0],rec[i][1]);
+    }    
+      
+     
+   //printf("rec[5][0]=%d\n",rec[5][0]);
     
     
-    int length;
     length = count - (*prevlen);
     printf("length=%d\n", length);
     
      //system("PAUSE");  
-    int g, num;
+    
     g=*start;
     num = 0;
     while(startPos[g]==startPos[*start]){
@@ -253,13 +271,13 @@ void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
     }
     //printf("num= %d, count=%d\n", num, count);  
         
-    int vectSize, p;
+   
 
     vectSize=count+1;
     printf("vectSize=%d\n", vectSize);
       
-     system("PAUSE"); 
-    int *possibleSites;
+     //system("PAUSE"); 
+   
     possibleSites=malloc(vectSize*sizeof(int));
         
     possibleSites[0]=0;
@@ -273,8 +291,7 @@ void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
     } 
     //printf("\n");
     
-    int m;
-    int *divSites;
+   
     divSites=malloc(vectSize*sizeof(int));
     m=pow(2,length);
     printf("divsites: ");
@@ -285,23 +302,27 @@ void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
       printf("\n"); 
      
     
-    int (*tempRec)[2];
+    
+    printf("vectSize=%d", vectSize);
     tempRec = malloc(2*vectSize*sizeof(int));
-    int a,z,blah;
+    
     //printf("REC CHECK=%d", rec[vectSize-1][1]);
     for(a=0; a<vectSize; a++){
       //tempRec[a]=malloc(2*sizeof(int));
         blah=possibleSites[a]/m;
+        //printf("blah=%d\n", blah);
         z=0;
         while(blah!=rec[z][0] && z < (*reclength)){
+            //printf("rec[z][0]=%d ", rec[z][0]);
             z++;
         }
-        if(z<(*reclength)){
+        if(z<(*reclength) && blah==rec[z][0]){
+            //printf("a=%d\n", a);
            tempRec[a][0]=blah;
-           printf("z=%d",z);
-           system("PAUSE");
+          // printf("z=%d\n",z);
+           //system("PAUSE");
            tempRec[a][1]=rec[z][1];
-           system("PAUSE");
+          // system("PAUSE");
            printf("blah=%d, num=%d ", tempRec[a][0], tempRec[a][1]);
            printf("\n");
            //system("PAUSE");
@@ -309,12 +330,12 @@ void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
     }      
     printf("\n");
       //system("PAUSE");
-    int nextlen;
+    
     nextlen=count-num;
     //printf("nextlen=%d\n", nextlen);
     
 
-    int *modSites;
+    
     modSites=malloc(vectSize*sizeof(int));
     m=pow(2,nextlen);
     printf("modsites: ");
@@ -326,30 +347,39 @@ void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
       
       //system("PAUSE");
     printf("\n");
-    int thing, sum,acount; 
+    
     acount=0;
     sum=0;
     rec=realloc(rec,count*2*sizeof(int));
     for(a=0;a<nextlen+1; a++){
       //rec[a]=malloc(2*sizeof(int));
         thing = modSites[a];
+        //printf("sum1=%d ", sum);
         sum = tempRec[a][1];
         z=a+1;
+        //printf("z=%d\n",z);
+       // printf("sum2=%d ", sum);
 	/* rearrange order so that z is checked *before* modSites is referenced 
 	   otherwise z can overrun end of array */
-        while((z<count+1)){
-	  while((z<count+1) && thing!=modSites[z]){
+        while((z<vectSize)){
+            //printf("sum3=%d ", sum);
+	        while((z<vectSize) && thing!=modSites[z]){
                 z++;
+               // printf("z=%d sum4=%d ",z, sum);
             }
-	  if((z<count+1) && thing==modSites[z]){
+	        if((z<vectSize) && thing==modSites[z]){
+	            //printf("thing=%d z=%d modsites[z]=%d\n", thing,z, modSites[z]);
                 sum+=tempRec[z][1];
                 z++;
+                //printf("sum5=%d ", sum);
             }
             else{
                 break;}
                 
         }
+        //printf("possibleSites=%d\n", possibleSites[a]);
         rec[a][0]=possibleSites[a];
+        //printf("sum6=%d\n", sum);
         rec[a][1]=sum;
         printf("%d %d\n",rec[a][0], rec[a][1]);
         acount++;
@@ -371,7 +401,7 @@ void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
     free(divSites);
     free(modSites);
 
-    int q, check;
+    
      q=1;
      check= startPos[*start];
      while(q<11){
@@ -412,10 +442,15 @@ int main(int argc, char *argv[])
     printR(length,R,star,rlen,f);
     next=*star;
     c=numHind(next);
-    while(next<47){
+    while(next<52){
        c=numHind(next);
-       printf("c=%d next=%d\n",c,next);
-       R=realloc(R,(c*2)*(sizeof(int)));
+       printf("c=%d rlen=%d\n",c,*rlen);
+       if(c>*rlen){
+          R=realloc(R,(c*2)*(sizeof(int)));
+      }
+      else{
+          R=realloc(R,((*rlen)*2)*(sizeof(int)));   
+      }     
        printf("BEFORE: len=%d star=%d rlen=%d \n", *length, *star, *rlen);
        genCase(length, R, star, rlen);
        if(*length==0){
@@ -430,8 +465,11 @@ int main(int argc, char *argv[])
          
           //R=realloc(R,(f)*(sizeof(int)));
           printR(length,R,star,rlen,f); 
+          
+          //printf("\nR[6][0]=%d\n ", R[6][0]);
           next=*star;
-      }    
+      }  
+      //printf("\nR[6][0]=%d\n ", R[6][0]);  
    }    
     
   
