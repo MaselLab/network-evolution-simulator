@@ -87,7 +87,7 @@ int numHind(int start){
    }       
     return(count);
 } 
-void printR(int *len, int **rec, int *start, int *reclength, int f){
+void printR(int *len, int (*rec)[2], int *start, int *reclength, int f){
     int h,i;
 
     printf("len=%d star=%d rlen=%d \n", *len, *start, *reclength);
@@ -101,7 +101,7 @@ void printR(int *len, int **rec, int *start, int *reclength, int f){
    }
 }    
 
-void baseCase(int *len, int **rec, int *start, int *reclength){
+void baseCase(int *len, int (*rec)[2], int *start, int *reclength){
 
 
     int n, b, e;
@@ -172,7 +172,7 @@ void baseCase(int *len, int **rec, int *start, int *reclength){
      acount=0;
       
      while(q<vectSize){
-          rec[q]=malloc(2*sizeof(int));
+       //rec[q]=malloc(2*sizeof(int));
           check = modSites[q];
           u=0;
           if(check==-1){
@@ -217,7 +217,7 @@ void baseCase(int *len, int **rec, int *start, int *reclength){
      *reclength=acount;
 } 
 
-void genCase(int *prevlen, int **rec, int *start, int *reclength){
+void genCase(int *prevlen, int (*rec)[2], int *start, int *reclength){
     
     int b,e;
     b=startPos[(*start)];
@@ -263,7 +263,8 @@ void genCase(int *prevlen, int **rec, int *start, int *reclength){
     possibleSites=malloc(vectSize*sizeof(int));
         
     possibleSites[0]=0;
-    for(i=0; i<vectSize; i++){
+    /* make sure we don't overrun length of possibleSites area which is vectSize */
+    for(i=0; i<vectSize-1; i++){
        possibleSites[i+1]= (int)pow(2,i);
     }
  
@@ -284,12 +285,12 @@ void genCase(int *prevlen, int **rec, int *start, int *reclength){
       printf("\n"); 
      
     
-    int **tempRec;
-    tempRec = malloc(vectSize*sizeof(int));
+    int (*tempRec)[2];
+    tempRec = malloc(2*vectSize*sizeof(int));
     int a,z,blah;
     //printf("REC CHECK=%d", rec[vectSize-1][1]);
     for(a=0; a<vectSize; a++){
-        tempRec[a]=malloc(2*sizeof(int));
+      //tempRec[a]=malloc(2*sizeof(int));
         blah=possibleSites[a]/m;
         z=0;
         while(blah!=rec[z][0] && z < (*reclength)){
@@ -328,17 +329,19 @@ void genCase(int *prevlen, int **rec, int *start, int *reclength){
     int thing, sum,acount; 
     acount=0;
     sum=0;
-    //rec=realloc(rec,count*sizeof(int));
+    rec=realloc(rec,count*2*sizeof(int));
     for(a=0;a<nextlen+1; a++){
-        rec[a]=malloc(2*sizeof(int));
+      //rec[a]=malloc(2*sizeof(int));
         thing = modSites[a];
         sum = tempRec[a][1];
         z=a+1;
-        while(z<count+1){
-            while(thing!=modSites[z] && z<count+1){
+	/* rearrange order so that z is checked *before* modSites is referenced 
+	   otherwise z can overrun end of array */
+        while((z<count+1)){
+	  while((z<count+1) && thing!=modSites[z]){
                 z++;
             }
-            if(thing==modSites[z] && z<count+1){
+	  if((z<count+1) && thing==modSites[z]){
                 sum+=tempRec[z][1];
                 z++;
             }
@@ -354,12 +357,16 @@ void genCase(int *prevlen, int **rec, int *start, int *reclength){
     printf("acoutn=%d\n", acount);
     //rec=realloc(rec,acount*sizeof(int)); 
     //printf("\n");
-    free(tempRec);
-    {int i;
-     for(i=0;i<vectSize;i++){
-         free(tempRec[i]);
-     }
+    /* no longer needed, should be done before tempRec is free()'d anyway */
+    /*{
+      int i;
+      for(i=0;i<vectSize;i++){
+	free(tempRec[i]);
+	}
     }        
+    */
+
+    free(tempRec);
    // free(hinderances);
     free(divSites);
     free(modSites);
@@ -387,7 +394,7 @@ int main(int argc, char *argv[])
 {
     int a,b,c,e,q,f,h, i,j,next;
     int *length, *star, *rlen;
-    int **R;
+    int (*R)[2];
     a=0;
     b=0;
     e=0;
@@ -396,19 +403,19 @@ int main(int argc, char *argv[])
     length=&a;
     star=&b;
     c=numHind(0);
-    R=malloc(c*(sizeof(int)));
+    R=malloc(c*2*(sizeof(int)));
     
    baseCase(length, R, star, rlen);
     
     f=*rlen;
-    R=realloc(R,(f)*(sizeof(int)));
+    R=realloc(R,(f*2)*(sizeof(int)));
     printR(length,R,star,rlen,f);
     next=*star;
     c=numHind(next);
     while(next<47){
        c=numHind(next);
        printf("c=%d next=%d\n",c,next);
-       R=realloc(R,(c)*(sizeof(int)));
+       R=realloc(R,(c*2)*(sizeof(int)));
        printf("BEFORE: len=%d star=%d rlen=%d \n", *length, *star, *rlen);
        genCase(length, R, star, rlen);
        if(*length==0){
@@ -447,10 +454,10 @@ int main(int argc, char *argv[])
    f=*rlen;
    printR(length,R,star,rlen,f);*/
 
-   
-   for(q=0;q<c;q++){
+   /* don't need to free R[q] anymore */
+   /* for(q=0;q<c;q++){
        free(R[q]);
-   }            
+       }  */          
     free(R);
     system("PAUSE");
-    }
+}
