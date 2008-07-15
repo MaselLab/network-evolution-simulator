@@ -2363,9 +2363,11 @@ int main(int argc, char *argv[])
   float fitness[PopSize], sumfit, lopt[NGENES], initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
 
   int c, directory_success;
+  int hold_genotype_constant = 0;
+  int curr_seed;
 
   /* parse command-line options */
-  while ((c = getopt (argc, argv, "hvd:r:")) != -1) {
+  while ((c = getopt (argc, argv, "hvgd:r:")) != -1) {
     switch (c)
       {
       case 'd':
@@ -2374,11 +2376,14 @@ int main(int argc, char *argv[])
       case 'r':
         dummyrun = atoi(optarg);
         break;
+      case 'g':
+        hold_genotype_constant = 1;
+        break;
       case 'v':
         verbose = 1;
         break;
       case 'h':
-        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h]\n", argv[0]);
+        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-g]\n", argv[0]);
         exit(0);
         break;
       default:
@@ -2410,21 +2415,37 @@ int main(int argc, char *argv[])
   if ((fp_growthrate = fopen(fp_growthrate_name,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
 
-
   sumfit = 0.0;
-  for (j=0; j<dummyrun; j++) ran1(&seed);
+
+  /* slight hack to initialize seed  */
+
+  if (!hold_genotype_constant)
+    for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+
+  /* initialize probein concentrations */
   for (i=0; i<NGENES; i++) {
     lopt[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
   }
+
+  /* get the kdis.txt values */
   fpkdis = fopen("kdis.txt","r");
   for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
     fscanf(fpkdis,"%f",&kdis[j]);
   }
+
+  /* now create the population of cells */
   for (j = 0; j < PopSize; j++) {
     if (j==PopSize-1) output=1;
     initialize_genotype(&indivs[j], kdis);
+
+    /* if genotype is held constant, start varying the seed *after*
+       initialize_genotype, so we can run the same genotype with
+       slightly different amounts of noise  */
+    if (hold_genotype_constant)
+      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+
     initialize_cell(&state, indivs[j].mRNAdecay, initmRNA, initProteinConc);
     /* 
      *  AKL 2008-03-21: removed indivs[j].y: wasn't being used
