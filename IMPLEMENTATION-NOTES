@@ -1,34 +1,38 @@
 Variable definitions:
 =====================
 
-Old name          New name                                   Meaning
----------         ---------                                  ---------
-Genotype->y       Genotype->bindSiteCount                    total number of binding sites
-Genotype->G       Genotype->interactionMatrix                interaction matrix
-Genotype->C       Genotype->cisRegSeq
-Genotype->O       Genotype->transcriptionFactorSeq
+Symbol  Old name          New name                                   Meaning
+------  ---------         ---------                                  ---------
+        Genotype->y       Genotype->bindSiteCount                    total number of binding sites
+G       Genotype->G       Genotype->interactionMatrix                interaction matrix
+C       Genotype->C       Genotype->cisRegSeq
+O       Genotype->O       Genotype->transcriptionFactorSeq
+        
+        CellState->y2     CellState->tfBoundCount                    current number of TFs bound
+        CellState->B2     CellState->tfBoundIndexes                  array of indices of bound TFs
+        CellState->y3     CellState->tfHinderedCount                 number of binding sites that have steric hindrances
+        CellState->B3     CellState->tfHinderedIndexes               array of binding sites that can't be bound due steric hindrance
+L_i(t)  CellState->L      CellState->proteinConc                     protein concentrations
+s_i(t)  CellState->Scyto  CellState->mRNACytoCount                   number of mRNA in cytoplasm
+s'_i(t) CellState->Snuclear          CellState->mRNANuclearCount
+        CellState->Stranslating      CellState->mRNATranslCytoCount
+        CellState->tStranslating     CellState->mRNATranslTimeEnd
+        CellState->lasttStranslating CellState->mRNATranslTimeEndLast
+        CellState->Stranscribing      CellState->mRNATranscrCount
+        CellState->tStranscribing     CellState->mRNATranscrTimeEnd
+        CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
+        
+        statechangeIDs                CellState->statechangeIDs      now part of CellState structure: 
+                                                                     keeps track of list of genes in each state
+        
+        rates, rates2                 merged into new GillespieRates struct:
 
-CellState->y2     CellState->tfBoundCount                    current number of TFs bound
-CellState->B2     CellState->tfBoundIndexes                  array of indices of bound TFs
-CellState->y3     CellState->tfHinderedCount                 number of binding sites that have steric hindrances
-CellState->B3     CellState->tfHinderedIndexes               array of binding sites that can't be bound due steric hindrance
-CellState->L      CellState->proteinConc                     protein concentrations
-CellState->Scyto  CellState->mRNACytoCount                   number of mRNA in cytoplasm
-CellState->Snuclear          CellState->mRNANuclearCount
-CellState->Stranslating      CellState->mRNATranslCytoCount
-CellState->tStranslating     CellState->mRNATranslTimeEnd
-CellState->lasttStranslating CellState->mRNATranslTimeEndLast
-CellState->Stranscribing      CellState->mRNATranscrCount
-CellState->tStranscribing     CellState->mRNATranscrTimeEnd
-CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
-
-statechangeIDs                CellState->statechangeIDs      now part of CellState structure: 
-                                                             keeps track of list of genes in each state
-
-rates, rates2                 merged into new GillespieRates struct
-
-nkon, nkonsum             }   merged into new KonStates struct   
-konIDs, konvalues         }
+s*alpha	rates->salphc                 GillespieRates->salphc         cached value of s_i(t)*alpha/c_i in l(t+deltat)=alpha*s(t)/c_i... formula
+-------
+  c_i
+        
+        nkon, nkonsum             }   merged into new KonStates struct   
+        konIDs, konvalues         }
 
 
 
