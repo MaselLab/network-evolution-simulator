@@ -65,20 +65,36 @@ float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *,
 
 void free_mem_CellState(CellState *state)
 {
-  FixedEvent *start,*info;
+  FixedEvent *start, *info;
 
   start = state->mRNATranslTimeEnd;  
-  while (start){
+  while (start) {
+    info = start;
+    start = start->next;
+    free(info);
+  }
+
+  /* start = state->mRNATranslTimeEndLast;  
+  while (start) {
     info = start;
     start = start->next;
     free(info);  
-  }
+    } */
+
   start = state->mRNATranscrTimeEnd;  
+  while (start) {
+    info = start;
+    start = start->next;
+    free(info);
+  }
+
+  /* start = state->mRNATranscrTimeEndLast;  
   while (start){
     info = start;
     start = start->next;
     free(info);  
-  }
+    } */
+
   free(state->tfBoundIndexes);
   free(state->tfHinderedIndexes);
 }
@@ -89,8 +105,8 @@ void sls_store(FixedEvent *i,
 {
   FixedEvent *old, *p;
   
-  p= *start;
-  if (!*last) { /*first element in list*/
+  p = *start;
+  if (!*last) { /* first element in list */
     i->next = NULL;
     *last = i;
     *start = i;
@@ -98,22 +114,23 @@ void sls_store(FixedEvent *i,
   }
   old=NULL;
   while (p) {
-    if (p->time < i->time){
-      old=p;
+    if (p->time < i->time) {
+      old = p;
       p = p->next;
     }
     else {
-      if (old) { /*goes in the middle*/
+      if (old) { /* goes in the middle */
         old->next = i;
-        i->next =p;
+        i->next = p;
         return;
+      } else {
+	i->next = p; /* new first element */
+	*start = i;
+	return;
       }
-      i->next = p; /*new first element*/
-      *start = i;
-      return;
     }
   }
-  (*last)->next = i; /*put on end*/
+  (*last)->next = i; /* put on end */
   i->next = NULL;
   *last = i;
 }
@@ -121,7 +138,7 @@ void sls_store(FixedEvent *i,
 
 void delete_time_course(TimeCourse *start2)
 {
-  TimeCourse *info,*start;
+  TimeCourse *info, *start;
   
   start = start2; 
   while (start){
@@ -137,7 +154,7 @@ void display2(TimeCourse *start)
 
   info = start;
   while (info){
-    fprintf(fperrors,"time %g conc %g\n",info->time,info->concentration);
+    fprintf(fperrors, "time %g conc %g\n", info->time, info->concentration);
     info = info->next;
   }
 }

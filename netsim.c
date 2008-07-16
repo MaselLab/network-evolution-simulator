@@ -432,8 +432,8 @@ void delete_fixed_event(int geneID,
                         FixedEvent **start,
                         FixedEvent **last)
 {
-  FixedEvent *info,*lastinfo;
-  int j,done;
+  FixedEvent *info, *lastinfo;
+  int j, done;
   
   j = -1;
   done = 0;
@@ -1080,9 +1080,11 @@ void remove_from_array(int toberemoved,
                        int force)
 {
   int i;
-  
   i = 0;
-  while (!(a[i]==toberemoved) && i < *len) {
+
+  /* check the range of i first so we don't access an uninitialized
+     array position in 'a'  */
+  while ((i < *len) && !(a[i]==toberemoved)) { 
     i++;
   }
   if (i < *len) {  
@@ -1717,7 +1719,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genes,
     }
     
     /* delete this fixed event: this mRNA will never be translated */
-    delete_fixed_event(i, (int) trunc(x) ,&(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
+    delete_fixed_event(i, (int) trunc(x), &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
     
     /* remove the mRNA from the count */
     (state->mRNATranslCytoCount[i])--;
@@ -2047,9 +2049,9 @@ void develop(Genotype *genes,
     }
     
     /* first check to see if a fixed event occurs in current t->dt window */
-    event=does_fixed_event_end(state->mRNATranslTimeEnd,
-                            state->mRNATranscrTimeEnd,
-                            fminf(t+dt, tdevelopment));
+    event = does_fixed_event_end(state->mRNATranslTimeEnd,
+                                 state->mRNATranscrTimeEnd,
+                                 fminf(t+dt, tdevelopment));
 
     /* while there are either transcription or translation events
        occuring in current t->dt window */
@@ -2064,7 +2066,7 @@ void develop(Genotype *genes,
                             timecoursestart, timecourselast,
                             state->proteinConc);
       } else {           /* if a translation event ends */
-                       /* TODO: could have else if (event==2) */
+        /* TODO: could have else if (event==2) */
         dt = state->mRNATranslTimeEnd->time - t;         /* make dt window smaller */
         total=0;  /* number of translation events */
 
@@ -2110,7 +2112,9 @@ void develop(Genotype *genes,
         fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n", t+dt, dt, x);
 
       /* check to see there aren't more fixed events to do */
-      event = does_fixed_event_end(state->mRNATranslTimeEnd, state->mRNATranscrTimeEnd, fminf(tdevelopment, t+dt));
+      event = does_fixed_event_end(state->mRNATranslTimeEnd, 
+                                   state->mRNATranscrTimeEnd, 
+                                   fminf(tdevelopment, t+dt));
     } 
 
     /* no remaining fixed events to do in dt, now do stochastic events */
@@ -2163,9 +2167,9 @@ void develop(Genotype *genes,
          */
         if (x < rates->transport) {     
           update_protein_conc(state->proteinConc, dt, 
-                            rates, konStates, 
-                            t, timecoursestart, timecourselast, 
-                            state->proteinConc);
+                              rates, konStates, 
+                              t, timecoursestart, timecourselast, 
+                              state->proteinConc);
           transport_event(x, transport, state, t+dt+ttranslation, rates);
         } else {
           x -= rates->transport;
@@ -2268,11 +2272,10 @@ void develop(Genotype *genes,
     }
   }
   free(koffvalues);
-  /* free(konStates->konIDs); */
   for (i=0; i<NGENES; i++) {
     free(konStates->konList[i]->available_sites);
+    free(konStates->konList[i]);
   }
-  /*free(konStates->konList); */
   free(konStates);
   free(rates);
 }
@@ -2391,12 +2394,15 @@ int main(int argc, char *argv[])
       }
   }
 
-  /* create error output file */
-  sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
-  fperrors = fopen(fperrors_name, "w");
-
   /* create output directory if needed */
+#ifdef __unix__
   directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
+#else 
+#ifdef __WIN32__
+  directory_success = mkdir(output_directory);
+#endif
+#endif
+
   if (directory_success==-1) 
     if (errno == EEXIST) {
       fprintf(stderr, "directory '%s' already exists\n", output_directory);
@@ -2404,6 +2410,10 @@ int main(int argc, char *argv[])
       fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
       exit(-1);
     }
+
+  /* create error output file */
+  sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
+  fperrors = fopen(fperrors_name, "w");
 
   /* create output files for cell size */
   sprintf(fp_cellsize_name, "%s/cellsize.dat", output_directory);
@@ -2432,8 +2442,9 @@ int main(int argc, char *argv[])
   /* get the kdis.txt values */
   fpkdis = fopen("kdis.txt","r");
   for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
-    fscanf(fpkdis,"%f",&kdis[j]);
+    fscanf(fpkdis,"%f", &kdis[j]);
   }
+  fclose(fpkdis);
 
   /* now create the population of cells */
   for (j = 0; j < PopSize; j++) {
@@ -2463,6 +2474,10 @@ int main(int argc, char *argv[])
       timecoursestart[i] = timecourselast[i] = NULL;
     }
     free_mem_CellState(&state);
+  }
+
+  for (j = 0; j < PopSize; j++) {
+    free(indivs[j].interactionMatrix);
   }
 
   /*
