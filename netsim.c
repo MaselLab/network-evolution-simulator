@@ -1893,7 +1893,7 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
 float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
   float growth_rate;
   float benefit_term, cost_term_prot, cost_term_mRNA;
-  int geneID = 7;      /* select a particular TF */
+  int geneID = 8;      /* select a particular TF */
   float Lp = 12064.28; /* mean gene expression */
   float Lm = 1589836;  /* max gene expression */
   float gpeak = 2*9.627*1e-5;
@@ -1912,7 +1912,8 @@ float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
   //float Kmax = Lp*Lp/(Lm-2*Lp);
 
   /* alternative 3 */
-  float cost = 1.61*1e-9;
+  float c = 1.61*1e-9;
+  float cost = c*(genes->proteindecay[geneID]);
   float gmax = gpeak + 2*cost*Lp + (pow(cost,2)*pow(Lp,2))/gpeak;
   float Kmax = (cost*pow(Lp,2))/gpeak;
   //float gmax = 0.000138787;
@@ -1920,18 +1921,18 @@ float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
 
   benefit_term = (gmax*cell_state->proteinConc[geneID])/(cell_state->proteinConc[geneID] + Kmax);
   cost_term_prot = - cost*cell_state->proteinConc[geneID];
-  cost_term_mRNA = - cost*cell_state->mRNACytoCount[geneID]*genes->translation[geneID];
+  cost_term_mRNA = - c*cell_state->mRNACytoCount[geneID]*genes->translation[geneID];
 
-  /* alternative 4: use translation rate rather than proteinConc  */
+  /* alternative 4: converted mRNA count into protein amount in above term for cost */
   growth_rate = benefit_term + cost_term_mRNA;
 
   /* make sure growth rate can't be negative */
   if (growth_rate < 0.0)
     growth_rate = 0.0;
 
-  /* printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
+  printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
          cell_state->proteinConc[0], gmax, Kmax, cost, cost_term_prot, cost_term_mRNA, 
-         cell_state->mRNACytoCount[geneID], growth_rate); */
+         cell_state->mRNACytoCount[geneID], growth_rate);
 
   return (growth_rate);
 }
