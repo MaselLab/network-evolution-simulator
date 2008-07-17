@@ -167,7 +167,7 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
+  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -1930,9 +1930,9 @@ float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
   if (growth_rate < 0.0)
     growth_rate = 0.0;
 
-  printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
+  /* printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
          cell_state->proteinConc[0], gmax, Kmax, cost, cost_term_prot, cost_term_mRNA, 
-         cell_state->mRNACytoCount[geneID], growth_rate);
+         cell_state->mRNACytoCount[geneID], growth_rate); */
 
   return (growth_rate);
 }
