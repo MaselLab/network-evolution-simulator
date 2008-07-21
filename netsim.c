@@ -167,7 +167,7 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);
+  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
   fprintf(fperrors,"activators vs repressors ");
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -1890,10 +1890,10 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
  * Functions that handle each possible Gillespie event 
  * ----------------------------------------------------- */
 
-float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
-  float growth_rate;
+float compute_growth_rate(CellState *cell_state, Genotype *genes, float t, float dt) {
+  float growth_rate_mRNA, growth_rate_prot;
   float benefit_term, cost_term_prot, cost_term_mRNA;
-  int geneID = 8;      /* select a particular TF */
+  int geneID = 9;      /* select a particular TF */
   float Lp = 12064.28; /* mean gene expression */
   float Lm = 1589836;  /* max gene expression */
   float gpeak = 2*9.627*1e-5;
@@ -1912,8 +1912,8 @@ float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
   //float Kmax = Lp*Lp/(Lm-2*Lp);
 
   /* alternative 3 */
-  float c = 1.61*1e-9;
-  float cost = c*(genes->proteindecay[geneID]);
+  float hc = 2.583*1e-9;
+  float cost = hc;
   float gmax = gpeak + 2*cost*Lp + (pow(cost,2)*pow(Lp,2))/gpeak;
   float Kmax = (cost*pow(Lp,2))/gpeak;
   //float gmax = 0.000138787;
@@ -1921,29 +1921,72 @@ float compute_growth_rate(CellState *cell_state, Genotype *genes, float dt) {
 
   benefit_term = (gmax*cell_state->proteinConc[geneID])/(cell_state->proteinConc[geneID] + Kmax);
   cost_term_prot = - cost*cell_state->proteinConc[geneID];
-  cost_term_mRNA = - c*cell_state->mRNACytoCount[geneID]*genes->translation[geneID];
+  cost_term_mRNA = - cost*(genes->translation[geneID]/genes->proteindecay[geneID])*cell_state->mRNACytoCount[geneID];
 
   /* alternative 4: converted mRNA count into protein amount in above term for cost */
-  growth_rate = benefit_term + cost_term_mRNA;
+  growth_rate_mRNA = benefit_term + cost_term_mRNA;
+  growth_rate_prot = benefit_term + cost_term_prot;
 
   /* make sure growth rate can't be negative */
-  if (growth_rate < 0.0)
-    growth_rate = 0.0;
+  if (growth_rate_mRNA < 0.0)
+    growth_rate_mRNA = 0.0;
+
+  if (growth_rate_prot < 0.0)
+    growth_rate_prot = 0.0;
 
   /* printf("protein=%g gmax=%g, Kmax=%g, cost=%g\ncost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate=%g\n", 
          cell_state->proteinConc[0], gmax, Kmax, cost, cost_term_prot, cost_term_mRNA, 
          cell_state->mRNACytoCount[geneID], growth_rate); */
+  
+  fprintf(fp_growthrate, "%g %g %g\n", t, growth_rate_mRNA, growth_rate_prot);
 
-  return (growth_rate);
+  return (growth_rate_mRNA);
+}
+
+float compute_growth_rate_dimer(CellState *cell_state, Genotype *genes, float t, float dt) {
+
+  float growth_rate_mRNA, growth_rate_prot;
+  float benefit_term, cost_term_prot, cost_term_mRNA;
+  int geneID = 9;      /* select a particular TF */
+  float L = cell_state->proteinConc[geneID];  /* cache value */
+
+  float Lp = 12000; /* mean gene expression is 12064.28 */
+  float gpeak = 2*9.627*1e-5;
+  float mean_decay_rate = 0.023;  /* in min^-1 from mean of distribution from Belle et al (2006) */
+  float hc = 2.583*1e-9;
+  float cost = hc;
+  float M0 = (pow(gpeak,2) - hc*pow(gpeak,2) + 2*hc*gpeak*Lp - 2*pow(hc,2)*gpeak*Lp +  pow(hc*Lp,2) - pow(hc,3)*pow(Lp,2))/gpeak;
+  float Km = (hc*pow(gpeak,2) - 2*hc*gpeak*Lp + 2*pow(hc,2)*gpeak*Lp + hc*pow(Lp,2) - 2*pow(hc*Lp,2) + pow(hc,3)*pow(Lp,2))/gpeak;
+
+  benefit_term = 0.5 * (Km + L + M0 - sqrt(pow(Km + L + M0, 2) - 4*L*M0));
+  cost_term_prot = - cost*L;
+  cost_term_mRNA = - cost*(genes->translation[geneID]/genes->proteindecay[geneID])*cell_state->mRNACytoCount[geneID];
+
+  growth_rate_mRNA = benefit_term + cost_term_mRNA;
+  growth_rate_prot = benefit_term + cost_term_prot;
+
+  /* printf("protein=%g M0=%g, Km=%g, cost=%g\nbenefit=%g, cost_prot=%g, cost_mRNA=%g (mRNA=%d), growth rate mRNA=%g, growth rate protein=%g\n", 
+         cell_state->proteinConc[0], M0, Km, cost, benefit_term, cost_term_prot, cost_term_mRNA, 
+         cell_state->mRNACytoCount[geneID], growth_rate_mRNA, growth_rate_prot);  */
+
+  /* make sure growth rate can't be negative */
+  if (growth_rate_mRNA < 0.0)
+    growth_rate_mRNA = 0.0;
+
+  if (growth_rate_prot < 0.0)
+    growth_rate_prot = 0.0;
+  
+  fprintf(fp_growthrate, "%g %g %g\n", t, growth_rate_mRNA, growth_rate_prot);
+
+  return (growth_rate_mRNA);
 }
 
 void update_cell_size(CellState *cell_state, Genotype *genes, float t, float dt) {
   
-  float growth_rate = compute_growth_rate(cell_state, genes, dt);
+  float growth_rate = compute_growth_rate_dimer(cell_state, genes, t, dt);
   cell_state->cellSize = (cell_state->cellSize)*exp(growth_rate*dt);
-  
   fprintf(fp_cellsize, "%g %g\n", t, cell_state->cellSize);
-  fprintf(fp_growthrate, "%g %g\n", t, growth_rate);
+
 }
 
 /*
