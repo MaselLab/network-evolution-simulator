@@ -20,7 +20,7 @@
 /* local includes */
 #include "random.h"
 #include "lib.h"
-#include "netsim.h"
+#include "netsim-bigtf.h"
 /* #include "list.h" */
 
 /*
@@ -144,7 +144,7 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
   } 
 
   printf("numElements: %3d\n", numElements);
-  
+
   for (i=0; i < numElements; i++) {
     printf("binding site %3d:\n", i);
     printf("       cis-reg region: %3d", interactionMatrix[i].cisregID);
@@ -155,20 +155,28 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
     printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[interactionMatrix[i].tfID][interactionMatrix[i].tfCopy]);
     printf("             position: %3d\n", interactionMatrix[i].sitePos);
     printf("               strand: %3d\n", interactionMatrix[i].strand);
-    printf("         Hamming dist: %3d\n", interactionMatrix[i].hammingDist);
+    printf("         Hamming dist: %3d\n", interactionMatrix[i].hammingDist); 
+    printf("        Hind Position: %3d\n", interactionMatrix[i].hindPos);          
   }
+
 }
 
 void initialize_genotype(Genotype *indiv, 
                          float kdis[])
 {
-  int i, j;
+  int i, j, p;
   
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
-  initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES); 
-  calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix));
-  /* print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); */
+  initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES);
+  for(p=0;p<NGENES;p++){
+      indiv->hindrancePositions[p]=rand()%10;
+      printf(" %d\n", indiv->hindrancePositions[p]);
+      } 
+  calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix), indiv->hindrancePositions);
+  print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); 
+  
   fprintf(fperrors,"activators vs repressors ");
+  
   for (i=0; i<NGENES; i++){
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
     while (indiv->mRNAdecay[i]<0.0)
@@ -206,6 +214,7 @@ void initialize_genotype(Genotype *indiv,
       indiv->PICdisassembly[i][1] = kdis[j];
 
   }
+
   fprintf(fperrors,"\n");
 }
 
@@ -237,7 +246,7 @@ void mutate(Genotype *old,
     if (PLOIDY == 2)
       new->PICdisassembly[i][1] = old->PICdisassembly[i][1];
   }
-  calc_interaction_matrix(new->cisRegSeq, new->transcriptionFactorSeq, &(new->bindSiteCount), &(new->interactionMatrix));
+  calc_interaction_matrix(new->cisRegSeq, new->transcriptionFactorSeq, &(new->bindSiteCount), &(new->interactionMatrix), new->hindrancePositions);
 }
 
 int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
@@ -246,7 +255,8 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                                    TFInteractionMatrix **interactionMatrix,
                                    int *maxAlloc,
                                    int cisRegCopy,
-                                   int tfCopy)
+                                   int tfCopy,
+                                   int hindPos[NGENES])
 {
   int i, j, geneID, tfind, match, maxBindingSiteAlloc;
 
@@ -277,6 +287,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
           (*interactionMatrix)[bindSiteCount].sitePos = i;
           (*interactionMatrix)[bindSiteCount].strand = 0;
           (*interactionMatrix)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
+          (*interactionMatrix)[bindSiteCount].hindPos = hindPos[tfind];
           bindSiteCount++;
         }
       }
@@ -308,6 +319,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
           (*interactionMatrix)[bindSiteCount].sitePos = i-TF_ELEMENT_LEN+1;
           (*interactionMatrix)[bindSiteCount].strand = 1;
           (*interactionMatrix)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
+          (*interactionMatrix)[bindSiteCount].hindPos = hindPos[tfind];
           bindSiteCount++;
         }
       }
@@ -320,7 +332,8 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
 void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                              char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
                              int *newBindSiteCount,
-                             TFInteractionMatrix **interactionMatrix)
+                             TFInteractionMatrix **interactionMatrix,
+                             int hindPos[NGENES])
 {
   int maxBindingSiteAlloc, bindSiteCount;
   
@@ -337,7 +350,7 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                                                  bindSiteCount,
                                                  interactionMatrix,
                                                  &maxBindingSiteAlloc,
-                                                 0, 0);
+                                                 0, 0, hindPos);
 
   if (PLOIDY == 2)  {
     
@@ -348,7 +361,7 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                                                    bindSiteCount,
                                                    interactionMatrix,
                                                    &maxBindingSiteAlloc,
-                                                   1, 0);
+                                                   1, 0, hindPos);
 
     /* don't currently consider the variant tfCopy combinations (0,1) or (1,1)  */
     /* bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
@@ -372,6 +385,7 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
     fprintf(fperrors, "realloc of interactionMatrix down to bindSiteCount = %d failed.\n", bindSiteCount);
     exit(1);
   }
+  //printf("bindSiteCount=%d\n", bindSiteCount);
   *newBindSiteCount = bindSiteCount;
 }
 
@@ -613,7 +627,7 @@ void calc_koff(int k,
         interactionMatrix[k].cisregCopy==interactionMatrix[state->tfBoundIndexes[j]].cisregCopy &&
         !(k==state->tfBoundIndexes[j])) {
       posdiff = interactionMatrix[k].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff) < 6) {
+      if (abs(posdiff) < 6) {/*Phey*/
         fprintf(fperrors,
                 "error: steric hindrance has been breached with site %d (on copy %d of gene %d), %d away from site %d (on copy %d of gene %d)\n",
                 k, interactionMatrix[k].cisregCopy, interactionMatrix[k].cisregID, posdiff, 
@@ -654,7 +668,7 @@ void scan_nearby_sites(int indexChanged,
 
       /* how close are we on the sequence */
       posdiff = interactionMatrix[indexChanged].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff) < 6) { /* within 6: bad: shouldn't happen */
+      if (abs(posdiff) < 6) { /* within 6: bad: shouldn't happen Phey*/
         fprintf(fperrors,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
                 indexChanged, posdiff, state->tfBoundIndexes[j]);
@@ -1387,7 +1401,7 @@ void attempt_tf_binding(Genotype *genes,
       posdiff = genes->interactionMatrix[site].sitePos - genes->interactionMatrix[k].sitePos;
 
       /* if within 6, we prevent binding by adding to steric hindrance */
-      if (abs(posdiff) < 6) {
+      if (abs(posdiff) < 6) {/*Phey*/
 
         /* if not enough memory, reallocate */
         if (state->tfHinderedCount > *maxbound3 - 1) {
@@ -1974,6 +1988,7 @@ void develop(Genotype *genes,
   float dt;                 /* delta-t */
 
   /* cached information about available binding sites for efficiency */
+ 
   KonStates *konStates =  malloc(sizeof(KonStates));
 
   GillespieRates *rates = malloc(sizeof(GillespieRates));
@@ -1988,12 +2003,13 @@ void develop(Genotype *genes,
     timecoursestart[i] = NULL;
     timecourselast[i] = NULL;
   }
+  
   add_time_points((float) 0.0, state->proteinConc, timecoursestart, timecourselast);
 
   /* set cell temperature and value of RTlnKr constant */
   state->temperature = temperature;
   state->RTlnKr = GasConstant * temperature * log(Kr);
-
+   
   /* number of possible binding sites */
   /* konStates->konIDs = malloc(2*genes->bindSiteCount*sizeof(int)); */
   /* konStates->konList = malloc(sizeof(KonList)); */
@@ -2002,7 +2018,7 @@ void develop(Genotype *genes,
     konStates->konList[i] = malloc(sizeof(KonList));
     konStates->konList[i]->available_sites = malloc(genes->bindSiteCount*sizeof(int));
   }
-
+  
   /* TODO: ? */
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
@@ -2010,6 +2026,7 @@ void develop(Genotype *genes,
   state->tfBoundIndexes = realloc(state->tfBoundIndexes, maxbound2*sizeof(int));
   koffvalues = malloc(maxbound2*sizeof(float)); 
   state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 2*maxbound3*sizeof(int));
+  
   /*if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
     !state->tfHinderedIndexes || !konStates->konIDs) { */
   if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
@@ -2022,8 +2039,10 @@ void develop(Genotype *genes,
   calc_from_state(genes, state, rates, konStates, transport, mRNAdecay);
 
   t = 0.0;  /* time starts at zero */
+  
 
   while (t < tdevelopment) {  /* run until development stops */
+  
     x=expdev(&seed);        /* draw random number */
 
     /* TODO: what is this doing? */
@@ -2035,7 +2054,7 @@ void develop(Genotype *genes,
                 konrate2, rates->koff);
       rates->koff = konrate2;
     }
-
+    
     /* do first Gillespie step to chose next event */
 
     calc_dt(&x, &dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
@@ -2054,6 +2073,7 @@ void develop(Genotype *genes,
                                  state->mRNATranscrTimeEnd,
                                  fminf(t+dt, tdevelopment));
 
+    
     /* while there are either transcription or translation events
        occuring in current t->dt window */
     while (event > 0) {
@@ -2154,7 +2174,9 @@ void develop(Genotype *genes,
        * references to konStates->nkonsum, probably a bit vulnerable to rounding
        * error
        */
-
+      
+      //printf("before stochastic\n");
+      //system("PAUSE");
       /* 
        * STOCHASTIC EVENT: a TF unbinds (koff) 
        */
@@ -2173,6 +2195,7 @@ void develop(Genotype *genes,
                               state->proteinConc);
           transport_event(x, transport, state, t+dt+ttranslation, rates);
         } else {
+            
           x -= rates->transport;
           /* 
            * STOCHASTIC EVENT: an mRNA decay event
@@ -2194,7 +2217,7 @@ void develop(Genotype *genes,
                * STOCHASTIC EVENT: TF binding event
                */
               if (x < rates->salphc + konrate) {   /* add variable (salphc) and constant (konrate) */
-                tf_binding_event(rates, state, genes, konStates, koffvalues,
+                 tf_binding_event(rates, state, genes, konStates, koffvalues,
                                  timecoursestart, timecourselast, konrate, dt, t, 
                                  maxbound2, maxbound3);
               } else {
@@ -2203,14 +2226,17 @@ void develop(Genotype *genes,
                  * STOCHASTIC EVENT: histone acetylation
                  */
                 if (x < (float) sum_rate_counts(rates->acetylationCount) * acetylate) {
+                     
                   histone_acteylation_event(rates, state, genes, konStates, 
                                             timecoursestart, timecourselast, dt, t);
                 } else {
+                   
                   x -= (float) sum_rate_counts(rates->acetylationCount) * acetylate;
                   /* 
                    * STOCHASTIC EVENT: histone deacetylation
                    */
                   if (x < (float) sum_rate_counts(rates->deacetylationCount) * deacetylate) {
+              
                     histone_deacteylation_event(rates, state, genes, konStates, 
                                                 timecoursestart, timecourselast, dt, t);
                   } else {
@@ -2234,6 +2260,7 @@ void develop(Genotype *genes,
                          * FALLBACK: shouldn't get here, previous
                          * events should be exhaustive
                          */
+                          
                         fprintf(fperrors, "error: no event assigned\n");
                       }
                     }
@@ -2244,19 +2271,22 @@ void develop(Genotype *genes,
           }
         }
       }
+      
       /* update cell size */
       update_cell_size(state, genes, t, dt);
       
       /* Gillespie step: advance time to next event at dt */
       t += dt;
       if (verbose) fprintf(fperrors, "dt=%g t=%g\n", dt, t);
-
+ 
       /* output time courses during run to capture output before segfault */
       for (i=0; i < NGENES; i++) {
         float *lopt;
         /*print_time_course(timecoursestart[i], i, lopt);*/
       }
+ 
     } else {
+       
       /* we will reach the end of development in dt */
       if (verbose) fprintf(fperrors, "finish at t=%g dt=%g\n", t, dt);
 
@@ -2272,6 +2302,7 @@ void develop(Genotype *genes,
       t = tdevelopment;
     }
   }
+
   free(koffvalues);
   for (i=0; i<NGENES; i++) {
     free(konStates->konList[i]->available_sites);
@@ -2433,7 +2464,7 @@ int main(int argc, char *argv[])
   if (!hold_genotype_constant)
     for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
 
-  /* initialize probein concentrations */
+  /* initialize protein concentrations */
   for (i=0; i<NGENES; i++) {
     lopt[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
@@ -2451,19 +2482,21 @@ int main(int argc, char *argv[])
   for (j = 0; j < PopSize; j++) {
     if (j==PopSize-1) output=1;
     initialize_genotype(&indivs[j], kdis);
-
     /* if genotype is held constant, start varying the seed *after*
        initialize_genotype, so we can run the same genotype with
        slightly different amounts of noise  */
     if (hold_genotype_constant)
-      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
-
+      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
+         ran1(&seed);
+   
     initialize_cell(&state, indivs[j].mRNAdecay, initmRNA, initProteinConc);
     /* 
      *  AKL 2008-03-21: removed indivs[j].y: wasn't being used
      *  initialize_cell(&state,indivs[j].y,indivs[j].mRNAdecay,initmRNA,initProteinConc); 
      */
     develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
+    printf("after develop\n");
+    //print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);
     /* dev_stability_only_lopt(lopt, timecoursestart); */
     fprintf(fperrors,"indiv %d\n",j);
     /* calc_fitness(lopt, &(fitness[j]), timecoursestart, selection);
