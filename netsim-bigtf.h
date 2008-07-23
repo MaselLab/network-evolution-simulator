@@ -144,22 +144,22 @@ struct KonStates {
 
 typedef struct TFInteractionMatrix TFInteractionMatrix;
 struct TFInteractionMatrix {
-  int cisregID;     /* 0 */
-  int tfID;         /* 1 */
-  int sitePos;      /* 2 */
-  int strand;       /* 3 */
-  int hammingDist;  /* 4 */
+  int cisregID;     /* 0 - cis-reg region*/
+  int tfID;         /* 1 - trnascription factor*/
+  int sitePos;      /* 2 - start position of binding site*/
+  int strand;       /* 3 - strand*/
+  int hammingDist;  /* 4 - hamming distance*/
   int cisregCopy;    /* which copy of gene */
   int tfCopy;        /* which copy of gene */ 
-  int hindPos;
-  int leftEdgePos;
+  int hindPos;       /*position of BS with in 15bp hindrance (offset)*/
+  int leftEdgePos;   /*start position of 15bp hindrance*/
 };
 
 typedef struct Genotype Genotype;
 struct Genotype {
   char cisRegSeq[NGENES][PLOIDY][CISREG_LEN];
   char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN];
-  int hindrancePositions[NGENES];
+  int hindrancePositions[NGENES];     /*offset positions of BS based on TF--heritable*/
   int bindSiteCount;
   TFInteractionMatrix *interactionMatrix;
 /* int (*interactionMatrix)[5];

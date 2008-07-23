@@ -143,7 +143,7 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
     }
   } 
 
-  printf("numElements: %3d\n", numElements);
+  //printf("numElements: %3d\n", numElements);
 
   for (i=0; i < numElements; i++) {
     printf("binding site %3d:\n", i);
@@ -282,7 +282,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
             }
             else if (verbose) fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
           }
-          if((i - hindPos[tfind]) >=0 && ((i - hindPos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN){
+          if(((i - hindPos[tfind]) >=0) && (((i - hindPos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN)){
           (*interactionMatrix)[bindSiteCount].cisregID = geneID;
           (*interactionMatrix)[bindSiteCount].cisregCopy = cisRegCopy; 
           (*interactionMatrix)[bindSiteCount].tfID = tfind;
@@ -317,7 +317,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
             }
             else if (verbose) fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
           }
-          if((i-TF_ELEMENT_LEN+1 - hindPos[tfind]) >=0 && ((i-TF_ELEMENT_LEN+1 - hindPos[tfind])+(HIND_LENGTH-1))< CISREG_LEN){
+          if(((i-TF_ELEMENT_LEN+1 - hindPos[tfind]) >=0) && (((i-TF_ELEMENT_LEN+1 - hindPos[tfind])+(HIND_LENGTH-1))< CISREG_LEN)){
           (*interactionMatrix)[bindSiteCount].cisregID = geneID;
           (*interactionMatrix)[bindSiteCount].cisregCopy = cisRegCopy; 
           (*interactionMatrix)[bindSiteCount].tfID = tfind;
@@ -634,8 +634,9 @@ void calc_koff(int k,
     if (interactionMatrix[k].cisregID==interactionMatrix[state->tfBoundIndexes[j]].cisregID &&
         interactionMatrix[k].cisregCopy==interactionMatrix[state->tfBoundIndexes[j]].cisregCopy &&
         !(k==state->tfBoundIndexes[j])) {
-      posdiff = interactionMatrix[k].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff) < HIND_OLD) {/*Phey*/
+      posdiff = interactionMatrix[k].leftEdgePos - interactionMatrix[state->tfBoundIndexes[j]].leftEdgePos;
+      //printf("diff=%d\n", posdiff);
+      if (abs(posdiff) < HIND_LENGTH) {/*Phey*/
         fprintf(fperrors,
                 "error: steric hindrance has been breached with site %d (on copy %d of gene %d), %d away from site %d (on copy %d of gene %d)\n",
                 k, interactionMatrix[k].cisregCopy, interactionMatrix[k].cisregID, posdiff, 
@@ -675,8 +676,9 @@ void scan_nearby_sites(int indexChanged,
         !(indexChanged==state->tfBoundIndexes[j])) {
 
       /* how close are we on the sequence */
-      posdiff = interactionMatrix[indexChanged].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff) < HIND_OLD) { /* within 6: bad: shouldn't happen Phey*/
+      posdiff = interactionMatrix[indexChanged].leftEdgePos - interactionMatrix[state->tfBoundIndexes[j]].leftEdgePos;
+      //printf("diff3=%d\n", posdiff);
+      if (abs(posdiff) < HIND_LENGTH) { /* within 6: bad: shouldn't happen Phey*/
         fprintf(fperrors,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
                 indexChanged, posdiff, state->tfBoundIndexes[j]);
@@ -1264,8 +1266,8 @@ void remove_tf_binding(Genotype *genes,
         if (bound==0) {
           siteID = state->tfHinderedIndexes[j][0];
           if (verbose) 
-            fprintf(fperrors,"Site %d pos %d on gene %d freed from steric hindrance\n",
-                    siteID, genes->interactionMatrix[siteID].sitePos, genes->interactionMatrix[siteID].cisregID);
+            fprintf(fperrors,"Site %d leftEdgePos %d on gene %d freed from steric hindrance\n",
+                    siteID, genes->interactionMatrix[siteID].leftEdgePos, genes->interactionMatrix[siteID].cisregID);
 
           /* adjust rates by returning kon to pool */
           add_kon(state->proteinConc[genes->interactionMatrix[siteID].tfID],
@@ -1305,8 +1307,8 @@ void remove_tf_binding(Genotype *genes,
     geneID = genes->interactionMatrix[site].cisregID;
     geneCopy = genes->interactionMatrix[site].cisregCopy;
     if (verbose) 
-      fprintf(fperrors,"Add site %d at pos %d on gene %d copy %d freed by unbinding\n",
-              site, genes->interactionMatrix[site].sitePos, geneID, geneCopy);
+      fprintf(fperrors,"Add site %d at leftEdgePos %d on gene %d copy %d freed by unbinding\n",
+              site, genes->interactionMatrix[site].leftEdgePos, geneID, geneCopy);
 
     /* adjust kon */
     add_kon(state->proteinConc[genes->interactionMatrix[site].tfID],
@@ -1406,11 +1408,12 @@ void attempt_tf_binding(Genotype *genes,
         !(k==site)) {
 
       /* check distance from current binding site (k) to the original (site) */
-      posdiff = genes->interactionMatrix[site].sitePos - genes->interactionMatrix[k].sitePos;
+                      //fprintf(fperrors, "site=%d k=%d\n", genes->interactionMatrix[site].leftEdgePos, genes->interactionMatrix[k].leftEdgePos);
+      posdiff = genes->interactionMatrix[site].leftEdgePos - genes->interactionMatrix[k].leftEdgePos;
 
       /* if within 6, we prevent binding by adding to steric hindrance */
-      if (abs(posdiff) < HIND_OLD) {/*Phey*/
-
+      if (abs(posdiff) < HIND_LENGTH) {/*Phey*/
+                    //fprintf(fperrors, "diff < 15\n");
         /* if not enough memory, reallocate */
         if (state->tfHinderedCount > *maxbound3 - 1) {
           (*maxbound3) *= 2;
@@ -2319,10 +2322,10 @@ void develop(Genotype *genes,
   free(konStates);
   free(rates);
   
-  int p;
+ /* int p;
    for(p=0;p<NGENES;p++){
       printf(" %d\n", genes->hindrancePositions[p]);
-      }
+      }*/
 }
 
 void dev_stability_only_lopt(float lopt[],
