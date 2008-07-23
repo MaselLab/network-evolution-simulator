@@ -170,9 +170,13 @@ void initialize_genotype(Genotype *indiv,
   initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*PLOIDY*NGENES);
   initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*PLOIDY*NGENES);
   for(p=0;p<NGENES;p++){
-      indiv->hindrancePositions[p]=rand()%10;
+      if(HIND_LENGTH == TF_ELEMENT_LEN){
+      indiv->hindrancePositions[p]=0;
+      } else {
+           indiv->hindrancePositions[p]=rand()%10;
+      }
       printf(" %d\n", indiv->hindrancePositions[p]);
-      } 
+  } 
   calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->interactionMatrix), indiv->hindrancePositions);
   print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); 
   
