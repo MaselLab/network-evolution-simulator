@@ -156,7 +156,8 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
     printf("             position: %3d\n", interactionMatrix[i].sitePos);
     printf("               strand: %3d\n", interactionMatrix[i].strand);
     printf("         Hamming dist: %3d\n", interactionMatrix[i].hammingDist); 
-    printf("        Hind Position: %3d\n", interactionMatrix[i].hindPos);          
+    printf("        Hind Position: %3d\n", interactionMatrix[i].hindPos); 
+    printf("         Start 15 Pos: %3d\n", interactionMatrix[i].leftEdgePos);        
   }
 
 }
@@ -235,7 +236,8 @@ void mutate(Genotype *old,
       }
     }
     for (k=0; k<TF_ELEMENT_LEN; k++) 
-      new->transcriptionFactorSeq[i][0][k] = old->transcriptionFactorSeq[i][0][k];    
+      new->transcriptionFactorSeq[i][0][k] = old->transcriptionFactorSeq[i][0][k];  
+    new->hindrancePositions[NGENES] = old->hindrancePositions[NGENES];  
     new->mRNAdecay[i] = old->mRNAdecay[i];
     new->proteindecay[i] = old->proteindecay[i];
     new->translation[i] = old->translation[i];
@@ -280,6 +282,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
             }
             else if (verbose) fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
           }
+          if((i - hindPos[tfind]) >=0 && ((i - hindPos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN){
           (*interactionMatrix)[bindSiteCount].cisregID = geneID;
           (*interactionMatrix)[bindSiteCount].cisregCopy = cisRegCopy; 
           (*interactionMatrix)[bindSiteCount].tfID = tfind;
@@ -288,7 +291,9 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
           (*interactionMatrix)[bindSiteCount].strand = 0;
           (*interactionMatrix)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
           (*interactionMatrix)[bindSiteCount].hindPos = hindPos[tfind];
+          (*interactionMatrix)[bindSiteCount].leftEdgePos = i - hindPos[tfind];
           bindSiteCount++;
+          }
         }
       }
     }
@@ -312,6 +317,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
             }
             else if (verbose) fprintf(fperrors, "realloc of interactionMatrix to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
           }
+          if((i-TF_ELEMENT_LEN+1 - hindPos[tfind]) >=0 && ((i-TF_ELEMENT_LEN+1 - hindPos[tfind])+(HIND_LENGTH-1))< CISREG_LEN){
           (*interactionMatrix)[bindSiteCount].cisregID = geneID;
           (*interactionMatrix)[bindSiteCount].cisregCopy = cisRegCopy; 
           (*interactionMatrix)[bindSiteCount].tfID = tfind;
@@ -320,7 +326,9 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
           (*interactionMatrix)[bindSiteCount].strand = 1;
           (*interactionMatrix)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
           (*interactionMatrix)[bindSiteCount].hindPos = hindPos[tfind];
+          (*interactionMatrix)[bindSiteCount].leftEdgePos = i-TF_ELEMENT_LEN+1 - hindPos[tfind];
           bindSiteCount++;
+          }
         }
       }
     }
@@ -627,7 +635,7 @@ void calc_koff(int k,
         interactionMatrix[k].cisregCopy==interactionMatrix[state->tfBoundIndexes[j]].cisregCopy &&
         !(k==state->tfBoundIndexes[j])) {
       posdiff = interactionMatrix[k].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff) < 6) {/*Phey*/
+      if (abs(posdiff) < HIND_OLD) {/*Phey*/
         fprintf(fperrors,
                 "error: steric hindrance has been breached with site %d (on copy %d of gene %d), %d away from site %d (on copy %d of gene %d)\n",
                 k, interactionMatrix[k].cisregCopy, interactionMatrix[k].cisregID, posdiff, 
@@ -668,7 +676,7 @@ void scan_nearby_sites(int indexChanged,
 
       /* how close are we on the sequence */
       posdiff = interactionMatrix[indexChanged].sitePos - interactionMatrix[state->tfBoundIndexes[j]].sitePos;
-      if (abs(posdiff) < 6) { /* within 6: bad: shouldn't happen Phey*/
+      if (abs(posdiff) < HIND_OLD) { /* within 6: bad: shouldn't happen Phey*/
         fprintf(fperrors,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
                 indexChanged, posdiff, state->tfBoundIndexes[j]);
@@ -1401,7 +1409,7 @@ void attempt_tf_binding(Genotype *genes,
       posdiff = genes->interactionMatrix[site].sitePos - genes->interactionMatrix[k].sitePos;
 
       /* if within 6, we prevent binding by adding to steric hindrance */
-      if (abs(posdiff) < 6) {/*Phey*/
+      if (abs(posdiff) < HIND_OLD) {/*Phey*/
 
         /* if not enough memory, reallocate */
         if (state->tfHinderedCount > *maxbound3 - 1) {
@@ -2310,6 +2318,11 @@ void develop(Genotype *genes,
   }
   free(konStates);
   free(rates);
+  
+  int p;
+   for(p=0;p<NGENES;p++){
+      printf(" %d\n", genes->hindrancePositions[p]);
+      }
 }
 
 void dev_stability_only_lopt(float lopt[],

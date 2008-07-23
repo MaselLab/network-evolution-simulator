@@ -14,10 +14,12 @@
 #ifndef PLOIDY
 #define PLOIDY 1           /* 1 = haploid, 2 = diploid */
 #endif
-#define NGENES 2          /* number of genes */
+#define NGENES 3          /* number of genes */
 #define CISREG_LEN 30     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
+#define HIND_LENGTH 15
+#define HIND_OLD 6
 
 extern int verbose;
 extern FILE *fperrors;
@@ -150,6 +152,7 @@ struct TFInteractionMatrix {
   int cisregCopy;    /* which copy of gene */
   int tfCopy;        /* which copy of gene */ 
   int hindPos;
+  int leftEdgePos;
 };
 
 typedef struct Genotype Genotype;
