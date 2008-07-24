@@ -81,6 +81,7 @@ FILE *fperrors;
 FILE *fp_cellsize;
 FILE *fp_growthrate;
 
+
 void initialize_sequence(char Seq[], 
                          int len)
 {
@@ -135,7 +136,7 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
   //printf("cis-reg     gene %2d (copy 0): %.*s\n", i, CISREG_LEN*NGENES*PLOIDY, cisRegSeq[i][0]);
 
   for (i=0; i < NGENES; i++) {
-    printf("TF sequence gene %2d (copy 0): %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i][0]);
+    printf( "TF sequence gene %2d (copy 0): %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i][0]);
     printf("cis-reg     gene %2d (copy 0): %.*s\n", i, CISREG_LEN, cisRegSeq[i][0]);
     if (PLOIDY == 2) {
       printf("TF sequence gene %2d (copy 1): %.*s\n", i, TF_ELEMENT_LEN, transcriptionFactorSeq[i][1]);
@@ -143,7 +144,7 @@ void print_interaction_matrix(TFInteractionMatrix *interactionMatrix,
     }
   } 
 
-  //printf("numElements: %3d\n", numElements);
+  //printf( "numElements: %3d\n", numElements);
 
   for (i=0; i < numElements; i++) {
     printf("binding site %3d:\n", i);
@@ -2515,7 +2516,7 @@ int main(int argc, char *argv[])
      *  initialize_cell(&state,indivs[j].y,indivs[j].mRNAdecay,initmRNA,initProteinConc); 
      */
     develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
-    printf("after develop\n");
+    //printf("after develop\n");
     //print_interaction_matrix(indiv->interactionMatrix, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq);
     /* dev_stability_only_lopt(lopt, timecoursestart); */
     fprintf(fperrors,"indiv %d\n",j);
@@ -2529,7 +2530,7 @@ int main(int argc, char *argv[])
     }
     free_mem_CellState(&state);
   }
-
+  //system("PAUSE");
   for (j = 0; j < PopSize; j++) {
     free(indivs[j].interactionMatrix);
   }
