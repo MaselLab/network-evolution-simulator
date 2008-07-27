@@ -23,6 +23,7 @@ OTHER = Makefile
 netsim: $(OBJS)
 netsim-check: $(OBJS)
 netsim-gprof: $(OBJS)
+netsim-bigtf: $(OBJS)
 
 ## check specific directory
 check-haploid:	clean
