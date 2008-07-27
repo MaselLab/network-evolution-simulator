@@ -18,6 +18,8 @@
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
+#define HIND_LENGTH 6         /*length of hindrance*/
+//#define HIND_OLD 6
 
 extern int verbose;
 extern FILE *fperrors;
@@ -142,19 +144,22 @@ struct KonStates {
 
 typedef struct TFInteractionMatrix TFInteractionMatrix;
 struct TFInteractionMatrix {
-  int cisregID;     /* 0 */
-  int tfID;         /* 1 */
-  int sitePos;      /* 2 */
-  int strand;       /* 3 */
-  int hammingDist;  /* 4 */
+  int cisregID;     /* 0 - cis-reg region*/
+  int tfID;         /* 1 - trnascription factor*/
+  int sitePos;      /* 2 - start position of binding site*/
+  int strand;       /* 3 - strand*/
+  int hammingDist;  /* 4 - hamming distance*/
   int cisregCopy;    /* which copy of gene */
   int tfCopy;        /* which copy of gene */ 
+  int hindPos;       /*position of BS with in 15bp hindrance (offset)*/
+  int leftEdgePos;   /*start position of 15bp hindrance*/
 };
 
 typedef struct Genotype Genotype;
 struct Genotype {
   char cisRegSeq[NGENES][PLOIDY][CISREG_LEN];
   char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN];
+  int hindrancePositions[NGENES];     /*offset positions of BS based on TF--heritable*/
   int bindSiteCount;
   TFInteractionMatrix *interactionMatrix;
 /* int (*interactionMatrix)[5];
@@ -228,7 +233,8 @@ struct TimeCourse
 extern void calc_interaction_matrix(char [NGENES][PLOIDY][CISREG_LEN],
                                     char [NGENES][PLOIDY][TF_ELEMENT_LEN],
                                     int *,
-                                    TFInteractionMatrix **);
+                                    TFInteractionMatrix **,
+                                    int [NGENES]);
 
 
 

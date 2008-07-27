@@ -1,4 +1,4 @@
-#include "netsim-bigtf.h" 
+#include "netsim.h" 
 
 extern float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *, float *), 
 		    float x, GillespieRates *rates, KonStates *konStates, float x1, float x2, float xacc);
