@@ -148,11 +148,10 @@ void print_interaction_matrix(AllTFBindingSites *allBindingSites,
   for (i=0; i < numElements; i++) {
     printf("binding site %3d:\n", i);
     printf("       cis-reg region: %3d", allBindingSites[i].cisregID);
-    printf("         cis-reg copy: %3d", allBindingSites[i].cisregCopy);
-    printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[allBindingSites[i].cisregID][allBindingSites[i].cisregCopy]);
+    printf("         cis-reg copy: %3d", allBindingSites[i].geneCopy);
+    printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[allBindingSites[i].cisregID][allBindingSites[i].geneCopy]);
     printf(" transcription-factor: %3d", allBindingSites[i].tfID);
-    printf("              TF copy: %3d", allBindingSites[i].tfCopy);
-    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[allBindingSites[i].tfID][allBindingSites[i].tfCopy]);
+    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[allBindingSites[i].tfID][allBindingSites[i].geneCopy]); 
     printf("             position: %3d\n", allBindingSites[i].sitePos);
     printf("               strand: %3d\n", allBindingSites[i].strand);
     printf("         Hamming dist: %3d\n", allBindingSites[i].hammingDist); 
@@ -259,8 +258,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                                    int bindSiteCount,
                                    AllTFBindingSites **allBindingSites,
                                    int *maxAlloc,
-                                   int cisRegCopy,
-                                   int tfCopy,
+                                   int geneCopy,
                                    int hindPos[NGENES])
 {
   int i, j, geneID, tfind, match, maxBindingSiteAlloc;
@@ -272,7 +270,7 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
       for (tfind=0; tfind < NGENES; tfind++) {
         match=0;
         for (j=i; j < i+TF_ELEMENT_LEN; j++) {
-          if (cisRegSeq[geneID][cisRegCopy][j] == transcriptionFactorSeq[tfind][tfCopy][j-i])
+          if (cisRegSeq[geneID][geneCopy][j] == transcriptionFactorSeq[tfind][geneCopy][j-i])
             match++;
         }
         if (match >= nmin){
@@ -287,9 +285,8 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
           }
           if(((i - hindPos[tfind]) >=0) && (((i - hindPos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN)) {
             (*allBindingSites)[bindSiteCount].cisregID = geneID;
-            (*allBindingSites)[bindSiteCount].cisregCopy = cisRegCopy; 
+            (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
             (*allBindingSites)[bindSiteCount].tfID = tfind;
-            (*allBindingSites)[bindSiteCount].tfCopy = tfCopy;
             (*allBindingSites)[bindSiteCount].sitePos = i;
             (*allBindingSites)[bindSiteCount].strand = 0;
             (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
@@ -305,10 +302,10 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
         match=0;
         for (j=i; j>i-TF_ELEMENT_LEN; j--)
           if (
-             (cisRegSeq[geneID][cisRegCopy][j]=='a' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='t')
-             || (cisRegSeq[geneID][cisRegCopy][j]=='t' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='a')
-             || (cisRegSeq[geneID][cisRegCopy][j]=='c' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='g')
-             || (cisRegSeq[geneID][cisRegCopy][j]=='g' && transcriptionFactorSeq[tfind][tfCopy][i-j]=='c')            
+             (cisRegSeq[geneID][geneCopy][j]=='a' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='t')
+             || (cisRegSeq[geneID][geneCopy][j]=='t' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='a')
+             || (cisRegSeq[geneID][geneCopy][j]=='c' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='g')
+             || (cisRegSeq[geneID][geneCopy][j]=='g' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='c')            
              ) match++;
         if (match >= nmin){
           if (bindSiteCount + 1 >= maxBindingSiteAlloc){
@@ -322,9 +319,8 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
           }
           if (((i-TF_ELEMENT_LEN+1 - hindPos[tfind]) >=0) && (((i-TF_ELEMENT_LEN+1 - hindPos[tfind])+(HIND_LENGTH-1))< CISREG_LEN)) {
             (*allBindingSites)[bindSiteCount].cisregID = geneID;
-            (*allBindingSites)[bindSiteCount].cisregCopy = cisRegCopy; 
+            (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
             (*allBindingSites)[bindSiteCount].tfID = tfind;
-            (*allBindingSites)[bindSiteCount].tfCopy = tfCopy; 
             (*allBindingSites)[bindSiteCount].sitePos = i-TF_ELEMENT_LEN+1;
             (*allBindingSites)[bindSiteCount].strand = 1;
             (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
@@ -351,7 +347,7 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
   maxBindingSiteAlloc = maxelements;
   *allBindingSites = malloc(maxBindingSiteAlloc*sizeof(AllTFBindingSites));
   if (!(*allBindingSites)) {
-    fprintf(fperrors,"initial setting of G failed.\n");
+    fprintf(fperrors,"initial setting of allBindingSites failed.\n");
     exit(1);
   }
   bindSiteCount = 0;
@@ -361,33 +357,18 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                                                  bindSiteCount,
                                                  allBindingSites,
                                                  &maxBindingSiteAlloc,
-                                                 0, 0, hindPos);
+                                                 0, hindPos);
 
   if (PLOIDY == 2)  {
     
-    /* vary the cisRegCopy (1) but keep tfCopy the same (0) (assume no
-       gene divergence) */
+    /* generate binding sites for other gene copy (assume no gene
+       divergence) */
     bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
                                                    transcriptionFactorSeq, 
                                                    bindSiteCount,
                                                    allBindingSites,
                                                    &maxBindingSiteAlloc,
-                                                   1, 0, hindPos);
-
-    /* don't currently consider the variant tfCopy combinations (0,1) or (1,1)  */
-    /* bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
-                                                   transcriptionFactorSeq, 
-                                                   bindSiteCount,
-                                                   allBindingSites,
-                                                   &maxBindingSiteAlloc,
-                                                   0, 1); */
-
-    /* bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
-                                                   transcriptionFactorSeq, 
-                                                   bindSiteCount,
-                                                   allBindingSites,
-                                                   &maxBindingSiteAlloc,
-                                                   1, 1); */
+                                                   1, hindPos);
   }
   /* printf("bindSiteCount = %d\n", bindSiteCount); */
 
@@ -635,15 +616,15 @@ void calc_koff(int k,
   Gibbs = (((float) allBindingSites[k].hammingDist)/3.0 - 1.0) * state->RTlnKr; /* subject to revision of TF_ELEMENT_LEN */
   for (j=0; j < state->tfBoundCount; j++) {
     if (allBindingSites[k].cisregID==allBindingSites[state->tfBoundIndexes[j]].cisregID &&
-        allBindingSites[k].cisregCopy==allBindingSites[state->tfBoundIndexes[j]].cisregCopy &&
+        allBindingSites[k].geneCopy==allBindingSites[state->tfBoundIndexes[j]].geneCopy &&
         !(k==state->tfBoundIndexes[j])) {
       posdiff = allBindingSites[k].leftEdgePos - allBindingSites[state->tfBoundIndexes[j]].leftEdgePos;
       //printf("diff=%d\n", posdiff);
       if (abs(posdiff) < HIND_LENGTH) {/*Phey*/
         fprintf(fperrors,
                 "error: steric hindrance has been breached with site %d (on copy %d of gene %d), %d away from site %d (on copy %d of gene %d)\n",
-                k, allBindingSites[k].cisregCopy, allBindingSites[k].cisregID, posdiff, 
-                state->tfBoundIndexes[j], allBindingSites[state->tfBoundIndexes[j]].cisregCopy, 
+                k, allBindingSites[k].geneCopy, allBindingSites[k].cisregID, posdiff, 
+                state->tfBoundIndexes[j], allBindingSites[state->tfBoundIndexes[j]].geneCopy, 
                 allBindingSites[state->tfBoundIndexes[j]].cisregID);
       }
       if (abs(posdiff) < 20) {
@@ -675,13 +656,13 @@ void scan_nearby_sites(int indexChanged,
     
     /* we are on the same cisreg sequence and we aren't the same TF binding  */
     if (allBindingSites[indexChanged].cisregID == allBindingSites[state->tfBoundIndexes[j]].cisregID && 
-        allBindingSites[indexChanged].cisregCopy == allBindingSites[state->tfBoundIndexes[j]].cisregCopy && 
+        allBindingSites[indexChanged].geneCopy == allBindingSites[state->tfBoundIndexes[j]].geneCopy && 
         !(indexChanged==state->tfBoundIndexes[j])) {
 
       /* how close are we on the sequence */
       posdiff = allBindingSites[indexChanged].leftEdgePos - allBindingSites[state->tfBoundIndexes[j]].leftEdgePos;
       //printf("diff3=%d\n", posdiff);
-      if (abs(posdiff) < HIND_LENGTH) { /* within 6: bad: shouldn't happen Phey*/
+      if (abs(posdiff) < HIND_LENGTH) { /* within HIND_LENGTH: bad: shouldn't happen Phey*/
         fprintf(fperrors,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
                 indexChanged, posdiff, state->tfBoundIndexes[j]);
@@ -800,7 +781,7 @@ int ready_to_transcribe(int geneID,
   *on=off=0;
   for (i=0; i < tfBoundCount; i++) {
     if (geneID==allBindingSites[tfBoundIndexes[i]].cisregID &&
-        geneCopy==allBindingSites[tfBoundIndexes[i]].cisregCopy)
+        geneCopy==allBindingSites[tfBoundIndexes[i]].geneCopy)
       {
         if (activating[allBindingSites[tfBoundIndexes[i]].tfID][geneCopy]) (*on)++;
         else off++;
@@ -823,7 +804,7 @@ int is_one_activator(int geneID,
   
   for (i=0; i < tfBoundCount; i++)
     if (geneID==allBindingSites[tfBoundIndexes[i]].cisregID && 
-        geneCopy==allBindingSites[tfBoundIndexes[i]].cisregCopy &&
+        geneCopy==allBindingSites[tfBoundIndexes[i]].geneCopy &&
         (activating[allBindingSites[tfBoundIndexes[i]].tfID][geneCopy])) 
       return (1);
   return (0);
@@ -1308,7 +1289,7 @@ void remove_tf_binding(Genotype *genes,
 
     /* find the gene and copy whose cisreg region has an unbinding event */
     geneID = genes->allBindingSites[site].cisregID;
-    geneCopy = genes->allBindingSites[site].cisregCopy;
+    geneCopy = genes->allBindingSites[site].geneCopy;
     if (verbose) 
       fprintf(fperrors,"Add site %d at leftEdgePos %d on gene %d copy %d freed by unbinding\n",
               site, genes->allBindingSites[site].leftEdgePos, geneID, geneCopy);
@@ -1398,7 +1379,7 @@ void attempt_tf_binding(Genotype *genes,
   geneID = genes->allBindingSites[site].cisregID;
 
   /* get the copy that the TF is binding to */
-  geneCopy = genes->allBindingSites[site].cisregCopy;
+  geneCopy = genes->allBindingSites[site].geneCopy;
   
   /* update steric hindrance data structures */
   /* JM: this cycles over all sites, not just bound ones, in order to
@@ -1407,7 +1388,7 @@ void attempt_tf_binding(Genotype *genes,
 
     /* if we are on the same gene and not the same binding site */
     if (geneID == genes->allBindingSites[k].cisregID &&
-        geneCopy == genes->allBindingSites[k].cisregCopy &&
+        geneCopy == genes->allBindingSites[k].geneCopy &&
         !(k==site)) {
 
       /* check distance from current binding site (k) to the original (site) */
