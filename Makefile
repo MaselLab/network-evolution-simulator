@@ -27,12 +27,12 @@ netsim-bigtf: $(OBJS)
 
 ## check specific directory
 check-haploid:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=1" netsim-check
+	make EXTRACFLAGS="-m32 -DPLOIDY=1 -DHIND_LENGTH=6" netsim-check
 	./netsim-check -r 4 -d output
 	@diff -r --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-kon-change-haploid-after-plus1-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-diploid:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2" netsim-check
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6" netsim-check
 	./netsim-check -r 4 -d output
 	@diff -r --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-kon-change-diploid-after-plus1-r-4 && echo -e "************\nPassed regression\n***********"
 

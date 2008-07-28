@@ -18,8 +18,9 @@
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
-#define HIND_LENGTH 6         /*length of hindrance*/
-//#define HIND_OLD 6
+#ifndef HIND_LENGTH
+#define HIND_LENGTH 15         /* length of hindrance (original was 6) */
+#endif
 
 extern int verbose;
 extern FILE *fperrors;
