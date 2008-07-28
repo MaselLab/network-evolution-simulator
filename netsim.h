@@ -230,11 +230,11 @@ struct TimeCourse
   TimeCourse *next;
 };     
 
-extern void calc_interaction_matrix(char [NGENES][PLOIDY][CISREG_LEN],
-                                    char [NGENES][PLOIDY][TF_ELEMENT_LEN],
-                                    int *,
-                                    AllTFBindingSites **,
-                                    int [NGENES]);
+extern void calc_all_binding_sites(char [NGENES][PLOIDY][CISREG_LEN],
+                                   char [NGENES][PLOIDY][TF_ELEMENT_LEN],
+                                   int *,
+                                   AllTFBindingSites **,
+                                   int [NGENES]);
 
 
 

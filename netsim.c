@@ -125,10 +125,10 @@ void initialize_sequence(char Seq[],
 }
 
 
-void print_interaction_matrix(AllTFBindingSites *allBindingSites, 
-                            int numElements,
-                            char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
-                            char cisRegSeq[NGENES][PLOIDY][CISREG_LEN])
+void print_all_binding_sites(AllTFBindingSites *allBindingSites, 
+                             int numElements,
+                             char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
+                             char cisRegSeq[NGENES][PLOIDY][CISREG_LEN])
 {
   int i;
 
@@ -175,8 +175,8 @@ void initialize_genotype(Genotype *indiv,
       }
       printf(" %d\n", indiv->hindrancePositions[p]);
   } 
-  calc_interaction_matrix(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions);
-  print_interaction_matrix(indiv->allBindingSites, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); 
+  calc_all_binding_sites(indiv->cisRegSeq, indiv->transcriptionFactorSeq, &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions);
+  print_all_binding_sites(indiv->allBindingSites, indiv->bindSiteCount, indiv->transcriptionFactorSeq, indiv->cisRegSeq); 
   
   fprintf(fperrors,"activators vs repressors ");
   
@@ -250,16 +250,16 @@ void mutate(Genotype *old,
     if (PLOIDY == 2)
       new->PICdisassembly[i][1] = old->PICdisassembly[i][1];
   }
-  calc_interaction_matrix(new->cisRegSeq, new->transcriptionFactorSeq, &(new->bindSiteCount), &(new->allBindingSites), new->hindrancePositions);
+  calc_all_binding_sites(new->cisRegSeq, new->transcriptionFactorSeq, &(new->bindSiteCount), &(new->allBindingSites), new->hindrancePositions);
 }
 
-int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
-                                   char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
-                                   int bindSiteCount,
-                                   AllTFBindingSites **allBindingSites,
-                                   int *maxAlloc,
-                                   int geneCopy,
-                                   int hindPos[NGENES])
+int calc_all_binding_sites_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
+                                  char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
+                                  int bindSiteCount,
+                                  AllTFBindingSites **allBindingSites,
+                                  int *maxAlloc,
+                                  int geneCopy,
+                                  int hindPos[NGENES])
 {
   int i, j, geneID, tfind, match, maxBindingSiteAlloc;
 
@@ -336,11 +336,11 @@ int calc_interaction_matrix_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
   return bindSiteCount;
 }
 
-void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
-                             char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
-                             int *newBindSiteCount,
-                             AllTFBindingSites **allBindingSites,
-                             int hindPos[NGENES])
+void calc_all_binding_sites(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
+                            char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN],
+                            int *newBindSiteCount,
+                            AllTFBindingSites **allBindingSites,
+                            int hindPos[NGENES])
 {
   int maxBindingSiteAlloc, bindSiteCount;
   
@@ -352,23 +352,23 @@ void calc_interaction_matrix(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
   }
   bindSiteCount = 0;
 
-  bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
-                                                 transcriptionFactorSeq, 
-                                                 bindSiteCount,
-                                                 allBindingSites,
-                                                 &maxBindingSiteAlloc,
-                                                 0, hindPos);
+  bindSiteCount = calc_all_binding_sites_sister(cisRegSeq, 
+                                                transcriptionFactorSeq, 
+                                                bindSiteCount,
+                                                allBindingSites,
+                                                &maxBindingSiteAlloc,
+                                                0, hindPos);
 
   if (PLOIDY == 2)  {
     
     /* generate binding sites for other gene copy (assume no gene
        divergence) */
-    bindSiteCount = calc_interaction_matrix_sister(cisRegSeq, 
-                                                   transcriptionFactorSeq, 
-                                                   bindSiteCount,
-                                                   allBindingSites,
-                                                   &maxBindingSiteAlloc,
-                                                   1, hindPos);
+    bindSiteCount = calc_all_binding_sites_sister(cisRegSeq, 
+                                                  transcriptionFactorSeq, 
+                                                  bindSiteCount,
+                                                  allBindingSites,
+                                                  &maxBindingSiteAlloc,
+                                                  1, hindPos);
   }
   /* printf("bindSiteCount = %d\n", bindSiteCount); */
 
