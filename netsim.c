@@ -268,6 +268,10 @@ int calc_all_binding_sites_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
   for (geneID=0; geneID < NGENES; geneID++) { /* which cis-reg region */
     for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) {      /* scan forwards */
       for (tfind=0; tfind < NGENES; tfind++) {
+#ifdef SKIP_GENE   /* don't attempt to find binding sites for output of this gene as it not a TF */
+        if (tfind == SELECTION_GENE)
+          continue;
+#endif
         match=0;
         for (j=i; j < i+TF_ELEMENT_LEN; j++) {
           if (cisRegSeq[geneID][geneCopy][j] == transcriptionFactorSeq[tfind][geneCopy][j-i])
@@ -299,6 +303,10 @@ int calc_all_binding_sites_sister(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
     }
     for (i=CISREG_LEN-1; i>=TF_ELEMENT_LEN-1; i--) {  /* scan backwards */
       for (tfind=0; tfind<NGENES; tfind++) {
+#ifdef SKIP_GENE   /* don't attempt to find binding sites for output of this gene as it not a TF */
+        if (tfind == SELECTION_GENE)
+          continue;
+#endif
         match=0;
         for (j=i; j>i-TF_ELEMENT_LEN; j--)
           if (
@@ -1902,7 +1910,7 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
 float compute_growth_rate(CellState *cell_state, Genotype *genes, float t, float dt) {
   float growth_rate_mRNA, growth_rate_prot;
   float benefit_term, cost_term_prot, cost_term_mRNA;
-  int geneID = 9;      /* select a particular TF */
+  int geneID = SELECTION_GENE;      /* select a particular TF */
   float Lp = 12064.28; /* mean gene expression */
   float Lm = 1589836;  /* max gene expression */
   float gpeak = 2*9.627*1e-5;
@@ -1956,7 +1964,7 @@ float compute_growth_rate_dimer(CellState *cell_state, Genotype *genes, float t,
 
   float growth_rate_mRNA, growth_rate_prot;
   float benefit_term, cost_term_prot, cost_term_mRNA;
-  int geneID = 9;      /* select a particular TF */
+  int geneID = SELECTION_GENE;      /* select a particular TF */
   float L = cell_state->proteinConc[geneID];  /* cache value */
 
   float Lp = 12000; /* mean gene expression is 12064.28 */

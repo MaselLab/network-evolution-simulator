@@ -14,7 +14,14 @@
 #ifndef PLOIDY
 #define PLOIDY 2           /* 1 = haploid, 2 = diploid */
 #endif
+
+#ifndef SELECTION_GENE
 #define NGENES 10          /* number of genes */
+#define SELECTION_GENE 9   /* set a default if there is none */
+#else
+#define NGENES 11          /* if we are selecting on a gene, increment total by one */
+#define SKIP_GENE 1       
+#endif
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
