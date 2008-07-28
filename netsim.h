@@ -142,8 +142,8 @@ struct KonStates {
   float konvalues[NGENES][3];
 };
 
-typedef struct TFInteractionMatrix TFInteractionMatrix;
-struct TFInteractionMatrix {
+typedef struct AllTFBindingSites AllTFBindingSites;
+struct AllTFBindingSites {
   int cisregID;     /* 0 - cis-reg region*/
   int tfID;         /* 1 - trnascription factor*/
   int sitePos;      /* 2 - start position of binding site*/
@@ -161,8 +161,8 @@ struct Genotype {
   char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN];
   int hindrancePositions[NGENES];     /*offset positions of BS based on TF--heritable*/
   int bindSiteCount;
-  TFInteractionMatrix *interactionMatrix;
-/* int (*interactionMatrix)[5];
+  AllTFBindingSites *allBindingSites;
+/* int (*allBindingSites)[5];
  5 elements are
     identity of cis-regulatory region
     identity of TF that binds
@@ -233,7 +233,7 @@ struct TimeCourse
 extern void calc_interaction_matrix(char [NGENES][PLOIDY][CISREG_LEN],
                                     char [NGENES][PLOIDY][TF_ELEMENT_LEN],
                                     int *,
-                                    TFInteractionMatrix **,
+                                    AllTFBindingSites **,
                                     int [NGENES]);
 
 

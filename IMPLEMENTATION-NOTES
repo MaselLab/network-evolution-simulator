@@ -4,7 +4,7 @@ Variable definitions:
 Symbol  Old name          New name                                   Meaning
 ------  ---------         ---------                                  ---------
         Genotype->y       Genotype->bindSiteCount                    total number of binding sites
-G       Genotype->G       Genotype->interactionMatrix                interaction matrix
+G       Genotype->G       Genotype->allBindingSites                  list of all TF binding sites with cached information about each site
 C       Genotype->C       Genotype->cisRegSeq
 O       Genotype->O       Genotype->transcriptionFactorSeq
         
@@ -39,7 +39,7 @@ s*alpha	rates->salphc                 GillespieRates->salphc         cached valu
 Function/Structs:
 ----------------
 
-G                 TFInteractionMatrix 
+G                 AllTFBindingSites
 UpdateL           UpdateProteinConc
 CalcG             CalcInteractionMatrix
 ChangeSCyto       ChangemRNACyto
