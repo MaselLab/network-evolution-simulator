@@ -38,6 +38,7 @@ s*alpha	rates->salphc                 GillespieRates->salphc         cached valu
 
 Function/Structs:
 ----------------
+
 G                 AllTFBindingSites
 UpdateL           UpdateProteinConc
 CalcG             CalcInteractionMatrix
