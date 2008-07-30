@@ -80,18 +80,20 @@ FILE *fperrors;
 FILE *fp_cellsize;
 FILE *fp_growthrate;
 
-/* growth rate parameters used during simulation */
+/* growth rate parameters globally used during simulation */
 static float Lp;         
 static float h;
 static float gmax;
 
-/* initialize the growth rate parameters */
+/* initialize the growth rate parameters: 
+ * do computations here so that we can easily change the scaling factor and Lp */
 void initialize_growth_rate_parameters() {
   float hc, gpeak, growth_rate_scaling;
-  hc = 2.583e-9*60.0;      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) */
   growth_rate_scaling = 2.0; /* set scaling factor */
-  gpeak = 9.627e-5*60.0*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min) */
+  gpeak = 0.005776*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min)=0.005776 */
   Lp = 12000;              /* mean gene expression is 12064.28 */
+  hc = (gpeak/Lp)*(1-(log(2-2*0.2)/log(2)));      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) 
+                                                   * using {s=0.2, N=500} matches {s=10^-5, N=10^7} combination (both Ns=100) */
   h = hc/0.023;            /* using c=0.023/min from mean of distribution from Belle et al (2006)*/
   gmax = gpeak + hc*Lp;    /* compute the gmax coefficient based on gpeak values */
 }
@@ -393,14 +395,12 @@ void calc_all_binding_sites(char cisRegSeq[NGENES][PLOIDY][CISREG_LEN],
                                                   &maxBindingSiteAlloc,
                                                   1, hindPos);
   }
-  /* printf("bindSiteCount = %d\n", bindSiteCount); */
 
   *allBindingSites = realloc(*allBindingSites, bindSiteCount*sizeof(AllTFBindingSites));
   if (!(*allBindingSites)) {
     fprintf(fperrors, "realloc of allBindingSites down to bindSiteCount = %d failed.\n", bindSiteCount);
     exit(1);
   }
-  //printf("bindSiteCount=%d\n", bindSiteCount);
   *newBindSiteCount = bindSiteCount;
 }
 
@@ -515,8 +515,8 @@ void initialize_cell(CellState *indiv,
   int i, k, totalmRNA;
   float t;
 
-  /* start cell size normalized at 1.0 */
-  indiv->cellSize = 1.0;
+  /* start cell size at 0.5 */
+  indiv->cellSize = 0.5;
   
   indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
   indiv->mRNATranslTimeEnd = indiv->mRNATranslTimeEndLast = NULL;
@@ -855,9 +855,7 @@ void calc_from_state(Genotype *genes,
     rates->salphc += salphc;
     rates->maxSalphc += fmaxf(proteinConcTFID, salphc);
     rates->minSalphc += fminf(proteinConcTFID, salphc);
-    /* konStates->konIDs[k][SITEID_INDEX] = k;
-       konStates->konIDs[k][TFID_INDEX] = i; */
-    
+
     /* update the list of sites that bind for a particular TF, i */
     konStates->konList[i]->available_sites[konStates->konList[i]->site_count] = k;
     (konStates->konList[i]->site_count)++;
@@ -1633,17 +1631,9 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
   float total_konrate2, konrate2_for_TF = 0.0;     
   int siteID;
 
-  /* loop through all *available* binding sites to
-   * choose one, the interval is weighted by the
-   * frequency of rates */
-  /* while (j < konStates->nkon-1 && x > konrate2) { */
-
   /* loop through all TFs, then choose a particular binding site */
   for (k=0; k < NGENES; k++) {
 
-    /* compute the total rate for all available binding sites for this
-     * particular TF: see if we are in the right range
-     */
 
     /* if no sites available for this TF, skip to next gene */
     if (konStates->konList[k]->site_count == 0) {
@@ -1651,7 +1641,10 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
         fprintf(fperrors, "looking at TF: %d, has %d sites available, skipping\n", k, konStates->konList[k]->site_count);
       continue;
     }
-    
+
+    /* compute the total rate for all available binding sites for this
+     * particular TF: see if we are in the right range
+     */
     /* first, cache the konrate2 for this particular gene */
     konrate2_for_TF = konStates->konvalues[k][KON_SALPHC_INDEX] + 
       konStates->konvalues[k][KON_DIFF_INDEX] * (1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt;
@@ -1678,19 +1671,11 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
 
         /* get ID of site */
         siteID = konStates->konList[k]->available_sites[l];
-        /* get ID of TF: now already held implictly */
-        /* i = konStates->konIDs[j][TFID_INDEX]; */
-        /* i = k; */
         
         if (verbose)
           fprintf(fperrors, "l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); 
 
-        /* compute the kon rate  */
-        /* konrate2 = konStates->konvalues[k][KON_SALPHC_INDEX] + 
-           konStates->konvalues[k][KON_DIFF_INDEX]*(1-exp(-konStates->konvalues[k][KON_PROTEIN_DECAY_INDEX]*dt))/dt; */
-        
         /* adjust random number */
-        /* x -= konrate2; */
         konrate2 = konrate2_for_TF;
         x -= konrate2;
       }
@@ -1714,10 +1699,6 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
                       t, timecoursestart, timecourselast,
                       state->proteinConc);
   if (verbose) fflush(fperrors);
-  
-  /* bind the j-th konID in the list which happens to be the binding site in SITEID_INDEX */
-  /* attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, 
-     konStates->konIDs[j][SITEID_INDEX]); */
   
   /* bind siteID */
   attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, siteID);
@@ -1835,16 +1816,11 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   int geneLoc, geneCopy;
   float x = ran1(&seed)*((float) sum_rate_counts(rates->acetylationCount));
   
-  /* geneLoc = (int)trunc(x) / PLOIDY;
-     geneCopy = (int)trunc(x) % PLOIDY; */
   get_gene(rates->acetylationCount, (int)trunc(x), &geneLoc, &geneCopy);
 
   /* choose a particular gene to change state */
   int geneID = state->statechangeIDs[ACTEYLATION][geneCopy][geneLoc];
 
-  /* choose a particular gene to change state */
-  /* int geneCopy = choose_gene_copy(); */
-  
   if (verbose) fprintf(fperrors,"acetylation event gene %d\nstate change from %d to 4\n",
                        geneID, state->active[geneID][geneCopy]);
   if (state->active[geneID][geneCopy] != ON_WITH_NUCLEOSOME)
@@ -1967,14 +1943,13 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
 
   x /= transcriptinit;
 
-  int geneCopy; /* = (int)trunc(x) % PLOIDY; */
-  int geneLoc; /* = (int)trunc(x) / PLOIDY; */
+  int geneCopy; 
+  int geneLoc; 
 
   get_gene(rates->transcriptInitCount, (int)trunc(x), &geneLoc, &geneCopy);
 
   /* choose the gene and copy that gets transcribed */
   geneID = state->statechangeIDs[TRANSCRIPTINIT][geneCopy][geneLoc];
-  /* geneCopy = choose_gene_copy(); */
 
   if (verbose) fprintf(fperrors,"transcription event gene %d, copy %d\n", geneID, geneCopy);
 
@@ -2424,7 +2399,7 @@ void print_time_course(TimeCourse *start,
   sprintf(filename, "%s/protein%d.dat", output_directory, i);
   if ((fpout = fopen(filename,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n",filename);
-  while (start){
+  while (start) {
     fprintf(fpout,"%g %g\n", start->time, start->concentration);
     start = start->next;
   }
