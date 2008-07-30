@@ -92,7 +92,7 @@ void initialize_growth_rate_parameters() {
   growth_rate_scaling = 2.0; /* set scaling factor */
   gpeak = 9.627e-5*60.0*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min) */
   Lp = 12000;              /* mean gene expression is 12064.28 */
-  h = hc/0.023;            /* using 0.023/min from mean of distribution from Belle et al (2006)*/
+  h = hc/0.023;            /* using c=0.023/min from mean of distribution from Belle et al (2006)*/
   gmax = gpeak + hc*Lp;    /* compute the gmax coefficient based on gpeak values */
 }
 

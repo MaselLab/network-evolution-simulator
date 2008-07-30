@@ -20,13 +20,15 @@
 #define SELECTION_GENE 9   /* set a default if there is none */
 #else
 #define NGENES 11          /* if we are selecting on a gene, increment total by one */
-#define SKIP_GENE 1       
+#define SKIP_GENE 1        /* don't include output of gene as a TF */
 #endif
+
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 6   /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
+
 #ifndef HIND_LENGTH
-#define HIND_LENGTH 15         /* length of hindrance (original was 6) */
+#define HIND_LENGTH 15         /* default length of hindrance (original was 6) */
 #endif
 
 extern int verbose;
@@ -152,14 +154,14 @@ struct KonStates {
 
 typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
-  int cisregID;     /* 0 - cis-reg region */
-  int tfID;         /* 1 - transcription factor */
-  int sitePos;      /* 2 - start position of binding site */
-  int strand;       /* 3 - strand */
-  int hammingDist;  /* 4 - hamming distance */
-  int geneCopy;    /* which copy of gene */
-  int hindPos;       /* position of BS with in 15bp hindrance (offset) */
-  int leftEdgePos;   /* start position of 15bp hindrance */
+  int cisregID;     /* cis-reg region */
+  int tfID;         /* transcription factor */
+  int sitePos;      /* start position of binding site */
+  int strand;       /* strand */
+  int hammingDist;  /* hamming distance */
+  int geneCopy;     /* which copy of gene */
+  int hindPos;      /* position of binding site within the HIND_LENGTH bp hindrance (offset) */
+  int leftEdgePos;  /* start position of HIND_LENGTH bp hindrance */
 };
 
 typedef struct Genotype Genotype;
