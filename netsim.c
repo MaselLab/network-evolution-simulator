@@ -564,7 +564,6 @@ void calc_time (float t,
   /* loop over all genes */
   for (i=0; i < NGENES; i++) {
     /* if currently transcribing add it to the rates */
-    /* TODO-DONE: check my interpretation of nkonsum */
     if (konStates->nkonsum[i]>0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] * t;
       if (fabs(ct)<10^-6) ect=ct;
@@ -617,9 +616,7 @@ void change_mRNA_cytoplasm(int i,
 {
   float salphc; 
   
-  /* TODO: check this */
-
-  /* number of mRNAs in cytoplasm affects ?? */
+  /* number of mRNAs in cytoplasm affects kon rates */
   salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
   rates->salphc += konStates->nkonsum[i]*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
   rates->maxSalphc += konStates->nkonsum[i]*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
@@ -719,11 +716,6 @@ void remove_kon(int siteID,
   int i, k;
   
   k = 0;
-  /* TODO: check ! */
-  /* find the index of the site that binds in konIDs  */
-  /* while (!(konStates->konIDs[k][SITEID_INDEX] == siteID) && k < konStates->nkon) {
-    k++;
-    } */
   
   while (!(konStates->konList[TFID]->available_sites[k] == siteID) && k < konStates->konList[TFID]->site_count) {
     k++;
@@ -749,14 +741,8 @@ void remove_kon(int siteID,
 
     (konStates->konList[TFID]->site_count)--;
 
-    /* TODO: check */
     /* move the last element end of array into space vacated by site k */
-    /* konStates->konIDs[k][SITEID_INDEX] = konStates->konIDs[konStates->nkon][SITEID_INDEX];
-       konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX]; */
-
     konStates->konList[TFID]->available_sites[k] = konStates->konList[TFID]->available_sites[konStates->konList[TFID]->site_count];
-    /*konStates->konIDs[k][TFID_INDEX] = konStates->konIDs[konStates->nkon][TFID_INDEX]; */
-
   } else {
     if (verbose)
       fprintf(fperrors, "||| couldn't remove site %d from TF %d in konList (k=%d)\n", siteID, TFID, k);
@@ -779,11 +765,7 @@ void add_kon(float proteinConcTFID,
   rates->minSalphc += fminf(proteinConcTFID, salphc);
 
   /* add back siteID to pool of available sites */
-  /* konStates->konIDs[konStates->nkon][SITEID_INDEX] = siteID;
-     konStates->konIDs[konStates->nkon][TFID_INDEX] = TFID; */
-  
   konStates->konList[TFID]->available_sites[konStates->konList[TFID]->site_count] = siteID;
-  /* konStates->konIDs[konStates->nkon][TFID_INDEX] = TFID; */
 
   /* one more site available */
   (konStates->konList[TFID]->site_count)++;
@@ -987,7 +969,6 @@ void calc_dt(float *x,
 
   /* 
    * convert the counts back into rates using the constants 
-   * TODO-DONE: check
    */
   rates->total += (float) rates->acetylationCount[0] * acetylate;
   rates->total += (float) rates->deacetylationCount[0] * deacetylate;
@@ -1001,11 +982,10 @@ void calc_dt(float *x,
     rates->total += (float) rates->transcriptInitCount[1] * transcriptinit;    
   }
 
-  /* TODO: check logic here of tbound1,2 */  
   tbound1 = *x/(rates->total + rates->maxSalphc);
   tbound2 = *x/(rates->total + rates->minSalphc);
   if (verbose) 
-    fprintf(fperrors,"bounds %g %g\n",tbound1,tbound2);
+    fprintf(fperrors, "bounds %g %g\n", tbound1, tbound2);
 
   /* if bounds are the same, simply choose tbound1 */
   if (tbound1==tbound2){
@@ -1051,8 +1031,7 @@ void end_transcription(float *dt,
   /* delete the fixed even which has just occurred */
   delete_fixed_event_start(&(state->mRNATranscrTimeEnd), &(state->mRNATranscrTimeEndLast));
 
-  /* add rate kRNA to transport and Gillespie rates
-   * TODO: check */
+  /* add rate kRNA to transport and Gillespie rates */
   transport[i] += kRNA;
   rates->transport += kRNA;
 }
@@ -1067,14 +1046,13 @@ void transport_event(float x,
   float konrate2;
   
   i = -1;
-  konrate2 = 0.0;  /* TODO-DONE: check, why is this set to zero?, should be set to zero fixed */
+  konrate2 = 0.0;  
 
   /* choose gene product (mRNA) that gets transported to cytoplasm
      based on weighting in transport[] array */
   while (i < NGENES && x > konrate2){
     i++;
     x -= transport[i];
-    /* TODO: isn't konrate2 or something supposed to computed here? */
   }
   if (verbose) {
     fprintf(fperrors, "transport event gene %d from %d copies\n", i, state->mRNANuclearCount[i]);
@@ -1092,8 +1070,7 @@ void transport_event(float x,
   /* decrease transport frequency */
   transport[i] -= kRNA;
 
-  /* if below a threshold, make zero:
-   * TODO: check */
+  /* if below a threshold, make zero */
   if (transport[i] < 0.1*kRNA) 
     transport[i]=0.0;
 
@@ -1258,7 +1235,6 @@ void remove_tf_binding(Genotype *genes,
     /* loop through the sterically hindered sites */
     while (j < state->tfHinderedCount) {
 
-      /* TODO: check logic here */
       /* check all sites hindered by binding to location 'site' */
       if (state->tfHinderedIndexes[j][1] == site) {
         k = bound = 0;
@@ -1294,7 +1270,7 @@ void remove_tf_binding(Genotype *genes,
           state->tfHinderedIndexes[j][0] = state->tfHinderedIndexes[state->tfHinderedCount][0];
           state->tfHinderedIndexes[j][1] = state->tfHinderedIndexes[state->tfHinderedCount][1];
         }
-      } else { /* only increment if we haven't shortened array (TODO: cleanup)  */
+      } else { /* only increment if we haven't shortened array */
         j++;
       }
     }    
@@ -1390,7 +1366,6 @@ void attempt_tf_binding(Genotype *genes,
   /* adjust rates by adding the new koffvalue to rates->koff */
   rates->koff += (*koffvalues)[state->tfBoundCount];
 
-  /* TODO: check, this seems the same as above ???  maybe remove?? */
   state->tfBoundIndexes[state->tfBoundCount] = site;
 
   /* increment number of bound TFs */
@@ -1612,7 +1587,6 @@ void calc_num_bound(float proteinConc[],
     sum += proteinConc[i];
   if (verbose) 
     /* fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, 0.0003*sum);*/
-    /* TODO: check! */
     /* if this is wrong for random sequences adjust Kr accordingly */
     fprintf(fperrors, "%d bound %g expected\n", tfBoundCount, (CISREG_LEN*NGENES*sum)/NumSitesInGenome);
 }
@@ -1750,9 +1724,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
   /* bind siteID */
   attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, siteID);
 
-  /* calculate the number of TFs bound
-   * TODO: check this seems to be purely diagnostic
-   */
+  /* calculate the number of TFs bound */
   calc_num_bound(state->proteinConc, state->tfBoundCount);
 }
 
@@ -1838,7 +1810,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genes,
     
   } else {
     /* 
-     * decay mRNA in process of translating (TODO: check!) 
+     * decay mRNA in process of translating
      */
     x = ran1(&seed)*((float) state->mRNATranslCytoCount[i]);
     if (verbose){
@@ -1981,7 +1953,6 @@ void disassemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *ge
 
     get_gene(rates->picDisassemblyCount, j, &geneLoc, &geneCopy);
 
-    /* TODO: why do we keep original rand number x, rather than choose a new one like other functions?  */
     x -= genes->PICdisassembly[state->statechangeIDs[PICDISASSEMBLY][geneCopy][geneLoc]][geneCopy];
   }
   if (j==NGENES*PLOIDY) fprintf(fperrors, "error in PIC disassembly\n");
@@ -2050,13 +2021,13 @@ void develop(Genotype *genes,
 
   /* UNUSED here remove: int posdiff; */
 
-  int maxbound2, maxbound3;  /* TODO: check these */
-  int site;      /* site where TF gets removed (TODO: check)  */
+  int maxbound2, maxbound3;  
+  int site;      /* site where TF gets removed  */
   int geneID;    /* ID of gene which is undergoing transitions in transcription state */
   int event;     /* boolean to keep track of whether FixedEvent has ended */
 
   float *koffvalues;   /* rates of unbinding */
-  int total;           /* total possible translation events, TODO: rename */
+  int total;           /* total possible translation events */
   float transport[NGENES];  /* transport rates of each mRNA */
   float mRNAdecay[NGENES];  /* mRNA decay rates */
   float x;                  /* random number */
@@ -2094,7 +2065,6 @@ void develop(Genotype *genes,
     konStates->konList[i]->available_sites = malloc(genes->bindSiteCount*sizeof(int));
   }
   
-  /* TODO: ? */
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
 
@@ -2120,7 +2090,6 @@ void develop(Genotype *genes,
   
     x=expdev(&seed);        /* draw random number */
 
-    /* TODO: what is this doing? */
     if (rates->koff < 0.0){
       konrate2 = 0.0;
       for (i=0; i < state->tfBoundCount; i++) konrate2 += koffvalues[i];
@@ -2131,7 +2100,6 @@ void develop(Genotype *genes,
     }
     
     /* do first Gillespie step to chose next event */
-
     calc_dt(&x, &dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
            state->mRNACytoCount, state->mRNATranslCytoCount);
 
@@ -2165,7 +2133,6 @@ void develop(Genotype *genes,
                             timecoursestart, timecourselast,
                             state->proteinConc);
       } else {           /* if a translation event ends */
-        /* TODO: could have else if (event==2) */
         dt = state->mRNATranslTimeEnd->time - t;         /* make dt window smaller */
         total=0;  /* number of translation events */
 
@@ -2196,7 +2163,7 @@ void develop(Genotype *genes,
                             timecoursestart, timecourselast,
                             state->proteinConc);
         
-        /* the number of mRNAs in cytoplasm affects binding, TODO: check*/
+        /* the number of mRNAs in cytoplasm affects binding */
         change_mRNA_cytoplasm(i, genes, state, rates, konStates);
       }
 
@@ -2229,7 +2196,7 @@ void develop(Genotype *genes,
       else calc_kon_rate(dt, konStates, &konrate); 
 
       /* 
-       * choose a new uniform?? (TODO) random number weighted by the
+       * choose a new uniform random number weighted by the
        * probability of all Gillespie events, note that konrate is
        * *not* included in rates->total, so it needs to be added here
        */
