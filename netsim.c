@@ -170,8 +170,8 @@ void print_all_binding_sites(AllTFBindingSites *allBindingSites,
     printf("             position: %3d\n", allBindingSites[i].sitePos);
     printf("               strand: %3d\n", allBindingSites[i].strand);
     printf("         Hamming dist: %3d\n", allBindingSites[i].hammingDist); 
-    printf("        Hind Position: %3d\n", allBindingSites[i].hindPos); 
-    printf("         Start 15 Pos: %3d\n", allBindingSites[i].leftEdgePos);        
+    printf("        Hind position: %3d\n", allBindingSites[i].hindPos); 
+    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, allBindingSites[i].leftEdgePos);        
   }
 }
 
@@ -1393,9 +1393,8 @@ void attempt_tf_binding(Genotype *genes,
                       //fprintf(fperrors, "site=%d k=%d\n", genes->allBindingSites[site].leftEdgePos, genes->allBindingSites[k].leftEdgePos);
       posdiff = genes->allBindingSites[site].leftEdgePos - genes->allBindingSites[k].leftEdgePos;
 
-      /* if within 6, we prevent binding by adding to steric hindrance */
-      if (abs(posdiff) < HIND_LENGTH) {/*Phey*/
-                    //fprintf(fperrors, "diff < 15\n");
+      /* if within HIND_LENGTH, we prevent binding by adding to steric hindrance */
+      if (abs(posdiff) < HIND_LENGTH) {/* Phey */
         /* if not enough memory, reallocate */
         if (state->tfHinderedCount > *maxbound3 - 1) {
           (*maxbound3) *= 2;
