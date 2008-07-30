@@ -17,13 +17,18 @@ OTHER = Makefile
 %-check: %.c %.h $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
 
+%-selection: %.c %.h $(OBJS) $(OTHER)
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
+
 %-gprof: %.c $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<
 
 netsim: $(OBJS)
 netsim-check: $(OBJS)
+netsim-selection: $(OBJS)
 netsim-gprof: $(OBJS)
 netsim-bigtf: $(OBJS)
+
 
 ## check specific directory
 check-haploid:	clean
@@ -36,6 +41,9 @@ check-diploid:	clean
 	./netsim-check -r 4 -d output
 	@diff -r --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-kon-change-diploid-after-plus1-r-4 && echo -e "************\nPassed regression\n***********"
 
+check-selection:	clean
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6 -DSELECTION_GENE=10" netsim-selection
+	./netsim-selection -r 4 -d selection
 
 profiling:	netsim-gprof
 
