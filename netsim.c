@@ -2295,9 +2295,6 @@ void develop(Genotype *genes,
         }
       }
       
-      /* update cell size */
-      //update_cell_size(state, genes, konStates, t, dt);
-      
       /* Gillespie step: advance time to next event at dt */
       t += dt;
       if (verbose) fprintf(fperrors, "dt=%g t=%g\n", dt, t);
