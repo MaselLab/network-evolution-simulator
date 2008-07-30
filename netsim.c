@@ -80,21 +80,20 @@ FILE *fperrors;
 FILE *fp_cellsize;
 FILE *fp_growthrate;
 
-/* growth rate parameters */
-static float growth_rate_scaling;
+/* growth rate parameters used during simulation */
 static float Lp;         
-static float gpeak;
 static float h;
 static float gmax;
 
-/* initialize the parameters */
+/* initialize the growth rate parameters */
 void initialize_growth_rate_parameters() {
-  float hc = 2.583e-9*60.0;      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) */
-  growth_rate_scaling = 2.0;
+  float hc, gpeak, growth_rate_scaling;
+  hc = 2.583e-9*60.0;      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) */
+  growth_rate_scaling = 2.0; /* set scaling factor */
   gpeak = 9.627e-5*60.0*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min) */
   Lp = 12000;              /* mean gene expression is 12064.28 */
-  h = hc/(0.023);          /* using 0.023/min from mean of distribution from Belle et al (2006)*/
-  gmax = gpeak + hc*Lp;    /* compute the gmax coefficient */
+  h = hc/0.023;            /* using 0.023/min from mean of distribution from Belle et al (2006)*/
+  gmax = gpeak + hc*Lp;    /* compute the gmax coefficient based on gpeak values */
 }
 
 void initialize_sequence(char Seq[], 
