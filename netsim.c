@@ -21,27 +21,7 @@
 #include "random.h"
 #include "lib.h"
 #include "netsim.h"
-/* #include "list.h" */
 
-/*
-  version27: each founding indiv has a different genotype, CopyGenotype is obsolete
-  version28: add selection (wrong sort)
-  v29: transcription initiation quenching rule, take selection out
-  v30reject: add delays to quenching and unquenching
-  v30: redo selection based on v29, buggy
-  v30alt: redo selection based on v27, free up memory of CellState and TimeCourse
-  v31: based on v30alt, replace stability only selection with selection for specific opt.
-  Hopefully this helps avoid evolution from always-on to always-off (not sufficient yet).
-  Move meanmRNA and protein initial states from initialize_cell to be universal
-  v32: koffIDs and nkoff have the same info as B2 and y2: remove them
-  v33: implement transcription initiation scheme with bursting, PIC assembly & H2A.Z
-  v34: disassembly rates bootstrapped from constitutively on Garcia-Martinez subset, not TF subset distribution
-  v35: output only a subset of timecourse measurements to prevent excessive output
-  change NumSitesInGenome value
-  v36: reglen changed to 150
-*/
-
-/* initialize constants as static const */
 static const int maxelements=500*PLOIDY; 
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
 static const int maxbound=500*PLOIDY;
@@ -2298,13 +2278,6 @@ void develop(Genotype *genes,
       /* Gillespie step: advance time to next event at dt */
       t += dt;
       if (verbose) fprintf(fperrors, "dt=%g t=%g\n", dt, t);
- 
-      /* output time courses during run to capture output before segfault */
-      for (i=0; i < NGENES; i++) {
-        float *lopt;
-        /*print_time_course(timecoursestart[i], i, lopt);*/
-      }
- 
     } else {
       /* we will reach the end of development in dt */
       if (verbose) fprintf(fperrors, "finish at t=%g dt=%g\n", t, dt);
@@ -2333,62 +2306,8 @@ void develop(Genotype *genes,
   free(rates);
 }
 
-void dev_stability_only_lopt(float lopt[],
-                          TimeCourse **timecoursestart)
-{
-  int i;
-  TimeCourse *start;
-  float dt1,dt2;
-  
-  for (i=0;i<NGENES;i++){
-    lopt[i]=0.0;
-    start = timecoursestart[i];
-    dt1=0.0;
-    while (start->next){
-      dt2 = (start->next->time - start->time)/2.0;
-      lopt[i] += start->concentration * (dt1+dt2);     
-      dt1=dt2;
-      start = start->next;
-    }
-    lopt[i] += start->concentration * dt1;
-    lopt[i] /= tdevelopment;
-    fprintf(fperrors,"lopt[%d] = %g\n",i,lopt[i]);
-  }
-}
-
-void calc_fitness(float lopt[],
-                 float *w,
-                 TimeCourse **timecoursestart, 
-                 float s)
-{
-  float d,dt1,dt2,x;
-  int i;
-  TimeCourse *start[NGENES];
-  
-  for (i=0;i<NGENES;i++) start[i]=timecoursestart[i];
-  dt1=0.0;
-  *w=0.0;
-  while (start[0]){
-    d = 0.0;
-    if (start[0]->next) dt2 = (start[0]->next->time - start[0]->time)/2.0;
-    else dt2=0.0;
-    for (i=0;i<NGENES;i++){
-      x = (start[i]->concentration - lopt[i]) / lopt[i];
-      d += x*x;
-    }
-    d = sqrt(d);
-    *w += exp(-s*d) * (dt1+dt2);     
-    if (verbose) fprintf(fperrors,"t=%g dt=%g+%g d=%g w=%g\n",start[0]->time,dt1,dt2,d,*w/tdevelopment);
-    dt1=dt2;
-    for (i=0;i<NGENES;i++) start[i] = start[i]->next;
-  }
-  *w /= tdevelopment;
-  fprintf(fperrors,"s=%g w=%g\n",s,*w);
-}
-
 void print_time_course(TimeCourse *start,
-                       int i,
-                       float lopt[])
+                       int i)
 {
   FILE *fpout;
   char filename[80];
@@ -2400,7 +2319,6 @@ void print_time_course(TimeCourse *start,
     fprintf(fpout,"%g %g\n", start->time, start->concentration);
     start = start->next;
   }
-  /* fprintf(fpout, "%g %g\n", tdevelopment, lopt[i]);  */
   fclose(fpout);  
 }
 
@@ -2416,7 +2334,7 @@ int main(int argc, char *argv[])
   TimeCourse *timecoursestart[NGENES]; /* array of pointers to list starts */
   TimeCourse *timecourselast[NGENES];
   TimeCourse *start;
-  float fitness[PopSize], sumfit, lopt[NGENES], initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
+  float initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
 
   int c, directory_success;
   int hold_genotype_constant = 0;
@@ -2480,8 +2398,6 @@ int main(int argc, char *argv[])
   if ((fp_growthrate = fopen(fp_growthrate_name,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
 
-  sumfit = 0.0;
-
   /* slight hack to initialize seed  */
 
   if (!hold_genotype_constant)
@@ -2489,7 +2405,6 @@ int main(int argc, char *argv[])
 
   /* initialize protein concentrations */
   for (i=0; i<NGENES; i++) {
-    lopt[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
   }
@@ -2518,12 +2433,9 @@ int main(int argc, char *argv[])
      *  initialize_cell(&state,indivs[j].y,indivs[j].mRNAdecay,initmRNA,initProteinConc); 
      */
     develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
-    /* dev_stability_only_lopt(lopt, timecoursestart); */
     fprintf(fperrors,"indiv %d\n",j);
-    /* calc_fitness(lopt, &(fitness[j]), timecoursestart, selection);
-       sumfit += fitness[j];*/
     for (i=0; i < NGENES; i++) {
-      if ((output) && j==PopSize-1) print_time_course(timecoursestart[i], i, lopt);
+      if ((output) && j==PopSize-1) print_time_course(timecoursestart[i], i);
       if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
       delete_time_course(timecoursestart[i]);
       timecoursestart[i] = timecourselast[i] = NULL;
@@ -2534,39 +2446,6 @@ int main(int argc, char *argv[])
   for (j = 0; j < PopSize; j++) {
     free(indivs[j].allBindingSites);
   }
-
-  /*
-    for (gen=1;gen<=Generations*PopSize;gen++){
-    fprintf(fperrors,"meanfit = %g\n",sumfit / (float) PopSize);
-    x = ran1(&seed) * sumfit;
-    j = -1;
-    while (x>0){
-      x -= fitness[j+1];
-      j++;
-    }
-    k = (int) trunc(ran1(&seed)*PopSize);
-    fprintf(fperrors,"gen=%d indiv %d reproduces fitness %g replaces indiv %d\n",
-      gen,j,fitness[j] * (float)PopSize / sumfit,k);
-    fflush(fperrors);
-    mutate(&(indivs[j]),&(indivs[k]),mN/(float)PopSize);
-    fprintf(fperrors,"finished mutating\n");fflush(fperrors);
-    initialize_cell(&state,indivs[k].y,indivs[k].mRNAdecay,initmRNA,initProteinConc);
-    develop(&indivs[k],&state,(float) 293.0,timecoursestart,timecourselast);
-    fprintf(fperrors,"finished development\n");fflush(fperrors);
-    //    dev_stability_only_lopt(lopt,timecoursestart);
-    sumfit -= fitness[k];
-    calc_fitness(lopt,&(fitness[k]),timecoursestart,selection);
-    fflush(fperrors);
-    sumfit += fitness[k];
-    for (i=0; i<NGENES; i++){
-      if (output && gen==Generations*PopSize) print_time_course(timecoursestart[i],i,lopt);
-      if (verbose) fprintf(fperrors,"deleting gene %d\n",i);
-      delete_time_course(timecoursestart[i]);
-      timecoursestart[i] = timecourselast[i] = NULL;
-    }
-    free_mem_CellState(&state);   
-  }
-  */
   fclose(fperrors);
   fclose(fp_cellsize);
   fclose(fp_growthrate);

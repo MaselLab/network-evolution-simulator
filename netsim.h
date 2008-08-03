@@ -156,29 +156,22 @@ typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
   int cisregID;     /* cis-reg region */
   int tfID;         /* transcription factor */
-  int sitePos;      /* start position of binding site */
-  int strand;       /* strand */
+  int sitePos;      /* start position of recognition site, always with reference to forward strand*/
+  int strand;       /* strand 0 (forward) or 1 (backward)*/
   int hammingDist;  /* hamming distance */
-  int geneCopy;     /* which copy of gene */
-  int hindPos;      /* position of binding site within the HIND_LENGTH bp hindrance (offset) */
+  int geneCopy;     /* which copy of gene, 0 to PLOIDY-1 */
+  int hindPos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
   int leftEdgePos;  /* start position of HIND_LENGTH bp hindrance */
+/* since leftEdgePos + hindPos should = sitePos, one of these should go */
 };
 
 typedef struct Genotype Genotype;
 struct Genotype {
   char cisRegSeq[NGENES][PLOIDY][CISREG_LEN];
   char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN];
-  int hindrancePositions[NGENES];     /* offset positions of BS based on TF--heritable */
+  int hindrancePositions[NGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int bindSiteCount;
   AllTFBindingSites *allBindingSites;
-/* int (*allBindingSites)[5];
- 5 elements are
-    identity of cis-regulatory region
-    identity of TF that binds
-    position 0 to 386 (first position, always in forwards strand)  
-    strand 0 (forward) or 1 (backward)
-    Hamming distance 0 to n-n_min 
-*/ 
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
@@ -203,10 +196,10 @@ struct CellState {
   int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
   int mRNANuclearCount[NGENES];       /* mRNAs in nucleus */
   int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
-  FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs move to cytoplasm (mRNACytoCount) */
+  FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs become fully loaded with ribosomes and start producing protein */
   FixedEvent *mRNATranslTimeEndLast; 
   int mRNATranscrCount[NGENES];             /* mRNAs which haven't finished transcription yet */
-  FixedEvent *mRNATranscrTimeEnd;    /* times when transcripts ? move to nucleus (mRNANuclearCount) */
+  FixedEvent *mRNATranscrTimeEnd;    /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
   FixedEvent *mRNATranscrTimeEndLast;
   float proteinConc[NGENES];
   int tfBoundCount;
@@ -215,7 +208,8 @@ struct CellState {
   int tfHinderedCount;
   int (*tfHinderedIndexes)[2];
   /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
-    2nd elem gives corresponding index of inhibiting TF in G (TODO: what is this?)
+    2nd elem gives corresponding index of inhibiting TF in all_binding_sites, so that we know when to release hindrance
+    binding sites can be hindered more than once, then multiple constraints must be lifted before TF binding
   */
   int active[NGENES][PLOIDY];
   /* gives the state of each of the genes, according to figure

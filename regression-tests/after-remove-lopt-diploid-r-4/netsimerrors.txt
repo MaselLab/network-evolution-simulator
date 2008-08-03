@@ -1,0 +1,3 @@
+activators vs repressors 0 0 1 1 1 1 0 0 1 1 0 0 1 1 1 1 1 1 1 1 
+warning: koffvalues add up to 527.398 instead of rates->koff=527.409
+indiv 0
