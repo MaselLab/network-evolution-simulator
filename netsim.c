@@ -1393,6 +1393,17 @@ void add_integer_time_points(float time,
     add_time_point(time, (float) proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
+void reach_s_phase(CellState *state) {
+  int i;
+
+  /* for each gene determine a time point during the [0, 30 min] S-phase interval */
+  for (i=0; i<NGENES; i++) {
+    state->replication_time[i] = 30.0*ran1(&seed);
+
+    printf("offset for replication time after S-phase starts: %g\n", state->replication_time[i]);
+  }
+}
+
 float compute_tprime(float c, float L, float alpha, float s_mRNA) {
   return (1/c) * log((c*L - alpha*s_mRNA)/(c*L - alpha*s_mRNA));
 }
@@ -2036,7 +2047,8 @@ void develop(Genotype *genes,
   t = 0.0;  /* time starts at zero */
 
   while (t < tdevelopment) {  /* run until development stops */
-  
+  //while (state->cellSize < 1.0) {  /* run until checkpoint reached */
+
     x=expdev(&seed);        /* draw random number */
 
     if (rates->koff < 0.0){
@@ -2133,6 +2145,7 @@ void develop(Genotype *genes,
 
     /* if we haven't already reached end of development with last delta-t */
     if (t+dt < tdevelopment) {
+    //if (state->cellSize < 1.0) {  /* run until checkpoint reached */
 
       /* compute total konrate (which is constant over the Gillespie step) */
       if (konStates->nkon==0) konrate = (-rates->salphc);
@@ -2277,6 +2290,8 @@ void develop(Genotype *genes,
       t = tdevelopment;
     }
   }
+  /* compute S-phase offsets */
+  reach_s_phase(state);
   free(koffvalues);
   for (i=0; i<NGENES; i++) {
     free(konStates->konList[i]->available_sites);

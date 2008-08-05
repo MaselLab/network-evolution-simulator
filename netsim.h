@@ -205,7 +205,7 @@ struct CellState {
   float proteinConc[NGENES];
   int tfBoundCount;
   int *tfBoundIndexes;
-  /* tfBoundIndexes lists just bound TFs according to binding site index in G */
+  /* tfBoundIndexes lists just bound TFs according to binding site index in all_binding_sites */
   int tfHinderedCount;
   int (*tfHinderedIndexes)[2];
   /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
@@ -218,6 +218,8 @@ struct CellState {
      3 is off but w/o nucleosome, 4 is on but w/o PIC
      5 is on but w/o TF criteria, 6 is fully on
   */
+
+  float replication_time[NGENES];
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
   int statechangeIDs[5][PLOIDY][NGENES]; 
