@@ -177,16 +177,17 @@ void initialize_genotype(Genotype *indiv,
   
   fprintf(fperrors,"activators vs repressors ");
   
-  for (i=0; i<NGENES; i++){
+  for (i=0; i<NGENES; i++) {
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
     while (indiv->mRNAdecay[i]<0.0)
       indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
     indiv->proteindecay[i]=-1.0;
-    while (indiv->proteindecay[i]<0.0){
-      if (ran1(&seed)<0.08421)
+    while (indiv->proteindecay[i] < 0.0) {
+      if (ran1(&seed) < 0.08421)
         indiv->proteindecay[i] = 0.0;
       else indiv->proteindecay[i] = exp(0.7874*gasdev(&seed)-3.7665);
     }
+    // TODO: we shouldn't do dilution here, because it is now variable (function of instantaneous growth rate)
     indiv->proteindecay[i] += 0.00578; /* dilution due to cell growth */
     indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
     while (indiv->translation[i] < 0.0)
@@ -197,8 +198,7 @@ void initialize_genotype(Genotype *indiv,
       indiv->activating[i][0] = 1;
       if (PLOIDY == 2) 
         indiv->activating[i][1] = 1;
-    }
-    else {
+    } else {
       indiv->activating[i][0] = 0;
       if (PLOIDY == 2) 
         indiv->activating[i][1] = 0;
@@ -497,7 +497,10 @@ void initialize_cell(CellState *indiv,
 
   /* start cell size at 0.5 */
   indiv->cellSize = 0.5;
-  
+
+  /* TODO: initialize growth rate to zero or  based on 120 min doubling? (i.e. 0.00578) */
+  indiv->growthRate = 0.0;
+
   indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
   indiv->mRNATranslTimeEnd = indiv->mRNATranslTimeEndLast = NULL;
   indiv->tfBoundCount = 0;  /* initialize with nothing bound */
@@ -596,11 +599,15 @@ void change_mRNA_cytoplasm(int i,
   float salphc; 
   
   /* number of mRNAs in cytoplasm affects kon rates */
-  salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
+  // salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
+  // TODO: check if OK to use KON_PROTEIN_DECAY_INDEX rather than genes->proteindecay[i]
+  salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
   rates->salphc += konStates->nkonsum[i]*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
   rates->maxSalphc += konStates->nkonsum[i]*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
   rates->minSalphc += konStates->nkonsum[i]*kon*(fminf(state->proteinConc[i], salphc) - fminf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));    
-  konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
+  // konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
+  // TODO: check if OK to use KON_PROTEIN_DECAY_INDEX rather than genes->proteindecay[i]
+  konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
   konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
 }
 
@@ -819,7 +826,6 @@ void calc_from_state(Genotype *genes,
   }
   state->tfBoundCount=0;
 
-  /* for (i=0; i<7; i++) rates[i]=0.0;    */
   rates->koff=0.0;
   rates->transport=0.0;
   rates->mRNAdecay=0.0;
@@ -1440,28 +1446,21 @@ float compute_integral(float alpha, float c, float gmax, float deltat, float s_m
   return 1.0/(pow(c,2)*Lp) * gmax * (-alpha*ect1*s_mRNA + c*(L*ect1 + alpha*deltat*s_mRNA));
 }
 
-float compute_growth_rate_dimer(CellState *cell_state, Genotype *genes, KonStates *konStates, float t, float deltat) {
+float compute_growth_rate_dimer(float alpha, 
+                                float s_mRNA,
+                                float L,
+                                float L_next,
+                                float t, 
+                                float deltat,
+                                float c,
+                                float ect,
+                                float ect1) {
 
   float integrated_growth_rate;
-  float ct, ect, ect1;
-  float L_next;
   float deltatprime, deltatrest;
-  int geneID = SELECTION_GENE;      /* select a particular TF */
-  float L = cell_state->proteinConc[geneID];  /* cache value of L(t) */
-  float alpha = genes->translation[geneID];   /* cache value of alpha for this gene */
-  float s_mRNA = cell_state->mRNACytoCount[geneID];   /* cache value of mRNAs in cytoplasm for this gene */
-  float c = genes->proteindecay[geneID];
-
-  ct = c*deltat;
-  ect = exp(-ct);
-  if (fabs(ct)<10^-6) ect1=ct;
-  else ect1 = 1-ect;   
-
-  /* compute L(t+delta) at end of interval using cached value of (s_mRNA*alpha)/c */
-  L_next = konStates->konvalues[geneID][KON_SALPHC_INDEX]*ect1 + ect*L;
 
   if (verbose) {
-    fprintf(fperrors, "L=%g, L_next=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", L, L_next, t, t+deltat, s_mRNA);
+    fprintf(fperrors, "L=%g, L_next=%g, c=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", L, L_next, c, t, t+deltat, s_mRNA);
   }
 
   /* choose the appropriate piecewise linear integral */
@@ -1505,16 +1504,9 @@ float compute_growth_rate_dimer(CellState *cell_state, Genotype *genes, KonState
   if (integrated_growth_rate < 0.0)
     integrated_growth_rate = 0.0;
   
-  fprintf(fp_growthrate, "%g %g %g %g\n", t, integrated_growth_rate, L, s_mRNA);
+  fprintf(fp_growthrate, "%g %g %g %g %g\n", t, integrated_growth_rate, L, s_mRNA, c);
 
   return (integrated_growth_rate);
-}
-
-void update_cell_size(CellState *cell_state, Genotype *genes, KonStates *konStates, float t, float dt) {
-  
-  float growth_rate = compute_growth_rate_dimer(cell_state, genes, konStates, t, dt);
-  cell_state->cellSize = (cell_state->cellSize)*exp(growth_rate);
-  fprintf(fp_cellsize, "%g %g\n", t, cell_state->cellSize);
 }
 
 /* 
@@ -1523,25 +1515,45 @@ void update_cell_size(CellState *cell_state, Genotype *genes, KonStates *konStat
  * false attractor if time steps are small and rising tide keeps
  * getting rounded down
  */
-void update_protein_conc(float proteinConc[],
-                         float dt,
-                         GillespieRates *rates,
-                         KonStates *konStates,
-                         float t,
-                         TimeCourse **timecoursestart,
-                         TimeCourse **timecourselast,
-                         float otherdata[])
+void update_protein_conc_cell_size(float proteinConc[],
+                                   CellState *state,
+                                   Genotype *genes,
+                                   float dt,
+                                   GillespieRates *rates,
+                                   KonStates *konStates,
+                                   float t,
+                                   TimeCourse **timecoursestart,
+                                   TimeCourse **timecourselast,
+                                   float otherdata[])
 {
   int i;
   float ct, ect, ect1;
+  float L, L_next, growth_rate;
 
   rates->maxSalphc = rates->minSalphc = 0.0;
   for (i=0; i<NGENES; i++) {
+    
+    if (SELECTION_GENE == i)
+      L = proteinConc[i];
+
+    /* TODO: check ! update protein decay rates due to dilution caused by growth */
+    /* do we update proteindecay as well?  I don't think so, this part is constant, TODO: check!! */
+    //konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i]  + state->growthRate;
+
     ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
     if (fabs(ct)<10^-6) ect1=ct;
     else ect1 = 1-ect;   
     proteinConc[i] = konStates->konvalues[i][KON_SALPHC_INDEX]*ect1 + ect*proteinConc[i];
+
+    if (SELECTION_GENE == i) {
+      L_next = proteinConc[i];
+      growth_rate = compute_growth_rate_dimer(genes->translation[SELECTION_GENE], state->mRNACytoCount[SELECTION_GENE], 
+                                              L, L_next, t, dt, konStates->konvalues[SELECTION_GENE][KON_PROTEIN_DECAY_INDEX], ect, ect1);
+      state->cellSize = (state->cellSize)*exp(growth_rate);
+      fprintf(fp_cellsize, "%g %g\n", t, state->cellSize);
+    }
+
     konStates->konvalues[i][KON_DIFF_INDEX] = (proteinConc[i] - konStates->konvalues[i][KON_SALPHC_INDEX]) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
     rates->maxSalphc += ((float) konStates->nkonsum[i]) * fmaxf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
     rates->minSalphc += ((float) konStates->nkonsum[i]) * fminf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
@@ -1549,7 +1561,10 @@ void update_protein_conc(float proteinConc[],
   rates->maxSalphc *= kon;
   rates->minSalphc *= kon;
   if ((output) && (*timecourselast)->time < t+dt-0.1)
-    add_time_points(t+dt,otherdata/*proteinConc*/,timecoursestart,timecourselast);
+    add_time_points(t+dt, otherdata, timecoursestart, timecourselast);
+
+  /* update the growth rate for next timestep */
+  state->growthRate = growth_rate;
 }
 
 void calc_num_bound(float proteinConc[],
@@ -1670,14 +1685,11 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
 
   /* printf("found it!!!! l: %d, site: %d, binds to TF: %d, konrate2: %g, x: %g\n", l, siteID, k, konrate2_for_TF, x);   */
 
-  /* update cell size *before* protein concentrations change */
-  update_cell_size(state, genes, konStates, t, dt);
-
   /* update protein concentration before doing the binding */
-  update_protein_conc(state->proteinConc, dt, 
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast,
-                      state->proteinConc);
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast,
+                                state->proteinConc);
   if (verbose) fflush(fperrors);
   
   /* bind siteID */
@@ -1712,14 +1724,11 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
                        j,state->tfBoundCount,site);
   if (j < 0) fprintf(fperrors, "error: koff event %d of %d at site %d\n", j, state->tfBoundCount,site);
   
-  /* update cell size *before* protein concentrations change */
-  update_cell_size(state, genes, konStates, t, dt);
-
   /* update protein concentration before removing TF */
-  update_protein_conc(state->proteinConc, dt, 
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast, 
-                      state->proteinConc);
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast, 
+                                state->proteinConc);
   
   /* remove TF binding from 'site' */
   remove_tf_binding(genes, state, rates, konStates, site, koffvalues);
@@ -1747,14 +1756,10 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genes,
   /* assume mRNA cytoplasm transport events equally likely */
   x = ran1(&seed)*((float) (state->mRNACytoCount[i] + state->mRNATranslCytoCount[i]));
 
-  /* update cell size *before* protein concentrations and mRNA cytoplasm numbers change */
-  update_cell_size(state, genes, konStates, t, dt);
-
-  update_protein_conc(state->proteinConc, dt,
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast,
-                      state->proteinConc);
-  
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast,
+                                state->proteinConc);
   /* 
    * decay mRNA in cytoplasm 
    */
@@ -1806,13 +1811,11 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   if (state->active[geneID][geneCopy] != ON_WITH_NUCLEOSOME)
     fprintf(fperrors, "error: acetylation event attempted from state %d\n", state->active[geneID][geneCopy]);
 
-  /* update cell size *before* protein concentrations change */
-  update_cell_size(state, genes, konStates, t, dt);
-
-  update_protein_conc(state->proteinConc, dt,
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast,
-                      state->proteinConc);
+  /* update protein concentration and cell size */
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast,
+                                state->proteinConc);
   
   /* set state: eject nucleosome, but there is no PIC yet */
   state->active[geneID][geneCopy] = ON_NO_PIC;
@@ -1844,13 +1847,10 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
   if (state->active[geneID][geneCopy] != OFF_NO_PIC)
     fprintf(fperrors, "error: deacetylation event attempted from state %d\n", state->active[geneID][geneCopy]);
 
-  /* update cell size *before* protein concentrations change */
-  update_cell_size(state, genes, konStates, t, dt);
-
-  update_protein_conc(state->proteinConc, dt, 
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast,
-                      state->proteinConc);
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast,
+                                state->proteinConc);
   /* set state: nucleosome returns */
   state->active[geneID][geneCopy] = OFF_FULL;
   remove_from_array(geneID, DEACTEYLATION, state->statechangeIDs[DEACTEYLATION][geneCopy], &(rates->deacetylationCount[geneCopy]), (int) 1);
@@ -1878,13 +1878,10 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genes
   if (state->active[geneID][geneCopy] != ON_NO_PIC)
     fprintf(fperrors, "error: PIC assembly event attempted from state %d\n", state->active[geneID][geneCopy]);
 
-  /* update cell size *before* protein concentrations change */
-  update_cell_size(state, genes, konStates, t, dt);
-
-  update_protein_conc(state->proteinConc, dt,
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast,
-                      state->proteinConc);
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast,
+                                state->proteinConc);
   
   /* turn gene fully on: ready for transcription */
   state->active[geneID][geneCopy] = ON_FULL;
@@ -1936,13 +1933,10 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
   if (state->active[geneID][geneCopy] != ON_FULL && state->active[geneID][geneCopy] != OFF_PIC)
     fprintf(fperrors, "error: transcription event attempted from state %d\n", state->active[geneID][geneCopy]);
 
-  /* update cell size *before* protein concentrations change */
-  update_cell_size(state, genes, konStates, t, dt);
-
-  update_protein_conc(state->proteinConc, dt,
-                      rates, konStates, 
-                      t, timecoursestart, timecourselast,
-                      state->proteinConc);
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast,
+                                state->proteinConc);
 
   /* now that transcription of gene has been initiated, 
    * we add the time it will end transcription, 
@@ -2078,13 +2072,10 @@ void develop(Genotype *genes,
       if (event==1) {  /* if a transcription event ends */
         end_transcription(&dt, t, state, transport, rates);
 
-        /* update cell size *before* protein concentrations change */
-        update_cell_size(state, genes, konStates, t, dt);
-
-        update_protein_conc(state->proteinConc, dt,
-                            rates, konStates, t,
-                            timecoursestart, timecourselast,
-                            state->proteinConc);
+        update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                      rates, konStates, t,
+                                      timecoursestart, timecourselast,
+                                      state->proteinConc);
       } else {           /* if a translation event ends */
         dt = state->mRNATranslTimeEnd->time - t;         /* make dt window smaller */
         total=0;  /* number of translation events */
@@ -2104,17 +2095,14 @@ void develop(Genotype *genes,
         /* delete the event that just happened */
         delete_fixed_event_start(&(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
 
-        /* update cell size *before* protein concentrations and mRNAs in cytoplasm change */
-        update_cell_size(state, genes, konStates, t, dt);
-
         /* there is one more mRNA that is now in cytoplasm */
         (state->mRNACytoCount[i])++;
 
         /* update protein concentration */
-        update_protein_conc(state->proteinConc, dt,
-                            rates, konStates, t,
-                            timecoursestart, timecourselast,
-                            state->proteinConc);
+        update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                      rates, konStates, t,
+                                      timecoursestart, timecourselast,
+                                      state->proteinConc);
         
         /* the number of mRNAs in cytoplasm affects binding */
         change_mRNA_cytoplasm(i, genes, state, rates, konStates);
@@ -2188,14 +2176,10 @@ void develop(Genotype *genes,
          * STOCHASTIC EVENT: a transport event
          */
         if (x < rates->transport) {     
-
-          /* update cell size *before* protein concentrations change */
-          update_cell_size(state, genes, konStates, t, dt);
-
-          update_protein_conc(state->proteinConc, dt, 
-                              rates, konStates, 
-                              t, timecoursestart, timecourselast, 
-                              state->proteinConc);
+          update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
+                                        rates, konStates, 
+                                        t, timecoursestart, timecourselast, 
+                                        state->proteinConc);
           transport_event(x, transport, state, t+dt+ttranslation, rates);
         } else {
             
@@ -2285,14 +2269,11 @@ void develop(Genotype *genes,
       /* do remaining dt */
       dt = tdevelopment - t;
 
-      /* final update of cell size *before* protein concentrations change */
-      update_cell_size(state, genes, konStates, t, dt);
-
       /* final update of protein concentration */
-      update_protein_conc(state->proteinConc, dt,
-                          rates, konStates,
-                          t, timecoursestart, timecourselast,
-                          state->proteinConc);
+      update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                    rates, konStates,
+                                    t, timecoursestart, timecourselast,
+                                    state->proteinConc);
       /* advance to end of development (this exits the outer while loop) */
       t = tdevelopment;
     }

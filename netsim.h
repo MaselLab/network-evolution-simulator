@@ -193,6 +193,7 @@ struct FixedEvent {
 typedef struct CellState CellState;
 struct CellState {
   float cellSize;                     /* size of cell */
+  float growthRate;                   /* total growth rate in the previous deltat */
   int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
   int mRNANuclearCount[NGENES];       /* mRNAs in nucleus */
   int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
