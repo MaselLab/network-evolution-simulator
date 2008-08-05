@@ -1019,51 +1019,6 @@ void end_transcription(float *dt,
   rates->transport += kRNA;
 }
 
-void transport_event(float x,
-                     float transport[NGENES],
-                     CellState *state,
-                     float endtime,
-                     GillespieRates *rates)
-{
-  int i;
-  float konrate2;
-  
-  i = -1;
-  konrate2 = 0.0;  
-
-  /* choose gene product (mRNA) that gets transported to cytoplasm
-     based on weighting in transport[] array */
-  while (i < NGENES && x > konrate2){
-    i++;
-    x -= transport[i];
-  }
-  if (verbose) {
-    fprintf(fperrors, "transport event gene %d from %d copies\n", i, state->mRNANuclearCount[i]);
-  }
-
-  /* one less mRNAs in nucleus */
-  (state->mRNANuclearCount[i])--;
-
-  /* it has just arrived in cytoplasm, ready to be translated */
-  (state->mRNATranslCytoCount[i])++;
-  
-  /* add the endtime for translation */
-  add_fixed_event_end(i, endtime, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
-
-  /* decrease transport frequency */
-  transport[i] -= kRNA;
-
-  /* if below a threshold, make zero */
-  if (transport[i] < 0.1*kRNA) 
-    transport[i]=0.0;
-
-  /* adjust rates */
-  rates->transport -= kRNA;
-
-  /* do similar threshold check */
-  if (rates->transport < 0.1*kRNA) 
-    rates->transport=0.0;
-}
 
 void remove_from_array(int toberemoved,
                        int type,
@@ -1616,6 +1571,65 @@ void get_gene(int rate_array[PLOIDY], int pos, int *geneLoc, int *geneCopy)
  * START
  * Functions that handle each possible Gillespie event 
  * ----------------------------------------------------- */
+void transport_event(GillespieRates *rates,
+                     CellState *state,
+                     Genotype *genes,
+                     KonStates *konStates,
+                     float transport[NGENES],
+                     TimeCourse **timecoursestart, 
+                     TimeCourse **timecourselast, 
+                     float tttranslation,
+                     float dt,
+                     float t,
+                     float x)
+{
+  int i;
+  float konrate2;
+  float endtime = t+dt+ttranslation;
+
+  update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
+                                rates, konStates, 
+                                t, timecoursestart, timecourselast, 
+                                state->proteinConc);
+  
+  i = -1;
+  konrate2 = 0.0;  
+
+  /* choose gene product (mRNA) that gets transported to cytoplasm
+     based on weighting in transport[] array */
+  while (i < NGENES && x > konrate2){
+    i++;
+    x -= transport[i];
+  }
+  if (verbose) {
+    fprintf(fperrors, "transport event gene %d from %d copies\n", i, state->mRNANuclearCount[i]);
+  }
+
+  /* one less mRNAs in nucleus */
+  (state->mRNANuclearCount[i])--;
+
+  /* it has just arrived in cytoplasm, ready to be translated */
+  (state->mRNATranslCytoCount[i])++;
+  
+  /* add the endtime for translation */
+  add_fixed_event_end(i, endtime, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
+
+  /* decrease transport frequency */
+  transport[i] -= kRNA;
+
+  /* if below a threshold, make zero */
+  if (transport[i] < 0.1*kRNA) 
+    transport[i]=0.0;
+
+  /* adjust rates */
+  rates->transport -= kRNA;
+
+  /* do similar threshold check */
+  if (rates->transport < 0.1*kRNA) 
+    rates->transport=0.0;
+}
+
+
 void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes, 
                       KonStates *konStates, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
                       float konrate, float dt, float t, int maxbound2, int maxbound3)
@@ -1736,8 +1750,8 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
 }
 
 void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genes, 
-                    KonStates *konStates, float *mRNAdecay, TimeCourse **timecoursestart, TimeCourse **timecourselast,
-                    float dt, float t, float x)
+                      KonStates *konStates, float *mRNAdecay, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                      float dt, float t, float x)
 {
   int i = -1, j;
   float konrate2 = 0.0;
@@ -1833,14 +1847,13 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
 {
   float x = ran1(&seed)*((float) sum_rate_counts(rates->deacetylationCount));
 
-  int geneCopy; /* = (int)trunc(x) % PLOIDY; */
-  int geneLoc; /* = (int)trunc(x) / PLOIDY; */
+  int geneCopy; 
+  int geneLoc; 
 
   get_gene(rates->deacetylationCount, (int)trunc(x), &geneLoc, &geneCopy);
 
   /* choose a particular gene and copy to change state */
   int geneID = state->statechangeIDs[DEACTEYLATION][geneCopy][geneLoc];
-  /* int geneCopy = choose_gene_copy(); */
 
   if (verbose) fprintf(fperrors,"deacetylation event gene %d, copy %d\nstate change from %d to 1\n",
                        geneID, geneCopy, state->active[geneID]);
@@ -1863,14 +1876,13 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genes
 
   float x = ran1(&seed)*((float) sum_rate_counts(rates->picAssemblyCount));
 
-  int geneCopy; /* = (int)trunc(x) % PLOIDY; */
-  int geneLoc; /*= (int)trunc(x) / PLOIDY; */
+  int geneCopy; 
+  int geneLoc; 
 
   get_gene(rates->picAssemblyCount, (int)trunc(x), &geneLoc, &geneCopy);
 
   /* choose a particular gene and copy to change state */
   int geneID = state->statechangeIDs[PICASSEMBLY][geneCopy][geneLoc];
-  /* int geneCopy = choose_gene_copy(); */
 
   if (verbose) fprintf(fperrors, "PIC assembly event gene %d copy %d\nstate change from %d to 6\n",
                        geneID, geneCopy, state->active[geneID][geneCopy]);
@@ -1983,11 +1995,7 @@ void develop(Genotype *genes,
   /* cached information about available binding sites for efficiency */
  
   KonStates *konStates =  malloc(sizeof(KonStates));
-
   GillespieRates *rates = malloc(sizeof(GillespieRates));
-
-  /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  /* int statechangeIDs[5][NGENES]; */
 
   float f, df, konrate, konrate2, diff, sum, ct, ect;
 
@@ -2004,9 +2012,6 @@ void develop(Genotype *genes,
   state->RTlnKr = GasConstant * temperature * log(Kr);
    
   /* number of possible binding sites */
-  /* konStates->konIDs = malloc(2*genes->bindSiteCount*sizeof(int)); */
-  /* konStates->konList = malloc(sizeof(KonList)); */
-
   for (i=0; i<NGENES; i++){
     konStates->konList[i] = malloc(sizeof(KonList));
     konStates->konList[i]->available_sites = malloc(genes->bindSiteCount*sizeof(int));
@@ -2019,8 +2024,6 @@ void develop(Genotype *genes,
   koffvalues = malloc(maxbound2*sizeof(float)); 
   state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 2*maxbound3*sizeof(int));
   
-  /*if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
-    !state->tfHinderedIndexes || !konStates->konIDs) { */
   if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
       !state->tfHinderedIndexes || !konStates->konList) {
     fprintf(fperrors,"memory allocation error at start of develop\n");
@@ -2031,7 +2034,6 @@ void develop(Genotype *genes,
   calc_from_state(genes, state, rates, konStates, transport, mRNAdecay);
 
   t = 0.0;  /* time starts at zero */
-  
 
   while (t < tdevelopment) {  /* run until development stops */
   
@@ -2176,11 +2178,8 @@ void develop(Genotype *genes,
          * STOCHASTIC EVENT: a transport event
          */
         if (x < rates->transport) {     
-          update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
-                                        rates, konStates, 
-                                        t, timecoursestart, timecourselast, 
-                                        state->proteinConc);
-          transport_event(x, transport, state, t+dt+ttranslation, rates);
+          transport_event(rates, state, genes, konStates, transport, 
+                          timecoursestart, timecourselast, ttranslation, dt, t, x);
         } else {
             
           x -= rates->transport;
