@@ -42,7 +42,7 @@ check-diploid:	clean
 	@diff -r --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-remove-lopt-diploid-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-selection:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6 -DSELECTION_GENE=10" netsim-selection
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15 -DSELECTION_GENE=10" netsim-selection
 	./netsim-selection -r 4 -d selection
 
 profiling:	netsim-gprof

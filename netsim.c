@@ -189,6 +189,7 @@ void initialize_genotype(Genotype *indiv,
     }
     // TODO: we shouldn't do dilution here, because it is now variable (function of instantaneous growth rate)
     indiv->proteindecay[i] += 0.00578; /* dilution due to cell growth */
+    //indiv->proteindecay[i] += 1e-6; /* protein ageing term */
     indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
     while (indiv->translation[i] < 0.0)
       indiv->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
@@ -578,6 +579,12 @@ void calc_kon_rate(float t,
   
   r = 0.0;
   for (i=0; i<NGENES; i++) {
+
+#ifdef SKIP_GENE   /* don't attempt to find binding sites for output of this gene as it not a TF */
+    if (i == SELECTION_GENE)
+      continue;
+#endif
+
     if (konStates->nkonsum[i] > 0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*t;
       if (fabs(ct)<10^-6) ect=ct;
@@ -609,6 +616,7 @@ void change_mRNA_cytoplasm(int i,
   // TODO: check if OK to use KON_PROTEIN_DECAY_INDEX rather than genes->proteindecay[i]
   konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
   konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
+  //printf("change_mRNA_cytoplasm: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
 }
 
 void calc_koff(int k,
@@ -712,7 +720,6 @@ void remove_kon(int siteID,
             siteID, k, konStates->konList[TFID]->site_count, TFID, konStates->nkon);
 
   /* make sure that we have enough unoccupied sites left */
-  /* if (k < konStates->nkon) {    */
   if (k < konStates->konList[TFID]->site_count && k < konStates->nkon) { 
     /* adjust rates */
     rates->salphc -= kon*salphc;
@@ -817,12 +824,13 @@ void calc_from_state(Genotype *genes,
   float salphc, proteinConcTFID; 
 
   for (i=0; i<NGENES; i++) {
-    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
-    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
-    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i];
+    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (genes->proteindecay[i] /*+ state->growthRate*/);
+    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (genes->proteindecay[i] /*+ state->growthRate*/);
+    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (genes->proteindecay[i] /*+ state->growthRate*/);
     konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
     konStates->nkonsum[i]=0;  
     konStates->konList[i]->site_count = 0;
+    //printf("calc_from_state: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
   }
   state->tfBoundCount=0;
 
@@ -860,7 +868,6 @@ void calc_from_state(Genotype *genes,
     if (PLOIDY == 2)
       state->statechangeIDs[ACTEYLATION][1][i] = i;
   }
-  /* for (i=4; i<7; i++) rates[i] *= kon; */
   rates->salphc *= kon;
   rates->maxSalphc *= kon;
   rates->minSalphc *= kon;
@@ -1193,11 +1200,11 @@ void remove_tf_binding(Genotype *genes,
 
           /* adjust rates by returning kon to pool */
           add_kon(state->proteinConc[genes->allBindingSites[siteID].tfID],
-                 konStates->konvalues[genes->allBindingSites[siteID].tfID][KON_SALPHC_INDEX],
-                 genes->allBindingSites[siteID].tfID,
-                 siteID,
-                 rates,
-                 konStates);
+                  konStates->konvalues[genes->allBindingSites[siteID].tfID][KON_SALPHC_INDEX],
+                  genes->allBindingSites[siteID].tfID,
+                  siteID,
+                  rates,
+                  konStates);
         }
 
         /* now we have one less sterically hindered site */
@@ -1502,9 +1509,11 @@ void update_protein_conc_cell_size(float proteinConc[],
     if (SELECTION_GENE == i)
       L = proteinConc[i];
 
-    /* TODO: check ! update protein decay rates due to dilution caused by growth */
-    /* do we update proteindecay as well?  I don't think so, this part is constant, TODO: check!! */
+    /* update protein decay rates due to dilution caused by growth */
+    /* currently disabled */
     //konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i]  + state->growthRate;
+
+    //printf("update_protein_conc: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
 
     ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
@@ -1512,6 +1521,10 @@ void update_protein_conc_cell_size(float proteinConc[],
     else ect1 = 1-ect;   
     proteinConc[i] = konStates->konvalues[i][KON_SALPHC_INDEX]*ect1 + ect*proteinConc[i];
 
+    konStates->konvalues[i][KON_DIFF_INDEX] = (proteinConc[i] - konStates->konvalues[i][KON_SALPHC_INDEX]) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
+    rates->maxSalphc += ((float) konStates->nkonsum[i]) * fmaxf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
+    rates->minSalphc += ((float) konStates->nkonsum[i]) * fminf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
+    
     if (SELECTION_GENE == i) {
       L_next = proteinConc[i];
       growth_rate = compute_growth_rate_dimer(genes->translation[SELECTION_GENE], state->mRNACytoCount[SELECTION_GENE], 
@@ -1520,13 +1533,10 @@ void update_protein_conc_cell_size(float proteinConc[],
       fprintf(fp_cellsize, "%g %g\n", t, state->cellSize);
     }
 
-    konStates->konvalues[i][KON_DIFF_INDEX] = (proteinConc[i] - konStates->konvalues[i][KON_SALPHC_INDEX]) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
-    rates->maxSalphc += ((float) konStates->nkonsum[i]) * fmaxf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
-    rates->minSalphc += ((float) konStates->nkonsum[i]) * fminf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
   }
   rates->maxSalphc *= kon;
   rates->minSalphc *= kon;
-  if ((output) && (*timecourselast)->time < t+dt-0.1)
+  if ((output) && (*timecourselast)->time < t+dt-0.1) 
     add_time_points(t+dt, otherdata, timecoursestart, timecourselast);
 
   /* update the growth rate for next timestep */
@@ -1654,6 +1664,10 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
   /* loop through all TFs, then choose a particular binding site */
   for (k=0; k < NGENES; k++) {
 
+#ifdef SKIP_GENE   /* don't attempt to find binding sites for output of this gene as it not a TF */
+    if (k == SELECTION_GENE)
+      continue;
+#endif
 
     /* if no sites available for this TF, skip to next gene */
     if (konStates->konList[k]->site_count == 0) {
@@ -1677,7 +1691,14 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
               k, konStates->konList[k]->site_count, konrate2_for_TF, total_konrate2, x); 
 
     /* if we are already in the appropriate TF, now choose a binding site */
-    if (!(x > total_konrate2) || (k == NGENES-1)) {
+    if (!(x > total_konrate2) || 
+#ifdef SKIP_GENE   /* there are actually NGENES-1 true genes */
+        (k == NGENES-2)
+#else
+        (k == NGENES-1)
+#endif
+        ) 
+      {
       float konrate2 = 0.0;
       
       if (verbose) 
@@ -2062,7 +2083,7 @@ void develop(Genotype *genes,
     
     /* do first Gillespie step to chose next event */
     calc_dt(&x, &dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
-           state->mRNACytoCount, state->mRNATranslCytoCount);
+            state->mRNACytoCount, state->mRNATranslCytoCount);
 
     if (verbose) 
       fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", t+dt, dt, x);
@@ -2130,7 +2151,7 @@ void develop(Genotype *genes,
 
       /* re-compute a new dt */
       calc_dt(&x, &dt, rates, konStates, mRNAdecay, 
-             genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
+              genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
 
       if (verbose) 
         fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n", t+dt, dt, x);
