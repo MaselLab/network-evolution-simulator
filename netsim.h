@@ -11,8 +11,8 @@
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 
-#ifndef PLOIDY
-#define PLOIDY 2           /* 1 = haploid, 2 = diploid */
+#ifndef MAX_PLOIDY
+#define MAX_PLOIDY 4       /* each gene can potentially exist as a tetraploid during replication */
 #endif
 
 #ifndef SELECTION_GENE
@@ -95,11 +95,11 @@ struct GillespieRates {
   float minSalphc;         /* rates[6] */
 
   /* number of genes in the following states */
-  int acetylationCount[PLOIDY];       /* rates2[0] */
-  int deacetylationCount[PLOIDY];     /* rates2[1] */
-  int picAssemblyCount[PLOIDY];       /* rates2[2] */
-  int transcriptInitCount[PLOIDY];    /* rates2[3] */
-  int picDisassemblyCount[PLOIDY];    /* rates2[4] */
+  int acetylationCount[MAX_PLOIDY];       /* rates2[0] */
+  int deacetylationCount[MAX_PLOIDY];     /* rates2[1] */
+  int picAssemblyCount[MAX_PLOIDY];       /* rates2[2] */
+  int transcriptInitCount[MAX_PLOIDY];    /* rates2[3] */
+  int picDisassemblyCount[MAX_PLOIDY];    /* rates2[4] */
 
   /* total, including rates2 */
   float total;                /* rates[7] */
@@ -159,7 +159,7 @@ struct AllTFBindingSites {
   int sitePos;      /* start position of recognition site, always with reference to forward strand*/
   int strand;       /* strand 0 (forward) or 1 (backward)*/
   int hammingDist;  /* hamming distance */
-  int geneCopy;     /* which copy of gene, 0 to PLOIDY-1 */
+  int geneCopy;     /* which copy of gene, 0 to MAX_PLOIDY-1 */
   int hindPos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
   int leftEdgePos;  /* start position of HIND_LENGTH bp hindrance */
 /* since leftEdgePos + hindPos should = sitePos, one of these should go */
@@ -167,16 +167,17 @@ struct AllTFBindingSites {
 
 typedef struct Genotype Genotype;
 struct Genotype {
-  char cisRegSeq[NGENES][PLOIDY][CISREG_LEN];
-  char transcriptionFactorSeq[NGENES][PLOIDY][TF_ELEMENT_LEN];
+  char cisRegSeq[NGENES][MAX_PLOIDY][CISREG_LEN];
+  char transcriptionFactorSeq[NGENES][MAX_PLOIDY][TF_ELEMENT_LEN];
   int hindrancePositions[NGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int bindSiteCount;
   AllTFBindingSites *allBindingSites;
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
-  int activating[NGENES][PLOIDY]; /* 1 is activating, 0 is repressing */
-  float PICdisassembly[NGENES][PLOIDY];
+  int activating[NGENES][MAX_PLOIDY]; /* 1 is activating, 0 is repressing */
+  float PICdisassembly[NGENES][MAX_PLOIDY];
+  int ploidy[NGENES];                 /* current per-gene ploidy */
 };
 
 /* 
@@ -197,22 +198,21 @@ struct CellState {
   int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
   int mRNANuclearCount[NGENES];       /* mRNAs in nucleus */
   int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
-  FixedEvent *mRNATranslTimeEnd;    /* times when mRNAs become fully loaded with ribosomes and start producing protein */
+  FixedEvent *mRNATranslTimeEnd;      /* times when mRNAs become fully loaded with ribosomes and start producing protein */
   FixedEvent *mRNATranslTimeEndLast; 
-  int mRNATranscrCount[NGENES];             /* mRNAs which haven't finished transcription yet */
-  FixedEvent *mRNATranscrTimeEnd;    /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
+  int mRNATranscrCount[NGENES];       /* mRNAs which haven't finished transcription yet */
+  FixedEvent *mRNATranscrTimeEnd;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
   FixedEvent *mRNATranscrTimeEndLast;
   float proteinConc[NGENES];
   int tfBoundCount;
-  int *tfBoundIndexes;
-  /* tfBoundIndexes lists just bound TFs according to binding site index in all_binding_sites */
+  int *tfBoundIndexes;                /* tfBoundIndexes lists just bound TFs according to binding site index in all_binding_sites */
   int tfHinderedCount;
   int (*tfHinderedIndexes)[2];
-  /*1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
-    2nd elem gives corresponding index of inhibiting TF in all_binding_sites, so that we know when to release hindrance
-    binding sites can be hindered more than once, then multiple constraints must be lifted before TF binding
-  */
-  int active[NGENES][PLOIDY];
+  /* 1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
+   * 2nd elem gives corresponding index of inhibiting TF in all_binding_sites, so that we know when to release hindrance
+   * binding sites can be hindered more than once, then multiple constraints must be lifted before TF binding
+   */
+  int active[NGENES][MAX_PLOIDY];
   /* gives the state of each of the genes, according to figure
      1 is fully off, 2 meets TF criteria
      3 is off but w/o nucleosome, 4 is on but w/o PIC
@@ -222,7 +222,7 @@ struct CellState {
   float replication_time[NGENES];
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  int statechangeIDs[5][PLOIDY][NGENES]; 
+  int statechangeIDs[5][MAX_PLOIDY][NGENES]; 
   float RTlnKr;
   float temperature;
 };
@@ -236,8 +236,9 @@ struct TimeCourse
   TimeCourse *next;
 };     
 
-extern void calc_all_binding_sites(char [NGENES][PLOIDY][CISREG_LEN],
-                                   char [NGENES][PLOIDY][TF_ELEMENT_LEN],
+extern void calc_all_binding_sites(int [NGENES],
+                                   char [NGENES][MAX_PLOIDY][CISREG_LEN],
+                                   char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
                                    int *,
                                    AllTFBindingSites **,
                                    int [NGENES]);
