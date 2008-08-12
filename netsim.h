@@ -56,8 +56,8 @@ enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
 /*
  * enum for stateChangeIDs
  */
-enum { ACTEYLATION = 0, 
-       DEACTEYLATION = 1, 
+enum { ACETYLATION = 0, 
+       DEACETYLATION = 1, 
        PICASSEMBLY = 2,
        TRANSCRIPTINIT = 3, 
        PICDISASSEMBLY = 4,

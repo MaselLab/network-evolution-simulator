@@ -249,84 +249,83 @@ int calc_all_binding_sites_sister(char cisRegSeq[NGENES][MAX_PLOIDY][CISREG_LEN]
                                   int bindSiteCount,
                                   AllTFBindingSites **allBindingSites,
                                   int *maxAlloc,
+                                  int geneID,
                                   int geneCopy,
                                   int hindPos[NGENES])
 {
-  int i, j, geneID, tfind, match, maxBindingSiteAlloc;
+  int i, j, tfind, match, maxBindingSiteAlloc;
 
   maxBindingSiteAlloc = *maxAlloc;
 
-  for (geneID=0; geneID < NGENES; geneID++) { /* which cis-reg region */
-    for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) {      /* scan forwards */
-      for (tfind=0; tfind < NGENES; tfind++) {
+  for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) {      /* scan forwards */
+    for (tfind=0; tfind < NGENES; tfind++) {
 #ifdef SKIP_GENE   /* don't attempt to find binding sites for output of this gene as it not a TF */
-        if (tfind == SELECTION_GENE)
-          continue;
+      if (tfind == SELECTION_GENE)
+        continue;
 #endif
-        match=0;
-        for (j=i; j < i+TF_ELEMENT_LEN; j++) {
-          if (cisRegSeq[geneID][geneCopy][j] == transcriptionFactorSeq[tfind][geneCopy][j-i])
-            match++;
+      match=0;
+      for (j=i; j < i+TF_ELEMENT_LEN; j++) {
+        if (cisRegSeq[geneID][geneCopy][j] == transcriptionFactorSeq[tfind][geneCopy][j-i])
+          match++;
+      }
+      if (match >= nmin){
+        if (bindSiteCount + 1 >= maxBindingSiteAlloc) {
+          maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
+          *allBindingSites = realloc(*allBindingSites, maxBindingSiteAlloc*sizeof(AllTFBindingSites));
+          if (!(*allBindingSites)) {
+            fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
+            exit(1);
+          }
+          else if (verbose) fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
         }
-        if (match >= nmin){
-          if (bindSiteCount + 1 >= maxBindingSiteAlloc) {
-            maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
-            *allBindingSites = realloc(*allBindingSites, maxBindingSiteAlloc*sizeof(AllTFBindingSites));
-            if (!(*allBindingSites)) {
-              fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
-              exit(1);
-            }
-            else if (verbose) fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
-          }
-          if(((i - hindPos[tfind]) >=0) && (((i - hindPos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN)) {
-            (*allBindingSites)[bindSiteCount].cisregID = geneID;
-            (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
-            (*allBindingSites)[bindSiteCount].tfID = tfind;
-            (*allBindingSites)[bindSiteCount].sitePos = i;
-            (*allBindingSites)[bindSiteCount].strand = 0;
-            (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
-            (*allBindingSites)[bindSiteCount].hindPos = hindPos[tfind];
-            (*allBindingSites)[bindSiteCount].leftEdgePos = i - hindPos[tfind];
-            bindSiteCount++;
-          }
+        if(((i - hindPos[tfind]) >=0) && (((i - hindPos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN)) {
+          (*allBindingSites)[bindSiteCount].cisregID = geneID;
+          (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
+          (*allBindingSites)[bindSiteCount].tfID = tfind;
+          (*allBindingSites)[bindSiteCount].sitePos = i;
+          (*allBindingSites)[bindSiteCount].strand = 0;
+          (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
+          (*allBindingSites)[bindSiteCount].hindPos = hindPos[tfind];
+          (*allBindingSites)[bindSiteCount].leftEdgePos = i - hindPos[tfind];
+          bindSiteCount++;
         }
       }
     }
-    for (i=CISREG_LEN-1; i>=TF_ELEMENT_LEN-1; i--) {  /* scan backwards */
-      for (tfind=0; tfind<NGENES; tfind++) {
+  }
+  for (i=CISREG_LEN-1; i>=TF_ELEMENT_LEN-1; i--) {  /* scan backwards */
+    for (tfind=0; tfind<NGENES; tfind++) {
 #ifdef SKIP_GENE   /* don't attempt to find binding sites for output of this gene as it not a TF */
-        if (tfind == SELECTION_GENE)
-          continue;
+      if (tfind == SELECTION_GENE)
+        continue;
 #endif
-        match=0;
-        for (j=i; j>i-TF_ELEMENT_LEN; j--)
-          if (
-             (cisRegSeq[geneID][geneCopy][j]=='a' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='t')
-             || (cisRegSeq[geneID][geneCopy][j]=='t' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='a')
+      match=0;
+      for (j=i; j>i-TF_ELEMENT_LEN; j--)
+        if (
+            (cisRegSeq[geneID][geneCopy][j]=='a' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='t')
+            || (cisRegSeq[geneID][geneCopy][j]=='t' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='a')
              || (cisRegSeq[geneID][geneCopy][j]=='c' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='g')
-             || (cisRegSeq[geneID][geneCopy][j]=='g' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='c')            
-             ) match++;
-        if (match >= nmin){
-          if (bindSiteCount + 1 >= maxBindingSiteAlloc){
-            maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
-            *allBindingSites = realloc(*allBindingSites, maxBindingSiteAlloc*sizeof(AllTFBindingSites));
-            if (!(*allBindingSites)){
-              fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
-              exit(1);
-            }
-            else if (verbose) fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
+            || (cisRegSeq[geneID][geneCopy][j]=='g' && transcriptionFactorSeq[tfind][geneCopy][i-j]=='c')            
+            ) match++;
+      if (match >= nmin){
+        if (bindSiteCount + 1 >= maxBindingSiteAlloc){
+          maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
+          *allBindingSites = realloc(*allBindingSites, maxBindingSiteAlloc*sizeof(AllTFBindingSites));
+          if (!(*allBindingSites)){
+            fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
+            exit(1);
           }
-          if (((i-TF_ELEMENT_LEN+1 - hindPos[tfind]) >=0) && (((i-TF_ELEMENT_LEN+1 - hindPos[tfind])+(HIND_LENGTH-1))< CISREG_LEN)) {
-            (*allBindingSites)[bindSiteCount].cisregID = geneID;
-            (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
-            (*allBindingSites)[bindSiteCount].tfID = tfind;
-            (*allBindingSites)[bindSiteCount].sitePos = i-TF_ELEMENT_LEN+1;
-            (*allBindingSites)[bindSiteCount].strand = 1;
-            (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
-            (*allBindingSites)[bindSiteCount].hindPos = hindPos[tfind];
-            (*allBindingSites)[bindSiteCount].leftEdgePos = i-TF_ELEMENT_LEN+1 - hindPos[tfind];
-            bindSiteCount++;
-          }
+          else if (verbose) fprintf(fperrors, "realloc of allBindingSites to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
+        }
+        if (((i-TF_ELEMENT_LEN+1 - hindPos[tfind]) >=0) && (((i-TF_ELEMENT_LEN+1 - hindPos[tfind])+(HIND_LENGTH-1))< CISREG_LEN)) {
+          (*allBindingSites)[bindSiteCount].cisregID = geneID;
+          (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
+          (*allBindingSites)[bindSiteCount].tfID = tfind;
+          (*allBindingSites)[bindSiteCount].sitePos = i-TF_ELEMENT_LEN+1;
+          (*allBindingSites)[bindSiteCount].strand = 1;
+          (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
+          (*allBindingSites)[bindSiteCount].hindPos = hindPos[tfind];
+          (*allBindingSites)[bindSiteCount].leftEdgePos = i-TF_ELEMENT_LEN+1 - hindPos[tfind];
+          bindSiteCount++;
         }
       }
     }
@@ -342,8 +341,9 @@ void calc_all_binding_sites(int ploidy[NGENES],
                             AllTFBindingSites **allBindingSites,
                             int hindPos[NGENES])
 {
-  int i, maxBindingSiteAlloc, bindSiteCount;
-  
+  int p, maxBindingSiteAlloc, bindSiteCount;
+  int geneID;
+
   maxBindingSiteAlloc = maxelements;
   *allBindingSites = malloc(maxBindingSiteAlloc*sizeof(AllTFBindingSites));
   if (!(*allBindingSites)) {
@@ -352,17 +352,23 @@ void calc_all_binding_sites(int ploidy[NGENES],
   }
   bindSiteCount = 0;
 
-  for (i=0; i< current_ploidy; i++) {
+  for (p=0; p < MAX_PLOIDY; p++) {     /* loop through the maximum ploidy possible */
 
-    /* generate binding sites for all gene copies (assume no gene
-       divergence) */
+    for (geneID=0; geneID < NGENES; geneID++) {  /* now which cis-reg region */
 
-    bindSiteCount = calc_all_binding_sites_sister(cisRegSeq, 
-                                                  transcriptionFactorSeq, 
-                                                  bindSiteCount,
-                                                  allBindingSites,
-                                                  &maxBindingSiteAlloc,
-                                                  i, hindPos);
+      if (p < ploidy[geneID]) {  
+        /* if this particular gene has this ploidy then generate binding sites
+        /* for all the relevant gene copies (assume no gene divergence) */
+        bindSiteCount = calc_all_binding_sites_sister(cisRegSeq, 
+                                                      transcriptionFactorSeq, 
+                                                      bindSiteCount,
+                                                      allBindingSites,
+                                                      &maxBindingSiteAlloc,
+                                                      geneID,
+                                                      p, 
+                                                      hindPos);
+      }
+    }
   }
 
   *allBindingSites = realloc(*allBindingSites, bindSiteCount*sizeof(AllTFBindingSites));
@@ -861,7 +867,7 @@ void calc_from_state(Genotype *genes,
     
     /* start all genes in acteylated state */
     for (j=0; j < genes->ploidy[i]; j++)
-      state->statechangeIDs[ACTEYLATION][j][i] = i;
+      state->statechangeIDs[ACETYLATION][j][i] = i;
   }
   rates->salphc *= kon;
   rates->maxSalphc *= kon;
@@ -1049,7 +1055,7 @@ void disassemble_PIC(CellState *state,
   /* disassemble PIC in OFF state */
   if (state->active[geneID][geneCopy] == OFF_PIC) {
     (state->active[geneID][geneCopy]) = OFF_NO_PIC;
-    state->statechangeIDs[DEACTEYLATION][geneCopy][rates->deacetylationCount[geneCopy]] = geneID;
+    state->statechangeIDs[DEACETYLATION][geneCopy][rates->deacetylationCount[geneCopy]] = geneID;
     (rates->deacetylationCount[geneCopy])++;
   }
   /* disassemble PIC in ON state */
@@ -1086,13 +1092,13 @@ void revise_activity_state(int geneID,
   /* OFF_FULL -> ON_WITH_NUCLEOSOME */
   if ((transcriptrule) && oldstate==OFF_FULL){
     state->active[geneID][geneCopy] = ON_WITH_NUCLEOSOME;
-    state->statechangeIDs[ACTEYLATION][geneCopy][rates->acetylationCount[geneCopy]] = geneID;
+    state->statechangeIDs[ACETYLATION][geneCopy][rates->acetylationCount[geneCopy]] = geneID;
     (rates->acetylationCount[geneCopy])++;      
   }
   /* OFF_NO_PIC -> ON_NO_PIC */
   if ((transcriptrule) && oldstate==OFF_NO_PIC) {
     state->active[geneID][geneCopy] = ON_NO_PIC;
-    remove_from_array(geneID, DEACTEYLATION,  state->statechangeIDs[DEACTEYLATION][geneCopy], &(rates->deacetylationCount[geneCopy]), (int) 1);
+    remove_from_array(geneID, DEACETYLATION,  state->statechangeIDs[DEACETYLATION][geneCopy], &(rates->deacetylationCount[geneCopy]), (int) 1);
     if (numactive){
       state->statechangeIDs[PICASSEMBLY][geneCopy][rates->picAssemblyCount[geneCopy]] = geneID;
       (rates->picAssemblyCount[geneCopy])++;
@@ -1111,14 +1117,14 @@ void revise_activity_state(int geneID,
   /* ON_WITH_NUCLEOSOME -> OFF_FULL */
   if (!(transcriptrule) && oldstate==ON_WITH_NUCLEOSOME) {
     state->active[geneID][geneCopy] = OFF_FULL;
-    remove_from_array(geneID, ACTEYLATION, state->statechangeIDs[ACTEYLATION][geneCopy], &(rates->acetylationCount[geneCopy]), (int) 1);
+    remove_from_array(geneID, ACETYLATION, state->statechangeIDs[ACETYLATION][geneCopy], &(rates->acetylationCount[geneCopy]), (int) 1);
   }
   
   /* ON_NO_PIC -> OFF_NO_PIC */
   if (!(transcriptrule) && oldstate==ON_NO_PIC){          
     state->active[geneID][geneCopy] = OFF_NO_PIC;
     remove_from_array(geneID, PICASSEMBLY, state->statechangeIDs[PICASSEMBLY][geneCopy], &(rates->picAssemblyCount[geneCopy]), (int) 0);
-    state->statechangeIDs[DEACTEYLATION][geneCopy][rates->deacetylationCount[geneCopy]] = geneID;
+    state->statechangeIDs[DEACETYLATION][geneCopy][rates->deacetylationCount[geneCopy]] = geneID;
     (rates->deacetylationCount[geneCopy])++;
   }
   /* ON_FULL -> OFF_PIC  */
@@ -1547,7 +1553,7 @@ int sum_rate_counts(int ploidy, int rate_array[MAX_PLOIDY])
   int i;
   float retval = 0.0;
 
-  for (i = 0; i < ploidy; i++) {
+  for (i = 0; i < MAX_PLOIDY; i++) {
     retval += rate_array[i];
   }
   return retval;
@@ -1559,7 +1565,7 @@ void get_gene(int ploidy, int rate_array[MAX_PLOIDY], int pos, int *geneLoc, int
   int total_rate = 0;
   *geneCopy = -1;   /* haven't found the copy yet */
 
-  while (i < ploidy && *geneCopy < 0) {
+  while (i < MAX_PLOIDY && *geneCopy < 0) {
     //printf("total_rate=%d, rate_array[%d]=%d, ploidy=%d\n", total_rate, i, rate_array[i], ploidy);
     if (pos < (total_rate + rate_array[i])) {
       *geneCopy = i;
@@ -1860,7 +1866,7 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   get_gene(current_ploidy, rates->acetylationCount, (int)trunc(x), &geneLoc, &geneCopy);
 
   /* choose a particular gene to change state */
-  int geneID = state->statechangeIDs[ACTEYLATION][geneCopy][geneLoc];
+  int geneID = state->statechangeIDs[ACETYLATION][geneCopy][geneLoc];
 
   if (verbose) fprintf(fperrors,"acetylation event gene %d\nstate change from %d to 4\n",
                        geneID, state->active[geneID][geneCopy]);
@@ -1875,7 +1881,7 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   
   /* set state: eject nucleosome, but there is no PIC yet */
   state->active[geneID][geneCopy] = ON_NO_PIC;
-  remove_from_array(geneID, ACTEYLATION, state->statechangeIDs[ACTEYLATION][geneCopy], &(rates->acetylationCount[geneCopy]), (int) 1);
+  remove_from_array(geneID, ACETYLATION, state->statechangeIDs[ACETYLATION][geneCopy], &(rates->acetylationCount[geneCopy]), (int) 1);
   if (is_one_activator(geneID, geneCopy, state->tfBoundIndexes, state->tfBoundCount, 
                        genes->allBindingSites, genes->activating)) {
     state->statechangeIDs[PICASSEMBLY][geneCopy][rates->picAssemblyCount[geneCopy]] = geneID; 
@@ -1895,7 +1901,7 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
   get_gene(current_ploidy, rates->deacetylationCount, (int)trunc(x), &geneLoc, &geneCopy);
 
   /* choose a particular gene and copy to change state */
-  int geneID = state->statechangeIDs[DEACTEYLATION][geneCopy][geneLoc];
+  int geneID = state->statechangeIDs[DEACETYLATION][geneCopy][geneLoc];
 
   if (verbose) fprintf(fperrors,"deacetylation event gene %d, copy %d\nstate change from %d to 1\n",
                        geneID, geneCopy, state->active[geneID]);
@@ -1908,7 +1914,7 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
                                 state->proteinConc);
   /* set state: nucleosome returns */
   state->active[geneID][geneCopy] = OFF_FULL;
-  remove_from_array(geneID, DEACTEYLATION, state->statechangeIDs[DEACTEYLATION][geneCopy], &(rates->deacetylationCount[geneCopy]), (int) 1);
+  remove_from_array(geneID, DEACETYLATION, state->statechangeIDs[DEACETYLATION][geneCopy], &(rates->deacetylationCount[geneCopy]), (int) 1);
 }
 
 void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genes, 
@@ -2197,10 +2203,10 @@ void develop(Genotype *genes,
         fprintf(fperrors,"PICdisassembly=%g\nkon=%g = %d * %g\n",
                 rates->picDisassembly, rates->salphc+konrate, konStates->nkon, (rates->salphc+konrate)/(float)konStates->nkon);
 
-        for (p=0; p < current_ploidy; p++) {
+        for (p=0; p < MAX_PLOIDY; p++) {
           fprintf(fperrors,"acetylation=%g (copy %d)\ndeacetylation=%g (copy %d)\nPIC assembly=%g (copy %d)\ntranscriptinit=%g (copy %d)\n",
-                  p, (float)rates->acetylationCount[0]*acetylate, p, (float)rates->deacetylationCount[0]*deacetylate, 
-                  p, (float)rates->picAssemblyCount[0]*PICassembly, p, (float)rates->transcriptInitCount[0]*transcriptinit);
+                  (float)rates->acetylationCount[p]*acetylate, p, (float)rates->deacetylationCount[p]*deacetylate, p, 
+                  (float)rates->picAssemblyCount[p]*PICassembly, p, (float)rates->transcriptInitCount[p]*transcriptinit, p);
         }
         fprintf(fperrors,"total=%g=%g+%g\n\n", rates->total + konrate, rates->total, konrate);
       }
