@@ -203,6 +203,10 @@ struct CellState {
   int mRNATranscrCount[NGENES];       /* mRNAs which haven't finished transcription yet */
   FixedEvent *mRNATranscrTimeEnd;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
   FixedEvent *mRNATranscrTimeEndLast;
+
+  FixedEvent *replicationTimeEnd;     /* times when gene duplicates */
+  FixedEvent *replicationTimeEndLast;    
+
   float proteinConc[NGENES];
   int tfBoundCount;
   int *tfBoundIndexes;                /* tfBoundIndexes lists just bound TFs according to binding site index in all_binding_sites */

@@ -1,3 +1,4 @@
+
 /* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
@@ -527,6 +528,8 @@ void initialize_cell(CellState *indiv,
 
   indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
   indiv->mRNATranslTimeEnd = indiv->mRNATranslTimeEndLast = NULL;
+  indiv->replicationTimeEnd = indiv->replicationTimeEndLast = NULL;
+
   indiv->tfBoundCount = 0;  /* initialize with nothing bound */
   indiv->tfHinderedCount = 0;
   indiv->tfBoundIndexes = NULL;
@@ -936,13 +939,27 @@ void calc_from_state(Genotype *genes,
  *  0 if there is no fixed event occuring before time t
  *  1 if a transcription event happens before time t
  *  2 if a translation event happens before time t
+ *  3 if a gene replication event happens before time t
  */
 int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
                          FixedEvent *mRNATranscrTimeEnd,
+                         FixedEvent *replicationTimeEnd,
                          float t)
 {
+
+  /*printf("t = %g ", t);
+  if (mRNATranscrTimeEnd == NULL)
+    printf("transcription is NULL ");
+  else
+    printf("transcription=%g ", mRNATranscrTimeEnd->time);
+  if (mRNATranslTimeEnd == NULL)
+    printf("translation is NULL ");
+  else
+    printf("translation=%g ", mRNATranslTimeEnd->time); 
+    printf("\n"); 
+  
   if (mRNATranslTimeEnd==NULL) {
-    if (mRNATranscrTimeEnd==NULL) return(0);
+  if (mRNATranscrTimeEnd==NULL) return(0);
     else{
       if (mRNATranscrTimeEnd->time<t) return(1);
       else return(0);
@@ -960,7 +977,42 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
         else return(0);
       }
     }
+    } 
+  */
+  int retval;
+  float t1;
+  float t2;
+  float t3;
+
+  if (mRNATranscrTimeEnd == NULL && mRNATranslTimeEnd==NULL && replicationTimeEnd==NULL) {
+    retval = 0;
+  } else {
+    // TODO: rewrite this to avoid use of magic number
+    t1 = mRNATranscrTimeEnd ? mRNATranscrTimeEnd->time : 9999.0;
+    t2 = mRNATranslTimeEnd ? mRNATranslTimeEnd->time : 9999.0;
+    t3 = replicationTimeEnd ? replicationTimeEnd->time : 9999.0;
+
+    //printf("t1=%g, t2=%g, t3=%g [t=%g] ", t1, t2, t3, t);
+
+    if ((t1 < t2) && (t1 < t3) && (t1 < t)) { 
+      if (mRNATranscrTimeEnd == NULL) retval = 0;
+      else retval = 1;
+    } else
+      if ((t2 < t3) && (t2 < t1) && (t2 < t)) {
+        if (mRNATranslTimeEnd == NULL)  retval = 0;
+        else retval = 2;
+      }
+      else 
+      if ((t3 < t1) && (t3 < t2) && (t3 < t)) {
+        if (replicationTimeEnd == NULL) retval = 0;
+        else retval = 3;
+      } 
+      else {
+        retval = 0;
+      }
   }
+  //printf("retval=%d\n", retval);
+  return retval;  
 }
 
 void calc_dt(float *x,
@@ -2225,25 +2277,15 @@ void develop(Genotype *genes,
   /* initialize transcriptional state of genes */
   calc_from_state(genes, state, rates, konStates, transport, mRNAdecay);
 
-  int duplication1 = 1;
-  int duplication2 = 1;
-
   t = 0.0;  /* time starts at zero */
+
+  //add_fixed_event(3, 42.0, &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
+  //add_fixed_event(2, 50.0, &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
 
   while (t < tdevelopment) {  /* run until development stops */
     //while (state->cellSize < 1.0) {  /* run until checkpoint reached */
 
     print_tf_occupancy(state, genes->allBindingSites, t);
-
-    // test duplicating a gene mid-way
-    if (t > 10.0 && duplication1 != 1) {
-      duplicate_gene(state, genes, rates, konStates, koffvalues, 3, t);
-      duplication1 = 1;
-    }
-    if (t > 50.0 && duplication2 != 1) {
-      duplicate_gene(state, genes, rates, konStates, koffvalues, 2, t);
-      duplication2 = 1;
-    }
 
     x=expdev(&seed);        /* draw random number */
 
@@ -2271,22 +2313,24 @@ void develop(Genotype *genes,
     /* first check to see if a fixed event occurs in current t->dt window */
     event = does_fixed_event_end(state->mRNATranslTimeEnd,
                                  state->mRNATranscrTimeEnd,
+                                 state->replicationTimeEnd,
                                  fminf(t+dt, tdevelopment));
-
     
     /* while there are either transcription or translation events
        occuring in current t->dt window */
     while (event > 0) {
       konrate = x/dt;
 
-      if (event==1) {  /* if a transcription event ends */
+      switch (event) {
+      case 1:   /* if a transcription event ends */
         end_transcription(&dt, t, state, transport, rates);
-
+        
         update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
                                       rates, konStates, t,
                                       timecoursestart, timecourselast,
                                       state->proteinConc);
-      } else {           /* if a translation event ends */
+        break;
+      case 2:            /* if a translation event ends */
         dt = state->mRNATranslTimeEnd->time - t;         /* make dt window smaller */
         total=0;  /* number of translation events */
 
@@ -2316,8 +2360,26 @@ void develop(Genotype *genes,
         
         /* the number of mRNAs in cytoplasm affects binding */
         change_mRNA_cytoplasm(i, genes, state, rates, konStates);
-      }
+        break;
+      case 3:  /* replicate gene */
+        dt = state->replicationTimeEnd->time - t;         /* make dt window smaller */
 
+        duplicate_gene(state, genes, rates, konStates, koffvalues, state->replicationTimeEnd->geneID, t);
+
+        /* delete the event that just happened */
+        delete_fixed_event_start(&(state->replicationTimeEnd), &(state->replicationTimeEndLast));
+
+        update_protein_conc_cell_size(state->proteinConc, state, genes, dt,
+                                      rates, konStates, t,
+                                      timecoursestart, timecourselast,
+                                      state->proteinConc);
+        break;
+      default:
+        printf("event=%d should never get here\n", event);
+        exit(-1);
+        break;
+      }
+      
       /* advance time by the dt */
       t += dt;
       x -= dt*konrate;
@@ -2334,6 +2396,7 @@ void develop(Genotype *genes,
       /* check to see there aren't more fixed events to do */
       event = does_fixed_event_end(state->mRNATranslTimeEnd, 
                                    state->mRNATranscrTimeEnd, 
+                                   state->replicationTimeEnd,
                                    fminf(tdevelopment, t+dt));
     } 
 
