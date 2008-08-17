@@ -178,6 +178,7 @@ struct Genotype {
   int activating[NGENES][MAX_PLOIDY]; /* 1 is activating, 0 is repressing */
   float PICdisassembly[NGENES][MAX_PLOIDY];
   int ploidy[NGENES];                 /* current per-gene ploidy */
+  float replication_time[NGENES];     /* per-gene replication time */
 };
 
 /* 
@@ -193,6 +194,7 @@ struct FixedEvent {
 
 typedef struct CellState CellState;
 struct CellState {
+  int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
   float cellSize;                     /* size of cell */
   float growthRate;                   /* total growth rate in the previous deltat */
   int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
@@ -222,8 +224,6 @@ struct CellState {
      3 is off but w/o nucleosome, 4 is on but w/o PIC
      5 is on but w/o TF criteria, 6 is fully on
   */
-
-  float replication_time[NGENES];
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
   int statechangeIDs[5][MAX_PLOIDY][NGENES]; 

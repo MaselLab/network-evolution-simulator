@@ -236,6 +236,13 @@ void initialize_genotype(Genotype *indiv,
       indiv->PICdisassembly[i][p] = kdis[j];
   }
 
+  /* for each gene determine a time point during the [0, 30 min] S-phase interval */
+  for (i=0; i<NGENES; i++) {
+    //genes->replication_time[i] = 30.0*ran1(&seed);
+    // TODO: don't make random for the moment
+    indiv->replication_time[i] = 30.0*(i/(float)NGENES);
+    printf("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
+  }
   fprintf(fperrors,"\n");
 }
 
@@ -519,6 +526,9 @@ void initialize_cell(CellState *indiv,
 {
   int i, j, k, totalmRNA;
   float t;
+
+  /* don't start in S phase */
+  indiv->in_s_phase = 0;
 
   /* start cell size at 0.5 */
   indiv->cellSize = 0.5;
@@ -1493,14 +1503,13 @@ void add_integer_time_points(float time,
     add_time_point(time, (float) proteinConc[i], &(timecoursestart[i]), &(timecourselast[i]));
 }
 
-void reach_s_phase(CellState *state) {
+void reach_s_phase(CellState *state, Genotype *genes, float t) {
   int i;
-
-  /* for each gene determine a time point during the [0, 30 min] S-phase interval */
-  for (i=0; i<NGENES; i++) {
-    state->replication_time[i] = 30.0*ran1(&seed);
-
-    printf("offset for replication time after S-phase starts: %g\n", state->replication_time[i]);
+  state->in_s_phase = 1;
+  for (i=0; i < NGENES; i++) {
+    printf("add replication for geneID=%d at t=%g\n", i, t + genes->replication_time[i]);
+    add_fixed_event(i, t + genes->replication_time[i], 
+		    &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
   }
 }
 
@@ -1603,8 +1612,8 @@ void update_protein_conc_cell_size(float proteinConc[],
       L = proteinConc[i];
 
     /* update protein decay rates due to dilution caused by growth */
-    /* currently disabled */
-    //konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i]  + state->growthRate;
+    /* TODO: currently disabled */
+    // konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genes->proteindecay[i]  + state->growthRate;
 
     //printf("update_protein_conc: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
 
@@ -2154,7 +2163,7 @@ void duplicate_gene(CellState *state,
       disassemble_PIC(state, genes, geneID, p, rates);
   
   if (verbose)
-    fprintf(fperrors, "number of binding sites before adding new sites=%d\n", genes->bindSiteCount);
+    fprintf(fperrors, "number of binding sites before adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
   
   sitesBefore = genes->bindSiteCount;
   maxBindingSiteAlloc = genes->bindSiteCount;
@@ -2176,11 +2185,12 @@ void duplicate_gene(CellState *state,
                                                          genes->hindrancePositions);
   }
   
-  print_all_binding_sites(genes->ploidy, genes->allBindingSites, genes->bindSiteCount, 
-                          genes->transcriptionFactorSeq, genes->cisRegSeq); 
+  /* print_all_binding_sites(genes->ploidy, genes->allBindingSites, genes->bindSiteCount, 
+     genes->transcriptionFactorSeq, genes->cisRegSeq);  */
+  printf("number of binding sites after adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
   
   if (verbose)
-    fprintf(fperrors, "number of binding sites after adding new sites=%d\n", genes->bindSiteCount);
+    fprintf(fperrors, "number of binding sites after adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
   
   /* update the konStates data structure */
   for (k=sitesBefore; k < genes->bindSiteCount; k++) {
@@ -2219,7 +2229,7 @@ void develop(Genotype *genes,
              TimeCourse **timecoursestart,
              TimeCourse **timecourselast)
 {
-  float t;
+  float t, division_time;
   int i, j, k;
 
   /* UNUSED here remove: int posdiff; */
@@ -2278,12 +2288,18 @@ void develop(Genotype *genes,
   calc_from_state(genes, state, rates, konStates, transport, mRNAdecay);
 
   t = 0.0;  /* time starts at zero */
+  division_time = 999999;  /* make artificially high */
 
-  //add_fixed_event(3, 42.0, &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
-  //add_fixed_event(2, 50.0, &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
+  while (t < tdevelopment && t < division_time) {  /* run until development stops */
 
-  while (t < tdevelopment) {  /* run until development stops */
-    //while (state->cellSize < 1.0) {  /* run until checkpoint reached */
+    /* compute S-phase offsets */
+    /* TODO: currently disabled until new regression output is generated */
+    if (0 && state->cellSize >= 1.0 && !state->in_s_phase)  { /* run until checkpoint reached */
+      reach_s_phase(state, genes, t);
+      division_time = t + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
+					  * a further 30 mins of growth after S phase */
+      printf("cell will divide at t=%g\n", division_time);
+    }
 
     print_tf_occupancy(state, genes->allBindingSites, t);
 
@@ -2548,8 +2564,6 @@ void develop(Genotype *genes,
       t = tdevelopment;
     }
   }
-  /* compute S-phase offsets */
-  reach_s_phase(state);
   free(koffvalues);
   for (i=0; i<NGENES; i++) {
     free(konStates->konList[i]->available_sites);
