@@ -33,13 +33,18 @@ netsim-bigtf: $(OBJS)
 ## check specific directory
 check-haploid:	clean
 	make EXTRACFLAGS="-m32 -DPLOIDY=1 -DHIND_LENGTH=6" netsim-check
-	./netsim-check -r 4 -p 1 -d output
+	./netsim-check -r 4 -p 1 -d output -c -1.0
 	@diff -r --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-remove-lopt-haploid-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-diploid:	clean
 	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6" netsim-check
-	./netsim-check -r 4 -p 2 -d output
+	./netsim-check -r 4 -p 2 -d output -c -1.0
 	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-remove-lopt-diploid-r-4 && echo -e "************\nPassed regression\n***********"
+
+check-duplication:	clean
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6" netsim-check
+	./netsim-check -r 4 -p 1 -d output -c 0.55
+	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-remove-lopt-haploid-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-selection:	clean
 	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15 -DSELECTION_GENE=10" netsim-selection

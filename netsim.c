@@ -28,7 +28,6 @@ static const int maxelements=500*MAX_PLOIDY;
 static const int maxbound=500*MAX_PLOIDY;
 static const int PopSize=1;
 static const int nmin=4;
-static const float tdevelopment=120.0;
 static const float kon=1e-4; /* lower value is so things run faster */
 /* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
    and 89% of the proteins being in the nucleus*/
@@ -50,10 +49,13 @@ static const float selection = 1.0;
 static const float mN = 0.1;
 static const int Generations=5;
 
-static int current_ploidy = 2;  /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
+static float tdevelopment=120.0;  /* default maximum development time: can be changed at runtime */
+static int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 static int output = 0;
-static long seed = 28121; /* something is wrong here: changing seed changes nothing */
-static int dummyrun=4;     /* used to change seed */
+static long seed = 28121;         /* something is wrong here: changing seed changes nothing */
+static int dummyrun=4;            /* used to change seed */
+static float critical_size = 1.0; /* critical size at which cell divides, 
+				     set to negative to prevent division  */
 
 /* file output parameters */
 static char *output_directory = "output";
@@ -247,37 +249,54 @@ void initialize_genotype(Genotype *indiv,
 }
 
 void mutate(Genotype *old,
-            Genotype *new,
+	    int geneID,
+	    int ploidy,
             float m)
 {
-  int i, j, k;
+  int i, j, k, p, q;
   char x;
   
-  for (i=0; i<NGENES; i++) {
-    for (k=0; k<CISREG_LEN; k++) {
-      new->cisRegSeq[i][0][k] = old->cisRegSeq[i][0][k];      
+  for (k=0; k<CISREG_LEN; k++) {
+
+    // TODO: only mutate replicated copies, not necessarily correct
+    for (q=0; q<ploidy; q++) {
+      p = q + ploidy;
       if (m > ran1(&seed)) {
-        x = old->cisRegSeq[i][0][k]; /* because sometimes old and new are the same */
-        // TODO: this part needs to be updated to work with new ploidy code when we
-        // mutation is included
-        //while (new->cisRegSeq[i][0][k] == x)
-        //  initialize_sequence(&(new->cisRegSeq[i][0][k]),(int) 1);
+	x = old->cisRegSeq[geneID][p][k]; /* because sometimes old and new are the same */
+	printf("in geneID=%d, mutating pos=%d, copy=%d:", geneID, k, p);
+	while (old->cisRegSeq[geneID][p][k] == x) {
+	  // TODO: should be moved to new function set_base_pair() and called from both 
+	  // here and initialize_sequence()
+	  float q = ran1(&seed);
+	  if (q<0.25)
+	    old->cisRegSeq[geneID][p][k] = 'a';
+	  else if (x<0.5)
+	    old->cisRegSeq[geneID][p][k] = 'c';
+	  else if (x<0.75)
+	    old->cisRegSeq[geneID][p][k] = 'g';
+	  else old->cisRegSeq[geneID][p][k] = 't';
+	  printf(" to base=%c [orig=%c]\n", old->cisRegSeq[geneID][p][k], x);
+	}
       }
     }
-    for (k=0; k<TF_ELEMENT_LEN; k++) 
-      new->transcriptionFactorSeq[i][0][k] = old->transcriptionFactorSeq[i][0][k];  
+    /* TODO: following should be moved to a new create_cell() function
+     * make this function strictly about mutation */
+
+    /*  for (k=0; k<TF_ELEMENT_LEN; k++) 
+      for (p=0; p<MAX_PLOIDY; p++) 
+	new->transcriptionFactorSeq[geneID][p][k] = old->transcriptionFactorSeq[geneID][p][k];  
     new->hindrancePositions[NGENES] = old->hindrancePositions[NGENES];  
-    new->mRNAdecay[i] = old->mRNAdecay[i];
-    new->proteindecay[i] = old->proteindecay[i];
-    new->translation[i] = old->translation[i];
+    new->mRNAdecay[geneID] = old->mRNAdecay[geneID];
+    new->proteindecay[geneID] = old->proteindecay[geneID];
+    new->translation[geneID] = old->translation[geneID];
 
     for (j=0; j < current_ploidy; j++)  {
-      new->activating[i][j] = old->activating[i][j];
-      new->PICdisassembly[i][j] = old->PICdisassembly[i][j];
-    }
+      new->activating[geneID][j] = old->activating[geneID][j];
+      new->PICdisassembly[geneID][j] = old->PICdisassembly[geneID][j];
+      } */
   }
-  calc_all_binding_sites(old->ploidy, new->cisRegSeq, new->transcriptionFactorSeq, 
-                         &(new->bindSiteCount), &(new->allBindingSites), new->hindrancePositions);
+    //calc_all_binding_sites(old->ploidy, new->cisRegSeq, new->transcriptionFactorSeq, 
+    //                       &(new->bindSiteCount), &(new->allBindingSites), new->hindrancePositions);
 }
 
 // TODO: rename
@@ -2167,6 +2186,11 @@ void duplicate_gene(CellState *state,
   
   sitesBefore = genes->bindSiteCount;
   maxBindingSiteAlloc = genes->bindSiteCount;
+
+  /* do mutation */
+  // TODO: decide on whether both copies get mutated or just duplicated one
+  // TODO: currently disabled
+  // mutate(genes, geneID, current_ploidy, 0.01);
   
   /* add new binding sites at the *end* of the current list */
   for (i=0; i < current_ploidy; i++) {
@@ -2294,7 +2318,7 @@ void develop(Genotype *genes,
 
     /* compute S-phase offsets */
     /* TODO: currently disabled until new regression output is generated */
-    if (0 && state->cellSize >= 1.0 && !state->in_s_phase)  { /* run until checkpoint reached */
+    if (critical_size > 0.0 && state->cellSize >= critical_size && !state->in_s_phase)  { /* run until checkpoint reached */
       reach_s_phase(state, genes, t);
       division_time = t + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
 					  * a further 30 mins of growth after S phase */
@@ -2611,7 +2635,7 @@ int main(int argc, char *argv[])
   initialize_growth_rate_parameters();
 
   /* parse command-line options */
-  while ((c = getopt (argc, argv, "hvgd:r:p:")) != -1) {
+  while ((c = getopt (argc, argv, "hvgd:r:p:t:c:")) != -1) {
     switch (c)
       {
       case 'd':
@@ -2623,6 +2647,12 @@ int main(int argc, char *argv[])
       case 'p':
         current_ploidy = atoi(optarg);
         break;
+      case 't':
+	tdevelopment = atof(optarg);
+	break;
+      case 'c':
+	critical_size = atof(optarg);
+	break;
       case 'g':
         hold_genotype_constant = 1;
         break;
@@ -2630,7 +2660,7 @@ int main(int argc, char *argv[])
         verbose = 1;
         break;
       case 'h':
-        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-g] [-p PLOIDY]\n", argv[0]);
+        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-g] [-p PLOIDY] [-t DEVELOPMENTTIME]\n", argv[0]);
         exit(0);
         break;
       default:
