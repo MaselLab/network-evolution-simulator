@@ -1,4 +1,3 @@
-
 /* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
@@ -199,7 +198,8 @@ void initialize_genotype(Genotype *indiv,
   } 
 
   calc_all_binding_sites(indiv->ploidy, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
-                         &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions);
+                         &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions,
+			 indiv->tfsPerGene);
   
   fprintf(fperrors,"activators vs repressors ");
   
@@ -248,9 +248,9 @@ void initialize_genotype(Genotype *indiv,
   fprintf(fperrors,"\n");
 }
 
-void mutate(Genotype *old,
+void mutate(Genotype *gene,
 	    int geneID,
-	    int ploidy,
+	    int geneCopy,
             float m)
 {
   int i, j, k, p, q;
@@ -258,26 +258,23 @@ void mutate(Genotype *old,
   
   for (k=0; k<CISREG_LEN; k++) {
 
-    // TODO: only mutate replicated copies, not necessarily correct
-    for (q=0; q<ploidy; q++) {
-      p = q + ploidy;
-      if (m > ran1(&seed)) {
-	x = old->cisRegSeq[geneID][p][k]; /* because sometimes old and new are the same */
-	printf("in geneID=%d, mutating pos=%d, copy=%d:", geneID, k, p);
-	while (old->cisRegSeq[geneID][p][k] == x) {
-	  // TODO: should be moved to new function set_base_pair() and called from both 
-	  // here and initialize_sequence()
-	  float q = ran1(&seed);
-	  if (q<0.25)
-	    old->cisRegSeq[geneID][p][k] = 'a';
-	  else if (x<0.5)
-	    old->cisRegSeq[geneID][p][k] = 'c';
-	  else if (x<0.75)
-	    old->cisRegSeq[geneID][p][k] = 'g';
-	  else old->cisRegSeq[geneID][p][k] = 't';
-	  printf(" to base=%c [orig=%c]\n", old->cisRegSeq[geneID][p][k], x);
-	}
+    p = geneCopy;
+    if (m > ran1(&seed)) {
+      x = gene->cisRegSeq[geneID][p][k]; /* because sometimes gene and new are the same */
+      printf("in geneID=%2d, mutating pos=%3d, copy=%1d:", geneID, k, p);
+      while (gene->cisRegSeq[geneID][p][k] == x) {
+	// TODO: should be moved to new function set_base_pair() and called from both 
+	// here and initialize_sequence()
+	float q = ran1(&seed);
+	if (q<0.25)
+	  gene->cisRegSeq[geneID][p][k] = 'a';
+	else if (x<0.5)
+	  gene->cisRegSeq[geneID][p][k] = 'c';
+	else if (x<0.75)
+	    gene->cisRegSeq[geneID][p][k] = 'g';
+	else gene->cisRegSeq[geneID][p][k] = 't';
       }
+      printf(" '%c' -> '%c'\n", x, gene->cisRegSeq[geneID][p][k]);
     }
     /* TODO: following should be moved to a new create_cell() function
      * make this function strictly about mutation */
@@ -395,7 +392,8 @@ void calc_all_binding_sites(int ploidy[NGENES],
                             char transcriptionFactorSeq[NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
                             int *newBindSiteCount,
                             AllTFBindingSites **allBindingSites,
-                            int hindPos[NGENES])
+                            int hindPos[NGENES],
+			    int tfsPerGene[NGENES])
 {
   int p, maxBindingSiteAlloc, bindSiteCount;
   int geneID;
@@ -408,11 +406,15 @@ void calc_all_binding_sites(int ploidy[NGENES],
   }
   bindSiteCount = 0;
 
-  for (p=0; p < MAX_PLOIDY; p++) {     /* loop through the maximum ploidy possible */
+  /* initialize per gene # of sites */
+  for (geneID=0; geneID < NGENES; geneID++) {
+    tfsPerGene[geneID] = 0;
+  }
 
-    for (geneID=0; geneID < NGENES; geneID++) {  /* now which cis-reg region */
-
+  for (geneID=0; geneID < NGENES; geneID++) {  /* now which cis-reg region */
+    for (p=0; p < MAX_PLOIDY; p++) {     /* loop through the maximum ploidy possible */
       if (p < ploidy[geneID]) {  
+	int before = bindSiteCount;
         /* if this particular gene has this ploidy then generate binding sites
         /* for all the relevant gene copies (assume no gene divergence) */
         bindSiteCount = calc_all_binding_sites_sister(cisRegSeq, 
@@ -423,6 +425,9 @@ void calc_all_binding_sites(int ploidy[NGENES],
                                                       geneID,
                                                       p, 
                                                       hindPos);
+
+	/* add the new number of sites */
+	tfsPerGene[geneID] += (bindSiteCount-before);
       }
     }
   }
@@ -2143,9 +2148,48 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
  * Functions that handle each possible Gillespie event 
  * ----------------------------------------------------- */
 
+/* Helper function that shifts siteIDs in KonStates, tfHinderedIndexes
+   and tfBoundIndexes after a position by the specified offset */
+void shift_binding_site_ids(CellState *state, 
+			    KonStates *konStates,
+			    int end,
+			    int offset)
+{
+  int i, j, k, siteID;
 
-/* eject TFs and duplicate gene   */
-void duplicate_gene(CellState *state,
+  /* shift all sites in konList */
+  for (i=0; i<NGENES; i++) {
+    k = 0;
+    while (k < konStates->konList[i]->site_count) {
+      siteID = konStates->konList[i]->available_sites[k];
+      if (siteID >= end)
+	konStates->konList[i]->available_sites[k] += offset;
+      k++;
+    }
+  }
+
+  /* shift all sites in tfHinderedIndexes */
+  j = 0;
+  while (j < state->tfHinderedCount) {
+    siteID = state->tfHinderedIndexes[j][0];
+    if (siteID >= end)
+      state->tfHinderedIndexes[j][0] += offset;
+    siteID = state->tfHinderedIndexes[j][1];
+    if (siteID >= end)
+      state->tfHinderedIndexes[j][1] += offset;
+    j++;
+  }
+
+  /* shift all sites in tfBoundIndexes */
+  for (j = 0; j < state->tfBoundCount; j++) {
+    siteID = state->tfBoundIndexes[j];
+    if (siteID >= end)
+      state->tfBoundIndexes[j] += offset;
+  }
+}
+
+/* eject TFs and replicate DNA   */
+void replicate_gene(CellState *state,
                     Genotype *genes,
                     GillespieRates *rates,
                     KonStates *konStates,
@@ -2153,7 +2197,7 @@ void duplicate_gene(CellState *state,
                     int geneID,
                     float t) {
   int i, j, k, l, p;
-  int sitesBefore, maxBindingSiteAlloc;
+  int start_tfbs_pos, end_tfbs_pos, number_tfbs_pre_replication, offset;
   
   if (verbose)
     fprintf(fperrors, "duplicating geneID=%d at t=%g\n", geneID, t);
@@ -2184,40 +2228,73 @@ void duplicate_gene(CellState *state,
   if (verbose)
     fprintf(fperrors, "number of binding sites before adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
   
-  sitesBefore = genes->bindSiteCount;
-  maxBindingSiteAlloc = genes->bindSiteCount;
-
   /* do mutation */
   // TODO: decide on whether both copies get mutated or just duplicated one
   // TODO: currently disabled
-  // mutate(genes, geneID, current_ploidy, 0.01);
-  
-  /* add new binding sites at the *end* of the current list */
-  for (i=0; i < current_ploidy; i++) {
-    p = i + current_ploidy;
-    
-    if (verbose)
-      fprintf(fperrors, "adding sites for gene=%d and copy=%d to allBindingSites\n", geneID, p);
-    
-    genes->bindSiteCount = calc_all_binding_sites_sister(genes->cisRegSeq, 
-                                                         genes->transcriptionFactorSeq, 
-                                                         genes->bindSiteCount,
-                                                         &(genes->allBindingSites),
-                                                         &maxBindingSiteAlloc,
-                                                         geneID,
-                                                         p, 
-                                                         genes->hindrancePositions);
+  //for (p=0; p<2*current_ploidy; p++)
+  //  mutate(genes, geneID, p, 0.01);
+
+  /* record number of TFBS pre-replication */
+  number_tfbs_pre_replication = genes->tfsPerGene[geneID];
+  start_tfbs_pos = 0;
+  end_tfbs_pos = 0;
+
+  /* record the beginning and end siteIDs of the pre-replication list
+     of binding sites  */
+  for (i=0; i<=geneID; i++) {  
+    start_tfbs_pos = end_tfbs_pos;             
+    end_tfbs_pos += genes->tfsPerGene[i];
   }
+
+  if (verbose) 
+    fprintf(fperrors, "geneID=%d has %d TFBS before replication [run from %d to %d]\n", 
+	    geneID, number_tfbs_pre_replication, start_tfbs_pos, end_tfbs_pos);
+
+  /* remove all of these TFBS from konStates, some of them may no
+     longer exist after mutation, we re-add them with add_kon() call
+     after new binding sites computed */
+  for (k=start_tfbs_pos; k < end_tfbs_pos; k++) {
+    remove_kon(k,
+	       genes->allBindingSites[k].tfID,
+	       rates, 
+	       konStates->konvalues[genes->allBindingSites[k].tfID][KON_SALPHC_INDEX],
+	       konStates,
+	       state->proteinConc[genes->allBindingSites[k].tfID]);
+  } 
   
+  /* recompute *all* binding sites, then relabel sites offset by
+     insertion (or deletion) of new sites created by replication */
+  calc_all_binding_sites(genes->ploidy, 
+			 genes->cisRegSeq, 
+			 genes->transcriptionFactorSeq, 
+			 &(genes->bindSiteCount),
+			 &(genes->allBindingSites),
+			 genes->hindrancePositions,
+			 genes->tfsPerGene); 
+
   /* print_all_binding_sites(genes->ploidy, genes->allBindingSites, genes->bindSiteCount, 
      genes->transcriptionFactorSeq, genes->cisRegSeq);  */
-  printf("number of binding sites after adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
-  
-  if (verbose)
+
+  /* use new tfsPerGene and pre-replication number to compute the
+     offset to shift the siteIDs */
+  offset = genes->tfsPerGene[geneID] - number_tfbs_pre_replication;
+
+  if (verbose) {
+    fprintf(fperrors, "geneID=%d has %d TFBS after replication [run from %d to %d]\n", 
+	   geneID, genes->tfsPerGene[geneID], start_tfbs_pos, end_tfbs_pos+offset);
+    fprintf(fperrors, "shift all TFBS after %d by %d\n", end_tfbs_pos, offset);
     fprintf(fperrors, "number of binding sites after adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
+  }
+
+  /* starting at the original ending point, move all sites along by
+     'offset'.  Note this assumes that TFBS for a particular gene are
+     always stored contiguously. */
+  shift_binding_site_ids(state, konStates, end_tfbs_pos, offset);
   
-  /* update the konStates data structure */
-  for (k=sitesBefore; k < genes->bindSiteCount; k++) {
+  /* update the konStates data structure to make available the newly
+   * created TF binding sites in the full [start, end+offset] region
+   */
+  for (k=start_tfbs_pos; k < (end_tfbs_pos + offset); k++) {
     add_kon(state->proteinConc[genes->allBindingSites[k].tfID],
             konStates->konvalues[genes->allBindingSites[k].tfID][KON_SALPHC_INDEX],
             genes->allBindingSites[k].tfID,
@@ -2404,7 +2481,7 @@ void develop(Genotype *genes,
       case 3:  /* replicate gene */
         dt = state->replicationTimeEnd->time - t;         /* make dt window smaller */
 
-        duplicate_gene(state, genes, rates, konStates, koffvalues, state->replicationTimeEnd->geneID, t);
+        replicate_gene(state, genes, rates, konStates, koffvalues, state->replicationTimeEnd->geneID, t);
 
         /* delete the event that just happened */
         delete_fixed_event_start(&(state->replicationTimeEnd), &(state->replicationTimeEndLast));

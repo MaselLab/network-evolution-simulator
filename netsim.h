@@ -172,6 +172,7 @@ struct Genotype {
   int hindrancePositions[NGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int bindSiteCount;
   AllTFBindingSites *allBindingSites;
+  int tfsPerGene[NGENES];             /* cache number of TFs per gene */
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
@@ -245,6 +246,7 @@ extern void calc_all_binding_sites(int [NGENES],
                                    char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
                                    int *,
                                    AllTFBindingSites **,
+                                   int [NGENES],
                                    int [NGENES]);
 
 
