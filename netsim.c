@@ -42,10 +42,8 @@ static const float startnucleus=0.1;
 static const float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
 static const float GasConstant=8.31447;
 static const float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
-static const float cooperative_distance=20;
-//static const float cooperative_distance=11;
-static const float NumSitesInGenome = 1.8e+6;
-//static const float NumSitesInGenome = 1.3e+6;
+static const float cooperative_distance=11;  /* distance co-operativity operates, changed from 20 */ 
+static const float NumSitesInGenome = 1.3e+6; /* updated from 1.8e+6 */
 static const float selection = 1.0;
 
 static const float mN = 0.1;
