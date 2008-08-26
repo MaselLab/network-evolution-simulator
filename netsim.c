@@ -67,21 +67,22 @@ FILE *fp_tfsbound;
 
 
 /* growth rate parameters globally used during simulation */
-static float Lp;         
+static float Pp;         
 static float h;
 static float gmax;
 
 /* initialize the growth rate parameters: 
- * do computations here so that we can easily change the scaling factor and Lp */
+ * do computations here so that we can easily change the scaling factor and Pp */
 void initialize_growth_rate_parameters() {
-  float hc, gpeak, growth_rate_scaling;
+  float hc, gpeak, growth_rate_scaling, Ltf;
   growth_rate_scaling = 2.0; /* set scaling factor */
   gpeak = 0.005776*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min)=0.005776 */
-  Lp = 12000;              /* mean gene expression is 12064.28 */
-  hc = (gpeak/Lp)*(1-(log(2-2*0.2)/log(2)));      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) 
+  Pp = 12000;              /* mean gene expression of all proteins is 12064.28 */
+  Ltf= 1418;               /* mean gene expression of only TFs is 1418 */
+  hc = (gpeak/Pp)*(1-(log(2-2*0.2)/log(2)));      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) 
                                                    * using {s=0.2, N=500} matches {s=10^-5, N=10^7} combination (both Ns=100) */
   h = hc/0.023;            /* using c=0.023/min from mean of distribution from Belle et al (2006)*/
-  gmax = gpeak + hc*Lp;    /* compute the gmax coefficient based on gpeak values */
+  gmax = gpeak + hc*(Pp+NGENES*Ltf);    /* compute the gmax coefficient based on gpeak and other parameters */
 }
 
 void initialize_sequence(char Seq[], 
@@ -1538,54 +1539,57 @@ void reach_s_phase(CellState *state, Genotype *genes, float t) {
   }
 }
 
-float compute_tprime(float c, float L, float alpha, float s_mRNA) {
-  return (1/c) * log((c*L - alpha*s_mRNA)/(c*L - alpha*s_mRNA));
+float compute_tprime(float c, float P, float alpha, float s_mRNA) {
+  return (1/c) * log((c*P - alpha*s_mRNA)/(c*P - alpha*s_mRNA));
 }
 
-float compute_integral(float alpha, float c, float gmax, float deltat, float s_mRNA, float L, float Lp, float ect, float ect1) {
-  return 1.0/(pow(c,2)*Lp) * gmax * (-alpha*ect1*s_mRNA + c*(L*ect1 + alpha*deltat*s_mRNA));
+float compute_integral(float alpha, float c, float gmax, float deltat, float s_mRNA, float P, float Pp, float ect, float ect1) {
+  return 1.0/(pow(c,2)*Pp) * gmax * (-alpha*ect1*s_mRNA + c*(P*ect1 + alpha*deltat*s_mRNA));
 }
 
 float compute_growth_rate_dimer(float alpha, 
                                 float s_mRNA,
-                                float L,
-                                float L_next,
+                                float all_alpha[NGENES],
+                                int all_s_mRNA[NGENES],
+                                float P,
+                                float P_next,
                                 float t, 
                                 float deltat,
                                 float c,
                                 float ect,
                                 float ect1) {
-
+  int i;
   float integrated_growth_rate;
+  float total_alpha_s = 0.0;
   float deltatprime, deltatrest;
 
   if (verbose) {
-    fprintf(fperrors, "L=%g, L_next=%g, c=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", L, L_next, c, t, t+deltat, s_mRNA);
+    fprintf(fperrors, "P=%g, P_next=%g, c=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", P, P_next, c, t, t+deltat, s_mRNA);
   }
 
   /* choose the appropriate piecewise linear integral */
-  if (((L > Lp) && (L_next >= L)) || ((L_next > Lp) && (L >= L_next))) {          /* L > Lp throughout */
+  if (((P > Pp) && (P_next >= P)) || ((P_next > Pp) && (P >= P_next))) {          /* P > Pp throughout */
     if (verbose)
-      fprintf(fperrors, "case 1: L=%g, L_next=%g > Lp=%g\n", L, L_next, Lp);
+      fprintf(fperrors, "case 1: P=%g, P_next=%g > Pp=%g\n", P, P_next, Pp);
     integrated_growth_rate = gmax * deltat;
-  } else if (((L_next < Lp) && (L_next >= L)) || ((L < Lp) && (L >= L_next))) {   /* L < Lp throughout */
+  } else if (((P_next < Pp) && (P_next >= P)) || ((P < Pp) && (P >= P_next))) {   /* P < Pp throughout */
     if (verbose)
-      fprintf(fperrors, "case 2: L=%g, L_next=%g < Lp=%g\n", L, L_next, Lp);
-    integrated_growth_rate = compute_integral(alpha, c, gmax, deltat, s_mRNA, L, Lp, ect, ect1);
-  } else if ((Lp > L) && (L_next > L)) {    /* L < Lp up until t' then L > Lp */
-    deltatprime = compute_tprime(c, L, alpha, s_mRNA);
+      fprintf(fperrors, "case 2: P=%g, P_next=%g < Pp=%g\n", P, P_next, Pp);
+    integrated_growth_rate = compute_integral(alpha, c, gmax, deltat, s_mRNA, P, Pp, ect, ect1);
+  } else if ((Pp > P) && (P_next > P)) {    /* P < Pp up until t' then P > Pp */
+    deltatprime = compute_tprime(c, P, alpha, s_mRNA);
     deltatrest = deltat - deltatprime;
     if (verbose)
-      fprintf(fperrors, "case 3: L=%g < Lp=%g until t'=%g (deltatprime=%g) then L_next=%g > Lp=%g\n", L, Lp, t+deltatprime, deltatprime, L_next, Lp);
-    integrated_growth_rate = compute_integral(alpha, c, gmax, deltatprime, s_mRNA, L, Lp, ect, ect1);
+      fprintf(fperrors, "case 3: P=%g < Pp=%g until t'=%g (deltatprime=%g) then P_next=%g > Pp=%g\n", P, Pp, t+deltatprime, deltatprime, P_next, Pp);
+    integrated_growth_rate = compute_integral(alpha, c, gmax, deltatprime, s_mRNA, P, Pp, ect, ect1);
     integrated_growth_rate += gmax * deltatrest;
-  } else if ((L > Lp) && (L > L_next)) {   /* L > Lp up until t' then L < Lp */
-    deltatprime = compute_tprime(c, L, alpha, s_mRNA);
+  } else if ((P > Pp) && (P > P_next)) {   /* P > Pp up until t' then P < Pp */
+    deltatprime = compute_tprime(c, P, alpha, s_mRNA);
     deltatrest = deltat - deltatprime;
     if (verbose)
-      fprintf(fperrors, "case 4: L=%g > Lp=%g until t'=%g (deltatprime=%g) then L_next=%g < Lp=%g\n", L, Lp, t+deltatprime, deltatprime, L_next, Lp);
+      fprintf(fperrors, "case 4: P=%g > Pp=%g until t'=%g (deltatprime=%g) then P_next=%g < Pp=%g\n", P, Pp, t+deltatprime, deltatprime, P_next, Pp);
     integrated_growth_rate = gmax * deltatprime;
-    integrated_growth_rate += compute_integral(alpha, c, gmax, deltatrest, s_mRNA, L, Lp, ect, ect1);
+    integrated_growth_rate += compute_integral(alpha, c, gmax, deltatrest, s_mRNA, P, Pp, ect, ect1);
   } else {
     printf("growth rate computation error: should not reach here.  exiting...\n");
     exit(-1);
@@ -1594,17 +1598,22 @@ float compute_growth_rate_dimer(float alpha,
   if (verbose)
     fprintf(fperrors, "growth rate (variable %g)-", integrated_growth_rate);
 
+  /* compute the total cost of translation across all genes  */
+  for (i=0; i<NGENES; i++) {
+    total_alpha_s += all_alpha[i] * all_s_mRNA[i];
+  }
+
   /* add constant term */
-  integrated_growth_rate += -alpha * h * s_mRNA * deltat;
+  integrated_growth_rate += -h * deltat * (total_alpha_s);
 
   if (verbose)
-    fprintf(fperrors, "(constant %g) = (total %g)\n", alpha * h * s_mRNA * deltat, integrated_growth_rate);
+    fprintf(fperrors, "(constant %g) = (total %g)\n", (h*deltat*total_alpha_s), integrated_growth_rate);
 
   /* make sure growth rate can't be negative */
   if (integrated_growth_rate < 0.0)
     integrated_growth_rate = 0.0;
   
-  fprintf(fp_growthrate, "%g %g %g %g %g\n", t, integrated_growth_rate, L, s_mRNA, c);
+  fprintf(fp_growthrate, "%g %g %g %g %g\n", t, integrated_growth_rate, P, s_mRNA, c);
 
   return (integrated_growth_rate);
 }
@@ -1655,6 +1664,7 @@ void update_protein_conc_cell_size(float proteinConc[],
     if (SELECTION_GENE == i) {
       L_next = proteinConc[i];
       growth_rate = compute_growth_rate_dimer(genes->translation[SELECTION_GENE], state->mRNACytoCount[SELECTION_GENE], 
+                                              genes->translation, state->mRNACytoCount, 
                                               L, L_next, t, dt, konStates->konvalues[SELECTION_GENE][KON_PROTEIN_DECAY_INDEX], ect, ect1);
       state->cellSize = (state->cellSize)*exp(growth_rate);
       fprintf(fp_cellsize, "%g %g\n", t, state->cellSize);
