@@ -42,7 +42,10 @@ static const float startnucleus=0.1;
 static const float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
 static const float GasConstant=8.31447;
 static const float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
+static const float cooperative_distance=20;
+//static const float cooperative_distance=11;
 static const float NumSitesInGenome = 1.8e+6;
+//static const float NumSitesInGenome = 1.3e+6;
 static const float selection = 1.0;
 
 static const float mN = 0.1;
@@ -710,7 +713,7 @@ void calc_koff(int k,
                 state->tfBoundIndexes[j], allBindingSites[state->tfBoundIndexes[j]].geneCopy, 
                 allBindingSites[state->tfBoundIndexes[j]].cisregID);
       }
-      if (abs(posdiff) < 20) {
+      if (abs(posdiff) < cooperative_distance) {
         if (posdiff>0) front++; else back++;
       }
     }
@@ -750,7 +753,7 @@ void scan_nearby_sites(int indexChanged,
                 "error: steric hindrance 2 has been breached with site %d %d away from site %d\n",
                 indexChanged, posdiff, state->tfBoundIndexes[j]);
       }
-      if (abs(posdiff) < 20) {  /* within 20, adjust koff */
+      if (abs(posdiff) < cooperative_distance) {  /* within 20, adjust koff */
 
         /* save old value */
         diff = -koffvalues[j];
