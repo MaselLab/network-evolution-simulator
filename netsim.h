@@ -10,6 +10,8 @@
 #include <stdio.h>
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
+#define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
+#define RT_SAFE_EPSILON 1e-6
 
 #ifndef MAX_PLOIDY
 #define MAX_PLOIDY 4       /* each gene can potentially exist as a tetraploid during replication */

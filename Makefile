@@ -32,23 +32,28 @@ netsim-bigtf: $(OBJS)
 
 ## check specific directory
 check-haploid:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=1 -DHIND_LENGTH=6" netsim-check
+	make EXTRACFLAGS="-m32 -DPLOIDY=1 -DHIND_LENGTH=15" netsim-check
 	./netsim-check -r 4 -p 1 -d output -c -1.0
-	@diff -r --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-change-NumSitesGenome-cooperativity-haploid-r-4 && echo -e "************\nPassed regression\n***********"
+	@diff -r --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/2008-08-29-haploid-dilution-hind-15-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-diploid:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6" netsim-check
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15" netsim-check
 	./netsim-check -r 4 -p 2 -d output -c -1.0
-	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/after-change-NumSitesGenome-cooperativity-diploid-r-4 && echo -e "************\nPassed regression\n***********"
+	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/2008-08-29-diploid-dilution-hind-15-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-replication:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=6" netsim-check
-	./netsim-check -r 4 -p 1 -d output -c 0.55
-	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/gene-replication-no-mutation-haploid-r-4 && echo -e "************\nPassed regression\n***********"
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15" netsim-check
+	./netsim-check -r 4 -p 2 -d output -c 0.55
+	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt output regression-tests/2008-08-29-replication-dilution-hind-15-r-4 && echo -e "************\nPassed regression\n***********"
 
 check-selection:	clean
 	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15 -DSELECTION_GENE=10" netsim-selection
-	./netsim-selection -r 4 -d selection
+	./netsim-selection -r 4 -p 2 -d selection -c -1.0
+
+check-sample-output:	clean
+	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15 -DSELECTION_GENE=10" netsim-selection
+	./netsim-selection -r 4 -p 2 -d selection -c -1.0 -t 150
+	@diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt selection regression-tests/2008-08-29-sample-output-11genes-diploid-r-4 && echo -e "************\nPassed regression\n***********"
 
 profiling:	netsim-gprof
 
