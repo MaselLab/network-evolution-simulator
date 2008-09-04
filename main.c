@@ -15,10 +15,6 @@
 #include "lib.h"
 #include "netsim.h"
 
-//int verbose;
-//FILE *fperrors;
-
-
 int main(int argc, char *argv[])
 {
   FILE *fpout, *fpkdis;
