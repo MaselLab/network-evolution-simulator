@@ -3,7 +3,7 @@ all: netsim
 CC = gcc
 CFLAGS = -g -std=c99 $(EXTRACFLAGS)
 #  -O3
-OBJS = random.o lib.o
+OBJS = random.o lib.o netsim.o
 LIBS = -lm 
 #-lefence
 OTHER = Makefile
@@ -14,8 +14,15 @@ OTHER = Makefile
 %: %.c %.h $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
 
+#%-check: %.c %.h $(OBJS) $(OTHER)
+#	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
+
 %-check: %.c %.h $(OBJS) $(OTHER)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) main.c
+
+main-matrix: main-matrix.c $(OBJS) $(OTHER)
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) main-matrix.c
+
 
 %-selection: %.c %.h $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) $<

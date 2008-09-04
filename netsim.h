@@ -243,6 +243,59 @@ struct TimeCourse
   TimeCourse *next;
 };     
 
+extern const int maxelements; 
+/* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
+const int maxbound;
+const int PopSize;
+const int nmin;
+const float kon; /* lower value is so things run faster */
+/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
+   and 89% of the proteins being in the nucleus*/
+const float kRNA;
+const float ttranslation;
+const float ttranscription;
+const float pact;
+const float transcriptinit; /* replace betaon and betaoff */
+const float deacetylate;
+const float acetylate;
+const float PICassembly;
+const float startnucleus;
+const float Kr;    /* don't put this less than 1, weird things happen to koff calculation */
+const float GasConstant;
+const float cooperativity;/* dGibbs, relative to 1 additional specific nt */
+const float cooperative_distance;  /* distance co-operativity operates, changed from 20 */ 
+const float NumSitesInGenome ; /* updated from 1.8e+6 */
+const float selection ;
+
+const float mN ;
+const int Generations;
+
+float tdevelopment;  /* default maximum development time: can be changed at runtime */
+int current_ploidy;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
+int output;
+long seed ;         /* something is wrong here: changing seed changes nothing */
+int dummyrun;            /* used to change seed */
+float critical_size ; /* critical size at which cell divides, 
+                                     set to negative to prevent division  */
+
+/* file output parameters */
+char *output_directory ;
+int verbose ;
+FILE *fperrors;
+FILE *fp_cellsize;
+FILE *fp_growthrate;
+FILE *fp_tfsbound;
+
+/* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
+   Belle et al. (2006) and small with respect to most growth rates  */
+float protein_aging;
+
+/* growth rate parameters globally used during simulation */
+float Pp;         
+float h;
+float gmax;
+
+
 extern void calc_all_binding_sites(int [NGENES],
                                    char [NGENES][MAX_PLOIDY][CISREG_LEN],
                                    char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
@@ -250,6 +303,314 @@ extern void calc_all_binding_sites(int [NGENES],
                                    AllTFBindingSites **,
                                    int [NGENES],
                                    int [NGENES]);
+
+extern void initialize_parameters();
+
+extern void initialize_growth_rate_parameters();
+
+extern void initialize_sequence(char [], int, int);
+
+extern void print_all_binding_sites(int [NGENES],
+                                    AllTFBindingSites *, 
+                                    int ,
+                                    char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
+                                    char [NGENES][MAX_PLOIDY][CISREG_LEN]);
+
+extern void print_tf_occupancy(CellState *,
+                               AllTFBindingSites *,
+                               float);
+extern void initialize_genotype(Genotype *, 
+                                float []);
+
+
+extern void mutate(Genotype *,
+                   int,
+                   int,
+                   float);
+
+extern int calc_all_binding_sites_sister(char [NGENES][MAX_PLOIDY][CISREG_LEN],
+                                         char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
+                                         int ,
+                                         AllTFBindingSites **,
+                                         int *,
+                                         int ,
+                                         int ,
+                                         int [NGENES]);
+
+
+extern void calc_all_binding_sites(int [NGENES],
+                                   char[NGENES][MAX_PLOIDY][CISREG_LEN],
+                                   char[NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
+                                   int *,
+                                   AllTFBindingSites **,
+                                   int [NGENES],
+                                   int [NGENES]);
+
+extern void add_fixed_event(int,
+                            float,
+                            FixedEvent **,
+                            FixedEvent **);
+
+extern void add_time_point(float,
+                           float,
+                           TimeCourse **,
+                           TimeCourse **);
+
+extern void add_fixed_event_end(int,
+                                float,
+                                FixedEvent **,
+                                FixedEvent **);
+
+extern void delete_fixed_event(int,
+                               int,
+                               FixedEvent **,
+                               FixedEvent **);
+
+extern void delete_fixed_event_start(FixedEvent **,
+                                     FixedEvent **);
+
+extern void initialize_cell(CellState *,
+                            int [NGENES],
+                            float [NGENES],
+                            float [NGENES],
+                            float [NGENES]);
+
+extern void calc_time (float, 
+                       float, 
+                       GillespieRates *,
+                       KonStates *,
+                       float *, 
+                       float *);
+
+extern void calc_kon_rate(float,
+                          KonStates *,
+                          float *);
+
+extern void change_mRNA_cytoplasm(int,
+                                  Genotype *,
+                                  CellState *,
+                                  GillespieRates *,
+                                  KonStates *);
+
+extern void calc_koff(int,
+                      AllTFBindingSites *,
+                      CellState *,
+                      float *);
+
+extern void scan_nearby_sites(int,
+                              AllTFBindingSites *,
+                              CellState *,
+                              GillespieRates *,
+                              float *);
+
+extern void remove_kon(int,
+                       int,
+                       GillespieRates *,
+                       float,
+                       KonStates *,
+                       float);
+
+extern void add_kon(float,
+                    float,
+                    int,
+                    int,
+                    GillespieRates *,
+                    KonStates *);
+
+
+extern int ready_to_transcribe(int,
+                               int,
+                               int *,
+                               int,
+                               AllTFBindingSites *,
+                               int [NGENES][MAX_PLOIDY],
+                               int *);
+
+extern int is_one_activator(int,
+                            int,
+                            int *,
+                            int,
+                            AllTFBindingSites *,
+                            int [NGENES][MAX_PLOIDY]);
+
+extern void calc_from_state(Genotype *,
+                            CellState *,
+                            GillespieRates *,
+                            KonStates *,
+                            float [],
+                            float []);
+
+extern int does_fixed_event_end(FixedEvent *,
+                                FixedEvent *,
+                                FixedEvent *,
+                                float);
+
+extern void calc_dt(float *,
+                    float *,
+                    GillespieRates *,
+                    KonStates *,
+                    float [],
+                    float [],
+                    int [],
+                    int []);
+
+extern void end_transcription(float *,
+                              float,
+                              CellState *,
+                              float [NGENES],
+                              GillespieRates *);
+
+extern void remove_from_array(int,
+                              int,
+                              int [],
+                              int *,
+                              int );
+
+extern void disassemble_PIC(CellState *,
+                            Genotype *,
+                            int,
+                            int,
+                            GillespieRates *);
+
+extern void revise_activity_state(int,
+                                  int,
+                                  Genotype *,
+                                  CellState *,
+                                  GillespieRates *);
+
+extern void remove_tf_binding(Genotype *,
+                              CellState *,
+                              GillespieRates *,
+                              KonStates *,
+                              int,
+                              float []);
+
+extern void attempt_tf_binding(Genotype *,
+                               CellState *,
+                               GillespieRates *,
+                               float **,
+                               KonStates *,
+                               int *,
+                               int *,
+                               int);
+
+extern void add_time_points(float,
+                            float [NGENES],
+                            TimeCourse **,
+                            TimeCourse **);
+
+extern void add_integer_time_points(float,
+                                    int [NGENES],
+                                    TimeCourse **,
+                                    TimeCourse **);
+
+extern void reach_s_phase(CellState *, Genotype *, float);
+
+extern float compute_tprime(float, float, float, float);
+
+extern float compute_integral(float, float, float, float, float, float, float, float, float);
+
+
+extern float compute_growth_rate_dimer(float *,
+                                float , 
+                                float ,
+                                float [NGENES],
+                                int [NGENES],
+                                float,
+                                float,
+                                float, 
+                                float,
+                                float,
+                                float,
+                                float);
+
+extern void update_protein_conc_cell_size(float[],
+                                          CellState *,
+                                          Genotype *,
+                                          float,
+                                          GillespieRates *,
+                                          KonStates *,
+                                          float,
+                                          TimeCourse **,
+                                          TimeCourse **,
+                                          float []);
+
+
+extern void calc_num_bound(float[],
+                           int );
+
+
+extern int sum_rate_counts(int, int[MAX_PLOIDY]);
+
+extern void get_gene(int, int [MAX_PLOIDY], int, int *, int *);
+
+
+extern void transport_event(GillespieRates *,
+                            CellState *,
+                            Genotype *,
+                            KonStates *,
+                            float [NGENES],
+                            TimeCourse **, 
+                            TimeCourse **, 
+                            float,
+                            float,
+                            float,
+                            float);
+
+extern void tf_binding_event(GillespieRates *, CellState *, Genotype *, 
+                             KonStates *, float *, TimeCourse **, TimeCourse **,
+                             float, float, float, int, int);
+
+extern void tf_unbinding_event(GillespieRates *, CellState *, Genotype *, 
+                               KonStates *, float *, TimeCourse **, TimeCourse **,
+                               float, float, float, float);
+
+extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, 
+                             KonStates *, float *, TimeCourse **, TimeCourse **,
+                             float, float, float);
+
+extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, 
+                                      KonStates *, TimeCourse **, TimeCourse **,
+                                      float, float);
+
+extern void histone_deacteylation_event(GillespieRates *, CellState *, Genotype *, 
+                                        KonStates *, TimeCourse **, TimeCourse **,
+                                        float, float);
+
+extern void assemble_PIC_event(GillespieRates *, CellState *, Genotype *, 
+                               KonStates *, TimeCourse **, TimeCourse **,
+                               float, float);
+
+extern void disassemble_PIC_event(GillespieRates *, CellState *, Genotype *, 
+                                  KonStates *, TimeCourse **, TimeCourse **,
+                                  float, float, float);
+
+extern void transcription_init_event(GillespieRates *, CellState *, Genotype *,
+                                     KonStates *, TimeCourse **, TimeCourse **,
+                                     float, float, float);
+
+
+extern void shift_binding_site_ids(CellState *, 
+                                   KonStates *,
+                                   int,
+                                   int);
+
+extern void replicate_gene(CellState *,
+                           Genotype *,
+                           GillespieRates *,
+                           KonStates *,
+                           float *,
+                           int,
+                           float);
+
+extern void develop(Genotype *,
+                    CellState *,
+                    float , /* in Kelvin */
+                    TimeCourse **,
+                    TimeCourse **);
+
+extern void print_time_course(TimeCourse *,
+                              int);
 
 
 

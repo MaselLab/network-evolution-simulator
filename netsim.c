@@ -22,57 +22,50 @@
 #include "lib.h"
 #include "netsim.h"
 
-static const int maxelements=500*MAX_PLOIDY; 
+const int maxelements=500*MAX_PLOIDY; 
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
-static const int maxbound=500*MAX_PLOIDY;
-static const int PopSize=1;
-static const int nmin=4;
-static const float kon=1e-4; /* lower value is so things run faster */
+const int maxbound=500*MAX_PLOIDY;
+const int PopSize=1;
+const int nmin=4;
+const float kon=1e-4; /* lower value is so things run faster */
 /* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
    and 89% of the proteins being in the nucleus*/
-static const float kRNA=618.0;
-static const float ttranslation=1.0;
-static const float ttranscription=1.0;
-static const float pact=0.62;
-static const float transcriptinit=8.5; /* replace betaon and betaoff */
-static const float deacetylate=0.462;
-static const float acetylate=0.1155;
-static const float PICassembly=0.0277;
-static const float startnucleus=0.1;
-static const float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
-static const float GasConstant=8.31447;
-static const float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
-static const float cooperative_distance=11;  /* distance co-operativity operates, changed from 20 */ 
-static const float NumSitesInGenome = 1.3e+6; /* updated from 1.8e+6 */
-static const float selection = 1.0;
+const float kRNA=618.0;
+const float ttranslation=1.0;
+const float ttranscription=1.0;
+const float pact=0.62;
+const float transcriptinit=8.5; /* replace betaon and betaoff */
+const float deacetylate=0.462;
+const float acetylate=0.1155;
+const float PICassembly=0.0277;
+const float startnucleus=0.1;
+const float Kr=10;    /* don't put this less than 1, weird things happen to koff calculation */
+const float GasConstant=8.31447;
+const float cooperativity=1.0;/* dGibbs, relative to 1 additional specific nt */
+const float cooperative_distance=11;  /* distance co-operativity operates, changed from 20 */ 
+const float NumSitesInGenome = 1.3e+6; /* updated from 1.8e+6 */
+const float selection = 1.0;
 
-static const float mN = 0.1;
-static const int Generations=5;
+const float mN = 0.1;
+const int Generations=5;
 
-static float tdevelopment=120.0;  /* default maximum development time: can be changed at runtime */
-static int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
-static int output = 0;
-static long seed = 28121;         /* something is wrong here: changing seed changes nothing */
-static int dummyrun=4;            /* used to change seed */
-static float critical_size = 1.0; /* critical size at which cell divides, 
+float tdevelopment=120.0;  /* default maximum development time: can be changed at runtime */
+int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
+int output = 0;
+long seed = 28121;         /* something is wrong here: changing seed changes nothing */
+int dummyrun=4;            /* used to change seed */
+float critical_size = 1.0; /* critical size at which cell divides, 
                                      set to negative to prevent division  */
 
 /* file output parameters */
-static char *output_directory = "output";
+char *output_directory = "output";
 int verbose = 0;
-FILE *fperrors;
-FILE *fp_cellsize;
-FILE *fp_growthrate;
-FILE *fp_tfsbound;
 
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */
-static float protein_aging = 1e-4;
+float protein_aging = 1e-4;
 
-/* growth rate parameters globally used during simulation */
-static float Pp;         
-static float h;
-static float gmax;
+
 
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
@@ -252,8 +245,8 @@ void initialize_genotype(Genotype *indiv,
 }
 
 void mutate(Genotype *gene,
-	    int geneID,
-	    int geneCopy,
+            int geneID,
+            int geneCopy,
             float m)
 {
   int i, j, k, p, q;
@@ -396,7 +389,7 @@ void calc_all_binding_sites(int ploidy[NGENES],
                             int *newBindSiteCount,
                             AllTFBindingSites **allBindingSites,
                             int hindPos[NGENES],
-			    int tfsPerGene[NGENES])
+                            int tfsPerGene[NGENES])
 {
   int p, maxBindingSiteAlloc, bindSiteCount;
   int geneID;
@@ -1936,7 +1929,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
 }
 
 void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes, 
-                      KonStates *konStates, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                        KonStates *konStates, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
                         float konrate, float dt, float t, float x)
 {
   int i, j = -1;
@@ -2189,9 +2182,9 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
 /* Helper function that shifts siteIDs in KonStates, tfHinderedIndexes
    and tfBoundIndexes after a position by the specified offset */
 void shift_binding_site_ids(CellState *state, 
-			    KonStates *konStates,
-			    int end,
-			    int offset)
+                            KonStates *konStates,
+                            int end,
+                            int offset)
 {
   int i, j, k, siteID;
 
@@ -2728,147 +2721,3 @@ void print_time_course(TimeCourse *start,
   fclose(fpout);  
 }
 
-int main(int argc, char *argv[])
-{
-  FILE *fpout, *fpkdis;
-  char fperrors_name[80];
-  char fp_cellsize_name[80];
-  char fp_growthrate_name[80];
-  char fp_tfsbound_name[80];
-  int i, j, k, gen;
-  CellState state;
-  Genotype indivs[PopSize];
-  TimeCourse *timecoursestart[NGENES]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[NGENES];
-  TimeCourse *start;
-  float initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
-
-  int c, directory_success;
-  int hold_genotype_constant = 0;
-  int curr_seed;
-
-  initialize_growth_rate_parameters();
-
-  /* parse command-line options */
-  while ((c = getopt (argc, argv, "hvgd:r:p:t:c:")) != -1) {
-    switch (c)
-      {
-      case 'd':
-        output_directory = optarg;
-        break;
-      case 'r':
-        dummyrun = atoi(optarg);
-        break;
-      case 'p':
-        current_ploidy = atoi(optarg);
-        break;
-      case 't':
-        tdevelopment = atof(optarg);
-        break;
-      case 'c':
-        critical_size = atof(optarg);
-        break;
-      case 'g':
-        hold_genotype_constant = 1;
-        break;
-      case 'v':
-        verbose = 1;
-        break;
-      case 'h':
-        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-g] [-p PLOIDY] [-t DEVELOPMENTTIME] [-c CRITICALSIZE]\n", argv[0]);
-        exit(0);
-        break;
-      default:
-        abort();
-      }
-  }
-
-  /* create output directory if needed */
-#ifdef __unix__
-  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
-#else 
-#ifdef __WIN32__
-  directory_success = mkdir(output_directory);
-#endif
-#endif
-
-  if (directory_success==-1) 
-    if (errno == EEXIST) {
-      fprintf(stderr, "directory '%s' already exists\n", output_directory);
-    } else {
-      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
-      exit(-1);
-    }
-
-  /* create error output file */
-  sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
-  fperrors = fopen(fperrors_name, "w");
-
-  /* create output files for cell size */
-  sprintf(fp_cellsize_name, "%s/cellsize.dat", output_directory);
-  if ((fp_cellsize = fopen(fp_cellsize_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
-
-  /* create output files for growth rate */
-  sprintf(fp_growthrate_name, "%s/growthrate.dat", output_directory);
-  if ((fp_growthrate = fopen(fp_growthrate_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
-
-  sprintf(fp_tfsbound_name, "%s/tfsbound.dat", output_directory);
-  if ((fp_tfsbound = fopen(fp_tfsbound_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
-
-  /* slight hack to initialize seed  */
-
-  if (!hold_genotype_constant)
-    for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
-
-  /* initialize protein concentrations */
-  for (i=0; i<NGENES; i++) {
-    initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
-    initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
-  }
-
-  /* get the kdis.txt values */
-  fpkdis = fopen("kdis.txt","r");
-  for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
-    fscanf(fpkdis,"%f", &kdis[j]);
-  }
-  fclose(fpkdis);
-
-  /* now create the population of cells */
-  for (j = 0; j < PopSize; j++) {
-    if (j==PopSize-1) output=1;
-    initialize_genotype(&indivs[j], kdis);
-    /* if genotype is held constant, start varying the seed *after*
-       initialize_genotype, so we can run the same genotype with
-       slightly different amounts of noise  */
-    if (hold_genotype_constant)
-      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
-         ran1(&seed);
-   
-    initialize_cell(&state, indivs[j].ploidy, indivs[j].mRNAdecay, initmRNA, initProteinConc);
-
-    /* print binding sites */
-    print_all_binding_sites(indivs[j].ploidy, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
-                            indivs[j].transcriptionFactorSeq, indivs[j].cisRegSeq); 
-
-    develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
-    fprintf(fperrors,"indiv %d\n",j);
-    for (i=0; i < NGENES; i++) {
-      if ((output) && j==PopSize-1) print_time_course(timecoursestart[i], i);
-      if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
-      delete_time_course(timecoursestart[i]);
-      timecoursestart[i] = timecourselast[i] = NULL;
-    }
-    free_mem_CellState(&state);
-  }
-
-  for (j = 0; j < PopSize; j++) {
-    free(indivs[j].allBindingSites);
-  }
-  fclose(fperrors);
-  fclose(fp_cellsize);
-  fclose(fp_growthrate);
-  fclose(fp_tfsbound);
-}
