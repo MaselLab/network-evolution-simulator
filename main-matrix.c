@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
   char fperrors_name[80];
   int i, j, k;
   Genotype indiv;
-  float initmRNA[NGENES], initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
+  float initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
 
   int c, directory_success;
   int hold_genotype_constant = 0;
@@ -105,7 +105,6 @@ int main(int argc, char *argv[])
   /* Jasmin: you can use these initial concentrations for computing your kons */
   for (i=0; i<NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
-    initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
   }
 
   /* create sequences and binding site matrix */
@@ -114,6 +113,13 @@ int main(int argc, char *argv[])
   /* print binding sites */
   print_all_binding_sites(indiv.ploidy, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq); 
+
+  /* Jasmin:
+     pseudo-code for looping (see also print_all_binding_sites in netsim.c):
+
+     for i=0 i < indiv.bindSiteCount i++
+       indiv.allBindingSites[i]
+  */
 
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
