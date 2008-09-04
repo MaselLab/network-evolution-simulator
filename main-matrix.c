@@ -15,31 +15,22 @@
 #include "lib.h"
 #include "netsim.h"
 
-//int verbose;
-//FILE *fperrors;
-
-
 int main(int argc, char *argv[])
 {
-  FILE *fpout, *fpkdis;
+  FILE *fpkdis;
   char fperrors_name[80];
-  char fp_cellsize_name[80];
-  char fp_growthrate_name[80];
-  char fp_tfsbound_name[80];
-  int i, j, k, gen;
-  CellState state;
+  int i, j, k;
   Genotype indiv;
-  TimeCourse *timecoursestart[NGENES]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[NGENES];
-  TimeCourse *start;
-  float initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
+  float initmRNA[NGENES], initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
 
   int c, directory_success;
   int hold_genotype_constant = 0;
   int curr_seed;
 
   verbose = 0;
-  initialize_growth_rate_parameters();
+
+  /* change to get a different genotype */
+  dummyrun = 4;
 
   /* parse command-line options */
   while ((c = getopt (argc, argv, "hvgd:r:p:t:c:")) != -1) {
@@ -75,7 +66,7 @@ int main(int argc, char *argv[])
       }
   }
 
-  /* create output directory if needed */
+/* create output directory if needed */
 #ifdef __unix__
   directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
 #else 
@@ -92,34 +83,41 @@ int main(int argc, char *argv[])
       exit(-1);
     }
 
-  /* create error output file */
   sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
   fperrors = fopen(fperrors_name, "w");
-
-
-  /* initialize protein concentrations */
-  for (i=0; i<NGENES; i++) {
-    initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
-    initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
-  }
 
   /* get the kdis.txt values */
   fpkdis = fopen("kdis.txt","r");
   for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
     fscanf(fpkdis,"%f", &kdis[j]);
   }
-  fclose(fpkdis);
+  fclose(fpkdis); 
 
+  /* change random number */
+  for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+
+
+  /**********************************************************************
+   *  modifiable part starts here
+   **********************************************************************/
+
+  /* initialize protein and mRNA concentrations */
+  /* Jasmin: you can use these initial concentrations for computing your kons */
+  for (i=0; i<NGENES; i++) {
+    initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
+    initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
+  }
+
+  /* create sequences and binding site matrix */
   initialize_genotype(&indiv, kdis);
-  
-  initialize_cell(&state, indiv.ploidy, indiv.mRNAdecay, initmRNA, initProteinConc);
   
   /* print binding sites */
   print_all_binding_sites(indiv.ploidy, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq); 
-  
-  free_mem_CellState(&state);
+
+  /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
   
+  /* close error file */
   fclose(fperrors);
 }
