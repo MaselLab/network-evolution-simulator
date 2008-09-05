@@ -160,31 +160,39 @@ void print_arrayT(struct Ttype *arrayT, int rowCount){
      
     // system("PAUSE");
      p=0;
-     if (sparseMatrix1 = fopen("sparseMatrix1.txt", "w")){
+     sparseMatrix1 = fopen("sparseMatrix1.txt", "w");
+     //if (sparseMatrix1 = fopen("sparseMatrix1.txt", "w")){
         //ask alex about this line of code...
-       fprintf(sparseMatrix1, "1Row  Column  Value\n\n");
-       //printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
-       fprintf(sparseMatrix1, "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
+       //fprintf(sparseMatrix1, "1Row  Column  Value\n\n");
+        printf( "1Row  Column  Value\n\n");
+       //fprintf(sparseMatrix1, "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
+       printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
    // system("PAUSE");
     
      while (p < rowCount) {
        q=0;
        while (q < arrayT[p].colCount) { 
-          fprintf(sparseMatrix1, " %d  ", arrayT[p].row+1);
+          /*fprintf(sparseMatrix1, " %d  ", arrayT[p].row+1);
     	  fprintf(sparseMatrix1, " %d    ", arrayT[p].col[q].colnum+1);
-	      fprintf(sparseMatrix1, " %.2f \n", *arrayT[p].col[q].kval);  
-          //printf( "\n\nValue%d: %.2f\n",q, *arrayT[p].col[q].kval);    
+	      fprintf(sparseMatrix1, " %.2f \n", *arrayT[p].col[q].kval);  */
+          //printf( "\n\nValue%d: %.2f\n",q, *arrayT[p].col[q].kval);   
+          
+          printf( " %d  ", arrayT[p].row+1);
+    	  printf( " %d    ", arrayT[p].col[q].colnum+1);
+	      printf( " %.2f \n", *arrayT[p].col[q].kval);   
     	  q++;
   	  
        }
        p++; 
-       fprintf(sparseMatrix1, "\n");   
+       //fprintf( "\n"); 
+       printf( "\n");   
     }
-    fprintf(sparseMatrix1, "\n");
-    //fclose(sparseMatrix1);
-  }else{
-    printf("Error printing to File");
-  }  
+    //fprintf( "\n"); 
+    printf( "\n");
+    fclose(sparseMatrix1);
+  //}else{
+  //  printf("Error printing to File");
+  //}  
 } 
 
 //prints the Xvector
@@ -218,7 +226,7 @@ int main(int argc, char *argv[])
   print_arrayT(arrayT, rowCount);
   
 
-  fclose(sparseMatrix1);
+  //fclose(sparseMatrix1);
   
   for (d=0; d<rowCount; d++) {
        free(arrayT[d].col);
