@@ -15,6 +15,11 @@
 #include "lib.h"
 #include "netsim.h"
 
+int intcmp(const void *a, const void *b)
+{
+    return *(int *)a - *(int *)b;
+}
+
 int main(int argc, char *argv[])
 {
   FILE *fpkdis;
@@ -111,15 +116,36 @@ int main(int argc, char *argv[])
   initialize_genotype(&indiv, kdis);
   
   /* print binding sites */
-  print_all_binding_sites(indiv.ploidy, indiv.allBindingSites, indiv.bindSiteCount, 
+  /*print_all_binding_sites(indiv.ploidy, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq); 
+  //printf("tfsPerGene = %d", indiv.tfsPerGene);
 
   /* Jasmin:
-     pseudo-code for looping (see also print_all_binding_sites in netsim.c):
+     pseudo-code for looping (see also print_all_binding_sites in netsim.c):*/
+    int sitePos[10];
 
-     for i=0 i < indiv.bindSiteCount i++
-       indiv.allBindingSites[i]
-  */
+
+     for(i=0; i < indiv.bindSiteCount; i++){
+       if(indiv.allBindingSites[i].cisregID == 0 && i<10){
+         printf("numBS=%d\n", i);
+         printf("regID=%d\n", indiv.allBindingSites[i].cisregID);
+         printf("  position=%d\n", indiv.allBindingSites[i].leftEdgePos);
+         sitePos[i]=indiv.allBindingSites[i].leftEdgePos;
+         }
+       }
+       
+     for(j=0;j<10;j++){
+     printf("%d\n", sitePos[j]);
+     }
+     printf("\n");
+     
+    qsort(sitePos, 10, sizeof(int), intcmp);
+
+
+       for(j=0;j<10;j++){
+     printf("%d\n", sitePos[j]);
+     }
+      
   system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
