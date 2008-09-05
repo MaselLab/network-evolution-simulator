@@ -239,7 +239,7 @@ void initialize_genotype(Genotype *indiv,
     //genes->replication_time[i] = 30.0*ran1(&seed);
     // TODO: don't make random for the moment
     indiv->replication_time[i] = 30.0*(i/(float)NGENES);
-    printf("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
+    //printf("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
   }
   fprintf(fperrors,"\n");
 }
