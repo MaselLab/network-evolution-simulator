@@ -192,7 +192,6 @@ void initialize_genotype(Genotype *indiv,
       } else  {
       indiv->hindrancePositions[p]=rand()%10;
     }
-    printf(" %d\n", indiv->hindrancePositions[p]);
   } 
 
   calc_all_binding_sites(indiv->ploidy, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
