@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
      for i=0 i < indiv.bindSiteCount i++
        indiv.allBindingSites[i]
   */
-
+  system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
   

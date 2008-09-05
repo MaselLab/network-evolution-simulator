@@ -2720,4 +2720,3 @@ void print_time_course(TimeCourse *start,
   }
   fclose(fpout);  
 }
-
