@@ -40,27 +40,27 @@ DIFF_CMD := @diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --ex
 
 ## check specific directory
 check-haploid:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=1 -DHIND_LENGTH=15" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DNO_SEPARATE_GENE" netsim-check
 	./netsim-check -r 4 -p 1 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2008-08-29-haploid-dilution-hind-15-r-4,$(DIFF_CMD)))
 
 check-diploid:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE" netsim-check
 	./netsim-check -r 4 -p 2 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2008-08-29-diploid-dilution-hind-15-r-4,$(DIFF_CMD)))
 
 check-replication:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE" netsim-check
 	./netsim-check -r 4 -p 2 -d output -c 0.55
 	$(subst RUN,output,$(subst ORIG,2008-08-29-replication-dilution-hind-15-r-4,$(DIFF_CMD)))
 
 check-selection:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15 -DSELECTION_GENE=10" netsim-selection
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0
 	$(subst RUN,selection,$(subst ORIG,2008-09-23-selection-r-4,$(DIFF_CMD)))
 
 check-sample-output:	clean
-	make EXTRACFLAGS="-m32 -DPLOIDY=2 -DHIND_LENGTH=15 -DSELECTION_GENE=10" netsim-selection
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0 -t 150
 	$(subst RUN,selection,$(subst ORIG,2008-08-29-sample-output-11genes-diploid-r-4,$(DIFF_CMD)))
 

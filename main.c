@@ -135,10 +135,10 @@ int main(int argc, char *argv[])
       for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
          ran1(&seed);
    
-    initialize_cell(&state, indivs[j].ploidy, indivs[j].mRNAdecay, initmRNA, initProteinConc);
+    initialize_cell(&state, indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
 
     /* print binding sites */
-    print_all_binding_sites(indivs[j].ploidy, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
+    print_all_binding_sites(indivs[j].copies, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
                             indivs[j].transcriptionFactorSeq, indivs[j].cisRegSeq); 
 
     develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);

@@ -13,16 +13,18 @@
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
 
-#ifndef MAX_PLOIDY
-#define MAX_PLOIDY 4       /* each gene can potentially exist as a tetraploid during replication */
+#ifndef MAX_COPIES
+#define MAX_COPIES 4       /* each gene can potentially exist as a tetraploid during replication */
 #endif
 
-#ifndef SELECTION_GENE
-#define NGENES 10          /* number of genes */
-#define SELECTION_GENE 9   /* set a default if there is none */
+#ifdef  NO_SEPARATE_GENE
+#define TFGENES 10          /* number of genes encoding TFs */
+#define NGENES TFGENES      /* total number of genes */
+#define SELECTION_GENE 9    /* index of selection gene */
 #else
-#define NGENES 11          /* if we are selecting on a gene, increment total by one */
-#define SKIP_GENE 1        /* don't include output of gene as a TF */
+#define TFGENES 10          /* number of genes encoding TFs */
+#define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total */
+#define SELECTION_GENE TFGENES   /* index of selection gene */
 #endif
 
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
@@ -97,11 +99,11 @@ struct GillespieRates {
   float minSalphc;         /* rates[6] */
 
   /* number of genes in the following states */
-  int acetylationCount[MAX_PLOIDY];       /* rates2[0] */
-  int deacetylationCount[MAX_PLOIDY];     /* rates2[1] */
-  int picAssemblyCount[MAX_PLOIDY];       /* rates2[2] */
-  int transcriptInitCount[MAX_PLOIDY];    /* rates2[3] */
-  int picDisassemblyCount[MAX_PLOIDY];    /* rates2[4] */
+  int acetylationCount[MAX_COPIES];       /* rates2[0] */
+  int deacetylationCount[MAX_COPIES];     /* rates2[1] */
+  int picAssemblyCount[MAX_COPIES];       /* rates2[2] */
+  int transcriptInitCount[MAX_COPIES];    /* rates2[3] */
+  int picDisassemblyCount[MAX_COPIES];    /* rates2[4] */
 
   /* total, including rates2 */
   float total;                /* rates[7] */
@@ -161,7 +163,7 @@ struct AllTFBindingSites {
   int sitePos;      /* start position of recognition site, always with reference to forward strand*/
   int strand;       /* strand 0 (forward) or 1 (backward)*/
   int hammingDist;  /* hamming distance */
-  int geneCopy;     /* which copy of gene, 0 to MAX_PLOIDY-1 */
+  int geneCopy;     /* which copy of gene, 0 to MAX_COPIES-1 */
   int hindPos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
   int leftEdgePos;  /* start position of HIND_LENGTH bp hindrance */
 /* since leftEdgePos + hindPos should = sitePos, one of these should go */
@@ -169,8 +171,8 @@ struct AllTFBindingSites {
 
 typedef struct Genotype Genotype;
 struct Genotype {
-  char cisRegSeq[NGENES][MAX_PLOIDY][CISREG_LEN];
-  char transcriptionFactorSeq[NGENES][MAX_PLOIDY][TF_ELEMENT_LEN];
+  char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN];
+  char transcriptionFactorSeq[NGENES][MAX_COPIES][TF_ELEMENT_LEN];
   int hindrancePositions[NGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int bindSiteCount;
   AllTFBindingSites *allBindingSites;
@@ -178,9 +180,9 @@ struct Genotype {
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
-  int activating[NGENES][MAX_PLOIDY]; /* 1 is activating, 0 is repressing */
-  float PICdisassembly[NGENES][MAX_PLOIDY];
-  int ploidy[NGENES];                 /* current per-gene ploidy */
+  int activating[NGENES][MAX_COPIES]; /* 1 is activating, 0 is repressing */
+  float PICdisassembly[NGENES][MAX_COPIES];
+  int copies[NGENES];                 /* current per-gene ploidy */
   float replication_time[NGENES];     /* per-gene replication time */
 };
 
@@ -221,7 +223,7 @@ struct CellState {
    * 2nd elem gives corresponding index of inhibiting TF in all_binding_sites, so that we know when to release hindrance
    * binding sites can be hindered more than once, then multiple constraints must be lifted before TF binding
    */
-  int active[NGENES][MAX_PLOIDY];
+  int active[NGENES][MAX_COPIES];
   /* gives the state of each of the genes, according to figure
      1 is fully off, 2 meets TF criteria
      3 is off but w/o nucleosome, 4 is on but w/o PIC
@@ -229,7 +231,7 @@ struct CellState {
   */
 
   /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  int statechangeIDs[5][MAX_PLOIDY][NGENES]; 
+  int statechangeIDs[5][MAX_COPIES][NGENES]; 
   float RTlnKr;
   float temperature;
 };
@@ -297,8 +299,8 @@ float gmax;
 
 
 extern void calc_all_binding_sites(int [NGENES],
-                                   char [NGENES][MAX_PLOIDY][CISREG_LEN],
-                                   char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
+                                   char [NGENES][MAX_COPIES][CISREG_LEN],
+                                   char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                    int *,
                                    AllTFBindingSites **,
                                    int [NGENES],
@@ -313,8 +315,8 @@ extern void initialize_sequence(char [], int, int);
 extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
-                                    char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
-                                    char [NGENES][MAX_PLOIDY][CISREG_LEN]);
+                                    char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
+                                    char [NGENES][MAX_COPIES][CISREG_LEN]);
 
 extern void print_tf_occupancy(CellState *,
                                AllTFBindingSites *,
@@ -328,8 +330,8 @@ extern void mutate(Genotype *,
                    int,
                    float);
 
-extern int calc_all_binding_sites_sister(char [NGENES][MAX_PLOIDY][CISREG_LEN],
-                                         char [NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
+extern int calc_all_binding_sites_sister(char [NGENES][MAX_COPIES][CISREG_LEN],
+                                         char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                          int ,
                                          AllTFBindingSites **,
                                          int *,
@@ -339,8 +341,8 @@ extern int calc_all_binding_sites_sister(char [NGENES][MAX_PLOIDY][CISREG_LEN],
 
 
 extern void calc_all_binding_sites(int [NGENES],
-                                   char[NGENES][MAX_PLOIDY][CISREG_LEN],
-                                   char[NGENES][MAX_PLOIDY][TF_ELEMENT_LEN],
+                                   char[NGENES][MAX_COPIES][CISREG_LEN],
+                                   char[NGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                    int *,
                                    AllTFBindingSites **,
                                    int [NGENES],
@@ -423,7 +425,7 @@ extern int ready_to_transcribe(int,
                                int *,
                                int,
                                AllTFBindingSites *,
-                               int [NGENES][MAX_PLOIDY],
+                               int [NGENES][MAX_COPIES],
                                int *);
 
 extern int is_one_activator(int,
@@ -431,7 +433,7 @@ extern int is_one_activator(int,
                             int *,
                             int,
                             AllTFBindingSites *,
-                            int [NGENES][MAX_PLOIDY]);
+                            int [NGENES][MAX_COPIES]);
 
 extern void calc_from_state(Genotype *,
                             CellState *,
@@ -540,9 +542,9 @@ extern void calc_num_bound(float[],
                            int );
 
 
-extern int sum_rate_counts(int, int[MAX_PLOIDY]);
+extern int sum_rate_counts(int[MAX_COPIES]);
 
-extern void get_gene(int, int [MAX_PLOIDY], int, int *, int *);
+extern void get_gene(int [MAX_COPIES], int, int *, int *);
 
 
 extern void transport_event(GillespieRates *,
