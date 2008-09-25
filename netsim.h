@@ -158,13 +158,12 @@ typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
   int cisregID;     /* cis-reg region */
   int tfID;         /* transcription factor */
-  int sitePos;      /* start position of recognition site, always with reference to forward strand*/
   int strand;       /* strand 0 (forward) or 1 (backward)*/
   int hammingDist;  /* hamming distance */
   int geneCopy;     /* which copy of gene, 0 to MAX_COPIES-1 */
+  int leftEdgePos;  /* start position of TF on DNA, always with reference to forward strand */
+                    /* note that recognition sitePos, can be computed from: (leftEdgePos+hindPos) */
   int hindPos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
-  int leftEdgePos;  /* start position of HIND_LENGTH bp hindrance */
-/* since leftEdgePos + hindPos should = sitePos, one of these should go */
 };
 
 typedef struct Genotype Genotype;

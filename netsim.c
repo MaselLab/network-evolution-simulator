@@ -109,8 +109,6 @@ void initialize_sequence(char Seq[],
     second = first + current_element;
     third = second + current_element;
     fourth = third + current_element;
-    /* first = i;
-       second = first + len/ploidy; */
     //printf("first=%d, second=%d, third=%d, fourth=%d\n", first, second, third, fourth); 
     x = ran1(&seed);
     Seq[first] = set_base_pair(x);
@@ -148,11 +146,10 @@ void print_all_binding_sites(int copies[NGENES],
     printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[allBindingSites[i].cisregID][allBindingSites[i].geneCopy]);
     printf(" transcription-factor: %3d", allBindingSites[i].tfID);
     printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[allBindingSites[i].tfID][allBindingSites[i].geneCopy]); 
-    printf("             position: %3d\n", allBindingSites[i].sitePos);
+    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, allBindingSites[i].leftEdgePos);        
+    printf("  Hind offset position: %3d\n", allBindingSites[i].hindPos); 
     printf("               strand: %3d\n", allBindingSites[i].strand);
     printf("         Hamming dist: %3d\n", allBindingSites[i].hammingDist); 
-    printf("        Hind position: %3d\n", allBindingSites[i].hindPos); 
-    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, allBindingSites[i].leftEdgePos);        
   }
 }
 
@@ -328,7 +325,6 @@ int calc_all_binding_sites_copy(char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
           (*allBindingSites)[bindSiteCount].cisregID = geneID;
           (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
           (*allBindingSites)[bindSiteCount].tfID = tfind;
-          (*allBindingSites)[bindSiteCount].sitePos = i;
           (*allBindingSites)[bindSiteCount].strand = 0;
           (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
           (*allBindingSites)[bindSiteCount].hindPos = hindPos[tfind];
@@ -362,7 +358,6 @@ int calc_all_binding_sites_copy(char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
           (*allBindingSites)[bindSiteCount].cisregID = geneID;
           (*allBindingSites)[bindSiteCount].geneCopy = geneCopy; 
           (*allBindingSites)[bindSiteCount].tfID = tfind;
-          (*allBindingSites)[bindSiteCount].sitePos = i-TF_ELEMENT_LEN+1;
           (*allBindingSites)[bindSiteCount].strand = 1;
           (*allBindingSites)[bindSiteCount].hammingDist = TF_ELEMENT_LEN-match;
           (*allBindingSites)[bindSiteCount].hindPos = hindPos[tfind];
@@ -598,8 +593,8 @@ void calc_time (float t,
 
   /* loop over all genes */
   for (i=0; i < NGENES; i++) {
-    /* if currently transcribing add it to the rates */
-    if (konStates->nkonsum[i]>0) {
+    /* if this particular TF is bound somewhere */
+    if (konStates->nkonsum[i] > 0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] * t;
       if (fabs(ct)<EPSILON) ect=ct;
       else ect = 1-exp(-ct);
