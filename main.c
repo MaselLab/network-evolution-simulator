@@ -1,3 +1,9 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- 
+/* 
+ * Yeast transcriptional network simulator
+ * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
+ * Copyright (c) 2007, 2008 Arizona Board of Regents (University of Arizona)
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -32,45 +38,48 @@ int main(int argc, char *argv[])
 
   int c, directory_success;
   int hold_genotype_constant = 0;
+  int output_binding_sites = 0;
   int curr_seed;
 
   verbose = 0;
   initialize_growth_rate_parameters();
 
   /* parse command-line options */
-  while ((c = getopt (argc, argv, "hvgd:r:p:t:c:")) != -1) {
-    switch (c)
-      {
-      case 'd':
-        output_directory = optarg;
+  while ((c = getopt (argc, argv, "ohvgd:r:p:t:c:")) != -1) {
+    switch (c)  {
+    case 'd':
+      output_directory = optarg;
+      break;
+    case 'r':
+      dummyrun = atoi(optarg);
+      break;
+    case 'p':
+      current_ploidy = atoi(optarg);
+      break;
+    case 't':
+      tdevelopment = atof(optarg);
+      break;
+    case 'c':
+      critical_size = atof(optarg);
+      break;
+    case 'g':
+      hold_genotype_constant = 1;
         break;
-      case 'r':
-        dummyrun = atoi(optarg);
-        break;
-      case 'p':
-        current_ploidy = atoi(optarg);
-        break;
-      case 't':
-        tdevelopment = atof(optarg);
-        break;
-      case 'c':
-        critical_size = atof(optarg);
-        break;
-      case 'g':
-        hold_genotype_constant = 1;
-        break;
-      case 'v':
-        verbose = 1;
-        break;
-      case 'h':
-        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-g] [-p PLOIDY] [-t DEVELOPMENTTIME] [-c CRITICALSIZE]\n", argv[0]);
-        exit(0);
-        break;
-      default:
-        abort();
-      }
+    case 'v':
+      verbose = 1;
+      break;
+    case 'h':
+      fprintf(stderr, "%s [-h] [-g] [-o] [-d DIRECTORY] [-r DUMMYRUN] [-p PLOIDY] [-t DEVELOPMENTTIME] [-c CRITICALSIZE]\n", argv[0]);
+      exit(0);
+      break;
+    case 'o':
+      output_binding_sites = 1;
+      break;
+    default:
+      abort();
+    }
   }
-
+  
   /* create output directory if needed */
 #ifdef __unix__
   directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
@@ -107,7 +116,6 @@ int main(int argc, char *argv[])
     fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
 
   /* slight hack to initialize seed  */
-
   if (!hold_genotype_constant)
     for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
 
@@ -138,8 +146,9 @@ int main(int argc, char *argv[])
     initialize_cell(&state, indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
 
     /* print binding sites */
-    print_all_binding_sites(indivs[j].copies, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
-                            indivs[j].transcriptionFactorSeq, indivs[j].cisRegSeq); 
+    if (output_binding_sites) 
+      print_all_binding_sites(indivs[j].copies, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
+                              indivs[j].transcriptionFactorSeq, indivs[j].cisRegSeq); 
 
     develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
     fprintf(fperrors,"indiv %d\n",j);

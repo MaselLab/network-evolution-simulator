@@ -40,9 +40,15 @@ Function/Structs:
 ----------------
 
 G                 AllTFBindingSites
-UpdateL           UpdateProteinConc
-CalcG             CalcInteractionMatrix
-ChangeSCyto       ChangemRNACyto
+UpdateL           update_protein_conc_cell_size
+CalcG             calc_all_binding_sites
+ChangeSCyto       change_mRNA_cytoplasm
+
+Defines
+-------
+
+TFGENES  total number of TF genes
+NGENES   total number of all genes + selection gene = TFGENES + 1
 
 New enum indices
 -----------------
@@ -73,6 +79,5 @@ nkon       total number of *available* binding sites
 nkonsum    total number of available binding sites on cis-reg sequence for a given TF
 
 
-Addkon, Removekon ?
 
 

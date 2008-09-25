@@ -99,14 +99,14 @@ struct GillespieRates {
   float minSalphc;         /* rates[6] */
 
   /* number of genes in the following states */
-  int acetylationCount[MAX_COPIES];       /* rates2[0] */
-  int deacetylationCount[MAX_COPIES];     /* rates2[1] */
-  int picAssemblyCount[MAX_COPIES];       /* rates2[2] */
-  int transcriptInitCount[MAX_COPIES];    /* rates2[3] */
-  int picDisassemblyCount[MAX_COPIES];    /* rates2[4] */
+  int acetylationCount[MAX_COPIES];       
+  int deacetylationCount[MAX_COPIES];     
+  int picAssemblyCount[MAX_COPIES];       
+  int transcriptInitCount[MAX_COPIES];    
+  int picDisassemblyCount[MAX_COPIES];    
 
-  /* total, including rates2 */
-  float total;                /* rates[7] */
+  /* total, including above */
+  float total;
 };
 
 /*
@@ -125,12 +125,10 @@ struct KonList {
 };
 /*
  * konStates : new composite data structure to cache information about
- * available binding sites to avoid re-computation.  This currently
- * just groups the previous data structures: 
+ * available binding sites to avoid re-computation.  This groups the
+ * previous data structures:
  *
  * konIDs, konvalues, nkonsum
- *
- * but will ultimately be refactored again for greater efficiency
  */
 typedef struct KonStates KonStates;
 struct KonStates {
@@ -147,10 +145,10 @@ struct KonStates {
   int nkonsum[NGENES];
 
   /* konvalues are rates of binding with:
-   * element 0 is other funny term (TODO ?)
+   * element 0 is (protein - salphc)/c
    * element 1 is c
    * element 2 is salphc
-   * Other index is which TF binds 
+   * second index is which TF binds 
    * The kon term is left out of all of them for computational efficiency
    */
   float konvalues[NGENES][3];
@@ -330,15 +328,14 @@ extern void mutate(Genotype *,
                    int,
                    float);
 
-extern int calc_all_binding_sites_sister(char [NGENES][MAX_COPIES][CISREG_LEN],
-                                         char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                         int ,
-                                         AllTFBindingSites **,
-                                         int *,
-                                         int ,
-                                         int ,
-                                         int [NGENES]);
-
+extern int calc_all_binding_sites_copy(char [NGENES][MAX_COPIES][CISREG_LEN],
+                                       char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
+                                       int ,
+                                       AllTFBindingSites **,
+                                       int *,
+                                       int ,
+                                       int ,
+                                       int [NGENES]);
 
 extern void calc_all_binding_sites(int [NGENES],
                                    char[NGENES][MAX_COPIES][CISREG_LEN],
@@ -418,7 +415,6 @@ extern void add_kon(float,
                     int,
                     GillespieRates *,
                     KonStates *);
-
 
 extern int ready_to_transcribe(int,
                                int,
@@ -512,7 +508,6 @@ extern float compute_tprime(float, float, float, float);
 
 extern float compute_integral(float, float, float, float, float, float, float, float, float);
 
-
 extern float compute_growth_rate_dimer(float *,
                                 float , 
                                 float ,
@@ -537,15 +532,12 @@ extern void update_protein_conc_cell_size(float[],
                                           TimeCourse **,
                                           float []);
 
-
 extern void calc_num_bound(float[],
                            int );
-
 
 extern int sum_rate_counts(int[MAX_COPIES]);
 
 extern void get_gene(int [MAX_COPIES], int, int *, int *);
-
 
 extern void transport_event(GillespieRates *,
                             CellState *,
@@ -591,7 +583,6 @@ extern void transcription_init_event(GillespieRates *, CellState *, Genotype *,
                                      KonStates *, TimeCourse **, TimeCourse **,
                                      float, float, float);
 
-
 extern void shift_binding_site_ids(CellState *, 
                                    KonStates *,
                                    int,
@@ -613,7 +604,5 @@ extern void develop(Genotype *,
 
 extern void print_time_course(TimeCourse *,
                               int);
-
-
 
 #endif /* !FILE_NETSIM_SEEN */

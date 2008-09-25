@@ -57,7 +57,7 @@ check-replication:	clean
 check-selection:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0
-	$(subst RUN,selection,$(subst ORIG,2008-09-23-selection-r-4,$(DIFF_CMD)))
+	$(subst RUN,selection,$(subst ORIG,2008-09-25-selection-r-4,$(DIFF_CMD)))
 
 check-sample-output:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15" netsim-selection

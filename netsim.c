@@ -55,7 +55,7 @@ int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
 int dummyrun=4;            /* used to change seed */
 float critical_size = 1.0; /* critical size at which cell divides, 
-                                     set to negative to prevent division  */
+                              set to negative to prevent division  */
 
 /* file output parameters */
 char *output_directory = "output";
@@ -64,8 +64,6 @@ int verbose = 0;
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */
 float protein_aging = 1e-4;
-
-
 
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
@@ -78,7 +76,22 @@ void initialize_growth_rate_parameters() {
   hc = (gpeak/Pp)*(1-(log(2-2*0.2)/log(2)));      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) 
                                                    * using {s=0.2, N=500} matches {s=10^-5, N=10^7} combination (both Ns=100) */
   h = hc/0.023;            /* using c=0.023/min from mean of distribution from Belle et al (2006)*/
-  gmax = gpeak + hc*(Pp+NGENES*Ltf);    /* compute the gmax coefficient based on gpeak and other parameters */
+  gmax = gpeak + hc*(Pp+(TFGENES*Ltf));    /* compute the gmax coefficient based on gpeak and other parameters */
+}
+
+char set_base_pair(float x) {
+  char base;
+
+  if (x<0.25)
+    base = 'a';
+  else if (x<0.5)
+    base = 'c';
+  else if (x<0.75)
+    base = 'g';
+  else 
+    base = 't';
+  
+  return base;
 }
 
 void initialize_sequence(char Seq[], 
@@ -100,13 +113,7 @@ void initialize_sequence(char Seq[],
        second = first + len/ploidy; */
     //printf("first=%d, second=%d, third=%d, fourth=%d\n", first, second, third, fourth); 
     x = ran1(&seed);
-    if (x<0.25)
-      Seq[first] = 'a';
-    else if (x<0.5)
-      Seq[first] = 'c';
-    else if (x<0.75)
-      Seq[first] = 'g';
-    else Seq[first] = 't';
+    Seq[first] = set_base_pair(x);
     /* clone the randomly chosen sequence for all other sites */
     Seq[second] = Seq[first];
     Seq[third] = Seq[first];
@@ -235,10 +242,11 @@ void initialize_genotype(Genotype *indiv,
 
   /* for each gene determine a time point during the [0, 30 min] S-phase interval */
   for (i=0; i<NGENES; i++) {
-    //genes->replication_time[i] = 30.0*ran1(&seed);
-    // TODO: don't make random for the moment
+    // TODO: use fixed times while testing, later will switch to random times
+    /* indiv->replication_time[i] = 30.0*ran1(&seed); */
     indiv->replication_time[i] = 30.0*(i/(float)NGENES);
-    //printf("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
+    if (verbose)
+      fprintf(fperrors, "offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
   }
   fprintf(fperrors,"\n");
 }
@@ -248,51 +256,45 @@ void mutate(Genotype *gene,
             int geneCopy,
             float m)
 {
-  int i, j, k, p, q;
+  int i, j, k, p;
   char x;
+  float q;
   
   for (k=0; k<CISREG_LEN; k++) {
 
     p = geneCopy;
     if (m > ran1(&seed)) {
       x = gene->cisRegSeq[geneID][p][k]; /* because sometimes gene and new are the same */
-      printf("in geneID=%2d, mutating pos=%3d, copy=%1d:", geneID, k, p);
+
+      if (verbose)
+        fprintf(fperrors, "in geneID=%2d, mutating pos=%3d, copy=%1d:", geneID, k, p);
       while (gene->cisRegSeq[geneID][p][k] == x) {
-	// TODO: should be moved to new function set_base_pair() and called from both 
-	// here and initialize_sequence()
-	float q = ran1(&seed);
-	if (q<0.25)
-	  gene->cisRegSeq[geneID][p][k] = 'a';
-	else if (x<0.5)
-	  gene->cisRegSeq[geneID][p][k] = 'c';
-	else if (x<0.75)
-	    gene->cisRegSeq[geneID][p][k] = 'g';
-	else gene->cisRegSeq[geneID][p][k] = 't';
+        q = ran1(&seed);
+        gene->cisRegSeq[geneID][p][k] = set_base_pair(q);
       }
-      printf(" '%c' -> '%c'\n", x, gene->cisRegSeq[geneID][p][k]);
+      if (verbose)
+        fprintf(fperrors, " '%c' -> '%c'\n", x, gene->cisRegSeq[geneID][p][k]);
     }
+
     /* TODO: following should be moved to a new create_cell() function
      * make this function strictly about mutation */
 
     /*  for (k=0; k<TF_ELEMENT_LEN; k++) 
-      for (p=0; p<MAX_COPIES; p++) 
-	new->transcriptionFactorSeq[geneID][p][k] = old->transcriptionFactorSeq[geneID][p][k];  
-    new->hindrancePositions[NGENES] = old->hindrancePositions[NGENES];  
-    new->mRNAdecay[geneID] = old->mRNAdecay[geneID];
-    new->proteindecay[geneID] = old->proteindecay[geneID];
-    new->translation[geneID] = old->translation[geneID];
-
-    for (j=0; j < current_ploidy; j++)  {
-      new->activating[geneID][j] = old->activating[geneID][j];
-      new->PICdisassembly[geneID][j] = old->PICdisassembly[geneID][j];
-      } */
+        for (p=0; p<MAX_COPIES; p++) 
+        new->transcriptionFactorSeq[geneID][p][k] = old->transcriptionFactorSeq[geneID][p][k];  
+        new->hindrancePositions[NGENES] = old->hindrancePositions[NGENES];  
+        new->mRNAdecay[geneID] = old->mRNAdecay[geneID];
+        new->proteindecay[geneID] = old->proteindecay[geneID];
+        new->translation[geneID] = old->translation[geneID];
+        
+        for (j=0; j < current_ploidy; j++)  {
+        new->activating[geneID][j] = old->activating[geneID][j];
+        new->PICdisassembly[geneID][j] = old->PICdisassembly[geneID][j];
+        } */
   }
-    //calc_all_binding_sites(old->copies, new->cisRegSeq, new->transcriptionFactorSeq, 
-    //                       &(new->bindSiteCount), &(new->allBindingSites), new->hindrancePositions);
 }
 
-// TODO: rename
-int calc_all_binding_sites_sister(char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
+int calc_all_binding_sites_copy(char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
                                   char transcriptionFactorSeq[NGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                   int bindSiteCount,
                                   AllTFBindingSites **allBindingSites,
@@ -403,18 +405,18 @@ void calc_all_binding_sites(int copies[NGENES],
       if (p < copies[geneID]) {  
         int before = bindSiteCount;
         /* if this particular gene has this copy number then generate binding sites
-        /* for all the relevant gene copies (assume no gene divergence) */
-        bindSiteCount = calc_all_binding_sites_sister(cisRegSeq, 
-                                                      transcriptionFactorSeq, 
-                                                      bindSiteCount,
-                                                      allBindingSites,
-                                                      &maxBindingSiteAlloc,
-                                                      geneID,
-                                                      p, 
-                                                      hindPos);
+           for all the relevant gene copies (assume no gene divergence) */
+        bindSiteCount = calc_all_binding_sites_copy(cisRegSeq, 
+                                                    transcriptionFactorSeq, 
+                                                    bindSiteCount,
+                                                    allBindingSites,
+                                                    &maxBindingSiteAlloc,
+                                                    geneID,
+                                                    p, 
+                                                    hindPos);
 
-	/* add the new number of sites */
-	tfsPerGene[geneID] += (bindSiteCount-before);
+        /* add the new number of sites */
+        tfsPerGene[geneID] += (bindSiteCount-before);
       }
     }
   }
@@ -544,7 +546,7 @@ void initialize_cell(CellState *indiv,
   /* start cell size at 0.5 */
   indiv->cellSize = 0.5;
 
-  /* TODO: initialize growth rate to zero or based on 120 min doubling? (i.e. 0.00578) */
+  /* initialize growth rate to zero (could also be based on 120 min doubling, i.e. 0.00578) */
   indiv->growthRate = 0.0;
 
   indiv->mRNATranscrTimeEnd = indiv->mRNATranscrTimeEndLast = NULL;
@@ -651,8 +653,6 @@ void change_mRNA_cytoplasm(int i,
   float salphc; 
   
   /* number of mRNAs in cytoplasm affects kon rates */
-  //salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / genes->proteindecay[i];
-  // TODO: check if OK to use KON_PROTEIN_DECAY_INDEX rather than genes->proteindecay[i]
   salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
   
   if (verbose)
@@ -662,11 +662,8 @@ void change_mRNA_cytoplasm(int i,
   rates->salphc += konStates->nkonsum[i]*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
   rates->maxSalphc += konStates->nkonsum[i]*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
   rates->minSalphc += konStates->nkonsum[i]*kon*(fminf(state->proteinConc[i], salphc) - fminf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));    
-  // konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / genes->proteindecay[i];
-  // TODO: check if OK to use KON_PROTEIN_DECAY_INDEX rather than genes->proteindecay[i]
   konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
   konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
-  //printf("change_mRNA_cytoplasm: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
 }
 
 void calc_koff(int k,
@@ -965,39 +962,6 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
                          FixedEvent *replicationTimeEnd,
                          float t)
 {
-
-  /*printf("t = %g ", t);
-  if (mRNATranscrTimeEnd == NULL)
-    printf("transcription is NULL ");
-  else
-    printf("transcription=%g ", mRNATranscrTimeEnd->time);
-  if (mRNATranslTimeEnd == NULL)
-    printf("translation is NULL ");
-  else
-    printf("translation=%g ", mRNATranslTimeEnd->time); 
-    printf("\n"); 
-  
-  if (mRNATranslTimeEnd==NULL) {
-  if (mRNATranscrTimeEnd==NULL) return(0);
-    else{
-      if (mRNATranscrTimeEnd->time<t) return(1);
-      else return(0);
-    }
-  } else {
-    if (mRNATranscrTimeEnd==NULL){
-      if (mRNATranslTimeEnd->time<t) return(2);
-      else return(0);
-    } else {
-      if (mRNATranscrTimeEnd->time < mRNATranslTimeEnd->time){
-        if (mRNATranscrTimeEnd->time < t) return(1);
-        else return(0);
-      } else {
-        if (mRNATranslTimeEnd->time < t) return(2);
-        else return(0);
-      }
-    }
-    } 
-  */
   int retval;
   float t1;
   float t2;
@@ -1011,7 +975,8 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
     t2 = mRNATranslTimeEnd ? mRNATranslTimeEnd->time : 9999.0;
     t3 = replicationTimeEnd ? replicationTimeEnd->time : 9999.0;
 
-    //printf("t1=%g, t2=%g, t3=%g [t=%g] ", t1, t2, t3, t);
+    if (verbose)
+      fprintf(fperrors, "check fixed event: t1=%g, t2=%g, t3=%g [t=%g] ", t1, t2, t3, t);
 
     if ((t1 < t2) && (t1 < t3) && (t1 < t)) { 
       if (mRNATranscrTimeEnd == NULL) retval = 0;
@@ -1030,7 +995,8 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
         retval = 0;
       }
   }
-  //printf("retval=%d\n", retval);
+  if (verbose)
+    fprintf(fperrors, "retval=%d\n", retval);
   return retval;  
 }
 
@@ -1649,7 +1615,6 @@ void update_protein_conc_cell_size(float proteinConc[],
       L = proteinConc[i];
 
     /* update protein decay rates due to dilution caused by growth */
-    /* TODO: currently disabled */
     adjusted_decay = genes->proteindecay[i] + state->growthRate;
 
     /* if this results in a zero decay rate, use protein aging term */
@@ -1658,7 +1623,8 @@ void update_protein_conc_cell_size(float proteinConc[],
     else 
       konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = protein_aging;
 
-    //printf("update_protein_conc: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
+    if (verbose)
+      fprintf(fperrors, "update_protein_conc: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
 
     ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
@@ -1852,31 +1818,30 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
               k, konStates->konList[k]->site_count, konrate2_for_TF, total_konrate2, x); 
 
     /* if we are already in the appropriate TF, now choose a binding site */
-    if (!(x > total_konrate2) || (k == TFGENES - 1)) 
-      {
-        float konrate2 = 0.0;
-        
-        if (verbose) 
-          fprintf(fperrors, "selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); 
+    if (!(x > total_konrate2) || (k == TFGENES - 1)) {
+      float konrate2 = 0.0;
       
-        while (l < konStates->konList[k]->site_count && x > konrate2) {
-          /* this will record the last binding site before we
-             reach the appropriate binding site  */
-          l++;
-
-          /* get ID of site */
-          siteID = konStates->konList[k]->available_sites[l];
+      if (verbose) 
+        fprintf(fperrors, "selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); 
+      
+      while (l < konStates->konList[k]->site_count && x > konrate2) {
+        /* this will record the last binding site before we
+           reach the appropriate binding site  */
+        l++;
         
-          if (verbose)
-            fprintf(fperrors, "l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); 
-
-          /* adjust random number */
-          konrate2 = konrate2_for_TF;
-          x -= konrate2;
-        }
-        /* found it, so break out of the outer for loop */
-        break;
-      } else {
+        /* get ID of site */
+        siteID = konStates->konList[k]->available_sites[l];
+        
+        if (verbose)
+          fprintf(fperrors, "l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); 
+        
+        /* adjust random number */
+        konrate2 = konrate2_for_TF;
+        x -= konrate2;
+      }
+      /* found it, so break out of the outer for loop */
+      break;
+    } else {
       x -= total_konrate2; 
     }
     
@@ -2196,7 +2161,7 @@ void shift_binding_site_ids(CellState *state,
   }
 }
 
-/* eject TFs and replicate DNA   */
+/* eject TFs and replicate DNA */
 void replicate_gene(CellState *state,
                     Genotype *genes,
                     GillespieRates *rates,
@@ -2237,10 +2202,9 @@ void replicate_gene(CellState *state,
     fprintf(fperrors, "number of binding sites before adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
   
   /* do mutation */
-  // TODO: decide on whether both copies get mutated or just duplicated one
-  // TODO: currently disabled
-  //for (p=0; p<2*current_ploidy; p++)
-  //  mutate(genes, geneID, p, 0.01);
+  // TODO: currently disabled, re-enable when multiple cells created
+  // for (p=0; p<2*current_ploidy; p++)
+  //   mutate(genes, geneID, p, 0.01);  
 
   /* record number of TFBS pre-replication */
   number_tfbs_pre_replication = genes->tfsPerGene[geneID];
@@ -2402,11 +2366,10 @@ void develop(Genotype *genes,
   while (t < tdevelopment && t < division_time) {  /* run until development stops */
 
     /* compute S-phase offsets */
-    /* TODO: currently disabled until new regression output is generated */
     if (critical_size > 0.0 && state->cellSize >= critical_size && !state->in_s_phase)  { /* run until checkpoint reached */
       reach_s_phase(state, genes, t);
       division_time = t + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
-					  * a further 30 mins of growth after S phase */
+                                          * a further 30 mins of growth after S phase */
       printf("cell will divide at t=%g\n", division_time);
     }
 
