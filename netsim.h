@@ -23,7 +23,7 @@
 #define SELECTION_GENE 9    /* index of selection gene */
 #else
 #define TFGENES 10          /* number of genes encoding TFs */
-#define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total */
+#define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
 #define SELECTION_GENE TFGENES   /* index of selection gene */
 #endif
 
