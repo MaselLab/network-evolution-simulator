@@ -122,7 +122,10 @@ int main(int argc, char *argv[])
 
   /* Jasmin:
      pseudo-code for looping (see also print_all_binding_sites in netsim.c):*/
+     //system("PAUSE");
     int sitePos[10];
+    int transFactor[10];
+    //int *startPos = calloc(indiv.bindSiteCount, sizeof(int));
 
 
      for(i=0; i < indiv.bindSiteCount; i++){
@@ -130,21 +133,32 @@ int main(int argc, char *argv[])
          printf("numBS=%d\n", i);
          printf("regID=%d\n", indiv.allBindingSites[i].cisregID);
          printf("  position=%d\n", indiv.allBindingSites[i].leftEdgePos);
+         printf(" transcription-factor: %3d\n", indiv.allBindingSites[i].tfID);
+         //printf("  p=%d, tf=%d\n", indiv.allBindingSites[i].leftEdgePos, indiv.allBindingSites[i].tfID);
+         //transFactor[i] = indiv.allBindingSites[i].tfID;
          sitePos[i]=indiv.allBindingSites[i].leftEdgePos;
          }
        }
-       
-     for(j=0;j<10;j++){
-     printf("%d\n", sitePos[j]);
-     }
-     printf("\n");
      
     qsort(sitePos, 10, sizeof(int), intcmp);
 
-
-       for(j=0;j<10;j++){
-     printf("%d\n", sitePos[j]);
+     int m;
+     for(j=0;j<10;j++){
+       printf("%d\n", sitePos[j]);
+       for(m=0; m<10;m++){
+         if(sitePos[j] == indiv.allBindingSites[m].leftEdgePos){
+            transFactor[j]= indiv.allBindingSites[m].tfID;
+         }
+       }
+    // printf("%d\n", initProteinConc[j]);
      }
+      printf("\n");
+     for(j=0;j<10;j++){
+     //printf("%d\n", sitePos[j]);
+     printf("%d  %d   %.3f\n", sitePos[j], transFactor[j], initProteinConc[(transFactor[j])]);
+     
+     }
+     printf("\n");
       
   system("PAUSE");
   /* free dynamically allocated all binding sites list */
