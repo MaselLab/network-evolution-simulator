@@ -118,17 +118,59 @@ int main(int argc, char *argv[])
   /* print binding sites */
   /*print_all_binding_sites(indiv.ploidy, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq); 
-  //printf("tfsPerGene = %d", indiv.tfsPerGene);
+  printf("tfsPerGene = %d", indiv.tfsPerGene);
 
   /* Jasmin:
      pseudo-code for looping (see also print_all_binding_sites in netsim.c):*/
      //system("PAUSE");
     int sitePos[10];
     int transFactor[10];
+    system("PAUSE");
+    struct AllTFBindingSites *rearranged;
+    rearranged = malloc(indiv.tfsPerGene[0]*sizeof(struct AllTFBindingSites));
+    rearranged[0] =indiv.allBindingSites[0];
+    printf("%d\n", indiv.allBindingSites[0].leftEdgePos);
+    printf("%d\n", rearranged[0].leftEdgePos);
     //int *startPos = calloc(indiv.bindSiteCount, sizeof(int));
-
-
-     for(i=0; i < indiv.bindSiteCount; i++){
+    system("PAUSE");
+    //printf("tfsPerGene = %d\n", indiv.tfsPerGene[0]);
+    int *storeLEP = calloc(10,sizeof(int));
+    storeLEP[0]=indiv.allBindingSites[0].leftEdgePos;
+    int count =1;
+     int front = 1;
+     int back = 10;
+     while(front < back){
+         if(indiv.allBindingSites[front].leftEdgePos<indiv.allBindingSites[back].leftEdgePos){
+            if(storeLEP[front-1]>indiv.allBindingSites[front].leftEdgePos){
+              storeLEP[count]=storeLEP[count-1];
+              storeLEP[count-1]=indiv.allBindingSites[front].leftEdgePos;
+              //storeLEP[count+1]=indiv.allBindingSites[back].leftEdgePos;
+              printf("%d\n", storeLEP[count-1]);
+              printf("%d\n", storeLEP[count]);
+              //printf("%d\n", storeLEP[count++]);
+            }
+            else{
+              storeLEP[count]=indiv.allBindingSites[front].leftEdgePos;
+              printf("%d\n", storeLEP[count]);
+              //storeLEP[count++]=indiv.allBindingSites[back].leftEdgePos;
+                 }
+            front++;
+            count++;
+         }else{
+            printf("%d\n", indiv.allBindingSites[back].leftEdgePos);
+             printf("%d\n", indiv.allBindingSites[front].leftEdgePos);
+             back--;
+         }
+    
+       
+     }
+     system("PAUSE");
+     /*int ch;
+     for(ch=0; ch<indiv.tfsPerGene[0];ch++){
+               printf("%d\n", rearranged[ch].leftEdgePos);
+     }*/
+    // system("PAUSE");
+     /*for(i=0; i < indiv.bindSiteCount; i++){
        if(indiv.allBindingSites[i].cisregID == 0 && i<10){
          printf("numBS=%d\n", i);
          printf("regID=%d\n", indiv.allBindingSites[i].cisregID);
@@ -140,7 +182,7 @@ int main(int argc, char *argv[])
          }
        }
      
-    qsort(sitePos, 10, sizeof(int), intcmp);
+    /*qsort(sitePos, 10, sizeof(int), intcmp);
 
      int m;
      for(j=0;j<10;j++){
@@ -158,11 +200,13 @@ int main(int argc, char *argv[])
      printf("%d  %d   %.3f\n", sitePos[j], transFactor[j], initProteinConc[(transFactor[j])]);
      
      }
-     printf("\n");
+     printf("\n");*/
       
   system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
+  free(rearranged);
+  free(storeLEP);
   
   /* close error file */
   fclose(fperrors);
