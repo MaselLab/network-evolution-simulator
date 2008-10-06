@@ -2,15 +2,15 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define TFBS 14
+#define TFBS 12
 #define SIZE 1
 #define HIND_LENGTH 15
 
-static int startPos[TFBS]= {1,2,3,3,10,10,11,11,11,13,16,16,17,17};
-static float kon[TFBS] = {1, 2, 3,4,5,6,7,8,9,10,11,12,13,14};
+static int startPos[TFBS]= {0,0,6,6,7,7,7,7,8,8,12,12};
+static float kon[TFBS] = {1, 2, 3,4,5,6,7,8,9,10,11,12};
 static float koff[5] = {1.5, 2.5, 3.5, 4.5, 5.5};
-static int hammDist[TFBS] = {2,2,2,2,2,2,1,2,1,2,2,2,1,2};
-static float diag[TFBS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static int hammDist[TFBS] = {2,2,2,2,2,2,1,2,1,2,2,2};
+static float diag[TFBS]={0,0,0,0,0,0,0,0,0,0,0,0};
 
 //static int startPos[TFBS]= {1,2,3,3,10,10,11,11,11,13,16,16,17,17, 20,20,21,24,24,25,25,25};
 
@@ -31,16 +31,16 @@ struct Ttype {
   int colCount;
 };                          
                            
-int convertToDecimal(int bits[TFBS]){
-     int n = TFBS-1;
+int convertToDecimal(int *bits, int TFBSites){
+     int n = TFBSites-1;
      int count =0;
-     int record[TFBS];
+     int record[TFBSites];
      int rec=0;
      while( n>=0 ){
          if(bits[n]==0){
             count++;
          }else{
-             record[rec]=(TFBS-1)-n;
+             record[rec]=(TFBSites-1)-n;
              rec++;
          }
          n--;
@@ -54,17 +54,18 @@ int convertToDecimal(int bits[TFBS]){
 }  
  
                           
-int isHindered(int bindSite, int bits[TFBS]){
-    int s = bindSite - 1;
+int isHindered(int bindSite, int *bits){
+    int s = bindSite-1;
     int count=0;
     //printf("%d\n", s);
     //printf("%d\n", startPos[bindSite]);
     int check = startPos[bindSite]-HIND_LENGTH;
     if(check<0){
         check=0;}
-    //printf("%d\n", check);
-    while(startPos[s] <= startPos[bindSite] && startPos[s] > check){
+   // printf("%d\n", check);
+    while(s>=0 && startPos[s] <= startPos[bindSite] && startPos[s] >= check){
        if(bits[s] == 1){
+                  //printf("hindered");
           return 1;
        } else {
           s--;
@@ -75,36 +76,36 @@ int isHindered(int bindSite, int bits[TFBS]){
     return 0;
   }
   
-  void configure(int bindSite, int bits[TFBS], int *numStates, int *statesArray){
+  void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TFBSites){
 
-     if(bindSite<TFBS-1){
+     if(bindSite<TFBSites-1){
         bits[bindSite] = 0;
-        configure(bindSite+1,bits,numStates,statesArray);
+        configure(bindSite+1,bits,numStates,statesArray,TFBSites);
         if(!isHindered(bindSite, bits)){
            bits[bindSite] = 1;
-           configure(bindSite+1,bits,numStates,statesArray);
+           configure(bindSite+1,bits,numStates,statesArray,TFBSites);
         }
      } else {
-        bits[TFBS-1] = 0;
-        statesArray[(*numStates)] = convertToDecimal(bits);
+        bits[TFBSites-1] = 0;
+        statesArray[(*numStates)] = convertToDecimal(bits, TFBSites);
         (*numStates)++;
         int i;
-        for(i=0; i<TFBS; i++){
+        for(i=0; i<TFBSites; i++){
            printf("%d", bits[i]);
         }
         printf("\n");
         if(!isHindered(bindSite, bits)){
-           bits[TFBS-1]=1;
-           convertToDecimal(bits);
-           statesArray[(*numStates)] = convertToDecimal(bits);
+           bits[TFBSites-1]=1;
+           convertToDecimal(bits, TFBSites);
+           statesArray[(*numStates)] = convertToDecimal(bits, TFBSites);
            (*numStates)++;
-           for(i=0; i<TFBS; i++){
+           for(i=0; i<TFBSites; i++){
               printf("%d", bits[i]);
            }
            printf("\n");
         }
       } 
-      
+     // system("PAUSE");
   }
   
   void diagonal(int row, float diag[TFBS], struct Ttype *arrayT, int m, int n){
@@ -224,17 +225,20 @@ void print_arrayT(struct Ttype *arrayT, int size){
      int *viableStates;
      struct Ttype *arrayT;
     
-     viableStates = malloc(30*sizeof(int));
+     viableStates = malloc(50*sizeof(int));
      arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));
      int array = 0;
     
-     configure(0,bits,&array,viableStates);
+     configure(0,bits,&array,viableStates,TFBS);
      system("PAUSE");
      //printf("viableStates=%d\n", viableStates[14]);
      //printf("array=%d\n", array);
      
      transitions(array,viableStates,TFBS,arrayT,kon,koff,hammDist);
      print_arrayT(arrayT,array);
+     
+     int test[12]={1,0,1,0,0,0,0,0,0,0,0,0};
+     printf("%d", isHindered(1,test)); 
      
      
      int d;

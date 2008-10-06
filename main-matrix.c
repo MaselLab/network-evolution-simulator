@@ -15,10 +15,109 @@
 #include "lib.h"
 #include "netsim.h"
 
+typedef int (*compfn)(const void*, const void*);
+
 int intcmp(const void *a, const void *b)
 {
     return *(int *)a - *(int *)b;
 }
+
+int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
+    if(elem1->leftEdgePos < elem2->leftEdgePos)
+        return -1;
+    else if(elem1->leftEdgePos > elem2->leftEdgePos)
+         return 1;
+    else
+         return 0;
+}
+
+ struct Coltype {
+    int colnum;
+    float *kval;
+};
+    
+struct Ttype {
+  int row;
+  struct Coltype *col;
+  int colCount;
+};  
+
+int convertToDecimal(int *bits, int TFBS){
+     int n = TFBS-1;
+     int count =0;
+     int record[TFBS];
+     int rec=0;
+     while( n>=0 ){
+         if(bits[n]==0){
+            count++;
+         }else{
+             record[rec]=(TFBS-1)-n;
+             rec++;
+         }
+         n--;
+     }
+     int i;
+     int decimal=0;
+     for(i=0; i<rec;i++){
+        decimal+= pow(2,record[i]);
+     }
+     return decimal;
+}              
+
+int isHindered(int bindSite, int *bits, int *startPos){
+    int s = bindSite - 1;
+    int count=0;
+    //printf("%d\n", s);
+    //printf("%d\n", startPos[bindSite]);
+    int check = startPos[bindSite]-HIND_LENGTH;
+    if(check<0){
+        check=0;}
+    //printf("%d\n", check);
+    while(s>=0 && startPos[s] <= startPos[bindSite] && startPos[s] >= check){
+       if(bits[s] == 1){
+          return 1;
+       } else {
+          s--;
+          count++;
+       }
+    }
+    //printf("%d\n",count);
+    return 0;
+  }
+  
+void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TFBS, int *startPos){
+
+     if(bindSite<TFBS-1){
+        bits[bindSite] = 0;
+        configure(bindSite+1,bits,numStates,statesArray,TFBS,startPos);
+        if(!isHindered(bindSite, bits,startPos)){
+           bits[bindSite] = 1;
+           configure(bindSite+1,bits,numStates,statesArray,TFBS,startPos);
+        }
+     } else {
+        bits[TFBS-1] = 0;
+        statesArray[(*numStates)] = convertToDecimal(bits, TFBS);
+        (*numStates)++;
+        int i;
+        for(i=0; i<TFBS; i++){
+          // printf("%d", bits[i]);
+       
+        }
+        //printf("\n");
+        if(!isHindered(bindSite, bits,startPos)){
+           bits[TFBS-1]=1;
+           convertToDecimal(bits, TFBS);
+           statesArray[(*numStates)] = convertToDecimal(bits, TFBS);
+           (*numStates)++;
+           for(i=0; i<TFBS; i++){
+             // printf("%d", bits[i]);
+           }
+          // printf("\n");
+        }
+      } 
+          //system("PAUSE");
+      
+  }
 
 int main(int argc, char *argv[])
 {
@@ -125,88 +224,45 @@ int main(int argc, char *argv[])
      //system("PAUSE");
     int sitePos[10];
     int transFactor[10];
-    system("PAUSE");
-    struct AllTFBindingSites *rearranged;
-    rearranged = malloc(indiv.tfsPerGene[0]*sizeof(struct AllTFBindingSites));
-    rearranged[0] =indiv.allBindingSites[0];
-    printf("%d\n", indiv.allBindingSites[0].leftEdgePos);
-    printf("%d\n", rearranged[0].leftEdgePos);
-    //int *startPos = calloc(indiv.bindSiteCount, sizeof(int));
-    system("PAUSE");
-    //printf("tfsPerGene = %d\n", indiv.tfsPerGene[0]);
-    int *storeLEP = calloc(10,sizeof(int));
-    storeLEP[0]=indiv.allBindingSites[0].leftEdgePos;
-    int count =1;
-     int front = 1;
-     int back = 10;
-     while(front < back){
-         if(indiv.allBindingSites[front].leftEdgePos<indiv.allBindingSites[back].leftEdgePos){
-            if(storeLEP[front-1]>indiv.allBindingSites[front].leftEdgePos){
-              storeLEP[count]=storeLEP[count-1];
-              storeLEP[count-1]=indiv.allBindingSites[front].leftEdgePos;
-              //storeLEP[count+1]=indiv.allBindingSites[back].leftEdgePos;
-              printf("%d\n", storeLEP[count-1]);
-              printf("%d\n", storeLEP[count]);
-              //printf("%d\n", storeLEP[count++]);
-            }
-            else{
-              storeLEP[count]=indiv.allBindingSites[front].leftEdgePos;
-              printf("%d\n", storeLEP[count]);
-              //storeLEP[count++]=indiv.allBindingSites[back].leftEdgePos;
-                 }
-            front++;
-            count++;
-         }else{
-            printf("%d\n", indiv.allBindingSites[back].leftEdgePos);
-             printf("%d\n", indiv.allBindingSites[front].leftEdgePos);
-             back--;
-         }
+    int *startPos;
+    startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
+    int TFBS;
+    TFBS = 20;
     
-       
+    int *bits = calloc(TFBS, sizeof(int));
+    int *viableStates;
+    //struct Ttype *arrayT;
+    
+    viableStates = malloc((100)*sizeof(int));
+     //arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));
+     int array = 0;
+    
+    
+    qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
+           sizeof(struct AllTFBindingSites),(compfn)compare );
+   printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
+     printf("\n");
+     int lem;
+     for(lem =0; lem<TFBS; lem++){
+             startPos[lem] = indiv.allBindingSites[lem].leftEdgePos;
+             
+             printf("%d\n", indiv.allBindingSites[lem].leftEdgePos);
      }
+     printf("\n");
+     configure(0,bits,&array,viableStates,TFBS,startPos);
+     printf("%d\n", array);
      system("PAUSE");
-     /*int ch;
-     for(ch=0; ch<indiv.tfsPerGene[0];ch++){
-               printf("%d\n", rearranged[ch].leftEdgePos);
-     }*/
-    // system("PAUSE");
-     /*for(i=0; i < indiv.bindSiteCount; i++){
-       if(indiv.allBindingSites[i].cisregID == 0 && i<10){
-         printf("numBS=%d\n", i);
-         printf("regID=%d\n", indiv.allBindingSites[i].cisregID);
-         printf("  position=%d\n", indiv.allBindingSites[i].leftEdgePos);
-         printf(" transcription-factor: %3d\n", indiv.allBindingSites[i].tfID);
-         //printf("  p=%d, tf=%d\n", indiv.allBindingSites[i].leftEdgePos, indiv.allBindingSites[i].tfID);
-         //transFactor[i] = indiv.allBindingSites[i].tfID;
-         sitePos[i]=indiv.allBindingSites[i].leftEdgePos;
-         }
-       }
-     
-    /*qsort(sitePos, 10, sizeof(int), intcmp);
-
-     int m;
-     for(j=0;j<10;j++){
-       printf("%d\n", sitePos[j]);
-       for(m=0; m<10;m++){
-         if(sitePos[j] == indiv.allBindingSites[m].leftEdgePos){
-            transFactor[j]= indiv.allBindingSites[m].tfID;
-         }
-       }
-    // printf("%d\n", initProteinConc[j]);
-     }
-      printf("\n");
-     for(j=0;j<10;j++){
-     //printf("%d\n", sitePos[j]);
-     printf("%d  %d   %.3f\n", sitePos[j], transFactor[j], initProteinConc[(transFactor[j])]);
-     
-     }
-     printf("\n");*/
       
-  system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
-  free(rearranged);
-  free(storeLEP);
+   /*int d;
+     for (d=0; d<array; d++) {
+       free(arrayT[d].col);
+  }   */ 
+  //free(arrayT);
+  free(viableStates);
+  free(bits);
+  free(startPos);
   
   /* close error file */
   fclose(fperrors);
