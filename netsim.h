@@ -9,6 +9,10 @@
 
 #include <stdio.h>
 
+#ifndef POP_SIZE
+#define POP_SIZE 1
+#endif
+
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
@@ -134,9 +138,6 @@ typedef struct KonStates KonStates;
 struct KonStates {
   /* number of currently *available* binding sites */
   int nkon;
-
-  /* elem 0 is siteID, elem 1 is TF that binds */
-  int (*konIDs)[2];
 
   /* list of structs  */
   KonList *konList[NGENES];
@@ -595,11 +596,11 @@ extern void replicate_gene(CellState *,
                            int,
                            float);
 
-extern void develop(Genotype *,
-                    CellState *,
-                    float , /* in Kelvin */
-                    TimeCourse **,
-                    TimeCourse **);
+extern void develop(Genotype [POP_SIZE],
+                    CellState [POP_SIZE],
+                    TimeCourse *[POP_SIZE][NGENES],
+                    TimeCourse *[POP_SIZE][NGENES], 
+                    float); /* in Kelvin */
 
 extern void print_time_course(TimeCourse *,
                               int);

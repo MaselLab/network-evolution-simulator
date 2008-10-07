@@ -29,11 +29,10 @@ int main(int argc, char *argv[])
   char fp_growthrate_name[80];
   char fp_tfsbound_name[80];
   int i, j, k, gen;
-  CellState state;
-  Genotype indivs[PopSize];
-  TimeCourse *timecoursestart[NGENES]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[NGENES];
-  TimeCourse *start;
+  CellState state[POP_SIZE];
+  Genotype indivs[POP_SIZE];
+  TimeCourse *timecoursestart[POP_SIZE][NGENES]; /* array of pointers to list starts */
+  TimeCourse *timecourselast[POP_SIZE][NGENES];
   float initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
 
   int c, directory_success;
@@ -133,8 +132,8 @@ int main(int argc, char *argv[])
   fclose(fpkdis);
 
   /* now create the population of cells */
-  for (j = 0; j < PopSize; j++) {
-    if (j==PopSize-1) output=1;
+  for (j = 0; j < POP_SIZE; j++) {
+    if (j==POP_SIZE-1) output=1;
     initialize_genotype(&indivs[j], kdis);
     /* if genotype is held constant, start varying the seed *after*
        initialize_genotype, so we can run the same genotype with
@@ -143,25 +142,27 @@ int main(int argc, char *argv[])
       for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
          ran1(&seed);
    
-    initialize_cell(&state, indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
+    initialize_cell(&state[j], indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
 
     /* print binding sites */
     if (output_binding_sites) 
       print_all_binding_sites(indivs[j].copies, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
                               indivs[j].transcriptionFactorSeq, indivs[j].cisRegSeq); 
 
-    develop(&indivs[j], &state, (float) 293.0, timecoursestart, timecourselast);
+  }
+  
+  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0);
+  //develop(&indivs[j], &state[j], (float) 293.0, timecoursestart, timecourselast);
+
+  for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"indiv %d\n",j);
     for (i=0; i < NGENES; i++) {
-      if ((output) && j==PopSize-1) print_time_course(timecoursestart[i], i);
+      if ((output) && j==POP_SIZE-1) print_time_course(timecoursestart[j][i], i);
       if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
-      delete_time_course(timecoursestart[i]);
-      timecoursestart[i] = timecourselast[i] = NULL;
+      delete_time_course(timecoursestart[j][i]);
+      timecoursestart[i][j] = timecourselast[j][i] = NULL;
     }
-    free_mem_CellState(&state);
-  }
-
-  for (j = 0; j < PopSize; j++) {
+    free_mem_CellState(&state[j]);
     free(indivs[j].allBindingSites);
   }
   fclose(fperrors);
