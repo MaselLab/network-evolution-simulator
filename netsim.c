@@ -20,6 +20,7 @@
 /* local includes */
 #include "random.h"
 #include "lib.h"
+#include "priority-queue.h"
 #include "netsim.h"
 
 const int maxelements=500*MAX_COPIES; 
@@ -2342,6 +2343,307 @@ void recompute_rates(GillespieRates *rates,
 
 }
 
+float do_single_timestep(Genotype *genes, 
+                         CellState *state, 
+                         KonStates *konStates, 
+                         GillespieRates *rates, 
+                         float *t,
+                         float *division_time,
+                         float *koffvalues,
+                         float transport[NGENES],
+                         float mRNAdecay[NGENES],
+                         float *x,
+                         float *dt,
+                         float *konrate,
+                         TimeCourse *timecoursestart[NGENES],
+                         TimeCourse *timecourselast[NGENES],
+                         int maxbound2,
+                         int maxbound3) 
+{
+  int i, j, k;
+
+  int event;     /* boolean to keep track of whether FixedEvent has ended */
+  int total;           /* total possible translation events */
+  
+  float f, df, konrate2, diff, sum, ct, ect;
+  
+  /* compute S-phase offsets */
+  if (critical_size > 0.0 && state->cellSize >= critical_size && !state->in_s_phase)  { /* run until checkpoint reached */
+    reach_s_phase(state, genes, *t);
+    *division_time = *t + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
+                                          * a further 30 mins of growth after S phase */
+    printf("cell will divide at t=%g\n", *division_time);
+  }
+  
+  print_tf_occupancy(state, genes->allBindingSites, *t);
+  
+  *x=expdev(&seed);        /* draw random number */
+
+  /* recompute rates */
+  // currently disabled
+  // recompute_rates(rates, state, genes, konStates, koffvalues) ;
+  
+  /* check for rounding error */
+  if (rates->koff < 0.0){
+    konrate2 = 0.0;
+    for (i=0; i < state->tfBoundCount; i++) konrate2 += koffvalues[i];
+    if ((verbose) || konrate2>0.0)
+      fprintf(fperrors,"warning: koffvalues add up to %g rates->koff=%g < 0\n",
+              konrate2, rates->koff);
+    rates->koff = konrate2;
+  }
+  
+  /* do first Gillespie step to chose next event */
+  calc_dt(x, dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
+          state->mRNACytoCount, state->mRNATranslCytoCount);
+  
+  if (verbose) 
+    fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
+  
+  
+  if (!(state->mRNATranscrTimeEndLast)) {
+    for (i=0;i<NGENES;i++)
+      if (verbose) fprintf(fperrors, "%d transcription events\n", state->mRNATranscrCount[i]);
+  }
+  
+  /* first check to see if a fixed event occurs in current t->dt window */
+  event = does_fixed_event_end(state->mRNATranslTimeEnd,
+                               state->mRNATranscrTimeEnd,
+                               state->replicationTimeEnd,
+                               fminf(*t+*dt, tdevelopment));
+  
+  /* while there are either transcription or translation events
+     occuring in current t->dt window */
+  while (event > 0) {
+    *konrate = (*x)/(*dt);
+    
+    switch (event) {
+    case 1:   /* if a transcription event ends */
+      end_transcription(dt, *t, state, transport, rates);
+      
+      update_protein_conc_cell_size(state->proteinConc, state, genes, *dt,
+                                    rates, konStates, *t,
+                                    timecoursestart, timecourselast,
+                                    state->proteinConc);
+      break;
+    case 2:            /* if a translation event ends */
+      *dt = state->mRNATranslTimeEnd->time - *t;         /* make dt window smaller */
+      total=0;  /* number of translation events */
+      
+      /* count current number of mRNAs that have recently arrived in cytoplasm */
+      for (i=0; i<NGENES; i++) total += state->mRNATranslCytoCount[i];
+      if (verbose) 
+        fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
+                total, *t, *dt); /* bug: dt can be negative */
+      
+      /* get identity of gene that has just finished translating */
+      i=state->mRNATranslTimeEnd->geneID;   
+      
+      /* there is one less mRNA that has just finished translation */
+      (state->mRNATranslCytoCount[i])--;   
+      
+      /* delete the event that just happened */
+      delete_fixed_event_start(&(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
+      
+      /* there is one more mRNA that is now in cytoplasm */
+      (state->mRNACytoCount[i])++;
+      
+      /* update protein concentration */
+      update_protein_conc_cell_size(state->proteinConc, state, genes, *dt,
+                                    rates, konStates, *t,
+                                    timecoursestart, timecourselast,
+                                    state->proteinConc);
+      
+      /* the number of mRNAs in cytoplasm affects binding */
+      change_mRNA_cytoplasm(i, genes, state, rates, konStates);
+      break;
+    case 3:  /* replicate gene */
+      *dt = state->replicationTimeEnd->time - *t;         /* make dt window smaller */
+      
+      replicate_gene(state, genes, rates, konStates, koffvalues, state->replicationTimeEnd->geneID, *t);
+      
+      /* delete the event that just happened */
+      delete_fixed_event_start(&(state->replicationTimeEnd), &(state->replicationTimeEndLast));
+      
+      update_protein_conc_cell_size(state->proteinConc, state, genes, *dt,
+                                    rates, konStates, *t,
+                                    timecoursestart, timecourselast,
+                                    state->proteinConc);
+      break;
+    default:
+      printf("event=%d should never get here\n", event);
+      exit(-1);
+      break;
+    }
+    
+    /* advance time by the dt */
+    *t += *dt;
+    *x -= (*dt)*(*konrate);
+    if (verbose) 
+      fprintf(fperrors, "dt=%g t=%g fixed event old x=%g new x=%g\n", *dt, *t, (*x)+(*dt)*(*konrate), *x);
+    
+    /* re-compute a new dt */
+    calc_dt(x, dt, rates, konStates, mRNAdecay, 
+            genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
+    
+    if (verbose) 
+      fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
+    
+    /* check to see there aren't more fixed events to do */
+    event = does_fixed_event_end(state->mRNATranslTimeEnd, 
+                                 state->mRNATranscrTimeEnd, 
+                                 state->replicationTimeEnd,
+                                 fminf(tdevelopment, *t+*dt));
+  } 
+  
+  /* no remaining fixed events to do in dt, now do stochastic events */
+  
+  /* if we haven't already reached end of development with last delta-t */
+  if (*t+*dt < tdevelopment) {
+    //if (state->cellSize < 1.0) {  /* run until checkpoint reached */
+    
+    /* compute total konrate (which is constant over the Gillespie step) */
+    if (konStates->nkon==0) *konrate = (-rates->salphc);
+    else calc_kon_rate(*dt, konStates, konrate); 
+    
+    /* 
+     * choose a new uniform random number weighted by the
+     * probability of all Gillespie events, note that konrate is
+     * *not* included in rates->total, so it needs to be added here
+     */
+    *x = ran1(&seed)*(rates->total + *konrate);  
+    
+    if (verbose) {
+      int p;
+      fprintf(fperrors,"\nx=%g\tfBoundCount=%g = %d * %g\ntransport=%g\ndecay=%g\n",
+              *x, rates->koff, state->tfBoundCount, rates->koff/(float)state->tfBoundCount, 
+              rates->transport, rates->mRNAdecay);
+      fprintf(fperrors,"PICdisassembly=%g\nkon=%g = %d * %g\n",
+              rates->picDisassembly, rates->salphc+(*konrate), konStates->nkon, (rates->salphc+(*konrate))/(float)konStates->nkon);
+      
+      for (p=0; p < MAX_COPIES; p++) {
+        fprintf(fperrors,"acetylation=%g (copy %d)\ndeacetylation=%g (copy %d)\nPIC assembly=%g (copy %d)\ntranscriptinit=%g (copy %d)\n",
+                (float)rates->acetylationCount[p]*acetylate, p, (float)rates->deacetylationCount[p]*deacetylate, p, 
+                (float)rates->picAssemblyCount[p]*PICassembly, p, (float)rates->transcriptInitCount[p]*transcriptinit, p);
+      }
+      fprintf(fperrors,"total=%g=%g+%g\n\n", rates->total + (*konrate), rates->total, konrate);
+    }
+    /* JM: kon generally could be handled better, with more direct
+     * references to konStates->nkonsum, probably a bit vulnerable to rounding
+     * error
+     */
+    
+    /* 
+     * STOCHASTIC EVENT: a TF unbinds (koff) 
+     */
+    if (*x < rates->koff) {  
+      tf_unbinding_event(rates, state, genes, konStates, koffvalues,
+                         timecoursestart, timecourselast, (*konrate), *dt, *t, *x);
+    } else {
+      *x -= rates->koff;  
+      /* 
+       * STOCHASTIC EVENT: a transport event
+       */
+      if (*x < rates->transport) {     
+        transport_event(rates, state, genes, konStates, transport, 
+                        timecoursestart, timecourselast, ttranslation, *dt, *t, *x);
+      } else {
+        
+        *x -= rates->transport;
+        /* 
+         * STOCHASTIC EVENT: an mRNA decay event
+         */
+        if (*x < rates->mRNAdecay) {  
+          mRNA_decay_event(rates, state, genes, konStates, mRNAdecay,
+                           timecoursestart, timecourselast, *dt, *t, *x);
+        } else {
+          *x -= rates->mRNAdecay;
+          /* 
+           * STOCHASTIC EVENT: PIC disassembly
+           */
+          if (*x < rates->picDisassembly) {
+            disassemble_PIC_event(rates, state, genes, konStates, 
+                                  timecoursestart,  timecourselast, *dt, *t, *x);
+          } else {
+            *x -= rates->picDisassembly;
+            /* 
+             * STOCHASTIC EVENT: TF binding event
+             */
+            if (*x < rates->salphc + (*konrate)) {   /* add variable (salphc) and constant (konrate) */
+              tf_binding_event(rates, state, genes, konStates, koffvalues,
+                               timecoursestart, timecourselast, (*konrate), *dt, *t, 
+                               maxbound2, maxbound3);
+            } else {
+              *x -= (rates->salphc + (*konrate));
+              /* 
+               * STOCHASTIC EVENT: histone acetylation
+               */
+              if (*x < (float) sum_rate_counts(rates->acetylationCount) * acetylate) {
+                
+                histone_acteylation_event(rates, state, genes, konStates, 
+                                          timecoursestart, timecourselast, *dt, *t);
+              } else {
+                
+                *x -= (float) sum_rate_counts(rates->acetylationCount) * acetylate;
+                /* 
+                 * STOCHASTIC EVENT: histone deacetylation
+                 */
+                if (*x < (float) sum_rate_counts(rates->deacetylationCount) * deacetylate) {
+                  
+                  histone_deacteylation_event(rates, state, genes, konStates, 
+                                              timecoursestart, timecourselast, *dt, *t);
+                } else {
+                  *x -= (float) sum_rate_counts(rates->deacetylationCount) * deacetylate;
+                  /* 
+                   * STOCHASTIC EVENT: PIC assembly
+                   */
+                  if (*x < (float) sum_rate_counts(rates->picAssemblyCount) * PICassembly) {
+                    assemble_PIC_event(rates, state, genes, konStates, 
+                                       timecoursestart, timecourselast, *dt, *t);
+                  } else {
+                    *x -= (float) sum_rate_counts(rates->picAssemblyCount) * PICassembly;
+                    /* 
+                     * STOCHASTIC EVENT: transcription initiation
+                     */
+                    if (*x < (float) sum_rate_counts(rates->transcriptInitCount) * transcriptinit) {
+                      transcription_init_event(rates, state, genes, konStates, 
+                                               timecoursestart, timecourselast, *dt, *t, *x);
+                    } else {
+                      /*
+                       * FALLBACK: shouldn't get here, previous
+                       * events should be exhaustive
+                       */
+                      
+                      fprintf(fperrors, "error: no event assigned: x=%g\n", *x);
+                    }
+                  }
+                }
+              }
+            }
+          }       
+        }
+      }
+    }
+    
+    /* Gillespie step: advance time to next event at dt */
+    *t += *dt;
+    if (verbose) fprintf(fperrors, "dt=%g t=%g\n", *dt, *t);
+  } else {
+    /* we will reach the end of development in dt */
+    if (verbose) fprintf(fperrors, "finish at t=%g dt=%g\n", *t, *dt);
+    
+    /* do remaining dt */
+    *dt = tdevelopment - *t;
+    
+    /* final update of protein concentration */
+    update_protein_conc_cell_size(state->proteinConc, state, genes, *dt,
+                                  rates, konStates,
+                                  *t, timecoursestart, timecourselast,
+                                  state->proteinConc);
+    /* advance to end of development (this exits the outer while loop) */
+    *t = tdevelopment;
+  }
+}
 
 /*
  * develop: run the cell for a given length of time
@@ -2353,18 +2655,18 @@ void develop(Genotype genes[POP_SIZE],
              float temperature) /* in Kelvin */
 {
   /* local variables that don't require per-cell tracking */
-  int i, j, k;
+  int i, j;
   int maxbound2, maxbound3;  
 
-  int event;     /* boolean to keep track of whether FixedEvent has ended */
-
-  int total;           /* total possible translation events */
+  /* cached information about available binding sites for efficiency */
+  KonStates konStates[POP_SIZE];
+  GillespieRates rates[POP_SIZE];
 
   float t[POP_SIZE];
   float division_time[POP_SIZE];
 
-  int site[POP_SIZE];      /* site where TF gets removed  */
-  int geneID[POP_SIZE];    /* ID of gene which is undergoing transitions in transcription state */
+  //int site[POP_SIZE];      /* site where TF gets removed  */
+  //int geneID[POP_SIZE];    /* ID of gene which is undergoing transitions in transcription state */
 
   float *koffvalues[POP_SIZE];   /* rates of unbinding */
   float transport[NGENES][POP_SIZE];  /* transport rates of each mRNA */
@@ -2372,12 +2674,7 @@ void develop(Genotype genes[POP_SIZE],
   float x[POP_SIZE];                  /* random number */
   float dt[POP_SIZE];                 /* delta-t */
 
-  /* cached information about available binding sites for efficiency */
-  KonStates konStates[POP_SIZE];
-  GillespieRates rates[POP_SIZE];
-
   float konrate[POP_SIZE];
-  float f, df, konrate2, diff, sum, ct, ect;
 
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
@@ -2420,290 +2717,67 @@ void develop(Genotype genes[POP_SIZE],
 
   }
 
+  FixedEvent *time_queue = NULL;
+  FixedEvent *time_queue_end = NULL;
+  float t_next;
+  int cell;
+
+  /* do one step for each cell */
+
   for (j = 0; j < POP_SIZE; j++) {
 
-  while (t[j] < tdevelopment && t[j] < division_time[j]) {  /* run until development stops */
+      do_single_timestep(&(genes[j]), 
+                         &(state[j]), 
+                         &(konStates[j]), 
+                         &(rates[j]), 
+                         &(t[j]),
+                         &(division_time[j]),
+                         koffvalues[j],
+                         transport[j],
+                         mRNAdecay[j],
+                         &(x[j]),
+                         &(dt[j]),
+                         &(konrate[j]),
+                         timecoursestart[j],
+                         timecourselast[j],
+                         maxbound2,
+                         maxbound3);
 
-    /* compute S-phase offsets */
-    if (critical_size > 0.0 && state[j].cellSize >= critical_size && !state[j].in_s_phase)  { /* run until checkpoint reached */
-      reach_s_phase(&state[j], &genes[j], t[j]);
-      division_time[j] = t[j] + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
-                                          * a further 30 mins of growth after S phase */
-      printf("cell will divide at t=%g\n", division_time[j]);
-    }
-
-    print_tf_occupancy(&state[j], genes[j].allBindingSites, t[j]);
-
-    x[j]=expdev(&seed);        /* draw random number */
-
-    /* recompute rates */
-    // currently disabled
-    // recompute_rates(rates, state, genes, konStates, koffvalues) ;
-
-    /* check for rounding error */
-    if (rates[j].koff < 0.0){
-      konrate2 = 0.0;
-      for (i=0; i < state[j].tfBoundCount; i++) konrate2 += koffvalues[i][j];
-      if ((verbose) || konrate2>0.0)
-        fprintf(fperrors,"warning: koffvalues add up to %g rates[j].koff=%g < 0\n",
-                konrate2, rates[j].koff);
-      rates[j].koff = konrate2;
-    }
-    
-    /* do first Gillespie step to chose next event */
-    calc_dt(&x[j], &dt[j], &rates[j], &konStates[j], mRNAdecay[j], genes[j].mRNAdecay,
-            state[j].mRNACytoCount, state[j].mRNATranslCytoCount);
-
-    if (verbose) 
-      fprintf(fperrors,"next stochastic event due at t=%g dt=%g x=%g\n", t[j]+dt[j], dt[j], x[j]);
-
-
-    if (!(state[j].mRNATranscrTimeEndLast)) {
-      for (i=0;i<NGENES;i++)
-        if (verbose) fprintf(fperrors, "%d transcription events\n", state[j].mRNATranscrCount[i]);
-    }
-    
-    /* first check to see if a fixed event occurs in current t->dt window */
-    event = does_fixed_event_end(state[j].mRNATranslTimeEnd,
-                                 state[j].mRNATranscrTimeEnd,
-                                 state[j].replicationTimeEnd,
-                                 fminf(t[j]+dt[j], tdevelopment));
-    
-    /* while there are either transcription or translation events
-       occuring in current t->dt window */
-    while (event > 0) {
-      konrate[j] = x[j]/dt[j];
-
-      switch (event) {
-      case 1:   /* if a transcription event ends */
-        end_transcription(&dt[j], t[j], &state[j], transport[j], &rates[j]);
-        
-        update_protein_conc_cell_size(state[j].proteinConc, &state[j], &genes[j], dt[j],
-                                      &rates[j], &konStates[j], t[j],
-                                      timecoursestart[j], timecourselast[j],
-                                      state[j].proteinConc);
-        break;
-      case 2:            /* if a translation event ends */
-        dt[j] = state[j].mRNATranslTimeEnd->time - t[j];         /* make dt window smaller */
-        total=0;  /* number of translation events */
-
-        /* count current number of mRNAs that have recently arrived in cytoplasm */
-        for (i=0; i<NGENES; i++) total += state[j].mRNATranslCytoCount[i];
-        if (verbose) 
-          fprintf(fperrors,"\ntranslation event finishes out of %d possible t=%g dt=%g\n",
-                  total, t[j], dt[j]); /* bug: dt can be negative */
-
-        /* get identity of gene that has just finished translating */
-        i=state[j].mRNATranslTimeEnd->geneID;   
-
-        /* there is one less mRNA that has just finished translation */
-        (state[j].mRNATranslCytoCount[i])--;   
-
-        /* delete the event that just happened */
-        delete_fixed_event_start(&(state[j].mRNATranslTimeEnd), &(state[j].mRNATranslTimeEndLast));
-
-        /* there is one more mRNA that is now in cytoplasm */
-        (state[j].mRNACytoCount[i])++;
-
-        /* update protein concentration */
-        update_protein_conc_cell_size(state[j].proteinConc, &state[j], &genes[j], dt[j],
-                                      &rates[j], &konStates[j], t[j],
-                                      timecoursestart[j], timecourselast[j],
-                                      state[j].proteinConc);
-        
-        /* the number of mRNAs in cytoplasm affects binding */
-        change_mRNA_cytoplasm(i, &genes[j], &state[j], &rates[j], &konStates[j]);
-        break;
-      case 3:  /* replicate gene */
-        dt[j] = state[j].replicationTimeEnd->time - t[j];         /* make dt window smaller */
-
-        replicate_gene(&state[j], &genes[j], &rates[j], &konStates[j], koffvalues[j], state[j].replicationTimeEnd->geneID, t[j]);
-
-        /* delete the event that just happened */
-        delete_fixed_event_start(&(state[j].replicationTimeEnd), &(state[j].replicationTimeEndLast));
-
-        update_protein_conc_cell_size(state[j].proteinConc, &state[j], &genes[j], dt[j],
-                                      &rates[j], &konStates[j], t[j],
-                                      timecoursestart[j], timecourselast[j],
-                                      state[j].proteinConc);
-        break;
-      default:
-        printf("event=%d should never get here\n", event);
-        exit(-1);
-        break;
-      }
-      
-      /* advance time by the dt */
-      t[j] += dt[j];
-      x[j] -= dt[j]*konrate[j];
-      if (verbose) 
-        fprintf(fperrors, "dt=%g t=%g fixed event old x=%g new x=%g\n", dt[j], t[j], x[j]+dt[j]*konrate[j], x[j]);
-
-      /* re-compute a new dt */
-      calc_dt(&x[j], &dt[j], &rates[j], &konStates[j], mRNAdecay[j], 
-              genes[j].mRNAdecay, state[j].mRNACytoCount, state[j].mRNATranslCytoCount);
-
-      if (verbose) 
-        fprintf(fperrors,"next stochastic event (2) due at t=%g dt=%g x=%g\n", t[j]+dt[j], dt[j], x[j]);
-
-      /* check to see there aren't more fixed events to do */
-      event = does_fixed_event_end(state[j].mRNATranslTimeEnd, 
-                                   state[j].mRNATranscrTimeEnd, 
-                                   state[j].replicationTimeEnd,
-                                   fminf(tdevelopment, t[j]+dt[j]));
-    } 
-
-    /* no remaining fixed events to do in dt, now do stochastic events */
-
-    /* if we haven't already reached end of development with last delta-t */
-    if (t[j]+dt[j] < tdevelopment) {
-    //if (state->cellSize < 1.0) {  /* run until checkpoint reached */
-
-      /* compute total konrate (which is constant over the Gillespie step) */
-      if (konStates[j].nkon==0) konrate[j] = (-rates[j].salphc);
-      else calc_kon_rate(dt[j], &konStates[j], &konrate[j]); 
-
-      /* 
-       * choose a new uniform random number weighted by the
-       * probability of all Gillespie events, note that konrate is
-       * *not* included in rates[j].total, so it needs to be added here
-       */
-      x[j] = ran1(&seed)*(rates[j].total + konrate[j]);  
-
-      if (verbose) {
-        int p;
-        fprintf(fperrors,"\nx=%g\tfBoundCount=%g = %d * %g\ntransport=%g\ndecay=%g\n",
-                x[j], rates[j].koff, state[j].tfBoundCount, rates[j].koff/(float)state[j].tfBoundCount, 
-                rates[j].transport, rates[j].mRNAdecay);
-        fprintf(fperrors,"PICdisassembly=%g\nkon=%g = %d * %g\n",
-                rates[j].picDisassembly, rates[j].salphc+konrate[j], konStates[j].nkon, (rates[j].salphc+konrate[j])/(float)konStates[j].nkon);
-
-        for (p=0; p < MAX_COPIES; p++) {
-          fprintf(fperrors,"acetylation=%g (copy %d)\ndeacetylation=%g (copy %d)\nPIC assembly=%g (copy %d)\ntranscriptinit=%g (copy %d)\n",
-                  (float)rates[j].acetylationCount[p]*acetylate, p, (float)rates[j].deacetylationCount[p]*deacetylate, p, 
-                  (float)rates[j].picAssemblyCount[p]*PICassembly, p, (float)rates[j].transcriptInitCount[p]*transcriptinit, p);
-        }
-        fprintf(fperrors,"total=%g=%g+%g\n\n", rates[j].total + konrate[j], rates[j].total, konrate);
-      }
-      /* JM: kon generally could be handled better, with more direct
-       * references to konStates->nkonsum, probably a bit vulnerable to rounding
-       * error
-       */
-
-      /* 
-       * STOCHASTIC EVENT: a TF unbinds (koff) 
-       */
-      if (x[j] < rates[j].koff) {  
-        tf_unbinding_event(&rates[j], &state[j], &genes[j], &konStates[j], koffvalues[j],
-                           timecoursestart[j], timecourselast[j], konrate[j], dt[j], t[j], x[j]);
-      } else {
-        x[j] -= rates[j].koff;  
-        /* 
-         * STOCHASTIC EVENT: a transport event
-         */
-        if (x[j] < rates[j].transport) {     
-          transport_event(&rates[j], &state[j], &genes[j], &konStates[j], transport[j], 
-                          timecoursestart[j], timecourselast[j], ttranslation, dt[j], t[j], x[j]);
-        } else {
-            
-          x[j] -= rates[j].transport;
-          /* 
-           * STOCHASTIC EVENT: an mRNA decay event
-           */
-          if (x[j] < rates[j].mRNAdecay) {  
-            mRNA_decay_event(&rates[j], &state[j], &genes[j], &konStates[j], mRNAdecay[j],
-                             timecoursestart[j], timecourselast[j], dt[j], t[j], x[j]);
-          } else {
-            x[j] -= rates[j].mRNAdecay;
-            /* 
-             * STOCHASTIC EVENT: PIC disassembly
-             */
-            if (x[j] < rates[j].picDisassembly) {
-              disassemble_PIC_event(&rates[j], &state[j], &genes[j], &konStates[j], 
-                                    timecoursestart[j],  timecourselast[j], dt[j], t[j], x[j]);
-            } else {
-              x[j] -= rates[j].picDisassembly;
-              /* 
-               * STOCHASTIC EVENT: TF binding event
-               */
-              if (x[j] < rates[j].salphc + konrate[j]) {   /* add variable (salphc) and constant (konrate) */
-                tf_binding_event(&rates[j], &state[j], &genes[j], &konStates[j], koffvalues[j],
-                                 timecoursestart[j], timecourselast[j], konrate[j], dt[j], t[j], 
-                                 maxbound2, maxbound3);
-              } else {
-                x[j] -= (rates[j].salphc + konrate[j]);
-                /* 
-                 * STOCHASTIC EVENT: histone acetylation
-                 */
-                if (x[j] < (float) sum_rate_counts(rates[j].acetylationCount) * acetylate) {
-                     
-                  histone_acteylation_event(&rates[j], &state[j], &genes[j], &konStates[j], 
-                                            timecoursestart[j], timecourselast[j], dt[j], t[j]);
-                } else {
-                   
-                  x[j] -= (float) sum_rate_counts(rates[j].acetylationCount) * acetylate;
-                  /* 
-                   * STOCHASTIC EVENT: histone deacetylation
-                   */
-                  if (x[j] < (float) sum_rate_counts(rates[j].deacetylationCount) * deacetylate) {
-              
-                    histone_deacteylation_event(&rates[j], &state[j], &genes[j], &konStates[j], 
-                                                timecoursestart[j], timecourselast[j], dt[j], t[j]);
-                  } else {
-                    x[j] -= (float) sum_rate_counts(rates[j].deacetylationCount) * deacetylate;
-                    /* 
-                     * STOCHASTIC EVENT: PIC assembly
-                     */
-                    if (x[j] < (float) sum_rate_counts(rates[j].picAssemblyCount) * PICassembly) {
-                      assemble_PIC_event(&rates[j], &state[j], &genes[j], &konStates[j], 
-                                         timecoursestart[j], timecourselast[j], dt[j], t[j]);
-                    } else {
-                      x[j] -= (float) sum_rate_counts(rates[j].picAssemblyCount) * PICassembly;
-                      /* 
-                       * STOCHASTIC EVENT: transcription initiation
-                       */
-                      if (x[j] < (float) sum_rate_counts(rates[j].transcriptInitCount) * transcriptinit) {
-                        transcription_init_event(&rates[j], &state[j], &genes[j], &konStates[j], 
-                                                 timecoursestart[j], timecourselast[j], dt[j], t[j], x[j]);
-                      } else {
-                        /*
-                         * FALLBACK: shouldn't get here, previous
-                         * events should be exhaustive
-                         */
-                          
-                        fprintf(fperrors, "error: no event assigned: x=%g\n", x[j]);
-                      }
-                    }
-                  }
-                }
-              }
-            }       
-          }
-        }
-      }
-      
-      /* Gillespie step: advance time to next event at dt */
-      t[j] += dt[j];
-      if (verbose) fprintf(fperrors, "dt=%g t=%g\n", dt[j], t[j]);
-    } else {
-      /* we will reach the end of development in dt */
-      if (verbose) fprintf(fperrors, "finish at t=%g dt=%g\n", t[j], dt[j]);
-
-      /* do remaining dt */
-      dt[j] = tdevelopment - t[j];
-
-      /* final update of protein concentration */
-      update_protein_conc_cell_size(state[j].proteinConc, &state[j], &genes[j], dt[j],
-                                    &rates[j], &konStates[j],
-                                    t[j], timecoursestart[j], timecourselast[j],
-                                    state[j].proteinConc);
-      /* advance to end of development (this exits the outer while loop) */
-      t[j] = tdevelopment;
-    }
+      /* insert each time into the queue */
+      insert_with_priority(&(time_queue), &(time_queue_end), j, t[j]);
   }
 
-  }
+  /* get the first cell to advance */
+  t_next = get_next(&time_queue, &time_queue_end, &cell);
 
+  while (t_next < tdevelopment && t_next < division_time[cell]) {  /* run until development stops */
+
+    /* log for testing: printf("update cell=%d, t=%.5g\n", cell, t_next); */
+
+    do_single_timestep(&(genes[cell]), 
+                       &(state[cell]), 
+                       &(konStates[cell]), 
+                       &(rates[cell]), 
+                       &(t[cell]),
+                       &(division_time[cell]),
+                       koffvalues[cell],
+                       transport[cell],
+                       mRNAdecay[cell],
+                       &(x[cell]),
+                       &(dt[cell]),
+                       &(konrate[cell]),
+                       timecoursestart[cell],
+                       timecourselast[cell],
+                       maxbound2,
+                       maxbound3);
+    
+    /* put the updated timestep back into the queue  */
+    insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
+    
+    /* get the cell with the smallest t to advance next */
+    t_next = get_next(&time_queue, &time_queue_end, &cell);
+  }
+  
   /* cleanup data structures */
 
   for (j = 0; j < POP_SIZE; j++) {

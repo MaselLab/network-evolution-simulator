@@ -596,6 +596,23 @@ extern void replicate_gene(CellState *,
                            int,
                            float);
 
+extern float do_single_timestep(Genotype *, 
+                                CellState *, 
+                                KonStates *, 
+                                GillespieRates *, 
+                                float *,
+                                float *,
+                                float *,
+                                float [NGENES],
+                                float [NGENES],
+                                float *,
+                                float *,
+                                float *,
+                                TimeCourse *[NGENES],
+                                TimeCourse *[NGENES],
+                                int,
+                                int) ;
+  
 extern void develop(Genotype [POP_SIZE],
                     CellState [POP_SIZE],
                     TimeCourse *[POP_SIZE][NGENES],

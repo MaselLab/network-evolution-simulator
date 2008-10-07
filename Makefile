@@ -3,8 +3,8 @@ all: netsim
 CC = gcc
 CFLAGS = -g -std=c99 $(EXTRACFLAGS)
 #  -O3
-OBJS = random.o lib.o netsim.o
-LIBS = -lm 
+OBJS = random.o lib.o netsim.o priority-queue.o
+LIBS = -lm
 #-lefence
 OTHER = Makefile
 
@@ -28,6 +28,9 @@ main-matrix: main-matrix.c $(OBJS) $(OTHER)
 
 %-gprof: %.c $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<
+
+qtest: qtest.c $(OBJS) priority-queue.o 
+	$(CC) $(CFLAGS) $(OBJS) priority-queue.o -o $@ $(LIBS) qtest.c
 
 netsim: $(OBJS)
 netsim-check: $(OBJS)
