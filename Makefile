@@ -27,7 +27,7 @@ main-matrix: main-matrix.c $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) main.c
 
 %-gprof: %.c $(OBJS) $(OTHER)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg $<
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg main.c
 
 qtest: qtest.c $(OBJS) priority-queue.o 
 	$(CC) $(CFLAGS) $(OBJS) priority-queue.o -o $@ $(LIBS) qtest.c

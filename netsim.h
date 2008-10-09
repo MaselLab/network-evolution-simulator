@@ -248,9 +248,6 @@ extern const int maxelements;
 const int maxbound;
 const int PopSize;
 const int nmin;
-const float kon; /* lower value is so things run faster */
-/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
-   and 89% of the proteins being in the nucleus*/
 const float kRNA;
 const float ttranslation;
 const float ttranscription;
@@ -269,6 +266,10 @@ const float selection ;
 
 const float mN ;
 const int Generations;
+
+float kon; /* lower value is so things run faster */
+/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
+   and 89% of the proteins being in the nucleus*/
 
 float tdevelopment;  /* default maximum development time: can be changed at runtime */
 int current_ploidy;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
@@ -620,6 +621,6 @@ extern void develop(Genotype [POP_SIZE],
                     float); /* in Kelvin */
 
 extern void print_time_course(TimeCourse *,
-                              int);
+                              int, int);
 
 #endif /* !FILE_NETSIM_SEEN */

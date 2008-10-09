@@ -27,9 +27,6 @@ const int maxelements=500*MAX_COPIES;
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
 const int maxbound=500*MAX_COPIES;
 const int nmin=4;
-const float kon=1e-4; /* lower value is so things run faster */
-/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
-   and 89% of the proteins being in the nucleus*/
 const float kRNA=618.0;
 const float ttranslation=1.0;
 const float ttranscription=1.0;
@@ -48,6 +45,11 @@ const float selection = 1.0;
 
 const float mN = 0.1;
 const int Generations=5;
+
+float kon=1e-4; /* lower value is so things run faster */
+/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
+   and 89% of the proteins being in the nucleus*/
+
 
 float tdevelopment=120.0;  /* default maximum development time: can be changed at runtime */
 int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
@@ -2792,12 +2794,17 @@ void develop(Genotype genes[POP_SIZE],
 }
 
 void print_time_course(TimeCourse *start,
-                       int i)
+                       int i,
+                       int j)
 {
   FILE *fpout;
   char filename[80];
   
-  sprintf(filename, "%s/protein%d.dat", output_directory, i);
+  /* do the normal thing on the first cell */
+  if (POP_SIZE == 1)
+    sprintf(filename, "%s/protein%d.dat", output_directory, i);
+  else
+    sprintf(filename, "%s/protein%03d-%02d.dat", output_directory, j, i);
   if ((fpout = fopen(filename,"w"))==NULL)
     fprintf(fperrors,"error: Can't open %s file\n",filename);
   while (start) {

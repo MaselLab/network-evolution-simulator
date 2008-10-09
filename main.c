@@ -35,17 +35,62 @@ int main(int argc, char *argv[])
   TimeCourse *timecourselast[POP_SIZE][NGENES];
   float initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
 
-  int c, directory_success;
+  int directory_success;
   int hold_genotype_constant = 0;
   int output_binding_sites = 0;
   int curr_seed;
+
+  int c;  /* for getopt_long() */
 
   verbose = 0;
   initialize_growth_rate_parameters();
 
   /* parse command-line options */
-  while ((c = getopt (argc, argv, "ohvgd:r:p:t:c:")) != -1) {
+  while (1) {
+    static struct option long_options[] =
+      {
+        /* These options set a flag. */
+        /* These options don't set a flag.
+           We distinguish them by their indices. */
+        {"directory",  required_argument, 0, 'd'},
+        {"randomseed", required_argument, 0, 'r'},
+        {"ploidy",  required_argument, 0, 'p'},
+        {"timedev",  required_argument, 0, 't'},
+        {"criticalsize",  required_argument, 0, 'c'},
+        {"genotypeconst",  no_argument, 0, 'g'},
+        {"kon",  required_argument, 0, 0},
+        {"verbose", no_argument,  no_argument, 'V'},
+        {"help",  no_argument, 0, 'h'},
+        {"outputbindingsites",  no_argument, 0, 'o'},
+        {0, 0, 0, 0}
+      };
+    
+    /* `getopt_long' stores the option index here. */
+    int option_index = 0;
+    
+    c = getopt_long (argc, argv, "d:r:p:t:c:gvho",
+                     long_options, &option_index);
+    
+    /* Detect the end of the options. */
+    if (c == -1)
+      break;
+    
     switch (c)  {
+    case 0:  /* long option without a short arg */
+      /* If this option set a flag, do nothing else now. */
+      if (long_options[option_index].flag != 0)
+        break;
+      if( strcmp("kon", long_options[option_index].name) == 0) {
+        char *endptr;
+        kon  = strtof(optarg, &endptr);
+        printf("setting kon=%f\n", kon);
+      } else {
+        printf ("option %s", long_options[option_index].name);
+        if (optarg)
+          printf (" with arg %s", optarg);
+        printf ("\n");
+      }
+      break;
     case 'd':
       output_directory = optarg;
       break;
@@ -63,12 +108,24 @@ int main(int argc, char *argv[])
       break;
     case 'g':
       hold_genotype_constant = 1;
-        break;
-    case 'v':
+      break;
+    case 'V':
       verbose = 1;
       break;
     case 'h':
-      fprintf(stderr, "%s [-h] [-g] [-o] [-d DIRECTORY] [-r DUMMYRUN] [-p PLOIDY] [-t DEVELOPMENTTIME] [-c CRITICALSIZE]\n", argv[0]);
+      fprintf(stderr, "Usage: %s [OPTION]\n\
+\n\
+ -g,  --genotypeconst       hold genotype constant\n\
+ -o,  --outputbindingsites  print out binding sites\n\
+ -d,  --directory=DIRECTORY directory to store output\n\
+ -r,  --randomseed=SEED     random seed\n\
+ -p,  --ploidy=PLOIDY       ploidy (1=haploid, 2=diploid)\n\
+ -t,  --timedev=TIME        length of time to run development\n\
+ -c,  --criticalsize=SIZE   critical size for cell division\n\
+      --kon=KON             kon value\n\
+ -h,  --help                display this help and exit\n\
+ -V,  --verbose             verbose output to error file\n\
+\n", argv[0]);
       exit(0);
       break;
     case 'o':
@@ -78,6 +135,15 @@ int main(int argc, char *argv[])
       abort();
     }
   }
+
+  /* Print any remaining command line arguments (not options). */
+  if (optind < argc) {
+    printf ("non-option ARGV-elements: ");
+    while (optind < argc)
+      printf ("%s ", argv[optind++]);
+    putchar ('\n');
+  }
+  
   
   /* create output directory if needed */
 #ifdef __unix__
@@ -133,7 +199,8 @@ int main(int argc, char *argv[])
 
   /* now create the population of cells */
   for (j = 0; j < POP_SIZE; j++) {
-    if (j==POP_SIZE-1) output=1;
+    //if (j==POP_SIZE-1) output=1;
+    output=1;
     initialize_genotype(&indivs[j], kdis);
     /* if genotype is held constant, start varying the seed *after*
        initialize_genotype, so we can run the same genotype with
@@ -152,15 +219,15 @@ int main(int argc, char *argv[])
   }
   
   develop(indivs, state, timecoursestart, timecourselast, (float) 293.0);
-  //develop(&indivs[j], &state[j], (float) 293.0, timecoursestart, timecourselast);
 
   for (j = 0; j < POP_SIZE; j++) {
-    fprintf(fperrors,"indiv %d\n",j);
+    fprintf(fperrors,"indiv %d\n", j);
     for (i=0; i < NGENES; i++) {
-      if ((output) && j==POP_SIZE-1) print_time_course(timecoursestart[j][i], i);
+      //if ((output) && j==POP_SIZE-1) print_time_course(timecoursestart[j][i], i, j);
+      if ((output)) print_time_course(timecoursestart[j][i], i, j);
       if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
       delete_time_course(timecoursestart[j][i]);
-      timecoursestart[i][j] = timecourselast[j][i] = NULL;
+      timecoursestart[j][i] = timecourselast[j][i] = NULL;
     }
     free_mem_CellState(&state[j]);
     free(indivs[j].allBindingSites);
