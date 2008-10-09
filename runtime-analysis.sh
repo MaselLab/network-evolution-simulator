@@ -9,7 +9,7 @@ do
 	for replicate in 1 2 3 4
 	do
 	    echo -n "$kon $rand $replicate " >> $outfile
-	    /usr/bin/time -f "%E %U %S" -a -o $outfile ./netsim-selection -r 4 -p 2 -d selection -c -1.0 --kon $kon
+	    /usr/bin/time -f "%E %U %S" -a -o $outfile ./netsim-selection -r $rand -p 2 -d selection -c -1.0 --kon $kon
 	done
     done
 done
