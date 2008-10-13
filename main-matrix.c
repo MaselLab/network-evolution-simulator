@@ -116,8 +116,67 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
         }
       } 
           //system("PAUSE");
-      
   }
+  
+   void diagonal(int row, float *diag, struct Ttype *arrayT, int m, int n){
+    int x;
+    diag[row]=0;
+          for (x=0; x<m; x++) {
+             diag[row] -= *(arrayT[n].col[x].kval);
+          }
+      arrayT[n].col[m].colnum = row;
+      arrayT[n].col[m].kval = &(diag[row]);   
+} 
+  
+  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float *kon, float koff[5],int *hammDist, float *diag){
+       int i, p,j,m;
+       int n=0;
+       for( i=0;i<size; i++){
+          arrayT[n].row = i;
+          arrayT[n].col = malloc((size+2)*sizeof(struct Coltype));
+         //printf("viableStates:%d, row num:%d\n",viableStates[i], i);
+        m=0;
+        for(p=0;p<TFBSites;p++){
+          int col = viableStates[i];
+          
+          if(col& (1<<p)){
+            col = viableStates[i] ^ (1<<p);
+           if( col!=viableStates[i]){
+             for(j=0;j<size; j++){
+               if(col==viableStates[j]){
+                 arrayT[n].col[m].colnum = j;
+                 int a = hammDist[p];
+                 arrayT[n].col[m].kval = &(koff[a]);
+                 m++;
+                 // printf("    col=%d, j=%d, p=%d\n", col, j, p);
+                // printf(" %d  %d  \n", i, j);
+               }
+             }
+           }
+         }else{
+          
+          int col = viableStates[i] | (1<<p);
+          if(col!=0 && col!=viableStates[i]){
+            for( j=0;j<size; j++){
+              if(col==viableStates[j]){
+                 arrayT[n].col[m].colnum = j;
+                 arrayT[n].col[m].kval = &(kon[p]);
+                 m++;
+                 //printf("    col=%d, j=%d, p=%d\n", col, j, p);
+                // printf(" %d  %d  \n", i, j);
+               }
+             }
+           }
+          }
+       }
+       diagonal(i,diag, arrayT, m, n);
+       m++;
+       arrayT[n].colCount = m;
+       n++;
+     }
+ 
+  }
+  
 
 int main(int argc, char *argv[])
 {
@@ -209,7 +268,22 @@ int main(int argc, char *argv[])
   /* Jasmin: you can use these initial concentrations for computing your kons */
   for (i=0; i<NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
+    //printf("%f\n", initProteinConc[i]);
   }
+ // printf("\n");
+ 
+    //populate Kon
+    float Kon[NGENES];
+    int counter;
+    for(counter=0; counter<NGENES; counter++){
+        Kon[counter]= initProteinConc[counter]*kon;
+        printf("%f\n",Kon[counter]);
+    }
+    
+    //populate Koff
+    float Koff[5];
+    //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
+    
 
   /* create sequences and binding site matrix */
   initialize_genotype(&indiv, kdis);
@@ -228,7 +302,7 @@ int main(int argc, char *argv[])
     startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     int TFBS;
     TFBS = 20;
-    
+      
     int *bits = calloc(TFBS, sizeof(int));
     int *viableStates;
     //struct Ttype *arrayT;
