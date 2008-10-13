@@ -580,7 +580,7 @@ void initialize_cell(CellState *state,
       if (t < ttranslation) {
         (state->mRNACytoCount[i])--;
         (state->mRNATranslCytoCount[i])++;
-        //LOG_VERBOSE("TRANSLATION EVENT time=%g for gene=%d [pointer=%p]\n", (ttranslation-t), i, state->mRNATranslTimeEnd);
+        LOG_VERBOSE("add translation event time=%g for gene=%d\n", (ttranslation-t), i);
         add_fixed_event(i, ttranslation-t, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
       }
     } 
@@ -913,7 +913,9 @@ void calc_from_state(Genotype *genes,
   for (i=0; i<NGENES; i++) {
     transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
+    LOG_VERBOSE("initializing transport[%d]=%g\n", i, transport[i]);
   }
+  LOG_VERBOSE("initializing rates->transport=%g\n", rates->transport);
 
   /* start all genes in acteylated state */
   for (j=0; j < MAX_COPIES; j++) {  
@@ -969,23 +971,6 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
   float t2;
   float t3;
 
-  // TODO: remove, used for temporary debuggin
-  /* if (mRNATranscrTimeEnd == NULL) {
-    LOG_VERBOSE_NOCELLID("mRNATranscrTimeEnd is NULL!\n");
-  } else {
-    LOG_VERBOSE_NOCELLID("mRNATranscrTimeEnd = %g for gene=%d\n", mRNATranscrTimeEnd->time, mRNATranscrTimeEnd->geneID);
-  }
-  if (mRNATranslTimeEnd == NULL) {
-    LOG_VERBOSE_NOCELLID("mRNATranslTimeEnd is NULL!\n");
-  } else {
-    LOG_VERBOSE_NOCELLID("mRNATranslTimeEnd  = %g for gene=%d\n", mRNATranslTimeEnd->time, mRNATranslTimeEnd->geneID);
-  }
-  if (replicationTimeEnd == NULL) {
-    LOG_VERBOSE_NOCELLID("replicationTimeEnd is NULL!\n");
-  } else {
-    LOG_VERBOSE_NOCELLID("replicationTimeEnd  = %g for gene=%d\n", replicationTimeEnd->time, replicationTimeEnd->geneID);
-    } */
-
   if (mRNATranscrTimeEnd == NULL && mRNATranslTimeEnd==NULL && replicationTimeEnd==NULL) {
     retval = 0;
   } else {
@@ -1013,7 +998,7 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
         retval = 0;
       }
   }
-  LOG_VERBOSE_NOCELLID("retval=%d\n", retval);
+  LOG_VERBOSE_NOCELLID("event=%d\n", retval);
   return retval;  
 }
 
@@ -1110,6 +1095,9 @@ void end_transcription(float *dt,
   /* add rate kRNA to transport and Gillespie rates */
   transport[i] += kRNA;
   rates->transport += kRNA;
+
+  LOG_VERBOSE("add one new mRNA in nucleus, updating transport[%d]=%g, rates->transport=%g\n", i, transport[i], rates->transport);
+
 }
 
 
@@ -1556,7 +1544,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
   else
     instantaneous_growth_rate = gmax;
 
-  LOG_VERBOSE_NOFUNC("growth rate (variable %g)-", *integrated_growth_rate);
+  LOG_VERBOSE_NOCELLID("growth rate (variable %g)-", *integrated_growth_rate);
 
   /* compute the total cost of translation across all genes  */
   for (i=0; i<NGENES; i++) {
@@ -1732,19 +1720,14 @@ void transport_event(GillespieRates *rates,
   while (i < NGENES && x > konrate2) {
     i++;
     x -= transport[i];
-    LOG_ERROR("[cell %03d] in choose gene x=%g, i=%d, konrate2=%g\n", state->cellID, x, i, konrate2);
   }
 
-  // TODO: fix this: sometimes attempts to choose a transport event that doesn't exist
-  // this function should never be reached.
-  /* if (i >= NGENES) {
-     LOG_ERROR("[cell %03d] attempted to choose gene=%d which doesn't exist\n", state->cellID, i);
-    return;
-    } else {
-    LOG_ERROR("[cell %03d] transport gene=%d  x=%g\n", state->cellID, i, x);
-    } */
+  if (i >= NGENES) {
+     LOG_ERROR("[cell %03d] attempted to choose mRNA for gene=%d which doesn't exist\n", state->cellID, i);
+     exit(-1);
+  } 
   
-  LOG_VERBOSE("transport event gene %d from %d copies\n", i, state->mRNANuclearCount[i]);
+  LOG_VERBOSE("do transport event mRNA from gene=%d from %d copies (x=%g)\n", i, state->mRNANuclearCount[i], i, x);
 
   /* one less mRNAs in nucleus */
   (state->mRNANuclearCount[i])--;
@@ -1753,10 +1736,8 @@ void transport_event(GillespieRates *rates,
   (state->mRNATranslCytoCount[i])++;
   
   /* add the endtime for translation */
-  LOG_VERBOSE("add TRANSLATION EVENT endtime=%f for gene=%d [pointer=%p]\n", endtime, i, state->mRNATranslTimeEnd);
+  LOG_VERBOSE("add translation event endtime=%f for mRNA encoded by gene=%d \n", endtime, i);
   add_fixed_event_end(i, endtime, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
-  LOG_VERBOSE("after adding fixed event, head time=%f for gene=%d [pointer=%p]\n", 
-              state->mRNATranslTimeEnd->time, state->mRNATranslTimeEnd->geneID, state->mRNATranslTimeEnd);
 
   /* decrease transport frequency */
   transport[i] -= kRNA;
@@ -2406,14 +2387,6 @@ float do_single_timestep(Genotype *genes,
       LOG_VERBOSE("%d transcription events\n", state->mRNATranscrCount[i]);
   }
   
-  // TODO: temporary debugging
-  /* if (state->mRNATranslTimeEnd == NULL) {
-    LOG_VERBOSE("mRNATranslTimeEnd is NULL at t=%g\n", *t);
-  }
-  else {
-    LOG_VERBOSE("mRNATranslTimeEnd is not NULL at t=%g\n", *t);
-    LOG_VERBOSE("mRNATranslTimeEnd pointer=%p\n", state->mRNATranslTimeEnd);
-    } */
 
   /* first check to see if a fixed event occurs in current t->dt window */
   event = does_fixed_event_end(state->mRNATranslTimeEnd,
@@ -2679,8 +2652,8 @@ void develop(Genotype genes[POP_SIZE],
   //int geneID[POP_SIZE];    /* ID of gene which is undergoing transitions in transcription state */
 
   float *koffvalues[POP_SIZE];   /* rates of unbinding */
-  float transport[NGENES][POP_SIZE];  /* transport rates of each mRNA */
-  float mRNAdecay[NGENES][POP_SIZE];  /* mRNA decay rates */
+  float transport[POP_SIZE][NGENES];  /* transport rates of each mRNA */
+  float mRNAdecay[POP_SIZE][NGENES];  /* mRNA decay rates */
   float x[POP_SIZE];                  /* random number */
   float dt[POP_SIZE];                 /* delta-t */
 
