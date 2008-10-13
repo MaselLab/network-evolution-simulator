@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
         {"criticalsize",  required_argument, 0, 'c'},
         {"genotypeconst",  no_argument, 0, 'g'},
         {"kon",  required_argument, 0, 0},
-        {"verbose", no_argument,  no_argument, 'V'},
+        {"verbose", no_argument,  0, 'v'},
         {"help",  no_argument, 0, 'h'},
         {"outputbindingsites",  no_argument, 0, 'o'},
         {0, 0, 0, 0}
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     case 'g':
       hold_genotype_constant = 1;
       break;
-    case 'V':
+    case 'v':
       verbose = 1;
       break;
     case 'h':
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
  -c,  --criticalsize=SIZE   critical size for cell division\n\
       --kon=KON             kon value\n\
  -h,  --help                display this help and exit\n\
- -V,  --verbose             verbose output to error file\n\
+ -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);
       exit(0);
       break;
@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
       for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
          ran1(&seed);
    
-    initialize_cell(&state[j], indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
+    initialize_cell(&state[j], j, indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
 
     /* print binding sites */
     if (output_binding_sites) 

@@ -39,6 +39,28 @@
 #define HIND_LENGTH 15         /* default length of hindrance (original was 6) */
 #endif
 
+#ifndef LOGGING_OFF
+#define LOG(...) fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) 
+#define LOG_ERROR(...) fprintf(fperrors, "[%s] [ERROR] ", __func__); fprintf (fperrors, __VA_ARGS__);
+#define LOG_WARNING(...) fprintf(fperrors, "[%s] [WARNING] ", __func__); fprintf (fperrors, __VA_ARGS__);
+#define LOG_NOFUNC(...) fprintf (fperrors, __VA_ARGS__) 
+#define LOG_VERBOSE_NOFUNC(...) if (verbose) { fprintf (fperrors, __VA_ARGS__); }
+#define LOG_VERBOSE(...) if (verbose) { \
+    if (state!=NULL)                  \
+      fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cellID); \
+    else \
+      fprintf(fperrors, "[%s] ", __func__);  \
+    fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#define LOG_VERBOSE_NOCELLID(...) if (verbose) { \
+    fprintf(fperrors, "[%s] ", __func__);                 \
+    fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#else
+#define LOG
+#define LOG_ERROR
+#define LOG_NOFUNC
+#define LOG_VERBOSE
+#endif
+
 extern int verbose;
 extern FILE *fperrors;
 
@@ -197,6 +219,7 @@ struct FixedEvent {
 
 typedef struct CellState CellState;
 struct CellState {
+  int cellID;                         /* cell ID */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
   float cellSize;                     /* size of cell */
   float growthRate;                   /* total growth rate in the previous deltat */
@@ -370,6 +393,7 @@ extern void delete_fixed_event_start(FixedEvent **,
                                      FixedEvent **);
 
 extern void initialize_cell(CellState *,
+                            int,
                             int [NGENES],
                             float [NGENES],
                             float [NGENES],
