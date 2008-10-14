@@ -1,5 +1,34 @@
 #!/bin/bash
-outfile=$1
+### Set the job name
+#PBS -N networkruntime
+
+### Request email when job begins and ends
+#PBS -m bea
+
+### Specify email address to use for notification.
+#PBS -M alexlanc@email.arizona.edu
+
+### Specify the PI group found with va command
+#PBS -W group_list=masel
+
+### Set the queue to submit this job., high_priority disabled
+#PBS -q high_priority 
+
+### Set the number of cpus that will be used.
+#PBS -l select=1:ncpus=1
+
+### Important!!! Include this line for your 1p job.
+### Without it, the whole cpu node containing 8 cpus will be allocated.
+#PBS -l place=pack:shared 
+
+### Specify up to a maximum of 1600 hours total cpu time for 1-processor job
+#PBS -l cput=240:0:0
+
+### Specify up to a maximum of 240 hours walltime for the job
+#PBS -l walltime=240:0:0
+
+date
+outfile=runtime-profile.txt
 # print out header
 echo "kon rand replicate real user sys" > $outfile
 for kon in 0.0001 0.0005 0.001
@@ -14,3 +43,4 @@ do
 	done
     done
 done
+date
