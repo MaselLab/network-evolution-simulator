@@ -204,7 +204,7 @@ void initialize_genotype(Genotype *indiv,
                          &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions,
                          indiv->tfsPerGene);
   
-  LOG("activators vs repressors ");
+  LOG_NOCELLID("activators vs repressors ");
   
   for (i=0; i<NGENES; i++) {
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -316,7 +316,7 @@ int calc_all_binding_sites_copy(char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
           maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
           *allBindingSites = realloc(*allBindingSites, maxBindingSiteAlloc*sizeof(AllTFBindingSites));
           if (!(*allBindingSites)) {
-            LOG_ERROR("realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
+            LOG_ERROR_NOCELLID("realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
             exit(1);
           }
           else LOG_VERBOSE_NOCELLID("realloc of allBindingSites to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
@@ -349,7 +349,7 @@ int calc_all_binding_sites_copy(char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
           maxBindingSiteAlloc = 2*maxBindingSiteAlloc;
           *allBindingSites = realloc(*allBindingSites, maxBindingSiteAlloc*sizeof(AllTFBindingSites));
           if (!(*allBindingSites)){
-            LOG_ERROR("realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
+            LOG_ERROR_NOCELLID("realloc of allBindingSites to bindSiteCount = %d failed.\n", maxBindingSiteAlloc);
             exit(1);
           }
           else LOG_VERBOSE_NOCELLID("realloc of allBindingSites to bindSiteCount = %d succeeded\n", maxBindingSiteAlloc);
@@ -385,7 +385,7 @@ void calc_all_binding_sites(int copies[NGENES],
   maxBindingSiteAlloc = maxelements;
   *allBindingSites = malloc(maxBindingSiteAlloc*sizeof(AllTFBindingSites));
   if (!(*allBindingSites)) {
-    LOG_ERROR("initial setting of allBindingSites failed.\n");
+    LOG_ERROR_NOCELLID("initial setting of allBindingSites failed.\n");
     exit(1);
   }
   bindSiteCount = 0;
@@ -418,7 +418,7 @@ void calc_all_binding_sites(int copies[NGENES],
 
   *allBindingSites = realloc(*allBindingSites, bindSiteCount*sizeof(AllTFBindingSites));
   if (!(*allBindingSites)) {
-    LOG_ERROR("realloc of allBindingSites down to bindSiteCount = %d failed.\n", bindSiteCount);
+    LOG_ERROR_NOCELLID("realloc of allBindingSites down to bindSiteCount = %d failed.\n", bindSiteCount);
     exit(1);
   }
   *newBindSiteCount = bindSiteCount;
@@ -511,8 +511,8 @@ void delete_fixed_event(int geneID,
     }
   }
   if (done == 0) {
-    LOG_ERROR("In %d elements, couldn't find element %d to delete in gene %d\n",
-              j+1, i, geneID);
+    LOG_ERROR_NOCELLID("In %d elements, couldn't find element %d to delete in gene %d\n",
+                       j+1, i, geneID);
   }
   free(info);
 }
@@ -1053,8 +1053,8 @@ void calc_dt(float *x,
   /* if bounds are the same, simply choose tbound1 */
   if (tbound1==tbound2){
     if (konStates->nkon!=0) {
-      LOG_ERROR("nkon=%d when it should be zero x=%f rates->maxSalphc=%g rates->minSalphc=%g rates->total=%g\n",
-              konStates->nkon, *x, rates->maxSalphc, rates->minSalphc, rates->total);
+      LOG_ERROR_NOCELLID("nkon=%d when it should be zero x=%f rates->maxSalphc=%g rates->minSalphc=%g rates->total=%g\n",
+                         konStates->nkon, *x, rates->maxSalphc, rates->minSalphc, rates->total);
     }
     *dt = tbound1;
   } else {
@@ -1122,7 +1122,7 @@ void remove_from_array(int toberemoved,
   else 
     if (force)  {
       /* don't always print because with a 4->3 transition PIC assembly is not there to be removed */
-      LOG_ERROR("error removing %d from array of length %d, type=%d\n", toberemoved, *len, type);
+      LOG_ERROR_NOCELLID("error removing %d from array of length %d, type=%d\n", toberemoved, *len, type);
     }
 }
 
@@ -1474,7 +1474,7 @@ void reach_s_phase(CellState *state, Genotype *genes, float t) {
   state->in_s_phase = 1;
 
   for (i=0; i < NGENES; i++) {
-    printf("add replication for geneID=%d at t=%g\n", i, t + genes->replication_time[i]);
+    LOG("add replication for geneID=%d at t=%g\n", i, t + genes->replication_time[i]);
 
     /* add the replication event to the queue */
     add_fixed_event(i, t + genes->replication_time[i], 
@@ -1534,7 +1534,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
     *integrated_growth_rate = gmax * deltatprime;
     *integrated_growth_rate += compute_integral(alpha, c, gmax, deltatrest, s_mRNA, P, Pp, ect, ect1);
   } else {
-    LOG_ERROR("growth rate computation error: should not reach here.  exiting...\n");
+    LOG_ERROR_NOCELLID("growth rate computation error: should not reach here.  exiting...\n");
     exit(-1);
   }
 
@@ -1869,7 +1869,7 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
     float konrate2 = 0.0;
     for (i = 0; i < state->tfBoundCount; i++) 
       konrate2 += koffvalues[i];
-    LOG_WARNING("warning: koffvalues add up to %g instead of rates->koff=%g\n",
+    LOG_WARNING("koffvalues add up to %g instead of rates->koff=%g\n",
                 konrate2, rates->koff);
     rates->koff = konrate2;
     j--; /* a bit of a fudge for rounding error, really should move on to rates->transport, but too complicated for something so minor */
@@ -2341,7 +2341,8 @@ float do_single_timestep(Genotype *genes,
                          TimeCourse *timecoursestart[NGENES],
                          TimeCourse *timecourselast[NGENES],
                          int maxbound2,
-                         int maxbound3) 
+                         int maxbound3,
+                         int no_fixed_dev_time) 
 {
   int i, j, k;
 
@@ -2355,7 +2356,7 @@ float do_single_timestep(Genotype *genes,
     reach_s_phase(state, genes, *t);
     *division_time = *t + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
                                           * a further 30 mins of growth after S phase */
-    printf("cell will divide at t=%g\n", *division_time);
+    LOG("add division time at t=%g\n", *division_time);
   }
   
   print_tf_occupancy(state, genes->allBindingSites, *t);
@@ -2476,11 +2477,11 @@ float do_single_timestep(Genotype *genes,
                                  state->replicationTimeEnd,
                                  fminf(tdevelopment, *t+*dt));
   } 
-  
+
   /* no remaining fixed events to do in dt, now do stochastic events */
   
   /* if we haven't already reached end of development with last delta-t */
-  if (*t+*dt < tdevelopment) {
+  if (*t+*dt < tdevelopment || no_fixed_dev_time) {
     //if (state->cellSize < 1.0) {  /* run until checkpoint reached */
     
     /* compute total konrate (which is constant over the Gillespie step) */
@@ -2635,11 +2636,17 @@ void develop(Genotype genes[POP_SIZE],
              CellState state[POP_SIZE],
              TimeCourse *timecoursestart[POP_SIZE][NGENES],
              TimeCourse *timecourselast[POP_SIZE][NGENES],
-             float temperature) /* in Kelvin */
+             float temperature,   /* in Kelvin */
+             float initmRNA[NGENES],
+             float initProteinConc[NGENES],
+             float kdis[NUM_K_DISASSEMBLY],
+             int hold_genotype_constant,
+             int output_binding_sites) 
 {
   /* local variables that don't require per-cell tracking */
   int i, j;
   int maxbound2, maxbound3;  
+  int curr_seed;
 
   /* cached information about available binding sites for efficiency */
   KonStates konStates[POP_SIZE];
@@ -2647,22 +2654,45 @@ void develop(Genotype genes[POP_SIZE],
 
   float t[POP_SIZE];
   float division_time[POP_SIZE];
-
-  //int site[POP_SIZE];      /* site where TF gets removed  */
-  //int geneID[POP_SIZE];    /* ID of gene which is undergoing transitions in transcription state */
-
   float *koffvalues[POP_SIZE];   /* rates of unbinding */
   float transport[POP_SIZE][NGENES];  /* transport rates of each mRNA */
   float mRNAdecay[POP_SIZE][NGENES];  /* mRNA decay rates */
   float x[POP_SIZE];                  /* random number */
   float dt[POP_SIZE];                 /* delta-t */
-
   float konrate[POP_SIZE];
+
+  /* priority queue and time step initialization */
+  FixedEvent *time_queue = NULL;
+  FixedEvent *time_queue_end = NULL;
+  float t_next = 0.0;   /* initialize to zero */
+  int cell = 0;         /* initialize cell number (TODO: this is only
+                           necessary when running for fixed
+                           development time) */
+  int divisions = 0;
+  int no_fixed_dev_time = 0;  /* switch on/off fixed development time  */
 
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
 
   for (j = 0; j < POP_SIZE; j++) {
+
+    output=1;
+    initialize_genotype(&genes[j], kdis);
+    /* if genotype is held constant, start varying the seed *after*
+       initialize_genotype, so we can run the same genotype with
+       slightly different amounts of noise  */
+    if (hold_genotype_constant)
+      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
+        ran1(&seed);
+   
+    initialize_cell(&state[j], j, genes[j].copies, genes[j].mRNAdecay, initmRNA, initProteinConc);
+
+    /* print binding sites */
+    if (output_binding_sites) 
+      print_all_binding_sites(genes[j].copies, genes[j].allBindingSites, genes[j].bindSiteCount, 
+                              genes[j].transcriptionFactorSeq, genes[j].cisRegSeq); 
+
+
     
     /* set cell temperature and value of RTlnKr constant */
     state[j].temperature = temperature;
@@ -2696,44 +2726,45 @@ void develop(Genotype genes[POP_SIZE],
     calc_from_state(&genes[j], &state[j], &rates[j], &konStates[j], transport[j], mRNAdecay[j]);
 
     t[j] = 0.0;  /* time starts at zero */
-    division_time[j] = 999999;  /* make artificially high */
+    division_time[j] = 999999.0;  /* make artificially high */
 
+    /* do one step for the cell */
+    do_single_timestep(&(genes[j]), 
+                       &(state[j]), 
+                       &(konStates[j]), 
+                       &(rates[j]), 
+                       &(t[j]),
+                       &(division_time[j]),
+                       koffvalues[j],
+                       transport[j],
+                       mRNAdecay[j],
+                       &(x[j]),
+                       &(dt[j]),
+                       &(konrate[j]),
+                       timecoursestart[j],
+                       timecourselast[j],
+                       maxbound2,
+                       maxbound3,
+                       no_fixed_dev_time);
+    
+    /* insert each initial time into the queue */
+    insert_with_priority(&(time_queue), &(time_queue_end), j, t[j]);
   }
 
-  FixedEvent *time_queue = NULL;
-  FixedEvent *time_queue_end = NULL;
-  float t_next;
-  int cell;
-
-  /* do one step for each cell */
-
-  for (j = 0; j < POP_SIZE; j++) {
-
-      do_single_timestep(&(genes[j]), 
-                         &(state[j]), 
-                         &(konStates[j]), 
-                         &(rates[j]), 
-                         &(t[j]),
-                         &(division_time[j]),
-                         koffvalues[j],
-                         transport[j],
-                         mRNAdecay[j],
-                         &(x[j]),
-                         &(dt[j]),
-                         &(konrate[j]),
-                         timecoursestart[j],
-                         timecourselast[j],
-                         maxbound2,
-                         maxbound3);
-
-      /* insert each time into the queue */
-      insert_with_priority(&(time_queue), &(time_queue_end), j, t[j]);
-  }
-
-  /* get the first cell to advance */
-  t_next = get_next(&time_queue, &time_queue_end, &cell);
-
+  //while (divisions < 2) {
   while (t_next < tdevelopment && t_next < division_time[cell]) {  /* run until development stops */
+
+    /* get the next cell with the smallest t to advance next */
+    t_next = get_next(&time_queue, &time_queue_end, &cell);
+
+    /* if (t_next >= division_time[cell])  {
+      divisions++;
+      printf("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", cell, t_next, division_time[cell], divisions);
+
+      // once this cell has divided, stop.  don't add a new event for
+      // this cell, go to next cell
+      continue;
+      }*/
 
     /* log for testing: */ 
     //printf("t_next=%.5g\n", t_next);
@@ -2755,7 +2786,8 @@ void develop(Genotype genes[POP_SIZE],
                        timecoursestart[cell],
                        timecourselast[cell],
                        maxbound2,
-                       maxbound3);
+                       maxbound3,
+                       no_fixed_dev_time);
 
     // TODO: remove
     //printf("[cell %03d] after doing timestep: t=%.5g, tfBoundCount=%d, x=%g, mRNANuclearCount=%d\n", 
@@ -2763,11 +2795,8 @@ void develop(Genotype genes[POP_SIZE],
 
     /* put the updated timestep back into the queue  */
     insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
-    
-    /* get the cell with the smallest t to advance next */
-    t_next = get_next(&time_queue, &time_queue_end, &cell);
   }
-  
+
   /* cleanup data structures */
 
   for (j = 0; j < POP_SIZE; j++) {
@@ -2794,7 +2823,7 @@ void print_time_course(TimeCourse *start,
   else
     sprintf(filename, "%s/protein%03d-%02d.dat", output_directory, j, i);
   if ((fpout = fopen(filename,"w"))==NULL) {
-    LOG_ERROR("error: Can't open %s file\n", filename);
+    LOG_ERROR_NOCELLID("error: Can't open %s file\n", filename);
   }
   while (start) {
     fprintf(fpout,"%g %g\n", start->time, start->concentration);

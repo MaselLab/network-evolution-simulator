@@ -1,3 +1,6 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+
+#include <math.h>
 #include "netsim.h"
 #include "priority-queue.h"
 
@@ -21,6 +24,10 @@ float get_next(FixedEvent **queue, FixedEvent **end, int *cell) {
     printf("queue is empty!\n");
   }
   return retval;
+}
+
+void delete_element(FixedEvent **queue, FixedEvent **end, int cell, float time) {
+  delete_fixed_event(cell, (int) trunc(time), queue, end);
 }
 
 /* look at the element with highest priority without removing it */

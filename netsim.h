@@ -40,11 +40,16 @@
 #endif
 
 #ifndef LOGGING_OFF
-#define LOG(...) fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) 
-#define LOG_ERROR(...) fprintf(fperrors, "[%s] [ERROR] ", __func__); fprintf (fperrors, __VA_ARGS__);
-#define LOG_WARNING(...) fprintf(fperrors, "[%s] [WARNING] ", __func__); fprintf (fperrors, __VA_ARGS__);
-#define LOG_NOFUNC(...) fprintf (fperrors, __VA_ARGS__) 
-#define LOG_VERBOSE_NOFUNC(...) if (verbose) { fprintf (fperrors, __VA_ARGS__); }
+#define LOG(...) { fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cellID); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
+#define LOG_NOCELLID(...) { fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
+#define LOG_ERROR(...) { fprintf(fperrors, "[%s: cell %03d ERROR] ", __func__, state->cellID); \
+    fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#define LOG_ERROR_NOCELLID(...) { fprintf(fperrors, "[%s ERROR] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#define LOG_WARNING(...) { fprintf(fperrors, "[%s: cell %03d WARNING] ", __func__, state->cellID); \
+    fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#define LOG_WARNING_NOCELLID(...) { fprintf(fperrors, "[%s WARNING] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#define LOG_NOFUNC(...) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+#define LOG_VERBOSE_NOFUNC(...) if (verbose) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #define LOG_VERBOSE(...) if (verbose) { \
     if (state!=NULL)                  \
       fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cellID); \
@@ -636,13 +641,19 @@ extern float do_single_timestep(Genotype *,
                                 TimeCourse *[NGENES],
                                 TimeCourse *[NGENES],
                                 int,
+                                int,
                                 int) ;
   
 extern void develop(Genotype [POP_SIZE],
                     CellState [POP_SIZE],
                     TimeCourse *[POP_SIZE][NGENES],
                     TimeCourse *[POP_SIZE][NGENES], 
-                    float); /* in Kelvin */
+                    float, /* in Kelvin */
+                    float [NGENES],
+                    float [NGENES],
+                    float [NUM_K_DISASSEMBLY],
+                    int,
+                    int); 
 
 extern void print_time_course(TimeCourse *,
                               int, int);

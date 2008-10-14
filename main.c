@@ -144,7 +144,6 @@ int main(int argc, char *argv[])
     putchar ('\n');
   }
   
-  
   /* create output directory if needed */
 #ifdef __unix__
   directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
@@ -197,28 +196,8 @@ int main(int argc, char *argv[])
   }
   fclose(fpkdis);
 
-  /* now create the population of cells */
-  for (j = 0; j < POP_SIZE; j++) {
-    //if (j==POP_SIZE-1) output=1;
-    output=1;
-    initialize_genotype(&indivs[j], kdis);
-    /* if genotype is held constant, start varying the seed *after*
-       initialize_genotype, so we can run the same genotype with
-       slightly different amounts of noise  */
-    if (hold_genotype_constant)
-      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
-         ran1(&seed);
-   
-    initialize_cell(&state[j], j, indivs[j].copies, indivs[j].mRNAdecay, initmRNA, initProteinConc);
-
-    /* print binding sites */
-    if (output_binding_sites) 
-      print_all_binding_sites(indivs[j].copies, indivs[j].allBindingSites, indivs[j].bindSiteCount, 
-                              indivs[j].transcriptionFactorSeq, indivs[j].cisRegSeq); 
-
-  }
-  
-  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0);
+  /* now create and run the population of cells */
+  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, initmRNA, initProteinConc, kdis, hold_genotype_constant, output_binding_sites);
 
   for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"indiv %d\n", j);
