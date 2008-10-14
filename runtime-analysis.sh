@@ -39,7 +39,7 @@ do
 	for replicate in 1
 	do
 	    echo -n "$kon $rand $replicate " >> $outfile
-	    /usr/bin/time -f "%E %U %S" -a -o $outfile /home/u30/alexlanc/src/network-code/netsim-selection -r $rand -p 2 -d selection -c -1.0 --kon $kon
+	    /usr/bin/time -f "%e %U %S" -a -o $outfile /home/u30/alexlanc/src/network-code/netsim-selection -r $rand -p 2 -d selection -c -1.0 --kon $kon
 	done
     done
 done
