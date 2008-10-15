@@ -282,6 +282,17 @@ int main(int argc, char *argv[])
     
     //populate Koff
     float Koff[5];
+    float Gibbs;
+    float RTlnKr;
+    float koffCheck;
+    float temperature = 293.15;
+    RTlnKr = GasConstant * temperature * log(Kr);
+    Gibbs = (((float) 0)/3.0 - 1.0) * RTlnKr;
+    printf("\n gibbs = %f\n", Gibbs);
+    koffCheck = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
+     printf("\n koffCheck = %f\n", koffCheck);
+    //*koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*state->temperature));
+    //Gibbs = (((float) allBindingSites[k].hammingDist)/3.0 - 1.0) * state->RTlnKr;
     //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
     
 
