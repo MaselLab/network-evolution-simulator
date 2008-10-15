@@ -128,17 +128,18 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
       arrayT[n].col[m].kval = &(diag[row]);   
 } 
   
-  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float *kon, float koff[5],int *hammDist, float *diag){
-       int i, p,j,m;
+ void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float *kon, float koff[5],int *hammDist, float *diag, int *TFon){
+       int i, p,j,m, tf;
        int n=0;
        for( i=0;i<size; i++){
+            //system("PAUSE");
           arrayT[n].row = i;
-          arrayT[n].col = malloc((size+2)*sizeof(struct Coltype));
+          arrayT[n].col = malloc((TFBSites+2)*sizeof(struct Coltype));
          //printf("viableStates:%d, row num:%d\n",viableStates[i], i);
         m=0;
         for(p=0;p<TFBSites;p++){
           int col = viableStates[i];
-          
+           // system("PAUSE");
           if(col& (1<<p)){
             col = viableStates[i] ^ (1<<p);
            if( col!=viableStates[i]){
@@ -157,16 +158,19 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
           
           int col = viableStates[i] | (1<<p);
           if(col!=0 && col!=viableStates[i]){
-            for( j=0;j<size; j++){
+                     
+            for( j=0;j<size; j++){   
               if(col==viableStates[j]){
                  arrayT[n].col[m].colnum = j;
-                 arrayT[n].col[m].kval = &(kon[p]);
+                 //arrayT[n].col[m].kval = &(kon[p]);
+                 printf("    col=%d, j=%d, p=%d TFon[%d]=%d\n", col, j, p, p, TFon[p]);
+                 arrayT[n].col[m].kval = &(kon[TFon[p]]);
                  m++;
                  //printf("    col=%d, j=%d, p=%d\n", col, j, p);
                 // printf(" %d  %d  \n", i, j);
                }
              }
-           }
+           }//printf("\n");
           }
        }
        diagonal(i,diag, arrayT, m, n);
@@ -176,6 +180,24 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
      }
  
   }
+  
+  void print_arrayT(struct Ttype *arrayT, int size, int *viableStates){
+     int p, q;  
+     printf("\n"); 
+    p=0;  
+    while (p < size) {
+       q=0;
+       while (q < arrayT[p].colCount) {
+          printf( "%d  %d | %d  %d  %.2f\n",p,arrayT[p].col[q].colnum, viableStates[p], viableStates[arrayT[p].col[q].colnum],  *arrayT[p].col[q].kval); 
+    	  //printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
+	      //printf( "Value%d: %.2f\n",q, *arrayT[p].col[q].kval);     
+    	  q++;
+       }
+       p++; 
+       printf("\n");   
+    }
+    printf("\n");
+} 
   
 
 int main(int argc, char *argv[])
@@ -280,17 +302,26 @@ int main(int argc, char *argv[])
         printf("%f\n",Kon[counter]);
     }
     
+    
     //populate Koff
     float Koff[5];
     float Gibbs;
     float RTlnKr;
     float koffCheck;
-    float temperature = 293.15;
+    float temperature = 293.0;
     RTlnKr = GasConstant * temperature * log(Kr);
-    Gibbs = (((float) 0)/3.0 - 1.0) * RTlnKr;
-    printf("\n gibbs = %f\n", Gibbs);
-    koffCheck = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
-     printf("\n koffCheck = %f\n", koffCheck);
+    int jo;
+    for( jo=0; jo<3; jo++){
+         Gibbs = (((float) jo)/3.0 - 1.0) * RTlnKr;
+         //printf("\n gibbs = %f\n", Gibbs);
+         koffCheck = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
+         //printf("\n koffCheck = %f\n", koffCheck);
+         Koff[jo] = koffCheck;
+    }
+    int jojo;
+    for(jojo=0; jojo<3; jojo++){
+       printf("Koff[%d] = %f\n", jojo, Koff[jojo]);
+    }
     //*koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*state->temperature));
     //Gibbs = (((float) allBindingSites[k].hammingDist)/3.0 - 1.0) * state->RTlnKr;
     //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
@@ -309,17 +340,25 @@ int main(int argc, char *argv[])
      //system("PAUSE");
     int sitePos[10];
     int transFactor[10];
-    int *startPos;
-    startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     int TFBS;
-    TFBS = 20;
+    TFBS = 19;
+    int *startPos;
+    int *hammDist;
+    float *diag;
+    int *TFon;
+    
+    startPos=malloc(TFBS*sizeof(int));
+    //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
+    hammDist = malloc(TFBS *sizeof(int));
+    diag = malloc(TFBS*sizeof(float));
+    TFon = malloc(TFBS*sizeof(int));
       
     int *bits = calloc(TFBS, sizeof(int));
     int *viableStates;
-    //struct Ttype *arrayT;
+    struct Ttype *arrayT;
     
     viableStates = malloc((100)*sizeof(int));
-     //arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));
+     arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));
      int array = 0;
     
     
@@ -330,24 +369,38 @@ int main(int argc, char *argv[])
      int lem;
      for(lem =0; lem<TFBS; lem++){
              startPos[lem] = indiv.allBindingSites[lem].leftEdgePos;
+             hammDist[lem] = indiv.allBindingSites[lem].hammingDist;
+             TFon[lem] = indiv.allBindingSites[lem].tfID;
              
              printf("%d\n", indiv.allBindingSites[lem].leftEdgePos);
+             printf("   Hd = %d   tf = %d\n", hammDist[lem], TFon[lem]);
+            
+     }
+     int mat;
+     for(mat=0; mat<TFBS; mat++){
+        printf("tf[%d] = %d\n", mat, TFon[mat]);
      }
      printf("\n");
      configure(0,bits,&array,viableStates,TFBS,startPos);
      printf("%d\n", array);
+       for(mat=0; mat<TFBS; mat++){
+        printf("tf[%d] = %d\n", mat, TFon[mat]);
+     }
      system("PAUSE");
-      
+     transitions(array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
+     print_arrayT(arrayT,array,viableStates);
+       system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
-   /*int d;
+   int d;
      for (d=0; d<array; d++) {
        free(arrayT[d].col);
-  }   */ 
-  //free(arrayT);
+  }   
+  free(arrayT);
   free(viableStates);
   free(bits);
   free(startPos);
+  free(hammDist);
   
   /* close error file */
   fclose(fperrors);
