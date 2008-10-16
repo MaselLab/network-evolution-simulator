@@ -162,9 +162,11 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
             for( j=0;j<size; j++){   
               if(col==viableStates[j]){
                  arrayT[n].col[m].colnum = j;
-                 //arrayT[n].col[m].kval = &(kon[p]);
-                 printf("    col=%d, j=%d, p=%d TFon[%d]=%d\n", col, j, p, p, TFon[p]);
-                 arrayT[n].col[m].kval = &(kon[TFon[p]]);
+                 //arrayT[n].col[m].kval = &(kon[p]); (TFon[p])
+                 //printf("    col=%d, j=%d, p=%d TFon[%d]=%d\n", col, j, p, p, TFon[p]);
+                 printf("       p=%d  kon[p]=%f\n", p, kon[p]);
+                 arrayT[n].col[m].kval = &kon[p];
+                 printf("  kval = %f kon[p]= %f\n", *arrayT[n].col[m].kval, kon[p]);
                  m++;
                  //printf("    col=%d, j=%d, p=%d\n", col, j, p);
                 // printf(" %d  %d  \n", i, j);
@@ -173,12 +175,13 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
            }//printf("\n");
           }
        }
-       diagonal(i,diag, arrayT, m, n);
+       //diagonal(i,diag, arrayT, m, n);
+       printf("%f   %f\n", *arrayT[0].col[0].kval, kon[0]);
        m++;
        arrayT[n].colCount = m;
        n++;
      }
- 
+  printf("%f   %f\n", *arrayT[0].col[0].kval, kon[0]);
   }
   
   void print_arrayT(struct Ttype *arrayT, int size, int *viableStates){
@@ -294,14 +297,7 @@ int main(int argc, char *argv[])
   }
  // printf("\n");
  
-    //populate Kon
-    float Kon[NGENES];
-    int counter;
-    for(counter=0; counter<NGENES; counter++){
-        Kon[counter]= initProteinConc[counter]*kon;
-        printf("%f\n",Kon[counter]);
-    }
-    
+  
     
     //populate Koff
     float Koff[5];
@@ -341,17 +337,23 @@ int main(int argc, char *argv[])
     int sitePos[10];
     int transFactor[10];
     int TFBS;
-    TFBS = 19;
+    TFBS = 20;
     int *startPos;
     int *hammDist;
     float *diag;
     int *TFon;
+    
+      //populate Kon
+    float *Kon;
+    
+    
     
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
     diag = malloc(TFBS*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
+    Kon = malloc(TFBS*sizeof(float));
       
     int *bits = calloc(TFBS, sizeof(int));
     int *viableStates;
@@ -367,13 +369,18 @@ int main(int argc, char *argv[])
    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
      printf("\n");
      int lem;
+      int bob;
      for(lem =0; lem<TFBS; lem++){
              startPos[lem] = indiv.allBindingSites[lem].leftEdgePos;
              hammDist[lem] = indiv.allBindingSites[lem].hammingDist;
              TFon[lem] = indiv.allBindingSites[lem].tfID;
+             bob = indiv.allBindingSites[lem].tfID;
+             printf("bob= %d\n", bob);
+             Kon[lem] = initProteinConc[bob]*kon;
              
              printf("%d\n", indiv.allBindingSites[lem].leftEdgePos);
              printf("   Hd = %d   tf = %d\n", hammDist[lem], TFon[lem]);
+             printf("         Kon[lem] = %f\n", Kon[lem]);
             
      }
      int mat;
@@ -388,6 +395,8 @@ int main(int argc, char *argv[])
      }
      system("PAUSE");
      transitions(array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
+     printf("%f\n", *arrayT[0].col[0].kval);
+       system("PAUSE");
      print_arrayT(arrayT,array,viableStates);
        system("PAUSE");
   /* free dynamically allocated all binding sites list */

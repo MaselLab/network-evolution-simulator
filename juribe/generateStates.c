@@ -2,15 +2,15 @@
 #include <math.h>
 #include <stdlib.h>
 
-#define TFBS 12
+#define TFBS 18
 #define SIZE 1
 #define HIND_LENGTH 15
 
-static int startPos[TFBS]= {0,0,6,6,7,7,7,7,8,8,12,12};
-static float kon[TFBS] = {1, 2, 3,4,5,6,7,8,9,10,11,12};
+static int startPos[TFBS]= {0,0,6,6,7,7,7,7,8,8,12,12,14,14,17,17,20,20};
+static float kon[TFBS] = {1, 2, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
 static float koff[5] = {1.5, 2.5, 3.5, 4.5, 5.5};
-static int hammDist[TFBS] = {2,2,2,2,2,2,1,2,1,2,2,2};
-static float diag[TFBS]={0,0,0,0,0,0,0,0,0,0,0,0};
+static int hammDist[TFBS] = {2,2,2,2,2,2,1,2,1,2,2,2,1,2,2,1,2,1};
+static float diag[TFBS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //static int startPos[TFBS]= {1,2,3,3,10,10,11,11,11,13,16,16,17,17, 20,20,21,24,24,25,25,25};
 
