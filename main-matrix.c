@@ -119,11 +119,16 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
   }
   
    void diagonal(int row, float *diag, struct Ttype *arrayT, int m, int n){
+         system("PAUSE");
+    printf("INSIDE DIAGONAL %f  %d  %d\n", *arrayT[0].col[0].kval, m, n);
     int x;
+    printf("ROW= %d\n", row);
     diag[row]=0;
           for (x=0; x<m; x++) {
+              printf("kvals: %f  ",  *arrayT[0].col[0].kval);
              diag[row] -= *(arrayT[n].col[x].kval);
           }
+      printf("\nINSIDE DIAGONAL AFTER FOR LOOP %f  %d  %d\n", *arrayT[0].col[0].kval, m, n);
       arrayT[n].col[m].colnum = row;
       arrayT[n].col[m].kval = &(diag[row]);   
 } 
@@ -175,7 +180,9 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
            }//printf("\n");
           }
        }
-       //diagonal(i,diag, arrayT, m, n);
+      
+       printf("%f   %f %d  %d\n", *arrayT[0].col[0].kval, kon[0], m, n);
+       diagonal(i,diag, arrayT, m, n);
        printf("%f   %f\n", *arrayT[0].col[0].kval, kon[0]);
        m++;
        arrayT[n].colCount = m;
