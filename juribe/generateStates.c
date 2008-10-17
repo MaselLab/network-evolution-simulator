@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -7,10 +8,10 @@
 #define HIND_LENGTH 15
 
 static int startPos[TFBS]= {0,0,6,6,7,7,7,7,8,8,12,12,14,14,17,17,20,20};
-static float kon[TFBS] = {1, 2, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
+//static float kon[TFBS] = {1, 2, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
 static float koff[5] = {1.5, 2.5, 3.5, 4.5, 5.5};
 static int hammDist[TFBS] = {2,2,2,2,2,2,1,2,1,2,2,2,1,2,2,1,2,1};
-static float diag[TFBS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+//static float diag[TFBS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 //static int startPos[TFBS]= {1,2,3,3,10,10,11,11,11,13,16,16,17,17, 20,20,21,24,24,25,25,25};
 
@@ -108,7 +109,7 @@ int isHindered(int bindSite, int *bits){
      // system("PAUSE");
   }
   
-  void diagonal(int row, float diag[TFBS], struct Ttype *arrayT, int m, int n){
+  void diagonal(int row, float *diag, struct Ttype *arrayT, int m, int n){
     int x;
     diag[row]=0;
           for (x=0; x<m; x++) {
@@ -118,7 +119,7 @@ int isHindered(int bindSite, int *bits){
       arrayT[n].col[m].kval = &(diag[row]);   
 } 
   
-  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float kon[TFBS], float koff[5],int hammDist[TFBS]){
+  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float *kon, float koff[5],int hammDist[TFBS], float *diag){
        int i, p,j,m;
        int n=0;
        for( i=0;i<size; i++){
@@ -205,7 +206,8 @@ void print_arrayT(struct Ttype *arrayT, int size){
     while (p < size) {
        q=0;
        while (q < arrayT[p].colCount) {
-          printf( "%d  %d  %.2f\n",p,q, *arrayT[p].col[q].kval); 
+             printf( "%d  %d   %d  %.2f\n",p,q, arrayT[p].col[q].colnum,  *arrayT[p].col[q].kval); 
+          //printf( "%d  %d  %.2f\n",p,q, *arrayT[p].col[q].kval); 
     	  //printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
 	      //printf( "Value%d: %.2f\n",q, *arrayT[p].col[q].kval);     
     	  q++;
@@ -224,7 +226,15 @@ void print_arrayT(struct Ttype *arrayT, int size){
      int *bits = calloc(TFBS, sizeof(int));
      int *viableStates;
      struct Ttype *arrayT;
-    
+     float *diag;
+     float *kon;
+     diag = malloc(TFBS*sizeof(float));
+     kon = malloc(TFBS*sizeof(float));
+     int i;
+     for(i=0; i<TFBS; i++){
+              kon[i]=i+1;
+     }
+    //kon[TFBS]={1, 2, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
      viableStates = malloc(50*sizeof(int));
      arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));
      int array = 0;
@@ -234,7 +244,7 @@ void print_arrayT(struct Ttype *arrayT, int size){
      //printf("viableStates=%d\n", viableStates[14]);
      //printf("array=%d\n", array);
      
-     transitions(array,viableStates,TFBS,arrayT,kon,koff,hammDist);
+     transitions(array,viableStates,TFBS,arrayT,kon,koff,hammDist, diag);
      print_arrayT(arrayT,array);
      
      int test[12]={1,0,1,0,0,0,0,0,0,0,0,0};
@@ -248,5 +258,7 @@ void print_arrayT(struct Ttype *arrayT, int size){
   free(arrayT);
   free(viableStates);
   free(bits);
+  free(diag);
+  //free(kon);
      system("PAUSE");}
   
