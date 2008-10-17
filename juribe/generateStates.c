@@ -119,7 +119,7 @@ int isHindered(int bindSite, int *bits){
       arrayT[n].col[m].kval = &(diag[row]);   
 } 
   
-  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float *kon, float koff[5],int hammDist[TFBS], float *diag){
+  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int hammDist[TFBS], float *diag){
        int i, p,j,m;
        int n=0;
        for( i=0;i<size; i++){
@@ -226,14 +226,16 @@ void print_arrayT(struct Ttype *arrayT, int size){
      int *bits = calloc(TFBS, sizeof(int));
      int *viableStates;
      struct Ttype *arrayT;
-     float *diag;
-     float *kon;
+     float *diag; 
      diag = malloc(TFBS*sizeof(float));
-     kon = malloc(TFBS*sizeof(float));
+     /*float *kon;
+     kon = malloc(TFBS*sizeof(float));*/
+     float kon[TFBS];
      int i;
      for(i=0; i<TFBS; i++){
               kon[i]=i+1;
      }
+     
     //kon[TFBS]={1, 2, 3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18};
      viableStates = malloc(50*sizeof(int));
      arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));

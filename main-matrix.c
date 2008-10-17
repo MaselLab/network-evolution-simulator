@@ -15,6 +15,8 @@
 #include "lib.h"
 #include "netsim.h"
 
+FILE *sparseMatrixV1;
+
 typedef int (*compfn)(const void*, const void*);
 
 int intcmp(const void *a, const void *b)
@@ -199,6 +201,38 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
     }
     printf("\n");
 } 
+
+void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
+      int p, q;  
+     printf("\n Row    Col      kval\n"); 
+    p=0;  
+    while (p < size) {
+       q=0;
+       while (q < arrayT[p].colCount) {
+           printf(" %d      %d      %f\n", p,arrayT[p].col[q].colnum,  *arrayT[p].col[q].kval); 
+           q++;
+       }
+       p++;
+    }
+    
+    sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
+     if (sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w")){
+        //ask alex about this line of code...
+       fprintf(sparseMatrixV1, "1Row  Column  Value\n\n");
+        //printf( "1Row  Column  Value\n\n");
+        p=0;  
+      while (p < size) {
+       q=0;
+       while (q < arrayT[p].colCount) {
+       fprintf(sparseMatrixV1, "%d,   %d,   %f\n", p+1,arrayT[p].col[q].colnum +1,  *arrayT[p].col[q].kval); 
+       //printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
+       q++;
+       }
+       p++;
+      }
+      }
+    
+}
   
 
 int main(int argc, char *argv[])
@@ -335,7 +369,7 @@ int main(int argc, char *argv[])
     int sitePos[10];
     int transFactor[10];
     int TFBS;
-    TFBS = 20;
+    TFBS = 16;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -365,6 +399,23 @@ int main(int argc, char *argv[])
     qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
            sizeof(struct AllTFBindingSites),(compfn)compare );
    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
+   
+   
+  /* for (i=0; i <indiv.tfsPerGene[0] ; i++) {
+    printf("binding site %3d:\n", i);
+    printf("       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
+    printf("         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
+    //printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
+    printf(" transcription-factor: %3d", indiv.allBindingSites[i].tfID);
+    //printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
+    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+    //printf("  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
+    printf("               strand: %3d\n", indiv.allBindingSites[i].strand);
+    //printf("         Hamming dist: %3d\n", indiv.allBindingSites[i].hammingDist); 
+  }*/
+   
+  // system("PAUSE");
+   
      printf("\n");
      int lem;
       int bob;
@@ -373,11 +424,11 @@ int main(int argc, char *argv[])
              hammDist[lem] = indiv.allBindingSites[lem].hammingDist;
              TFon[lem] = indiv.allBindingSites[lem].tfID;
              bob = indiv.allBindingSites[lem].tfID;
-             printf("bob= %d\n", bob);
+             //printf("bob= %d\n", bob);
              Kon[lem] = initProteinConc[bob]*kon;
              
-             printf("%d\n", indiv.allBindingSites[lem].leftEdgePos);
-             printf("   Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
+             printf("%d", indiv.allBindingSites[lem].leftEdgePos);
+             printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
              printf(" Kon[lem] = %f\n", Kon[lem]);
             
      }
@@ -396,6 +447,7 @@ int main(int argc, char *argv[])
      //printf("%f\n", *arrayT[0].col[0].kval);
       // system("PAUSE");
      print_arrayT(arrayT,array,viableStates);
+     print_arrayT_MATLAB(arrayT,array,viableStates);
        system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
