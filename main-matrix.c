@@ -218,7 +218,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
     sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
      if (sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w")){
         //ask alex about this line of code...
-       fprintf(sparseMatrixV1, "1Row  Column  Value\n\n");
+       //fprintf(sparseMatrixV1, "1Row  Column  Value\n\n");
         //printf( "1Row  Column  Value\n\n");
         p=0;  
       while (p < size) {
@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
     int sitePos[10];
     int transFactor[10];
     int TFBS;
-    TFBS = 16;
+    TFBS = 15;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -455,13 +455,13 @@ int main(int argc, char *argv[])
      for (d=0; d<array; d++) {
        free(arrayT[d].col);
   }   
+  
   free(arrayT);
   free(viableStates);
   free(bits);
   free(startPos);
   free(hammDist);
   free(TFon);
-  
   /* close error file */
   fclose(fperrors);
 }
