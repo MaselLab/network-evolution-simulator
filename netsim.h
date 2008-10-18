@@ -201,7 +201,8 @@ struct Genotype {
   int hindrancePositions[NGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int bindSiteCount;
   AllTFBindingSites *allBindingSites;
-  int tfsPerGene[NGENES];             /* cache number of TFs per gene */
+  int tfsPerGene[NGENES];               /* cache number of TFs per gene */
+  int tfsStart[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs */
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
@@ -325,14 +326,6 @@ float h;
 float gmax;
 
 
-extern void calc_all_binding_sites(int [NGENES],
-                                   char [NGENES][MAX_COPIES][CISREG_LEN],
-                                   char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                   int *,
-                                   AllTFBindingSites **,
-                                   int [NGENES],
-                                   int [NGENES]);
-
 extern void initialize_parameters();
 
 extern void initialize_growth_rate_parameters();
@@ -343,7 +336,8 @@ extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
                                     char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                    char [NGENES][MAX_COPIES][CISREG_LEN]);
+                                    char [NGENES][MAX_COPIES][CISREG_LEN],
+                                    int [NGENES][MAX_COPIES][2]);
 
 extern void print_tf_occupancy(CellState *,
                                AllTFBindingSites *,
@@ -372,12 +366,13 @@ extern void calc_all_binding_sites(int [NGENES],
                                    int *,
                                    AllTFBindingSites **,
                                    int [NGENES],
-                                   int [NGENES]);
+                                   int [NGENES],
+                                   int [NGENES][MAX_COPIES][2]);
 
-extern void add_fixed_event(int,
-                            float,
-                            FixedEvent **,
-                            FixedEvent **);
+extern int add_fixed_event(int,
+                           float,
+                           FixedEvent **,
+                           FixedEvent **);
 
 extern void add_time_point(float,
                            float,

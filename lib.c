@@ -99,40 +99,45 @@ void free_mem_CellState(CellState *state)
   free(state->tfHinderedIndexes);
 }
 
-void sls_store(FixedEvent *i, 
+// TODO: remove, keep track of comparisons only for debugging
+int sls_store(FixedEvent *i, 
                FixedEvent **start, 
                FixedEvent **last)
 {
   FixedEvent *old, *p;
+
+  int pos = 0;
   
   p = *start;
   if (!*last) { /* first element in list */
     i->next = NULL;
     *last = i;
     *start = i;
-    return;
+    return pos;
   }
   old=NULL;
   while (p) {
     if (p->time < i->time) {
       old = p;
       p = p->next;
+      pos++;
     }
     else {
       if (old) { /* goes in the middle */
         old->next = i;
         i->next = p;
-        return;
+        return pos;
       } else {
 	i->next = p; /* new first element */
 	*start = i;
-	return;
+	return pos;
       }
     }
   }
   (*last)->next = i; /* put on end */
   i->next = NULL;
   *last = i;
+  return pos;
 }
 
 

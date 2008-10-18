@@ -127,15 +127,17 @@ void print_all_binding_sites(int copies[NGENES],
                              AllTFBindingSites *allBindingSites, 
                              int numElements,
                              char transcriptionFactorSeq[NGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                             char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN])
+                             char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN],
+                             int tfsStart[NGENES][MAX_COPIES][2])
 {
   int i, j;
 
   for (i=0; i < NGENES; i++) {
-
     for (j=0; j < copies[i]; j++) {
       printf("TF sequence gene %2d (copy %d): %.*s\n", i, j, TF_ELEMENT_LEN, transcriptionFactorSeq[i][j]);
       printf("cis-reg     gene %2d (copy %d): %.*s\n", i, j, CISREG_LEN, cisRegSeq[i][j]);
+      printf("ID range    gene %2d (copy %d): [%3d, %3d]\n", i, j, tfsStart[i][j][0], tfsStart[i][j][1]);
+      printf("\n");
     }
   } 
 
@@ -202,7 +204,7 @@ void initialize_genotype(Genotype *indiv,
 
   calc_all_binding_sites(indiv->copies, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
                          &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions,
-                         indiv->tfsPerGene);
+                         indiv->tfsPerGene, indiv->tfsStart);
   
   LOG_NOCELLID("activators vs repressors ");
   
@@ -245,6 +247,7 @@ void initialize_genotype(Genotype *indiv,
     // TODO: use fixed times while testing, later will switch to random times
     /* indiv->replication_time[i] = 30.0*ran1(&seed); */
     indiv->replication_time[i] = 30.0*(i/(float)NGENES);
+    //indiv->replication_time[i] = 0.0;
     LOG_VERBOSE_NOCELLID("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
   }
 }
@@ -377,7 +380,8 @@ void calc_all_binding_sites(int copies[NGENES],
                             int *newBindSiteCount,
                             AllTFBindingSites **allBindingSites,
                             int hindPos[NGENES],
-                            int tfsPerGene[NGENES])
+                            int tfsPerGene[NGENES],
+                            int tfsStart[NGENES][MAX_COPIES][2])
 {
   int p, maxBindingSiteAlloc, bindSiteCount;
   int geneID;
@@ -393,12 +397,20 @@ void calc_all_binding_sites(int copies[NGENES],
   /* initialize per gene # of sites */
   for (geneID=0; geneID < NGENES; geneID++) {
     tfsPerGene[geneID] = 0;
+    for (p=0; p < MAX_COPIES; p++) {
+      tfsStart[geneID][p][0] = -1;
+      tfsStart[geneID][p][1] = -1;
+    }
   }
 
   for (geneID=0; geneID < NGENES; geneID++) {  /* now which cis-reg region */
     for (p=0; p < MAX_COPIES; p++) {     /* loop through the maximum copies possible */
       if (p < copies[geneID]) {  
         int before = bindSiteCount;
+
+        /* record initial siteID for this copy */
+        tfsStart[geneID][p][0] = bindSiteCount;
+
         /* if this particular gene has this copy number then generate binding sites
            for all the relevant gene copies (assume no gene divergence) */
         bindSiteCount = calc_all_binding_sites_copy(cisRegSeq, 
@@ -409,6 +421,9 @@ void calc_all_binding_sites(int copies[NGENES],
                                                     geneID,
                                                     p, 
                                                     hindPos);
+
+        /* record end siteID for this copy */
+        tfsStart[geneID][p][1] = bindSiteCount - 1;
 
         /* add the new number of sites */
         tfsPerGene[geneID] += (bindSiteCount-before);
@@ -425,13 +440,14 @@ void calc_all_binding_sites(int copies[NGENES],
 }
 
 
-void add_fixed_event(int i,
+int add_fixed_event(int i,
                      float t,
                      FixedEvent **start,
                      FixedEvent **last)
 {
   FixedEvent *newtime;
-  
+  int pos;
+
   newtime = (FixedEvent *)malloc(sizeof(FixedEvent));
   if (!newtime) {
     printf("Out of memory\n");
@@ -440,7 +456,8 @@ void add_fixed_event(int i,
   newtime->geneID = i;
   newtime->time = t;
   LOG_VERBOSE_NOCELLID("adding event at time=%f for gene=%d\n", t, i);
-  sls_store(newtime, start, last);
+  pos = sls_store(newtime, start, last);
+  return pos;
 }
 
 void add_time_point(float time,
@@ -2218,12 +2235,13 @@ void replicate_gene(CellState *state,
   /* recompute *all* binding sites, then relabel sites offset by
      insertion (or deletion) of new sites created by replication */
   calc_all_binding_sites(genes->copies, 
-			 genes->cisRegSeq, 
-			 genes->transcriptionFactorSeq, 
-			 &(genes->bindSiteCount),
-			 &(genes->allBindingSites),
-			 genes->hindrancePositions,
-			 genes->tfsPerGene); 
+                         genes->cisRegSeq, 
+                         genes->transcriptionFactorSeq, 
+                         &(genes->bindSiteCount),
+                         &(genes->allBindingSites),
+                         genes->hindrancePositions,
+                         genes->tfsPerGene,
+                         genes->tfsStart); 
 
   /* print_all_binding_sites(genes->copies, genes->allBindingSites, genes->bindSiteCount, 
      genes->transcriptionFactorSeq, genes->cisRegSeq);  */
@@ -2269,6 +2287,60 @@ void replicate_gene(CellState *state,
 
   }
 }
+
+void recalibrate_cell(GillespieRates *rates,
+                      CellState *state,
+                      Genotype *genes,
+                      KonStates *konStates,
+                      float *koffvalues) 
+{
+  int i, j, k;
+  float protein_decay;
+  float salphc, new_salphc = 0.0;
+  float new_maxSalphc = 0.0;
+  float new_minSalphc = 0.0;
+  float new_transport = 0.0;
+
+  float konrate2;
+
+  /* loop through all genes */
+  for (i=0; i < NGENES; i++) {
+    /* look at all unoccupied sites to regenerate salphc */
+    for (j=0; j < konStates->konList[i]->site_count; j++) {
+      //geneID = genes->allBindingSites[state->tfBoundIndexes[j]].tfID;
+      /* if protein decay is otherwise going to be zero, use aging term */
+      protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
+      salphc = ((float) (state->mRNACytoCount[i]) * genes->translation[i] / protein_decay);;
+      new_salphc += salphc;
+      new_maxSalphc += fmaxf(state->proteinConc[i], salphc);
+      new_minSalphc += fminf(state->proteinConc[i], salphc);
+    }
+
+    /* transport rates */
+    new_transport += kRNA * (float) (state->mRNANuclearCount[i]);
+  }
+
+  /* check for rounding error */
+  //if (rates->koff < 0.0){
+  konrate2 = 0.0;
+  for (i=0; i < state->tfBoundCount; i++) konrate2 += koffvalues[i];
+
+
+  /*if (rates->salphc < 0.0 || 
+      rates->maxSalphc < 0.0 ||
+      rates->minSalphc < 0.0 ||
+      rates->transport < 0.0 ||
+      rates->koff < 0.0) { */
+    printf("salphc:     old=%g new=%g\n", rates->salphc, new_salphc*kon);
+    printf("maxSalphc:  old=%g new=%g\n", rates->maxSalphc, new_maxSalphc*kon);
+    printf("minSalphc:  old=%g new=%g\n", rates->minSalphc, new_minSalphc*kon);
+    printf("transport:  old=%g new=%g\n", rates->transport, new_transport);
+    printf("koffvalues: old=%g new=%g\n", rates->koff, konrate2);
+    printf("\n");
+    /*}*/
+
+}
+
 
 /*
  * recompute rates from scratch to avoid compounding rounding error
@@ -2323,6 +2395,169 @@ void recompute_rates(GillespieRates *rates,
     printf("koffvalues: old=%g new=%g\n", rates->koff, konrate2);
     printf("\n");
     /*}*/
+
+}
+
+int move_gene_copy(int from_copy,
+                   int to_copy,
+                   int gene,
+                   Genotype *from_genotype,
+                   Genotype *to_genotype,
+                   CellState *from_state,
+                   CellState *to_state,
+                   int lastpos)
+{
+  int k;
+  int siteID, newSiteID, geneID, geneCopy;
+  int start=from_genotype->tfsStart[gene][from_copy][0];
+  int end=from_genotype->tfsStart[gene][from_copy][1];
+      
+  /* shift all sites in tfBoundIndexes */
+  for (k = 0; k < from_state->tfBoundCount; k++) {
+    siteID = from_state->tfBoundIndexes[k];
+    geneID = from_genotype->allBindingSites[siteID].cisregID;
+    geneCopy = from_genotype->allBindingSites[siteID].geneCopy;
+    /* check to see if TF is within the gene copy to be moved */
+    if (siteID >= start && siteID <= end && geneCopy == from_copy && geneID == gene) {
+      /* fix  */
+      if (start  == lastpos + 1)  /* if no offset required: keep siteID */
+        newSiteID = siteID;
+      else                        /* otherwise offset them by the difference */
+        newSiteID = siteID  - (start - lastpos);
+      printf("gene=%d [copy=%d] mother siteID=%d, move to daughter [copy=%d] siteID=%d (daughter tfBoundCount=%d), lastpos= %d, offset=%d\n", 
+             gene, from_copy, siteID, to_copy, newSiteID, to_state->tfBoundCount, lastpos, (start - lastpos));
+      to_state->tfBoundIndexes[to_state->tfBoundCount] = newSiteID;
+      to_state->tfBoundCount++;
+    }
+  }
+  lastpos += (end - start) + 1;   /* update the last position in new binding site array */
+  printf("gene=%d [copy=%d] start=%d, end=%d, lastpos=%d\n", gene, from_copy, start, end, lastpos);
+  return lastpos;
+}
+
+
+void initialize_daughter_cell(int motherID,
+                              int daughterID,
+                              Genotype genes[POP_SIZE],
+                              CellState state[POP_SIZE],
+                              KonStates konStates[POP_SIZE],
+                              float *koffvalues[POP_SIZE],
+                              float transport[POP_SIZE][NGENES],
+                              float mRNAdecay[POP_SIZE][NGENES])
+
+{
+  int i, k, p;
+  Genotype daughter = genes[daughterID]; 
+  Genotype mother = genes[motherID]; 
+  CellState daughter_state = state[daughterID];
+  CellState mother_state = state[motherID];
+
+  int copy1 = 0;
+  int copy2 = 1;
+
+  daughter_state.tfBoundCount = 0;
+
+  /* first set the genotype of the daughter */
+  /* do first because we may end up resetting the mother cell */
+  
+  //int start = mother.tfsStart[0][copy1][0];
+  //int end = mother.tfsStart[0][copy1][1];
+
+  int lastpos = 0;
+
+  printf("mother cell total tfBoundCount=%d\n", mother_state.tfBoundCount);
+
+  print_all_binding_sites(genes[motherID].copies, genes[motherID].allBindingSites, genes[motherID].bindSiteCount, 
+                          genes[motherID].transcriptionFactorSeq, genes[motherID].cisRegSeq, genes[motherID].tfsStart); 
+
+
+  for (i=0; i < NGENES; i++) {
+
+    /* reset the number of copies of gene in mother and daughter after
+       division to original ploidy */
+    daughter.copies[i] = current_ploidy;
+
+    // assume diploid for the moment
+    //for (p=0; p < current_ploidy; p++) {
+
+    // for the moment
+    // take copy 0 and 1 from mother to form copy 0 and 1 in daughter
+    // mother    daughter
+    // copy 0 -> copy 0
+    // copy 1 -> copy 1
+    // copy 0 -> copy 2
+    // copy 1 -> copy 3
+    // while mother keeps copy 2 and 3
+    // mother    mother
+    // copy 2 -> copy 0
+    // copy 3 -> copy 1
+    // copy 2 -> copy 2
+    // copy 3 -> copy 3
+    
+    for (k=0; k < CISREG_LEN; k++) {
+      // need to save some temporary copies of base-pairs here in case
+      // daughter cell is replacing mother cell
+
+      daughter.cisRegSeq[i][0][k] = mother.cisRegSeq[i][copy1][k];
+      daughter.cisRegSeq[i][1][k] = mother.cisRegSeq[i][copy2][k];
+      daughter.cisRegSeq[i][2][k] = mother.cisRegSeq[i][copy1][k];
+      daughter.cisRegSeq[i][3][k] = mother.cisRegSeq[i][copy2][k];
+
+      /* mother.cisRegSeq[i][0][k] = mother.cisRegSeq[i][2][k];
+         mother.cisRegSeq[i][1][k] = mother.cisRegSeq[i][3][k];
+         mother.cisRegSeq[i][2][k] = mother.cisRegSeq[i][2][k];
+         mother.cisRegSeq[i][3][k] = mother.cisRegSeq[i][3][k]; */
+    }
+
+    for (k=0; k < TF_ELEMENT_LEN; k++) {
+      // need to save some temporary copies of base-pairs here in case
+      // daughter cell is replacing mother cell
+
+      daughter.transcriptionFactorSeq[i][0][k] = mother.transcriptionFactorSeq[i][copy1][k];
+      daughter.transcriptionFactorSeq[i][1][k] = mother.transcriptionFactorSeq[i][copy2][k];
+      daughter.transcriptionFactorSeq[i][2][k] = mother.transcriptionFactorSeq[i][copy1][k];
+      daughter.transcriptionFactorSeq[i][3][k] = mother.transcriptionFactorSeq[i][copy2][k];
+
+      /* mother.transcriptionFactorSeq[i][0][k] = mother.transcriptionFactorSeq[i][2][k];
+         mother.transcriptionFactorSeq[i][1][k] = mother.transcriptionFactorSeq[i][3][k];
+         mother.transcriptionFactorSeq[i][2][k] = mother.transcriptionFactorSeq[i][2][k];
+         mother.transcriptionFactorSeq[i][3][k] = mother.transcriptionFactorSeq[i][3][k]; */
+    }
+
+    printf("gene=%d, copies=%d, copy1=%d\n", i, mother.copies[i], copy1); 
+    if (mother.copies[i] - 1 >= copy1) {
+      lastpos = move_gene_copy(copy1, 0, i, &mother, &daughter, &mother_state, &daughter_state, lastpos);
+    }
+
+    printf("gene=%d, copies=%d, copy2=%d\n", i, mother.copies[i], copy2);
+    if (mother.copies[i] - 1 >= copy2) {
+      lastpos = move_gene_copy(copy2, 1, i, &mother, &daughter, &mother_state, &daughter_state, lastpos);
+    }
+
+    mother.copies[i] = current_ploidy;
+  
+  }
+
+  /* recompute *all* binding sites in daughter, then relabel sites */
+  calc_all_binding_sites(daughter.copies, 
+                         daughter.cisRegSeq, 
+                         daughter.transcriptionFactorSeq, 
+                         &(daughter.bindSiteCount),
+                         &(daughter.allBindingSites),
+                         mother.hindrancePositions,
+                         daughter.tfsPerGene,
+                         daughter.tfsStart); 
+  
+  print_all_binding_sites(daughter.copies, daughter.allBindingSites, daughter.bindSiteCount, 
+                          daughter.transcriptionFactorSeq, daughter.cisRegSeq, daughter.tfsStart); 
+
+  /* now reset the genotype of the mother */
+  
+  /* then split up the volume of the cell */
+
+  /* recompute rates in daughter */
+
+  /* recompute rates in mother */
 
 }
 
@@ -2669,10 +2904,16 @@ void develop(Genotype genes[POP_SIZE],
                            necessary when running for fixed
                            development time) */
   int divisions = 0;
+  //long int timesteps = 0; 
   int no_fixed_dev_time = 0;  /* switch on/off fixed development time  */
 
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
+
+  /* initialize heap */
+  bheap_t *queue;
+
+  queue = bh_alloc(POP_SIZE);
 
   for (j = 0; j < POP_SIZE; j++) {
 
@@ -2690,7 +2931,7 @@ void develop(Genotype genes[POP_SIZE],
     /* print binding sites */
     if (output_binding_sites) 
       print_all_binding_sites(genes[j].copies, genes[j].allBindingSites, genes[j].bindSiteCount, 
-                              genes[j].transcriptionFactorSeq, genes[j].cisRegSeq); 
+                              genes[j].transcriptionFactorSeq, genes[j].cisRegSeq, genes[j].tfsStart); 
 
 
     
@@ -2748,23 +2989,41 @@ void develop(Genotype genes[POP_SIZE],
                        no_fixed_dev_time);
     
     /* insert each initial time into the queue */
-    insert_with_priority(&(time_queue), &(time_queue_end), j, t[j]);
+    //insert_with_priority(&(time_queue), &(time_queue_end), j, t[j]);
+    int ops;
+    ops = insert_with_priority_heap(queue, j, t[j]);
+    /* printf("insert %d %d %g\n", j, ops, t[j]); */
+
   }
 
   //while (divisions < 2) {
   while (t_next < tdevelopment && t_next < division_time[cell]) {  /* run until development stops */
 
     /* get the next cell with the smallest t to advance next */
-    t_next = get_next(&time_queue, &time_queue_end, &cell);
+    //t_next = get_next(&time_queue, &time_queue_end, &cell);
+    int ops;
+    t_next = get_next_heap(queue, &cell, &ops);
+    /* if (timesteps % 100 == 0) 
+       printf("getmin %d %d %g\n", cell, ops, t[cell]); */
 
-    /* if (t_next >= division_time[cell])  {
+
+    if (0 && t_next >= division_time[cell])  { /* disable for time being */
       divisions++;
       printf("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", cell, t_next, division_time[cell], divisions);
 
-      // once this cell has divided, stop.  don't add a new event for
-      // this cell, go to next cell
-      continue;
-      }*/
+      initialize_daughter_cell(0,
+                               1,
+                               genes,
+                               state,
+                               konStates,
+                               koffvalues,
+                               transport,
+                               mRNAdecay);
+
+      // once this cell has divided, stop for debugging
+      exit(0);
+      //continue;
+      }
 
     /* log for testing: */ 
     //printf("t_next=%.5g\n", t_next);
@@ -2793,8 +3052,14 @@ void develop(Genotype genes[POP_SIZE],
     //printf("[cell %03d] after doing timestep: t=%.5g, tfBoundCount=%d, x=%g, mRNANuclearCount=%d\n", 
     //       cell, t[cell], (state[cell]).tfBoundCount, x[cell], state[cell].mRNANuclearCount[10]);
 
+    //timesteps++;
+
     /* put the updated timestep back into the queue  */
-    insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
+    // ops = insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
+    ops = insert_with_priority_heap(queue, cell, t[cell]);
+    /* if (timesteps % 100 == 0) 
+       printf("insert %d %d %g\n", cell, ops, t[cell]); */
+
   }
 
   /* cleanup data structures */

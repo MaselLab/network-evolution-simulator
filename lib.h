@@ -3,7 +3,7 @@
 extern float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *, float *), 
 		    float x, GillespieRates *rates, KonStates *konStates, float x1, float x2, float xacc);
 extern void free_mem_CellState(CellState *state);
-extern void sls_store(FixedEvent *i, 
+extern int sls_store(FixedEvent *i, 
 		      FixedEvent **start, 
 		      FixedEvent **last);
 extern void delete_time_course(TimeCourse *start2);
