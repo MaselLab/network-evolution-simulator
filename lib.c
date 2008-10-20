@@ -63,9 +63,9 @@ float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *,
   return 0.0;
 }
 
-void free_mem_CellState(CellState *state)
-{
-  FixedEvent *start, *info;
+void delete_queues(CellState *state) {
+
+ FixedEvent *start, *info;
 
   start = state->mRNATranslTimeEnd;  
   while (start) {
@@ -94,15 +94,19 @@ void free_mem_CellState(CellState *state)
     start = start->next;
     free(info);  
     } */
+}
 
+void free_mem_CellState(CellState *state)
+{
+  delete_queues(state);
   free(state->tfBoundIndexes);
   free(state->tfHinderedIndexes);
 }
 
 // TODO: remove, keep track of comparisons only for debugging
 int sls_store(FixedEvent *i, 
-               FixedEvent **start, 
-               FixedEvent **last)
+	      FixedEvent **start, 
+	      FixedEvent **last)
 {
   FixedEvent *old, *p;
 
