@@ -227,6 +227,7 @@ typedef struct CellState CellState;
 struct CellState {
   int cellID;                         /* cell ID */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
+  float division_time;                /* current division time */ 
   float cellSize;                     /* size of cell */
   float growthRate;                   /* total growth rate in the previous deltat */
   int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
@@ -306,7 +307,10 @@ int output;
 long seed ;         /* something is wrong here: changing seed changes nothing */
 int dummyrun;            /* used to change seed */
 float critical_size ; /* critical size at which cell divides, 
-                                     set to negative to prevent division  */
+                         set to negative to prevent division  */
+
+float time_s_phase;  /* length of S phase (default: 30 mins) */
+float time_g2_phase; /* length of G2/mitosis phase (default: 30 mins) */
 
 /* file output parameters */
 char *output_directory ;
@@ -625,7 +629,6 @@ extern float do_single_timestep(Genotype *,
                                 CellState *, 
                                 KonStates *, 
                                 GillespieRates *, 
-                                float *,
                                 float *,
                                 float *,
                                 float [NGENES],

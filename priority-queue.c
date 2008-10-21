@@ -69,6 +69,10 @@ float get_next_heap(bheap_t *queue, int *cell, int *pos) {
   return time;
 }
 
+void delete_element_heap(bheap_t *queue, int cell) {
+  bh_delete(queue, cell);
+}
+
 
 /*** Prototypes for functions internal to the implementation. ***/
 

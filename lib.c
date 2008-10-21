@@ -99,8 +99,8 @@ void delete_queues(CellState *state) {
 void free_mem_CellState(CellState *state)
 {
   delete_queues(state);
-  free(state->tfBoundIndexes);
-  free(state->tfHinderedIndexes);
+  if (state->tfBoundIndexes) free(state->tfBoundIndexes);
+  if (state->tfHinderedIndexes) free(state->tfHinderedIndexes);
 }
 
 // TODO: remove, keep track of comparisons only for debugging

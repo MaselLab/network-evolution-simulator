@@ -59,6 +59,10 @@ int dummyrun=4;            /* used to change seed */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
 
+float time_s_phase = 30.0;  /* length of S phase (default: 30 mins) */
+float time_g2_phase = 30.0; /* length of G2/mitosis phase (default: 30 mins) */
+
+
 /* file output parameters */
 char *output_directory = "output";
 int verbose = 0;
@@ -242,11 +246,11 @@ void initialize_genotype(Genotype *indiv,
   }
   LOG_NOFUNC("\n");
 
-  /* for each gene determine a time point during the [0, 30 min] S-phase interval */
+  /* for each gene determine a time point during the [0, time_s_phase min] S-phase interval */
   for (i=0; i<NGENES; i++) {
     // TODO: use fixed times while testing, later will switch to random times
-    /* indiv->replication_time[i] = 30.0*ran1(&seed); */
-    indiv->replication_time[i] = 30.0*(i/(float)NGENES);
+    /* indiv->replication_time[i] = time_s_phase*ran1(&seed); */
+    indiv->replication_time[i] = time_s_phase*(i/(float)NGENES);
     //indiv->replication_time[i] = 0.0;
     LOG_VERBOSE_NOCELLID("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
   }
@@ -2292,7 +2296,7 @@ void recalibrate_cell(GillespieRates *rates,
                       CellState *state,
                       Genotype *genes,
                       KonStates *konStates,
-                      float *koffvalues,
+                      float **koffvalues,
                       float mRNAdecay[NGENES],
                       float transport[NGENES]) 
 {
@@ -2316,6 +2320,12 @@ void recalibrate_cell(GillespieRates *rates,
 
   /* regenerate konStates */
   for (i=0; i < NGENES; i++) {
+    /* if protein decay is otherwise going to be zero, use aging term */
+    protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
+    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
+    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
+    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
+    konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
     konStates->nkonsum[i]=0;  
     konStates->konList[i]->site_count = 0;
   }
@@ -2330,41 +2340,48 @@ void recalibrate_cell(GillespieRates *rates,
     j = 0;
     while (j < state->tfBoundCount && available) {
       siteID = state->tfBoundIndexes[j];
-      if (siteID == k)  /* site is not available, don't add to kon */
+      if (siteID == k)  // site is not available, don't add to kon 
         available = 0;
       j++;
     }
 
     if (available) {
-      /* update the list of sites that bind for a particular TF, i */
+      // update the list of sites that bind for a particular TF, i
       konStates->konList[tfID]->available_sites[konStates->konList[tfID]->site_count] = siteID;
       (konStates->konList[tfID]->site_count)++;
       (konStates->nkonsum[tfID])++;
-      konStates->nkon = genes->bindSiteCount;
+      konStates->nkon++;
     }
   }
 
-  /* loop through all genes */
+  // loop through all genes 
   for (i=0; i < NGENES; i++) {
-    /* look at all unoccupied sites to regenerate salphc */
+    // look at all unoccupiead sites to regenerate salphc 
     for (j=0; j < konStates->konList[i]->site_count; j++) {
       //geneID = genes->allBindingSites[state->tfBoundIndexes[j]].tfID;
-      /* if protein decay is otherwise going to be zero, use aging term */
+      // if protein decay is otherwise going to be zero, use aging term 
       protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
-      salphc = ((float) (state->mRNACytoCount[i]) * genes->translation[i] / protein_decay);;
+      //salphc = ((float) (state->mRNACytoCount[i]) * genes->translation[i] / protein_decay);;
+      salphc = konStates->konvalues[i][KON_SALPHC_INDEX];
       rates->salphc += salphc;
       rates->maxSalphc += fmaxf(state->proteinConc[i], salphc);
       rates->minSalphc += fminf(state->proteinConc[i], salphc);
-    }
+    } 
+  }
 
+  for (i=0; i < NGENES; i++) {
     /* transport rates */
     transport[i] += kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
-
   }
 
-  konrate2 = 0.0;
-  for (i=0; i < state->tfBoundCount; i++) konrate2 += koffvalues[i];
+  /* recompute koffvalues for all sites */
+  for (i=0; i < state->tfBoundCount; i++) {
+    int site = state->tfBoundIndexes[i];
+    calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[i]));
+    rates->koff += (*koffvalues)[i];
+  }
+
 
   /* now update with kon */
   rates->salphc *= kon;
@@ -2474,7 +2491,7 @@ int move_gene_copy(int from_copy,
         newSiteID = siteID;
       else                        /* otherwise offset them by the difference */
         newSiteID = siteID  - (start - lastpos);
-      printf("gene=%d [copy=%d] orig siteID=%d, move to new [copy=%d] siteID=%d (daughter tfBoundCount=%d), lastpos= %d, offset=%d\n", 
+      LOG_VERBOSE_NOCELLID("gene=%d [copy=%d] orig siteID=%d, move to new [copy=%d] siteID=%d (daughter tfBoundCount=%d), lastpos= %d, offset=%d\n", 
              gene, from_copy, siteID, to_copy, newSiteID, to_state->tfBoundCount, lastpos, (start - lastpos));
       to_state->tfBoundIndexes[to_state->tfBoundCount] = newSiteID;
       to_state->tfBoundCount++;
@@ -2488,47 +2505,47 @@ int move_gene_copy(int from_copy,
     geneCopy = from_genotype->allBindingSites[siteID].geneCopy;
     if (siteID >= start && siteID <= end && geneCopy == from_copy && geneID == gene) {
       newSiteID = siteID - (start - lastpos);
-      to_state->tfHinderedIndexes[from_state->tfHinderedCount][0] = newSiteID;
-      printf("k=%d, gene=%d [copy=%d] orig hindering siteID=%d, move to new [copy=%d] siteID=%d (new tfHinderedCount=%d), lastpos= %d, offset=%d\n", 
-             k, gene, from_copy, siteID, to_copy, newSiteID, to_state->tfHinderedCount, lastpos, (start - lastpos));
+      to_state->tfHinderedIndexes[to_state->tfHinderedCount][0] = newSiteID;
+      LOG_VERBOSE_NOCELLID("k=%d, gene=%d [copy=%d] orig hindering siteID=%d, move to new [copy=%d] siteID=%d (new tfHinderedCount=%d), lastpos= %d, offset=%d\n", 
+                         k, gene, from_copy, siteID, to_copy, newSiteID, to_state->tfHinderedCount, lastpos, (start - lastpos));
       siteID = from_state->tfHinderedIndexes[k][1];
       newSiteID = siteID - (start - lastpos);
-      to_state->tfHinderedIndexes[from_state->tfHinderedCount][1] = newSiteID;
-      printf("k=%d, gene=%d [copy=%d] orig hindered siteID=%d, move to new [copy=%d] siteID=%d (new tfHinderedCount=%d), lastpos= %d, offset=%d\n", 
-             k, gene, from_copy, siteID, to_copy, newSiteID, to_state->tfHinderedCount, lastpos, (start - lastpos));
+      to_state->tfHinderedIndexes[to_state->tfHinderedCount][1] = newSiteID;
+      LOG_VERBOSE_NOCELLID("k=%d, gene=%d [copy=%d] orig hindered siteID=%d, move to new [copy=%d] siteID=%d (new tfHinderedCount=%d), lastpos= %d, offset=%d\n", 
+                         k, gene, from_copy, siteID, to_copy, newSiteID, to_state->tfHinderedCount, lastpos, (start - lastpos));
       to_state->tfHinderedCount++;
     }
   }
 
   lastpos += (end - start) + 1;   /* update the last position in new binding site array */
-  printf("gene=%d [copy=%d] start=%d, end=%d, lastpos=%d\n", gene, from_copy, start, end, lastpos);
+  LOG_VERBOSE_NOCELLID("gene=%d [copy=%d] start=%d, end=%d, lastpos=%d\n", gene, from_copy, start, end, lastpos);
   return lastpos;
 }
 
-void clone_queue(FixedEvent *start_orig,
-                 FixedEvent *last_orig,
-                 FixedEvent *start_clone,
-                 FixedEvent *last_clone) 
+void clone_queue(FixedEvent **start_orig,
+                 FixedEvent **last_orig,
+                 FixedEvent **start_clone,
+                 FixedEvent **last_clone) 
 {
-  while (start_orig != NULL) {
-    printf("adding geneID=%d time=%g to new clone, removing from orig\n", start_orig->geneID, start_orig->time);
-    add_fixed_event(start_orig->geneID, start_orig->time, &start_clone, &last_clone);
-    delete_fixed_event_start(&start_orig, &last_orig);
+  while (*start_orig != NULL) {
+    printf("adding geneID=%d time=%g to new clone, removing from orig\n", (*start_orig)->geneID, (*start_orig)->time);
+    add_fixed_event((*start_orig)->geneID, (*start_orig)->time, start_clone, last_clone);
+    delete_fixed_event_start(start_orig, last_orig);
   }
 
-  if (start_clone != NULL) {
-    printf("clone queue is not empty: head is: geneID=%d time=%g\n", start_clone->geneID, start_clone->time);
+  if (*start_clone != NULL) {
+    printf("clone queue is not empty: head is: geneID=%d time=%g\n", (*start_clone)->geneID, (*start_clone)->time);
   }
 }
 
-void split_mRNA(FixedEvent *start_clone,
-                FixedEvent *last_clone,
+void split_mRNA(FixedEvent **start_clone,
+                FixedEvent **last_clone,
                 int count_clone[NGENES],
-                FixedEvent *start_daughter,
-                FixedEvent *last_daughter,
+                FixedEvent **start_daughter,
+                FixedEvent **last_daughter,
                 int count_daughter[NGENES],
-                FixedEvent *start_mother,
-                FixedEvent *last_mother,
+                FixedEvent **start_mother,
+                FixedEvent **last_mother,
                 int count_mother[NGENES],
                 int i,
                 float fraction) 
@@ -2536,23 +2553,25 @@ void split_mRNA(FixedEvent *start_clone,
   // regenerate initial queue(s)
   int j;
   for (j=0; j < count_clone[i]; j++) {
-    if (start_clone != NULL) {
-      int geneID = start_clone->geneID;
-      float time = start_clone->time;
+    if (*start_clone != NULL) {
+      int geneID = (*start_clone)->geneID;
+      float time = (*start_clone)->time;
       
       if (ran1(&seed) <= fraction) { /* fraction of time move to daughter */
         count_daughter[geneID]++;
-        add_fixed_event(geneID, time, &(start_daughter), &(last_daughter));
+        add_fixed_event(geneID, time, start_daughter, last_daughter);
         printf("move event at time=%g on gene %d to daughter=%d of total mRNATranscrCount=%d\n", 
                  time, geneID, count_daughter[i], count_clone[i]);
       } else {  /* (1-fraction of time move to mother */
         count_mother[geneID]++;
-        add_fixed_event(geneID, time, &(start_mother), &(last_mother));
+        add_fixed_event(geneID, time, start_mother, last_mother);
         printf("move event at time=%g on gene %d to mother=%d of total mRNATranscrCount=%d\n", 
                time, geneID, count_daughter[i], count_clone[i]);
       }
       /* remove from original queue */
-      delete_fixed_event_start(&(start_clone), &(last_clone));
+
+      printf("removing event at time=%g on gene %d from clone of queue\n", time, geneID);
+      delete_fixed_event_start(start_clone, last_clone);
     }
   }
 }
@@ -2561,18 +2580,13 @@ void split_mRNA(FixedEvent *start_clone,
 void clone_cell(Genotype *genes_orig,
                 CellState *state_orig,
                 GillespieRates *rates_orig,
-                //float *koffvalues_orig,
                 Genotype *genes_clone,
                 CellState *state_clone,
-                GillespieRates *rates_clone
-                //float *koffvalues_clone
-                )
+                GillespieRates *rates_clone)
 {
   int i, k, p;
 
   state_clone->in_s_phase = state_orig->in_s_phase;
-
-  printf("orig=%d clone=%d\n", state_orig->in_s_phase, state_clone->in_s_phase);
 
   state_clone->cellSize = state_orig->cellSize;
   state_clone->growthRate =  state_orig->growthRate;
@@ -2609,19 +2623,26 @@ void clone_cell(Genotype *genes_orig,
   state_clone->tfBoundCount  = 0;  //state_orig->tfBoundCount;
   state_clone->tfHinderedCount = 0; // state_orig->tfHinderedCount;
 
-  // copy bound indexes
-  state_clone->tfBoundIndexes = malloc(state_orig->tfBoundCount*sizeof(int));
-  for (k=0; k < state_orig->tfBoundCount; k++) {
-    state_clone->tfBoundIndexes[k] = state_orig->tfBoundIndexes[k];
-    state_clone->tfBoundCount++;
+  state_clone->tfBoundIndexes = NULL;
+  state_clone->tfHinderedIndexes = NULL;
+
+  // copy bound indexes if there are any
+  if (state_orig->tfBoundCount > 0) {
+    state_clone->tfBoundIndexes = malloc(state_orig->tfBoundCount*sizeof(int));
+    for (k=0; k < state_orig->tfBoundCount; k++) {
+      state_clone->tfBoundIndexes[k] = state_orig->tfBoundIndexes[k];
+      state_clone->tfBoundCount++;
+    }
   }
 
-  // copy bound indexes
-  state_clone->tfHinderedIndexes = malloc(2*state_orig->tfHinderedCount*sizeof(int));
-  for (k=0; k < state_orig->tfHinderedCount; k++) {
-    state_clone->tfHinderedIndexes[k][0] = state_orig->tfHinderedIndexes[k][0];
-    state_clone->tfHinderedIndexes[k][1] = state_orig->tfHinderedIndexes[k][1];
-    state_clone->tfHinderedCount++;
+  // copy bound hindrance positions if there are any
+  if (state_orig->tfHinderedCount > 0) {
+    state_clone->tfHinderedIndexes = malloc(2*state_orig->tfHinderedCount*sizeof(int));
+    for (k=0; k < state_orig->tfHinderedCount; k++) {
+      state_clone->tfHinderedIndexes[k][0] = state_orig->tfHinderedIndexes[k][0];
+      state_clone->tfHinderedIndexes[k][1] = state_orig->tfHinderedIndexes[k][1];
+      state_clone->tfHinderedCount++;
+    }
   }
 
   /* more state.... */
@@ -2652,11 +2673,10 @@ void clone_cell(Genotype *genes_orig,
 
   // clone queue and empty original
 
-  clone_queue(state_orig->mRNATranscrTimeEnd, state_orig->mRNATranscrTimeEndLast,
-                state_clone->mRNATranscrTimeEnd, state_clone->mRNATranscrTimeEndLast);
-  clone_queue(state_orig->mRNATranslTimeEnd, state_orig->mRNATranslTimeEndLast,
-                state_clone->mRNATranslTimeEnd, state_clone->mRNATranslTimeEndLast);
-
+  clone_queue(&(state_orig->mRNATranscrTimeEnd), &(state_orig->mRNATranscrTimeEndLast),
+              &(state_clone->mRNATranscrTimeEnd), &(state_clone->mRNATranscrTimeEndLast));
+  clone_queue(&(state_orig->mRNATranslTimeEnd), &(state_orig->mRNATranslTimeEndLast),
+              &(state_clone->mRNATranslTimeEnd), &(state_clone->mRNATranslTimeEndLast));
 }
 
 
@@ -2666,7 +2686,7 @@ void initialize_daughter_cell(int motherID,
                               CellState *mother_state,
                               GillespieRates *mother_rates,
                               KonStates *mother_konStates,
-                              float *mother_koffvalues,
+                              float **mother_koffvalues,
                               float mother_transport[NGENES],
                               float mother_mRNAdecay[NGENES],
 
@@ -2674,7 +2694,7 @@ void initialize_daughter_cell(int motherID,
                               CellState *daughter_state,
                               GillespieRates *daughter_rates,
                               KonStates *daughter_konStates,
-                              float *daughter_koffvalues,
+                              float **daughter_koffvalues,
                               float daughter_mRNAdecay[NGENES],
                               float daughter_transport[NGENES],
 
@@ -2687,7 +2707,6 @@ void initialize_daughter_cell(int motherID,
   Genotype genes_clone;
   CellState state_clone;
   GillespieRates rates_clone;
-  float koffvalues_clone;
 
   int daughter_copy1 = 1;
   int daughter_copy2 = 2;
@@ -2698,16 +2717,47 @@ void initialize_daughter_cell(int motherID,
   clone_cell(mother,
              mother_state,
              mother_rates,
-             //mother_koffvalues,
              &genes_clone,
              &state_clone,
-             &rates_clone
-             //koffvalues_clone
-             );
+             &rates_clone);
 
-
+  if (mother_state->mRNATranscrTimeEnd != NULL) {
+    printf("before delete_queues mother mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
+  }
+  
+  if (daughter_state->mRNATranscrTimeEnd != NULL) {
+    printf("before delete_queues daughter mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
+  }
+  
   // free the existing memory for the time queue
   delete_queues(daughter_state);
+  delete_queues(mother_state);
+
+  // then reset pointers
+  daughter_state->mRNATranscrTimeEnd = NULL;
+  daughter_state->mRNATranscrTimeEndLast = NULL;
+  daughter_state->mRNATranslTimeEnd = NULL;
+  daughter_state->mRNATranslTimeEndLast = NULL;
+
+  mother_state->mRNATranscrTimeEnd = NULL;
+  mother_state->mRNATranscrTimeEndLast = NULL;
+  mother_state->mRNATranslTimeEnd = NULL;
+  mother_state->mRNATranslTimeEndLast = NULL;
+
+
+  fflush(stdout);
+
+ if (mother_state->mRNATranscrTimeEnd != NULL) {
+    printf("after delete_queues mother mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
+ }
+
+ if (daughter_state->mRNATranscrTimeEnd != NULL) {
+    printf("after delete_queues daughter mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
+ }
 
   /* reset the length of TF data structures to zero, we have to reconstruct them */
   daughter_state->tfBoundCount = 0;
@@ -2719,9 +2769,12 @@ void initialize_daughter_cell(int motherID,
   daughter_state->in_s_phase = 0;
   mother_state->in_s_phase = 0;
 
+  daughter_state->division_time = 999999.0;  /* reset division time for this cell */
+  mother_state->division_time = 999999.0;  /* reset division time for this cell */
+
   /* reset size to appropriate fraction of cell size */
   daughter_state->cellSize = fraction;
-  mother_state->cellSize = 1-fraction;
+  mother_state->cellSize = (1-fraction);
 
   /* TODO: growth rate, take instantaneous growth rate just before
      division, this will be updated after first new time step */
@@ -2734,10 +2787,11 @@ void initialize_daughter_cell(int motherID,
   int lastpos_daughter = 0;
   int lastpos_mother = 0;
 
-  printf("mother cell total tfBoundCount=%d, tfHinderedCount=%d\n", state_clone.tfBoundCount, state_clone.tfHinderedCount);
+  LOG_VERBOSE_NOCELLID("[cell %03d] (mother) total tfBoundCount=%d, tfHinderedCount=%d\n", motherID, 
+                       state_clone.tfBoundCount, state_clone.tfHinderedCount);
 
-  print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
-                          mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
+  //print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
+  //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
 
   for (i=0; i < NGENES; i++) {
 
@@ -2885,14 +2939,24 @@ void initialize_daughter_cell(int motherID,
   }
 
   // reallocate memory
-  daughter_state->tfBoundIndexes = realloc(daughter_state->tfBoundIndexes, daughter_state->tfBoundCount*sizeof(int));
-  mother_state->tfBoundIndexes = realloc(mother_state->tfBoundIndexes, mother_state->tfBoundCount*sizeof(int));
+  //daughter_state->tfBoundIndexes = realloc(daughter_state->tfBoundIndexes, 2*(daughter_state->tfBoundCount+1)*sizeof(int));
+  daughter_state->tfBoundIndexes = realloc(daughter_state->tfBoundIndexes, 10*maxbound*sizeof(int));
+  //mother_state->tfBoundIndexes = realloc(mother_state->tfBoundIndexes, 2*(mother_state->tfBoundCount+1)*sizeof(int));
+  mother_state->tfBoundIndexes = realloc(mother_state->tfBoundIndexes, 10*maxbound*sizeof(int));
 
-  daughter_state->tfHinderedIndexes = realloc(daughter_state->tfHinderedIndexes, 2*daughter_state->tfHinderedCount*sizeof(int));
-  mother_state->tfHinderedIndexes = realloc(mother_state->tfHinderedIndexes, 2*mother_state->tfHinderedCount*sizeof(int));
+  //daughter_state->tfHinderedIndexes = realloc(daughter_state->tfHinderedIndexes, 10*daughter_state->tfHinderedCount*sizeof(int));
+  daughter_state->tfHinderedIndexes = realloc(daughter_state->tfHinderedIndexes, 100*maxbound*sizeof(int));
+  //mother_state->tfHinderedIndexes = realloc(mother_state->tfHinderedIndexes, 10*mother_state->tfHinderedCount*sizeof(int));
+  mother_state->tfHinderedIndexes = realloc(mother_state->tfHinderedIndexes, 100*maxbound*sizeof(int));
+  
+  // reallocate koffvalues memory
+  //*daughter_koffvalues = realloc(*daughter_koffvalues, 2*(daughter_state->tfBoundCount+1)* sizeof(float)); 
+  *daughter_koffvalues = realloc(*daughter_koffvalues, 100*maxbound*sizeof(float)); 
+  //*mother_koffvalues = realloc(*mother_koffvalues, 2*(mother_state->tfBoundCount+1)* sizeof(float)); 
+  *mother_koffvalues = realloc(*mother_koffvalues, 100*maxbound*sizeof(float)); 
 
   if (!daughter_state->tfBoundIndexes || !mother_state->tfBoundIndexes || 
-      !daughter_state->tfHinderedCount || !mother_state->tfHinderedCount) {
+      !daughter_state->tfHinderedIndexes || !mother_state->tfHinderedIndexes) {
     LOG_ERROR_NOCELLID("memory allocation error\n");
     exit(1);
   }
@@ -2907,8 +2971,8 @@ void initialize_daughter_cell(int motherID,
                          daughter->tfsPerGene,
                          daughter->tfsStart); 
 
-  print_all_binding_sites(daughter->copies, daughter->allBindingSites, daughter->bindSiteCount, 
-                          daughter->transcriptionFactorSeq, daughter->cisRegSeq, daughter->tfsStart); 
+  //print_all_binding_sites(daughter->copies, daughter->allBindingSites, daughter->bindSiteCount, 
+  //                        daughter->transcriptionFactorSeq, daughter->cisRegSeq, daughter->tfsStart); 
 
   /* recompute *all* binding sites in mother, then relabel sites */
   calc_all_binding_sites(mother->copies, 
@@ -2920,14 +2984,31 @@ void initialize_daughter_cell(int motherID,
                          mother->tfsPerGene,
                          mother->tfsStart); 
 
-  print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
-                          mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
+  //print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
+  //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
 
   /* reset counters */
   for (i=0; i < NGENES; i++) {
     daughter_state->mRNATranscrCount[i] = 0;
     mother_state->mRNATranscrCount[i] =  0;
+    daughter_state->mRNACytoCount[i] = 0;
+    mother_state->mRNACytoCount[i] = 0;
+    daughter_state->mRNANuclearCount[i] = 0;
+    mother_state->mRNANuclearCount[i] = 0;
+    daughter_state->mRNATranslCytoCount[i] = 0;
+    mother_state->mRNATranslCytoCount[i] = 0;
   }
+
+ if (mother_state->mRNATranscrTimeEnd != NULL) {
+    printf("before split_mRNA mother mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
+ }
+
+ if (daughter_state->mRNATranscrTimeEnd != NULL) {
+    printf("before split_mRNA daughter mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
+ }
+
   
   /* split up the volume of the cell */
   for (i=0; i < NGENES; i++) {
@@ -2961,18 +3042,16 @@ void initialize_daughter_cell(int motherID,
     //mother_state->mRNATranscrCount[i] =  state_clone.mRNATranscrCount[i] - daughter_state->mRNATranscrCount[i];
 
     // split up mRNATranscrCount, along with FixedTime events
-    split_mRNA(state_clone.mRNATranscrTimeEnd, state_clone.mRNATranscrTimeEndLast, state_clone.mRNATranscrCount,
-               daughter_state->mRNATranscrTimeEnd, daughter_state->mRNATranscrTimeEndLast, daughter_state->mRNATranscrCount,
-               mother_state->mRNATranscrTimeEnd, mother_state->mRNATranscrTimeEndLast, mother_state->mRNATranscrCount,
+    split_mRNA(&(state_clone.mRNATranscrTimeEnd), &(state_clone.mRNATranscrTimeEndLast), state_clone.mRNATranscrCount,
+               &(daughter_state->mRNATranscrTimeEnd), &(daughter_state->mRNATranscrTimeEndLast), daughter_state->mRNATranscrCount,
+               &(mother_state->mRNATranscrTimeEnd), &(mother_state->mRNATranscrTimeEndLast), mother_state->mRNATranscrCount,
                i, fraction);
 
     // split up mRNATranslCytoCount, along with FixedTime events
-    split_mRNA(state_clone.mRNATranslTimeEnd, state_clone.mRNATranslTimeEndLast, state_clone.mRNATranslCytoCount,
-               daughter_state->mRNATranslTimeEnd, daughter_state->mRNATranslTimeEndLast, daughter_state->mRNATranslCytoCount,
-               mother_state->mRNATranslTimeEnd, mother_state->mRNATranslTimeEndLast, mother_state->mRNATranslCytoCount,
+    split_mRNA(&(state_clone.mRNATranslTimeEnd), &(state_clone.mRNATranslTimeEndLast), state_clone.mRNATranslCytoCount,
+               &(daughter_state->mRNATranslTimeEnd), &(daughter_state->mRNATranslTimeEndLast), daughter_state->mRNATranslCytoCount,
+               &(mother_state->mRNATranslTimeEnd), &(mother_state->mRNATranslTimeEndLast), mother_state->mRNATranslCytoCount,
                i, fraction);
-
-    
   }  
 
   /* recompute rates in daughter */
@@ -2984,6 +3063,10 @@ void initialize_daughter_cell(int motherID,
                    daughter_mRNAdecay,
                    daughter_transport);
 
+  /*for (i=0; i < daughter_state->tfBoundCount; i++) {
+    printf("daughter koffvalues[%d]=%g, rates->koff=%g\n", i, (*daughter_koffvalues)[i], daughter_rates->koff);
+    } */
+
   /* recompute rates in mother */
   recalibrate_cell(mother_rates,
                    mother_state,
@@ -2993,10 +3076,26 @@ void initialize_daughter_cell(int motherID,
                    mother_mRNAdecay,
                    mother_transport);
   
-  printf("tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
+  LOG_VERBOSE_NOCELLID("tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
          mother_state->tfBoundCount, motherID, daughter_state->tfBoundCount, daughterID);
 
-  printf("in_s_phase=%d\n", mother_state->in_s_phase);
+  LOG_VERBOSE_NOCELLID("tfHinderedCount=%d (motherID=%d), tfHinderedCount=%d (daughterID=%d)\n", 
+         mother_state->tfHinderedCount, motherID, daughter_state->tfHinderedCount, daughterID);
+
+  /* free up memory created by temporary copy */
+
+ if (mother_state->mRNATranscrTimeEnd != NULL) {
+    printf("mother mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
+ }
+
+ if (daughter_state->mRNATranscrTimeEnd != NULL) {
+    printf("daughter mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
+ }
+
+ // free the memory associated with temporary copy of mother
+ free_mem_CellState(&state_clone);
 }
 
 float do_single_timestep(Genotype *genes, 
@@ -3004,7 +3103,6 @@ float do_single_timestep(Genotype *genes,
                          KonStates *konStates, 
                          GillespieRates *rates, 
                          float *t,
-                         float *division_time,
                          float *koffvalues,
                          float transport[NGENES],
                          float mRNAdecay[NGENES],
@@ -3027,9 +3125,9 @@ float do_single_timestep(Genotype *genes,
   /* compute S-phase offsets */
   if (critical_size > 0.0 && state->cellSize >= critical_size && !state->in_s_phase)  { /* run until checkpoint reached */
     reach_s_phase(state, genes, *t);
-    *division_time = *t + 30.0 + 30.0;   /* current time plus 30 mins for S phase and 
-                                          * a further 30 mins of growth after S phase */
-    LOG("add division time at t=%g\n", *division_time);
+    /* current time plus 30 mins for S phase and a further 30 mins of growth after S phase */
+    state->division_time = *t + time_s_phase + time_g2_phase;   
+    LOG("at t=%g add division time=%g, cellSize=%g\n", *t, state->division_time, state->cellSize);
   }
   
   print_tf_occupancy(state, genes->allBindingSites, *t);
@@ -3173,6 +3271,7 @@ float do_single_timestep(Genotype *genes,
       LOG_VERBOSE("snapshot:\n x=%g, tfBoundCount=%g = %d * %g\n transport=%g\n decay=%g\n",
                   *x, rates->koff, state->tfBoundCount, rates->koff/(float)state->tfBoundCount, 
                   rates->transport, rates->mRNAdecay);
+      LOG_VERBOSE_NOFUNC(" rates->salphc=%g\n konrate=%g\n",rates->salphc, (*konrate));
       LOG_VERBOSE_NOFUNC(" PICdisassembly=%g\n kon=%g = %d * %g\n",
                   rates->picDisassembly, rates->salphc+(*konrate), konStates->nkon, (rates->salphc+(*konrate))/(float)konStates->nkon);
       
@@ -3181,7 +3280,7 @@ float do_single_timestep(Genotype *genes,
                            (float)rates->acetylationCount[p]*acetylate, p, (float)rates->deacetylationCount[p]*deacetylate, p, 
                            (float)rates->picAssemblyCount[p]*PICassembly, p, (float)rates->transcriptInitCount[p]*transcriptinit, p);
       }
-      LOG_VERBOSE_NOFUNC(" total=%g=%g+%g\n\n", rates->total + (*konrate), rates->total, konrate);
+      LOG_VERBOSE_NOFUNC(" total=%g=%g+%g\n\n", rates->total + (*konrate), rates->total, *konrate);
     }
     /* JM: kon generally could be handled better, with more direct
      * references to konStates->nkonsum, probably a bit vulnerable to rounding
@@ -3326,7 +3425,6 @@ void develop(Genotype genes[POP_SIZE],
   GillespieRates rates[POP_SIZE];
 
   float t[POP_SIZE];
-  float division_time[POP_SIZE];
   float *koffvalues[POP_SIZE];   /* rates of unbinding */
   float transport[POP_SIZE][NGENES];  /* transport rates of each mRNA */
   float mRNAdecay[POP_SIZE][NGENES];  /* mRNA decay rates */
@@ -3405,7 +3503,7 @@ void develop(Genotype genes[POP_SIZE],
     calc_from_state(&genes[j], &state[j], &rates[j], &konStates[j], transport[j], mRNAdecay[j]);
 
     t[j] = 0.0;  /* time starts at zero */
-    division_time[j] = 999999.0;  /* make artificially high */
+    state[j].division_time = 999999.0;  /* make artificially high */
 
     /* do one step for the cell */
     do_single_timestep(&(genes[j]), 
@@ -3413,7 +3511,6 @@ void develop(Genotype genes[POP_SIZE],
                        &(konStates[j]), 
                        &(rates[j]), 
                        &(t[j]),
-                       &(division_time[j]),
                        koffvalues[j],
                        transport[j],
                        mRNAdecay[j],
@@ -3431,11 +3528,10 @@ void develop(Genotype genes[POP_SIZE],
     int ops;
     ops = insert_with_priority_heap(queue, j, t[j]);
     /* printf("insert %d %d %g\n", j, ops, t[j]); */
-
   }
 
-  //while (divisions < 2) {
-  while (t_next < tdevelopment && t_next < division_time[cell]) {  /* run until development stops */
+  //while (divisions < 10) {
+  while (t_next < tdevelopment && t_next < state[cell].division_time) {  /* run until development stops */
 
     /* get the next cell with the smallest t to advance next */
     //t_next = get_next(&time_queue, &time_queue_end, &cell);
@@ -3444,73 +3540,14 @@ void develop(Genotype genes[POP_SIZE],
     /* if (timesteps % 100 == 0) 
        printf("getmin %d %d %g\n", cell, ops, t[cell]); */
 
-
-    if (0 && t_next >= division_time[cell])  { /* disable for time being */
-    //if (t_next >= 0.01)  { 
-      divisions++;
-      printf("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", cell, t_next, division_time[cell], divisions);
-
-      int motherID = 0;
-      int daughterID = 1;
-      initialize_daughter_cell(motherID,
-                               daughterID,
-                               &(genes[motherID]),
-                               &(state[motherID]),
-                               &(rates[motherID]),
-                               &(konStates[motherID]),
-                               koffvalues[motherID],
-                               transport[motherID],
-                               mRNAdecay[motherID],
-
-                               &(genes[daughterID]),
-                               &(state[daughterID]),
-                               &(rates[daughterID]),
-                               &(konStates[daughterID]),
-                               koffvalues[daughterID],
-                               transport[daughterID],
-                               mRNAdecay[daughterID],
-                               0.56);
-      
-      printf("advance time for daughter\n");
-      printf("outside: tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
-             (state[motherID]).tfBoundCount, motherID, (state[daughterID]).tfBoundCount, daughterID);
-      printf("outside in_s_phase=%d\n", (state[motherID]).in_s_phase);
-
-      /* advance time for daughter */
-      do_single_timestep(&(genes[daughterID]), 
-                         &(state[daughterID]), 
-                         &(konStates[daughterID]), 
-                         &(rates[daughterID]), 
-                         &(t[daughterID]),
-                         &(division_time[daughterID]),
-                         koffvalues[daughterID],
-                         transport[daughterID],
-                         mRNAdecay[daughterID],
-                         &(x[daughterID]),
-                         &(dt[daughterID]),
-                         &(konrate[daughterID]),
-                         timecoursestart[daughterID],
-                         timecourselast[daughterID],
-                         maxbound2,
-                         maxbound3,
-                         no_fixed_dev_time);
-      
-      // once this cell has divided, stop for debugging
-      exit(0);
-      //continue;
-      }
-
-    /* log for testing: */ 
-    //printf("t_next=%.5g\n", t_next);
-    //printf("[cell %03d] before doing timestep: t=%.5g, tfBoundCount=%d, x=%g, mRNANuclearCount=%d\n", 
-    //       cell, t[cell], (state[cell]).tfBoundCount, x[cell], (state[cell]).mRNANuclearCount[10]);
+    //printf("do timestep=%g for cell=%03d, size is=%g\n", t_next, cell, state[cell].cellSize);
 
     do_single_timestep(&(genes[cell]), 
                        &(state[cell]), 
                        &(konStates[cell]), 
                        &(rates[cell]), 
                        &(t[cell]),
-                       &(division_time[cell]),
+                       //&(division_time[cell]),
                        koffvalues[cell],
                        transport[cell],
                        mRNAdecay[cell],
@@ -3523,18 +3560,103 @@ void develop(Genotype genes[POP_SIZE],
                        maxbound3,
                        no_fixed_dev_time);
 
-    // TODO: remove
-    //printf("[cell %03d] after doing timestep: t=%.5g, tfBoundCount=%d, x=%g, mRNANuclearCount=%d\n", 
-    //       cell, t[cell], (state[cell]).tfBoundCount, x[cell], state[cell].mRNANuclearCount[10]);
 
-    //timesteps++;
+    if (0 && t_next >= (state[cell]).division_time)  { /* disable for time being */
+    //if (t_next >= (state[cell]).division_time)  { 
+    //if (t_next >= 0.01)  { 
+      divisions++;
+      printf("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", cell, t_next, state[cell].division_time, divisions);
+      LOG("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", cell, t_next, state[cell].division_time, divisions);
 
-    /* put the updated timestep back into the queue  */
-    // ops = insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
-    ops = insert_with_priority_heap(queue, cell, t[cell]);
-    /* if (timesteps % 100 == 0) 
-       printf("insert %d %d %g\n", cell, ops, t[cell]); */
+      int motherID = cell;
+      int daughterID;
+      daughterID = (motherID == 0) ? 1 : 0;
 
+      // removing pending event in daughter cells from queue
+      delete_element_heap(queue, daughterID);
+      printf("removing pending event from queue from cell that will be replaced by daughter cell=%d\n", daughterID);
+
+      initialize_daughter_cell(motherID,
+                               daughterID,
+                               &(genes[motherID]),
+                               &(state[motherID]),
+                               &(rates[motherID]),
+                               &(konStates[motherID]),
+                               &(koffvalues[motherID]),
+                               transport[motherID],
+                               mRNAdecay[motherID],
+                               &(genes[daughterID]),
+                               &(state[daughterID]),
+                               &(rates[daughterID]),
+                               &(konStates[daughterID]),
+                               &(koffvalues[daughterID]),
+                               transport[daughterID],
+                               mRNAdecay[daughterID],
+                               0.44);
+
+      LOG_VERBOSE("AFTER DIVISION: take a new step for mother cell=%d\n", motherID);
+      /*printf("advance time for daughter\n");
+      printf("outside: tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
+             (state[motherID]).tfBoundCount, motherID, (state[daughterID]).tfBoundCount, daughterID);
+      printf("outside in_s_phase=%d\n", (state[motherID]).in_s_phase);
+
+      for (i=0; i < state[daughterID].tfBoundCount; i++) {
+        printf("outside daughter koffvalues[%d]=%g, rates->koff=%g\n", i, (koffvalues[daughterID])[i], (rates[daughterID]).koff);
+        } */
+
+      /* advance time for mother */
+      do_single_timestep(&(genes[motherID]), 
+                         &(state[motherID]), 
+                         &(konStates[motherID]), 
+                         &(rates[motherID]), 
+                         &(t[motherID]),
+                         //&(division_time[motherID]),
+                         koffvalues[motherID],
+                         transport[motherID],
+                         mRNAdecay[motherID],
+                         &(x[motherID]),
+                         &(dt[motherID]),
+                         &(konrate[motherID]),
+                         timecoursestart[motherID],
+                         timecourselast[motherID],
+                         maxbound2,
+                         maxbound3,
+                         no_fixed_dev_time);
+      
+      insert_with_priority_heap(queue, motherID, t[motherID]); 
+
+      LOG_VERBOSE("AFTER DIVISION: take a new step for daughter cell=%d\n", daughterID);
+
+      /* advance time for daughter */
+      do_single_timestep(&(genes[daughterID]), 
+                         &(state[daughterID]), 
+                         &(konStates[daughterID]), 
+                         &(rates[daughterID]), 
+                         &(t[daughterID]),
+                         koffvalues[daughterID],
+                         transport[daughterID],
+                         mRNAdecay[daughterID],
+                         &(x[daughterID]),
+                         &(dt[daughterID]),
+                         &(konrate[daughterID]),
+                         timecoursestart[daughterID],
+                         timecourselast[daughterID],
+                         maxbound2,
+                         maxbound3,
+                         no_fixed_dev_time);
+
+      insert_with_priority_heap(queue, daughterID, t[daughterID]);
+      
+      // once this cell has divided, stop for debugging
+      //exit(0);
+      //continue;
+    }
+    else {
+
+      /* put the updated timestep back into the queue  */
+      // ops = insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
+      ops = insert_with_priority_heap(queue, cell, t[cell]);
+    }
   }
 
   /* cleanup data structures */
