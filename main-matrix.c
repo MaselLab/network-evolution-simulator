@@ -366,8 +366,8 @@ int main(int argc, char *argv[])
   /* Jasmin:
      pseudo-code for looping (see also print_all_binding_sites in netsim.c):*/
      //system("PAUSE");
-    int sitePos[10];
-    int transFactor[10];
+    //int sitePos[10];
+    //int transFactor[10];
     int TFBS;
     TFBS = 15;
     int *startPos;
