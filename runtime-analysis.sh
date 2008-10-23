@@ -31,7 +31,7 @@ date
 outfile=runtime-profile.txt
 # print out header
 echo "kon rand replicate real user sys" > $outfile
-for kon in 0.0001 0.0005 0.001
+for kon in 0.00001 0.0001 0.001 0.01 0.1
 do 
 
     for ((rand=4;rand<104;rand+=1))
