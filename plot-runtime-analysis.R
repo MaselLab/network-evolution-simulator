@@ -1,5 +1,8 @@
+library(lattice)
 runtimeall=read.table("/tmp/new-runtime/runtime-all.txt", head=T)
 outall=aggregate(runtimeall, by=list(runtimeall$kon), mean)
+outall=transform(subset(outall, kon>1e-10), gen=77040000/(500*real*33))
+postscript("generations-vs-kon.ps")
 xyplot(gen~kon,
        scales=list(y=list(log=T),x=list(log=T)),
        data=outall,
@@ -9,3 +12,4 @@ xyplot(gen~kon,
          regr=lm(log10(sbs$gen)~log10(sbs$kon)); print(regr[[1]][[2]]); print(regr[[1]][[2]]); 
          panel.abline(regr)
        })
+dev.off()
