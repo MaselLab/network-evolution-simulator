@@ -49,7 +49,7 @@ const int Generations=5;
 float kon=1e-4; /* lower value is so things run faster */
 /* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
    and 89% of the proteins being in the nucleus*/
-
+int burn_in = 1;
 
 float tdevelopment=120.0;  /* default maximum development time: can be changed at runtime */
 int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
@@ -179,7 +179,7 @@ void print_tf_occupancy(CellState *state,
     bound_count[geneID][geneCopy]++;
   }
 
-  fprintf(fp_tfsbound, "%g ", t);
+  fprintf(fp_tfsbound, "%g %d ", t, state->tfBoundCount);
   for (i = 0; i < NGENES; i++) 
     for (j = 0; j < MAX_COPIES; j++) 
       fprintf(fp_tfsbound, "%d ", bound_count[i][j]);
@@ -3121,6 +3121,18 @@ float do_single_timestep(Genotype *genes,
   int total;           /* total possible translation events */
   
   float f, df, konrate2, diff, sum, ct, ect;
+
+  if (burn_in) {
+    int burn_in_count;
+    for (burn_in_count=0; burn_in_count < 32; burn_in_count++) {
+      tf_binding_event(rates, state, genes, konStates, koffvalues,
+                       timecoursestart, timecourselast, (*konrate), *dt, *t, 
+                       maxbound2, maxbound3);
+      printf("t=%g bind a TF as part of burn-in, burn_in=%d\n", *t, burn_in);
+    }
+    burn_in = 0;
+  } 
+
   
   /* compute S-phase offsets */
   if (critical_size > 0.0 && state->cellSize >= critical_size && !state->in_s_phase)  { /* run until checkpoint reached */
