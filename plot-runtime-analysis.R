@@ -9,7 +9,7 @@ xyplot(gen~kon,
        panel=function(x, y,...) {
          panel.xyplot(x, y, ...)
          sbs=subset(outall, kon>1e-8)
-         regr=lm(log10(sbs$gen)~log10(sbs$kon)); print(regr[[1]][[2]]); print(regr[[1]][[2]]); 
+         regr=lm(log10(sbs$gen)~log10(sbs$kon)); print(regr[[1]][[2]]); print(regr[[1]][[1]]); 
          panel.abline(regr)
        })
 dev.off()
