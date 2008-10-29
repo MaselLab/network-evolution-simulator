@@ -33,15 +33,15 @@ int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
          return 0;
 }
 
- struct Coltype {
-    int colnum;
+ struct Rowtype {
+    int rownum;
     float *kval;
 };
     
 struct Ttype {
-  int row;
-  struct Coltype *col;
-  int colCount;
+  int col;
+  struct Rowtype *row;
+  int rowCount;
 };  
 
 int convertToDecimal(int *bits, int TFBS){
@@ -120,36 +120,38 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
           //system("PAUSE");
   }
 
-   void diagonal(int row, float *diag, struct Ttype *arrayT, int m, int n){
+   void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
         
     int x;
-    diag[row]=0;
+    diag[col]=0;
           for (x=0; x<m; x++) {
-             diag[row] -= *(arrayT[n].col[x].kval);
+             diag[col] -= *(arrayT[n].row[x].kval);
           }
-      arrayT[n].col[m].colnum = row;
-      arrayT[n].col[m].kval = &(diag[row]);   
+      arrayT[n].row[m].rownum = col;
+      arrayT[n].row[m].kval = &(diag[col]);   
 } 
   
  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
        int i, p,j,m, tf;
        int n=0;
        for( i=0;i<size; i++){
-          arrayT[n].row = i;
-          arrayT[n].col = malloc((TFBSites+2)*sizeof(struct Coltype));
-         //printf("viableStates:%d, row num:%d\n",viableStates[i], i);
+          arrayT[n].col = i;
+          arrayT[n].row = malloc((TFBSites+2)*sizeof(struct Rowtype));
+         printf("viableStates:%d, col num:%d\n",viableStates[i], i);
         m=0;
         for(p=0;p<TFBSites;p++){
-          int col = viableStates[i];
+          int row = viableStates[i];
            // system("PAUSE");
-          if(col& (1<<p)){
-            col = viableStates[i] ^ (1<<p);
-           if( col!=viableStates[i]){
+          if(!(row& (1<<p))){
+                    
+           int row = viableStates[i] | (1<<p);
+           if(row!=0 && row!=viableStates[i]){
+           //if( row!=viableStates[i]){
              for(j=0;j<size; j++){
-               if(col==viableStates[j]){
-                 arrayT[n].col[m].colnum = j;
+               if(row==viableStates[j]){
+                 arrayT[n].row[m].rownum = j;
                  int a = hammDist[p];
-                 arrayT[n].col[m].kval = &(koff[a]);
+                 arrayT[n].row[m].kval = &(koff[a]);
                  m++;
                  // printf("    col=%d, j=%d, p=%d\n", col, j, p);
                 // printf(" %d  %d  \n", i, j);
@@ -157,14 +159,13 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
              }
            }
          }else{
-          
-          int col = viableStates[i] | (1<<p);
-          if(col!=0 && col!=viableStates[i]){
-                     
+               
+          int row = viableStates[i] ^ (1<<p);
+            if( row!=viableStates[i]){     
             for( j=0;j<size; j++){   
-              if(col==viableStates[j]){
-                 arrayT[n].col[m].colnum = j;
-                 arrayT[n].col[m].kval = &kon[p];
+              if(row==viableStates[j]){
+                 arrayT[n].row[m].rownum = j;
+                 arrayT[n].row[m].kval = &kon[p];
                  m++;
                  //printf("    col=%d, j=%d, p=%d\n", col, j, p);
                 // printf(" %d  %d  \n", i, j);
@@ -179,7 +180,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
       
       // printf("CHECK HERE!!!!!!! kval00: %f   kon0: %f\n", *arrayT[0].col[0].kval, kon[0]);
        m++;
-       arrayT[n].colCount = m;
+       arrayT[n].rowCount = m;
        n++;
      }
   }
@@ -190,8 +191,8 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
     p=0;  
     while (p < size) {
        q=0;
-       while (q < arrayT[p].colCount) {
-          printf( "%d  %d | %d  %d  %.2f\n",p,arrayT[p].col[q].colnum, viableStates[p], viableStates[arrayT[p].col[q].colnum],  *arrayT[p].col[q].kval); 
+       while (q < arrayT[p].rowCount) {
+          printf( "%d  %d | %d  %d  %.2f\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  *arrayT[p].row[q].kval); 
     	  //printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
 	      //printf( "Value%d: %.2f\n",q, *arrayT[p].col[q].kval);     
     	  q++;
@@ -208,8 +209,8 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
     p=0;  
     while (p < size) {
        q=0;
-       while (q < arrayT[p].colCount) {
-           printf(" %d      %d      %f\n", p,arrayT[p].col[q].colnum,  *arrayT[p].col[q].kval); 
+       while (q < arrayT[p].rowCount) {
+           printf(" %d      %d      %f\n", p,arrayT[p].row[q].rownum,  *arrayT[p].row[q].kval); 
            q++;
        }
        p++;
@@ -223,8 +224,8 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
         p=0;  
       while (p < size) {
        q=0;
-       while (q < arrayT[p].colCount) {
-       fprintf(sparseMatrixV1, "%d,   %d,   %f\n", p+1,arrayT[p].col[q].colnum +1,  *arrayT[p].col[q].kval); 
+       while (q < arrayT[p].rowCount) {
+       fprintf(sparseMatrixV1, "%d,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval); 
        //printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
        q++;
        }
@@ -369,7 +370,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 16;
+    TFBS = 15;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -453,7 +454,7 @@ int main(int argc, char *argv[])
   free(indiv.allBindingSites);
    int d;
      for (d=0; d<array; d++) {
-       free(arrayT[d].col);
+       free(arrayT[d].row);
   }   
   
   free(arrayT);
