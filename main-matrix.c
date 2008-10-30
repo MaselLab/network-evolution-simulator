@@ -184,6 +184,20 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
        n++;
      }
   }
+  void addRowOnes(struct Ttype *arrayT, int size){
+      int p,q;
+      int a[1]={1};
+      p=0;
+      while (p<size){
+         q=0;
+         while(q< arrayT[p].rowCount){
+                  if(arrayT[p].row[q].rownum==4){
+                    printf("FOUR");
+                    }
+         }
+      }
+             
+  }
   
   void print_arrayT(struct Ttype *arrayT, int size, int *viableStates){
      int p, q;  
@@ -192,8 +206,11 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
     while (p < size) {
        q=0;
        while (q < arrayT[p].rowCount) {
+             if(arrayT[p].row[q].rownum!=4){
           printf( "%d  %d | %d  %d  %.2f\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  *arrayT[p].row[q].kval); 
-    	  //printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
+    	  }else{
+              printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
+          }//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
 	      //printf( "Value%d: %.2f\n",q, *arrayT[p].col[q].kval);     
     	  q++;
        }
@@ -205,16 +222,25 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
 
 void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
       int p, q;  
-     printf("\n Row    Col      kval\n"); 
+     printf("\n Col   Row      kval\n"); 
     p=0;  
     while (p < size) {
        q=0;
        while (q < arrayT[p].rowCount) {
+           if(arrayT[p].row[q].rownum!=4){
            printf(" %d      %d      %f\n", p,arrayT[p].row[q].rownum,  *arrayT[p].row[q].kval); 
+           }else{
+                //printf(" %d      %d      %d\n", p,arrayT[p].row[q].rownum,  1);  
+           }
            q++;
        }
        p++;
     }
+    int count=0;
+       while(count<size){
+          printf(" %d     %d    %d\n", count, 4, 1);
+          count++;
+          }
     
     sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
      if (sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w")){
@@ -225,12 +251,19 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
       while (p < size) {
        q=0;
        while (q < arrayT[p].rowCount) {
-       fprintf(sparseMatrixV1, "%d,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval); 
+       if(arrayT[p].row[q].rownum!=4){
+       fprintf(sparseMatrixV1, "%d,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval);
+       }else{} 
        //printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
        q++;
        }
        p++;
       }
+      int count=0;
+       while(count<size){
+          fprintf(sparseMatrixV1," %d     %d    %d\n", 5, count+1, 1);
+          count++;
+          }
       }
     
 }
@@ -447,6 +480,7 @@ int main(int argc, char *argv[])
      transitions(array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
      //printf("%f\n", *arrayT[0].col[0].kval);
       // system("PAUSE");
+      //addRowOnes(arrayT, array);
      print_arrayT(arrayT,array,viableStates);
      print_arrayT_MATLAB(arrayT,array,viableStates);
        system("PAUSE");
