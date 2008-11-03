@@ -134,18 +134,19 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
 } 
   
  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
-       statesV1 = fopen("statesV1.txt", "w");
-       columnV1 = fopen("columnV1.txt","w");
-     if (statesV1 = fopen("statesV1.txt", "w") ){
-     if( columnV1 = fopen("columnV1.txt", "w")){
+     //  statesV1 = fopen("statesV1.txt", "w");
+     //  columnV1 = fopen("columnV1.txt","w");
+   //  if (statesV1 = fopen("statesV1.txt", "w") ){
+   //  if( columnV1 = fopen("columnV1.txt", "w")){
        int i, p,j,m, tf;
        int n=0;
+       printf("size=%d TFBS= %d\n", size, TFBSites);
        for( i=0;i<size; i++){
           arrayT[n].col = i;
-          arrayT[n].row = malloc(((TFBSites*4))*sizeof(struct Rowtype));
+          arrayT[n].row = malloc((TFBSites*5)*sizeof(struct Rowtype));
          printf("viableStates:%d, col num:%d\n",viableStates[i], i);
-        fprintf(statesV1,"%d \n", viableStates[i]);
-         fprintf(columnV1,"%d\n",i);
+     //   fprintf(statesV1,"%d \n", viableStates[i]);
+      //   fprintf(columnV1,"%d\n",i);
         m=0;
         for(p=0;p<TFBSites;p++){
           int row = viableStates[i];
@@ -161,55 +162,63 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
                  int a = hammDist[p];
                  arrayT[n].row[m].kval = &(koff[a]);
                  m++;
-                 // printf("    col=%d, j=%d, p=%d\n", col, j, p);
-                 printf(" %d  %d  \n", i, j);
+                  //printf("    col=%d, rownum=%d, j=%d, p=%d\n",row, &(arrayT[n].row[m].rownum),j, p);
+                 //printf(" %d  %d  \n", i, j);
                }
              }
            }
          }else{
                
+
           int row = viableStates[i] ^ (1<<p);
             if( row!=viableStates[i]){     
             for( j=0;j<size; j++){   
               if(row==viableStates[j]){
                  arrayT[n].row[m].rownum = j;
-                 arrayT[n].row[m].kval = &kon[p];
+                 arrayT[n].row[m].kval = &(kon[p]);
                  m++;
-                 //printf("    col=%d, j=%d, p=%d\n", col, j, p);
-                 printf(" %d  %d  \n", i, j);
+                 //printf("    col=%d, rownum=%d, j=%d, p=%d\n", row, &(arrayT[n].row[m].rownum),j, p);
+                 //printf(" %d  %d  \n", i, j);
                }
              }
            }//printf("\n");
           }
        }
       
-    //  printf("kval00: %f   kon0: %f %m= %d  n= %d  i= %d\n", arrayT[75].row[0].kval, kon[0], m, n, i);
+     // system("PAUSE");
+     // if(n>74){
+         //printf("row75:%d, kval75: %f \n",&(arrayT[75].row[0].rownum), *(arrayT[75].row[0].kval));
+         //}
+     // printf("kval00: %f   kon0: %f %m= %d  n= %d  i= %d\n", *arrayT[0].row[0].kval, kon[0], m, n, i);
        diagonal(i,diag, arrayT, m, n);
       
-      // printf("CHECK HERE!!!!!!! kval00: %f   kon0: %f\n", *arrayT[0].col[0].kval, kon[0]);
+      //printf("CHECK HERE!!!!!!! kval00: %f   kon0: %f\n", *arrayT[1].row[0].kval, kon[0]);
        m++;
        arrayT[n].rowCount = m;
+      // printf("rowCount=%d\n",  arrayT[n].rowCount);
        n++;
      }
-     //printf("kval00: %f \n", *(arrayT[75].row[0].kval));
-     }}
+     //printf("kval00: %f \n", *(arrayT[74].row[0].kval));
+     //}}
   }
   
   void print_arrayT(struct Ttype *arrayT, int size, int *viableStates){
      int p, q;  
      printf("%d\n",size); 
      //printf("CHECK:%d  %d | %d  %d  %d\n", 64,arrayT[64].row[0].rownum, viableStates[64], viableStates[arrayT[64].row[0].rownum],  *arrayT[64].row[0].kval ); 
-    // system("PAUSE");
+   //  system("PAUSE");
     p=0;  
     while (p < size) {
        q=0;
+       //printf("rowCount=%d, q=%d\n",  arrayT[p].rowCount,q);
        while (q < arrayT[p].rowCount) {
-          if(arrayT[p].row[q].rownum!=4){
-          printf( "%d  %d | %d  %d  %.2f\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  *arrayT[p].row[q].kval); 
-    	  }else{
-              printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
-          }//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
-	      //printf( "Value%d: %.2f\n",q, *arrayT[p].col[q].kval);     
+          //if(arrayT[p].row[q].rownum!=4){
+         // printf("rownum=%d\n", &(arrayT[p].row[q].rownum));
+          printf( "%d  %d | %d  %d  \n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum]); 
+    	 // }else{
+              //printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
+          //}//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
+	     // printf( "Value%d: %.2f\n",q, *arrayT[p].row[q].kval);     
     	  q++;
        }
        p++; 
@@ -220,52 +229,52 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
 } 
 
 void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
-      int p, q;  
+     int p, q;  
      printf("\n Col   Row      kval\n"); 
     p=0;  
     while (p < size) {
        q=0;
        while (q < arrayT[p].rowCount) {
-           if(arrayT[p].row[q].rownum!=4){
+          // if(arrayT[p].row[q].rownum!=4){
            printf(" %d      %d      %f\n", p,arrayT[p].row[q].rownum,  *arrayT[p].row[q].kval); 
-           }else{
+         //  }else{
                 //printf(" %d      %d      %d\n", p,arrayT[p].row[q].rownum,  1);  
-           }
+           //}
            q++;
        }
        p++;
     }
-    int count=0;
+    /*int count=0;
        while(count<size){
           printf(" %d     %d    %d\n", count, 4, 1);
           count++;
-          }
-    
+          }*/
+    system("PAUSE");
    
     sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
      if (sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w")){
         //ask alex about this line of code...
        //fprintf(sparseMatrixV1, "1Row  Column  Value\n\n");
         //printf( "1Row  Column  Value\n\n");
-        p=0;  
+        int p=0;  
       while (p < size) {
-       q=0;
+      int q=0;
        while (q < arrayT[p].rowCount) {
-       if(arrayT[p].row[q].rownum!=4){
+      // if(arrayT[p].row[q].rownum!=4){
        fprintf(sparseMatrixV1, "%d,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval);
-       }else{} 
+      // }else{} 
        //printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
        q++;
        }
        p++;
       }
-      int count=0;
+     /* int count=0;
        while(count<size){
           fprintf(sparseMatrixV1," %d     %d    %d\n", 5, count+1, 1);
           count++;
-          }
+          }*/
       }
-    
+    //fclose(sparseMatrixV1);
 }
   
 
@@ -403,7 +412,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 23;
+    TFBS = 15;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -425,8 +434,9 @@ int main(int argc, char *argv[])
     int *viableStates;
     struct Ttype *arrayT;
     
-    viableStates = malloc((100)*sizeof(int));
-     arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
+    viableStates = malloc((TFBS*4)*sizeof(int));
+    arrayT = malloc((pow(2,TFBS)+1)*sizeof(struct Ttype));
+    // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
     
     
@@ -473,6 +483,7 @@ int main(int argc, char *argv[])
      printf("\n");
      configure(0,bits,&array,viableStates,TFBS,startPos);
      printf("%d\n", array);
+     //arrayT=realloc(arrayT, array*sizeof(struct Ttype));
       /* for(mat=0; mat<TFBS; mat++){
         printf("tf[%d] = %d\n", mat, TFon[mat]);
      }*/
@@ -481,9 +492,11 @@ int main(int argc, char *argv[])
      //printf("%f\n", *arrayT[0].col[0].kval);
       // system("PAUSE");
       //addRowOnes(arrayT, array);
+      printf("HERE");
       system("PAUSE");
      print_arrayT(arrayT,array,viableStates);
      system("PAUSE");
+      printf("HERE in between");
      print_arrayT_MATLAB(arrayT,array,viableStates);
        system("PAUSE");
   /* free dynamically allocated all binding sites list */
@@ -499,6 +512,8 @@ int main(int argc, char *argv[])
   free(startPos);
   free(hammDist);
   free(TFon);
+  free(diag);
   /* close error file */
   fclose(fperrors);
+  fclose(sparseMatrixV1);
 }
