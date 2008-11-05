@@ -123,26 +123,18 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
   }
 
    void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
-      if(n>=70){
-          printf( "rownum= %d  kvalDIAG=%.2f\n", arrayT[70].row[0].rownum, *(arrayT[70].row[0].kval));}  
+      
     int x;
-    int value=0;
-    printf("col=%d\n", col);
-    //diag[col]=0;
+    float value=0;
+    diag[col]=0;
           for (x=0; x<m; x++) {
              value -= *(arrayT[n].row[x].kval);
-             if(n>=75){
-          printf( "rownum= %d  kvalDIAGIN2=%.2f\n", arrayT[70].row[0].rownum, *(arrayT[70].row[0].kval));}  
           }
-     if(n>=70){
-          printf( "rownum= %d  kvalDIAGMID=%.2f\n", arrayT[70].row[0].rownum, *(arrayT[70].row[0].kval));}  
-      //PROBLEM IS IN HERE !!!!!!!!!!!!
+      //printf("%d   %.2f  %.2f\n", col, diag[col], value);
       diag[col]=value;
       arrayT[n].row[m].rownum = col;
       arrayT[n].row[m].kval = &(diag[col]); 
-      ////////////////////////////  
-      if(n>=70){
-          printf( "rownum= %d  kvalDIAG=%.2f\n", arrayT[70].row[0].rownum, *(arrayT[70].row[0].kval));}  
+      
 } 
   
  void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
@@ -214,7 +206,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
        diagonal(i,diag, arrayT, m, n);
          if(n>70){
           printf( "rownum= %d  kvalQ=%.2f\n", arrayT[70].row[0].rownum, *(arrayT[70].row[0].kval));}
-      system("PAUSE");
+      //system("PAUSE");
       //printf("CHECK HERE!!!!!!! kval00: %f   kon0: %f\n", *arrayT[1].row[0].kval, kon[0]);
        m++;
        arrayT[n].rowCount = m;
@@ -453,7 +445,7 @@ int main(int argc, char *argv[])
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
-    diag = malloc(TFBS*sizeof(float));
+    diag = malloc(100*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
     //Kon = malloc(TFBS*sizeof(float));
       
