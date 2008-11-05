@@ -15,9 +15,12 @@
 #include "lib.h"
 #include "netsim.h"
 
+#define NUM = 130
+
 FILE *sparseMatrixV1;
 FILE *statesV1;
 FILE *columnV1;
+FILE *leftEdgePositions;
 
 typedef int (*compfn)(const void*, const void*);
 
@@ -147,7 +150,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
        printf("size=%d TFBS= %d\n", size, TFBSites);
        for( i=0;i<size; i++){
           arrayT[n].col = i;
-          arrayT[n].row = malloc((100)*sizeof(struct Rowtype));
+          arrayT[n].row = malloc((220)*sizeof(struct Rowtype));
          printf("viableStates:%d, col num:%d\n",viableStates[i], i);
        fprintf(statesV1,"%d \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
@@ -407,7 +410,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 24;
+    TFBS = 31;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -421,7 +424,7 @@ int main(int argc, char *argv[])
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
-    diag = malloc(100*sizeof(float));
+    diag = malloc(220*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
     //Kon = malloc(TFBS*sizeof(float));
       
@@ -429,8 +432,8 @@ int main(int argc, char *argv[])
     int *viableStates;
     struct Ttype *arrayT;
     
-    viableStates = malloc((TFBS*4)*sizeof(int));
-    arrayT = malloc(100*sizeof(struct Ttype));
+    viableStates = malloc((TFBS*8)*sizeof(int));
+    arrayT = malloc(220*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
     
@@ -439,19 +442,21 @@ int main(int argc, char *argv[])
            sizeof(struct AllTFBindingSites),(compfn)compare );
    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
    
-   
-  /* for (i=0; i <indiv.tfsPerGene[0] ; i++) {
-    printf("binding site %3d:\n", i);
-    printf("       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
-    printf("         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
+     leftEdgePositions = fopen("leftEdgePositions.txt", "w");
+     if (leftEdgePositions = fopen("leftEdgePositions.txt", "w")){
+   for (i=0; i <indiv.tfsPerGene[0] ; i++) {
+    fprintf(leftEdgePositions, "binding site %3d:  ", i);
+    //printf("       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
+    //printf("         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
     //printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
-    printf(" transcription-factor: %3d", indiv.allBindingSites[i].tfID);
+    //printf(" transcription-factor: %3d", indiv.allBindingSites[i].tfID);
     //printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
-    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+    //printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+    fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
     //printf("  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
-    printf("               strand: %3d\n", indiv.allBindingSites[i].strand);
+    //printf("               strand: %3d\n", indiv.allBindingSites[i].strand);
     //printf("         Hamming dist: %3d\n", indiv.allBindingSites[i].hammingDist); 
-  }*/
+  }}
    
   // system("PAUSE");
    
