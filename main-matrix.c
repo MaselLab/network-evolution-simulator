@@ -113,8 +113,10 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
         //printf("\n");
         if(!isHindered(bindSite, bits,startPos)){
            bits[TFBS-1]=1;
-           convertToDecimal(bits, TFBS);
+           //convertToDecimal(bits, TFBS);
+           printf("%d\n", TFBS);
            statesArray[(*numStates)] = convertToDecimal(bits, TFBS);
+           printf("numstates=%d, %d convert=%d\n", (*numStates), statesArray[(*numStates)], convertToDecimal(bits, TFBS));
            (*numStates)++;
            for(i=0; i<TFBS; i++){
              // printf("%d", bits[i]);
@@ -150,7 +152,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
        printf("size=%d TFBS= %d\n", size, TFBSites);
        for( i=0;i<size; i++){
           arrayT[n].col = i;
-          arrayT[n].row = malloc((220)*sizeof(struct Rowtype));
+          arrayT[n].row = malloc((250)*sizeof(struct Rowtype));
          printf("viableStates:%d, col num:%d\n",viableStates[i], i);
        fprintf(statesV1,"%d \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
@@ -167,6 +169,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
                       a = hammDist[p];
                       arrayT[n].row[m].kval = &(koff[a]);
                       m++;
+                      printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
                       //printf("koff=%f\n", koff[a]);
                      //printf("    col=%d, rownum=%d, j=%d, p=%d\n",row, &(arrayT[n].row[m].rownum),j, p);
                      //printf(" %d  %d  \n", i, j);
@@ -182,7 +185,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
                       arrayT[n].row[m].rownum = j;
                       arrayT[n].row[m].kval = &(kon[p]);
                       m++;
-                      //printf("rownum=%d", arrayT[n].row[m].rownum);
+                      printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
                       //printf("    col=%d, rownum=%d, j=%d, p=%d\n", row, &(arrayT[n].row[m].rownum),j, p);
                      //printf(" %d  %d  \n", i, j);
                     }
@@ -410,7 +413,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 31;
+    TFBS = 32;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -424,7 +427,7 @@ int main(int argc, char *argv[])
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
-    diag = malloc(220*sizeof(float));
+    diag = malloc(250*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
     //Kon = malloc(TFBS*sizeof(float));
       
@@ -432,8 +435,8 @@ int main(int argc, char *argv[])
     int *viableStates;
     struct Ttype *arrayT;
     
-    viableStates = malloc((TFBS*8)*sizeof(int));
-    arrayT = malloc(220*sizeof(struct Ttype));
+    viableStates = malloc((250)*sizeof(int));
+    arrayT = malloc(250*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
     
@@ -482,7 +485,10 @@ int main(int argc, char *argv[])
      }*/
      printf("\n");
      configure(0,bits,&array,viableStates,TFBS,startPos);
-    
+    int sh;
+    for(sh=0; sh<array; sh++){
+              printf("%d\n", viableStates[sh]);
+}
      printf("%d\n", array);
      //arrayT=realloc(arrayT, array*sizeof(struct Ttype));
       /* for(mat=0; mat<TFBS; mat++){
