@@ -49,7 +49,7 @@ struct Ttype {
   int rowCount;
 };  
 
-int convertToDecimal(int *bits, int TFBS){
+float convertToDecimal(int *bits, int TFBS){
      int n = TFBS-1;
      int count =0;
      int record[TFBS];
@@ -64,7 +64,7 @@ int convertToDecimal(int *bits, int TFBS){
          n--;
      }
      int i;
-     int decimal=0;
+     float decimal=0;
      for(i=0; i<rec;i++){
         decimal+= pow(2,record[i]);
      }
@@ -92,7 +92,7 @@ int isHindered(int bindSite, int *bits, int *startPos){
     return 0;
   }
   
-void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TFBS, int *startPos){
+void configure(int bindSite, int *bits, int *numStates, float *statesArray, int TFBS, int *startPos){
 
      if(bindSite<TFBS-1){
         bits[bindSite] = 0;
@@ -142,7 +142,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
       
 } 
   
- void transitions(int size, int *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
+ void transitions(int size, float *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
        statesV1 = fopen("statesV1.txt", "w");
        columnV1 = fopen("columnV1.txt","w");
      if (statesV1 = fopen("statesV1.txt", "w") ){
@@ -153,15 +153,16 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
        for( i=0;i<size; i++){
           arrayT[n].col = i;
           arrayT[n].row = malloc((250)*sizeof(struct Rowtype));
-         printf("viableStates:%d, col num:%d\n",viableStates[i], i);
-       fprintf(statesV1,"%d \n", viableStates[i]);
+         printf("viableStates:%.1f, col num:%d\n",viableStates[i], i);
+       fprintf(statesV1,"%.1f \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
         m=0;
-        row = viableStates[i];
+        row = (int)viableStates[i];
         for(p=0;p<TFBSites;p++){
      
-          if(!(row & (1<<p))){       
-             row = viableStates[i] | (1<<p);
+          if(!(row & (1<<p))){     
+              //need to do decimal to binray here!!!!!!!!  
+             row = (int)viableStates[i] | (1<<p);
              if(row!=0 && row!=viableStates[i]){
                 for(j=0;j<size; j++){
                    if(row==viableStates[j]){
@@ -177,7 +178,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
                  }
               }
           }else{
-              row = viableStates[i] ^ (1<<p);
+              row = (int)viableStates[i] ^ (1<<p);
               if(row != viableStates[i]){     
                  for( j=0;j<size; j++){   
                     if(row==viableStates[j]){
@@ -202,7 +203,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
      }}
   }
   
-  void print_arrayT(struct Ttype *arrayT, int size, int *viableStates){
+  void print_arrayT(struct Ttype *arrayT, int size, float *viableStates){
      int p, q;  
      printf("%d\n",size); 
      //printf("CHECK:%d  %d | %d  %d  %d\n", 64,arrayT[64].row[0].rownum, viableStates[64], viableStates[arrayT[64].row[0].rownum],  *arrayT[64].row[0].kval ); 
@@ -214,7 +215,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
        while (q < arrayT[p].rowCount) {
           //if(arrayT[p].row[q].rownum!=4){
          // printf("rownum=%d\n", &(arrayT[p].row[q].rownum));
-          printf( "%d  %d | %d  %d  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
+          printf( "%d  %.1f | %d  %d  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
     	  //}else{
            //   printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
          // }//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
@@ -229,7 +230,7 @@ void configure(int bindSite, int *bits, int *numStates, int *statesArray, int TF
     printf("\n");
 } 
 
-void print_arrayT_MATLAB(struct Ttype *arrayT, int size, int *viableStates){
+void print_arrayT_MATLAB(struct Ttype *arrayT, int size, float *viableStates){
      int p, q;  
      printf("\n Col   Row      kval\n"); 
     p=0;  
@@ -432,10 +433,10 @@ int main(int argc, char *argv[])
     //Kon = malloc(TFBS*sizeof(float));
       
     int *bits = calloc(TFBS, sizeof(int));
-    int *viableStates;
+    float *viableStates;
     struct Ttype *arrayT;
     
-    viableStates = malloc((250)*sizeof(int));
+    viableStates = malloc((250)*sizeof(float));
     arrayT = malloc(250*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
@@ -487,7 +488,7 @@ int main(int argc, char *argv[])
      configure(0,bits,&array,viableStates,TFBS,startPos);
     int sh;
     for(sh=0; sh<array; sh++){
-              printf("%d\n", viableStates[sh]);
+              printf("%.1f\n", viableStates[sh]);
 }
      printf("%d\n", array);
      //arrayT=realloc(arrayT, array*sizeof(struct Ttype));
