@@ -17,6 +17,8 @@
 
 #define NUM = 130
 
+int array_size = 400;
+
 FILE *sparseMatrixV1;
 FILE *statesV1;
 FILE *columnV1;
@@ -153,7 +155,7 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
        printf("size=%d TFBS= %d\n", size, TFBSites);
        for( i=0;i<size; i++){
           arrayT[n].col = i;
-          arrayT[n].row = malloc((250)*sizeof(struct Rowtype));
+          arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
          printf("viableStates:%d, col num:%d\n",viableStates[i], i);
        fprintf(statesV1,"%.1f \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
@@ -439,11 +441,10 @@ int main(int argc, char *argv[])
     float Kon[TFBS];
     
     
-    
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
-    diag = malloc(250*sizeof(float));
+    diag = malloc(array_size*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
     //Kon = malloc(TFBS*sizeof(float));
       
@@ -451,8 +452,8 @@ int main(int argc, char *argv[])
     long *viableStates;
     struct Ttype *arrayT;
     
-    viableStates = malloc((250)*sizeof(long));
-    arrayT = malloc(250*sizeof(struct Ttype));
+    viableStates = malloc((array_size)*sizeof(long));
+    arrayT = malloc(array_size*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
     
@@ -536,7 +537,6 @@ int main(int argc, char *argv[])
   free(startPos);
   free(viableStates);
   free(bits);
-  free(startPos);
   free(hammDist);
   free(TFon);
   free(diag);
