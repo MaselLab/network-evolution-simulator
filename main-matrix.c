@@ -152,7 +152,7 @@ void configure(int bindSite, int *bits, int *numStates, float *statesArray, int 
        printf("size=%d TFBS= %d\n", size, TFBSites);
        for( i=0;i<size; i++){
           arrayT[n].col = i;
-          arrayT[n].row = malloc((250)*sizeof(struct Rowtype));
+          arrayT[n].row = malloc((200)*sizeof(struct Rowtype));
          printf("viableStates:%.1f, col num:%d\n",viableStates[i], i);
        fprintf(statesV1,"%.1f \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
@@ -215,7 +215,7 @@ void configure(int bindSite, int *bits, int *numStates, float *statesArray, int 
        while (q < arrayT[p].rowCount) {
           //if(arrayT[p].row[q].rownum!=4){
          // printf("rownum=%d\n", &(arrayT[p].row[q].rownum));
-          printf( "%d  %.1f | %d  %d  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
+          printf( "%d  %d | %d  %d  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
     	  //}else{
            //   printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
          // }//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
@@ -414,7 +414,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 32;
+    TFBS = 31;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -428,7 +428,7 @@ int main(int argc, char *argv[])
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
-    diag = malloc(250*sizeof(float));
+    diag = malloc(200*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
     //Kon = malloc(TFBS*sizeof(float));
       
@@ -436,8 +436,8 @@ int main(int argc, char *argv[])
     float *viableStates;
     struct Ttype *arrayT;
     
-    viableStates = malloc((250)*sizeof(float));
-    arrayT = malloc(250*sizeof(struct Ttype));
+    viableStates = malloc((200)*sizeof(float));
+    arrayT = malloc(200*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
     
@@ -445,10 +445,13 @@ int main(int argc, char *argv[])
     qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
            sizeof(struct AllTFBindingSites),(compfn)compare );
    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
-   
+   system("PAUSE");
      leftEdgePositions = fopen("leftEdgePositions.txt", "w");
      if (leftEdgePositions = fopen("leftEdgePositions.txt", "w")){
    for (i=0; i <indiv.tfsPerGene[0] ; i++) {
+       if(indiv.allBindingSites[i].tfID ==1){
+          printf("One:%d  LeftEdge:%d\n", i, indiv.allBindingSites[i].leftEdgePos);
+          }
     fprintf(leftEdgePositions, "binding site %3d:  ", i);
     //printf("       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
     //printf("         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
