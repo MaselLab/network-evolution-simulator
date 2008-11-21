@@ -52,7 +52,7 @@ struct Ttype {
   int rowCount;
 };  
 
-int convertToDecimal(int *bits, int TFBS){
+long convertToDecimal(int *bits, int TFBS){
      int n = TFBS-1;
      int count =0;
      int record[TFBS];
@@ -67,7 +67,7 @@ int convertToDecimal(int *bits, int TFBS){
          n--;
      }
      int i;
-     int decimal=0;
+     long decimal=0;
      for(i=0; i<rec;i++){
         decimal+= (long)pow(2,record[i]);
      }
