@@ -160,12 +160,12 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
        fprintf(statesV1,"%.1f \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
         m=0;
-        row = (long)viableStates[i];
+        row = viableStates[i];
         for(p=0;p<TFBSites;p++){
      
           if(!(row & (1<<p))){     
               //need to do decimal to binray here!!!!!!!!  
-             row = (long)viableStates[i] | (1<<p);
+             row = viableStates[i] | (long)(1<<p);
              if(row!=0 && row!=viableStates[i]){
                 for(j=0;j<size; j++){
                    if(row==viableStates[j]){
@@ -173,7 +173,7 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
                       a = hammDist[p];
                       arrayT[n].row[m].kval = &(koff[a]);
                       m++;
-                      printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
+                     // printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
                       //printf("koff=%f\n", koff[a]);
                      //printf("    col=%d, rownum=%d, j=%d, p=%d\n",row, &(arrayT[n].row[m].rownum),j, p);
                      //printf(" %d  %d  \n", i, j);
@@ -181,7 +181,7 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
                  }
               }
           }else{
-              row = (long)viableStates[i] ^ (1<<p);
+              row = viableStates[i] ^ (long)(1<<p);
               if(row != viableStates[i]){     
                  for( j=0;j<size; j++){   
                     if(row==viableStates[j]){
@@ -189,7 +189,7 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
                       arrayT[n].row[m].rownum = j;
                       arrayT[n].row[m].kval = &(kon[p]);
                       m++;
-                      printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
+                      //printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
                       //printf("    col=%d, rownum=%d, j=%d, p=%d\n", row, &(arrayT[n].row[m].rownum),j, p);
                      //printf(" %d  %d  \n", i, j);
                     }
@@ -526,6 +526,7 @@ int main(int argc, char *argv[])
     system("PAUSE");
       //printf("HERE in between");
      print_arrayT_MATLAB(arrayT,array,viableStates);
+     printf("long=%d\n", sizeof(long));
        system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
