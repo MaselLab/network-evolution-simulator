@@ -75,11 +75,11 @@ long convertToDecimal(int *bits, int TFBS){
 }              
 
 int isHindered(int bindSite, int *bits, int *startPos){
-    int s = bindSite;
+    int s = bindSite-1;
     int count=0;
     //printf("%d\n", s);
     //printf("%d\n", startPos[bindSite]);
-    int check = startPos[bindSite]-(HIND_LENGTH-1);
+    int check = startPos[bindSite]-(HIND_LENGTH);
     if(check<0){
         check=0;}
     //printf("%d\n", check);
@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 15;
+    TFBS = 20;
     int *startPos;
     int *hammDist;
     float *diag;
