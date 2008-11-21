@@ -527,6 +527,7 @@ int main(int argc, char *argv[])
       //printf("HERE in between");
      print_arrayT_MATLAB(arrayT,array,viableStates);
      printf("long=%d\n", sizeof(long));
+     printf("hindlength=%d\n", HIND_LENGTH);
        system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
