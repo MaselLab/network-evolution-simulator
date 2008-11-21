@@ -2,7 +2,7 @@ all: netsim
 
 CC = gcc
 CFLAGS = -g -std=c99 $(EXTRACFLAGS)
-#  -O3
+#  -O3 -pg
 OBJS = random.o lib.o netsim.o priority-queue.o
 LIBS = -lm
 #-lefence
@@ -37,6 +37,9 @@ netsim-check: $(OBJS)
 netsim-selection: $(OBJS)
 netsim-gprof: $(OBJS)
 netsim-bigtf: $(OBJS)
+
+main-matrix-32bit: clean
+	make EXTRACFLAGS="-m32" main-matrix
 
 ## common command for doing regression test diff
 DIFF_CMD := @diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
