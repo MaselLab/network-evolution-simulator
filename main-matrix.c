@@ -75,7 +75,7 @@ int convertToDecimal(int *bits, int TFBS){
 }              
 
 int isHindered(int bindSite, int *bits, int *startPos){
-    int s = bindSite - 1;
+    int s = bindSite-1;
     int count=0;
     //printf("%d\n", s);
     //printf("%d\n", startPos[bindSite]);
@@ -528,6 +528,7 @@ int main(int argc, char *argv[])
      print_arrayT_MATLAB(arrayT,array,viableStates);
      printf("long=%d\n", sizeof(long));
      printf("hindlength=%d\n", HIND_LENGTH);
+      printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
        system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
