@@ -425,6 +425,7 @@ int main(int argc, char *argv[])
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq); 
   printf("tfsPerGene = %d", indiv.tfsPerGene);
 
+
   /* Jasmin:
      pseudo-code for looping (see also print_all_binding_sites in netsim.c):*/
      //system("PAUSE");
