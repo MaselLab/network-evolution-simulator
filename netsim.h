@@ -169,6 +169,9 @@ struct KonStates {
   /* list of structs  */
   KonList *konList[NGENES];
 
+  // check
+  // TODO: remove, this is redundant with konList above
+  //
   /* number of available binding sites for a given TF */
   int nkonsum[NGENES];
 
@@ -300,6 +303,8 @@ const int Generations;
 float kon; /* lower value is so things run faster */
 /* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
    and 89% of the proteins being in the nucleus*/
+float kon_after_burnin; 
+int burn_in;
 
 float tdevelopment;  /* default maximum development time: can be changed at runtime */
 int current_ploidy;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */

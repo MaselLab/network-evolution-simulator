@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
 
   int c;  /* for getopt_long() */
 
+  burn_in = 0;  /* don't do burn-in of kon by default */
   verbose = 0;
   initialize_growth_rate_parameters();
 
@@ -59,6 +60,7 @@ int main(int argc, char *argv[])
         {"criticalsize",  required_argument, 0, 'c'},
         {"genotypeconst",  no_argument, 0, 'g'},
         {"kon",  required_argument, 0, 0},
+        {"konafter",  required_argument, 0, 0},
         {"verbose", no_argument,  0, 'v'},
         {"help",  no_argument, 0, 'h'},
         {"outputbindingsites",  no_argument, 0, 'o'},
@@ -80,15 +82,22 @@ int main(int argc, char *argv[])
       /* If this option set a flag, do nothing else now. */
       if (long_options[option_index].flag != 0)
         break;
-      if( strcmp("kon", long_options[option_index].name) == 0) {
+      if (strcmp("kon", long_options[option_index].name) == 0) {
         char *endptr;
         kon  = strtof(optarg, &endptr);
-        printf("setting kon=%f\n", kon);
+        printf("setting kon=%g\n", kon);
       } else {
-        printf ("option %s", long_options[option_index].name);
-        if (optarg)
-          printf (" with arg %s", optarg);
-        printf ("\n");
+        if (strcmp("konafter", long_options[option_index].name) == 0) {
+          char *endptr;
+          kon_after_burnin  = strtof(optarg, &endptr);
+          printf("setting konafter=%g\n", kon_after_burnin);
+          burn_in = 1;
+        } else {
+          printf ("option %s", long_options[option_index].name);
+          if (optarg)
+            printf (" with arg %s", optarg);
+          printf ("\n");
+        }
       }
       break;
     case 'd':
@@ -109,6 +118,9 @@ int main(int argc, char *argv[])
     case 'g':
       hold_genotype_constant = 1;
       break;
+    case 'b':
+      burn_in = 1;
+      break;
     case 'v':
       verbose = 1;
       break;
@@ -122,7 +134,8 @@ int main(int argc, char *argv[])
  -p,  --ploidy=PLOIDY       ploidy (1=haploid, 2=diploid)\n\
  -t,  --timedev=TIME        length of time to run development\n\
  -c,  --criticalsize=SIZE   critical size for cell division\n\
-      --kon=KON             kon value\n\
+      --kon=KON             initial kon value\n\
+      --konafter=KON        kon value post-burnin\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);
