@@ -69,7 +69,7 @@ int convertToDecimal(int *bits, int TFBS){
      int i;
      int decimal=0;
      for(i=0; i<rec;i++){
-        decimal+= (int)pow(2,record[i]);
+        decimal+= (long)pow(2,record[i]);
      }
      return decimal;
 }              
