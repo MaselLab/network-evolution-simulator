@@ -15,7 +15,7 @@
 #include "lib.h"
 #include "netsim.h"
 
-#define NUM = 130
+
 
 int array_size = 400;
 
