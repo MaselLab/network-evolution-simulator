@@ -2417,7 +2417,6 @@ void recalibrate_cell(GillespieRates *rates,
     rates->koff += (*koffvalues)[i];
   }
 
-
   /* now update with kon */
   rates->salphc *= kon;
   rates->maxSalphc *= kon;
@@ -2713,6 +2712,155 @@ void clone_cell(Genotype *genes_orig,
               &(state_clone->mRNATranslTimeEnd), &(state_clone->mRNATranslTimeEndLast));
 }
 
+void initialize_new_cell_state(CellState *state, CellState state_clone, double scale)
+{
+  // reset pointers
+  state->mRNATranscrTimeEnd = NULL;
+  state->mRNATranscrTimeEndLast = NULL;
+  state->mRNATranslTimeEnd = NULL;
+  state->mRNATranslTimeEndLast = NULL;
+
+  fflush(stdout);
+
+  if (state->mRNATranscrTimeEnd != NULL) {
+    printf("after delete_queues  mRNATranscrTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", state->mRNATranscrTimeEnd->time, state->mRNATranscrTimeEnd->geneID);
+  }
+
+  /* reset the length of TF data structures to zero, we have to reconstruct them */
+  state->tfBoundCount = 0;
+  state->tfHinderedCount = 0;
+
+  /* reset S phase state to 0 */
+  state->in_s_phase = 0;
+
+  state->division_time = 999999.0;  /* reset division time for this cell */
+
+  /* reset size to appropriate scale of cell size */
+  state->cellSize = scale;
+
+  /* TODO: check! growth rate, take instantaneous growth rate just before
+     division, this will be updated after first new time step */
+  state->growthRate = state_clone.growthRate;
+}
+
+void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone, 
+                              CellState *state, CellState state_clone,
+                              GillespieRates *rates, GillespieRates rates_clone,
+                              int geneID, int copy1, int copy2, int *lastpos)
+{
+  int i, j, k;
+
+  for (k=0; k < CISREG_LEN; k++) {
+    genes->cisRegSeq[geneID][0][k] = genes_clone.cisRegSeq[geneID][copy1][k];
+    genes->cisRegSeq[geneID][1][k] = genes_clone.cisRegSeq[geneID][copy2][k];
+    genes->cisRegSeq[geneID][2][k] = genes_clone.cisRegSeq[geneID][copy1][k];
+    genes->cisRegSeq[geneID][3][k] = genes_clone.cisRegSeq[geneID][copy2][k];
+  }
+
+  for (k=0; k < TF_ELEMENT_LEN; k++) {
+    genes->transcriptionFactorSeq[geneID][0][k] = genes_clone.transcriptionFactorSeq[geneID][copy1][k];
+    genes->transcriptionFactorSeq[geneID][1][k] = genes_clone.transcriptionFactorSeq[geneID][copy2][k];
+    genes->transcriptionFactorSeq[geneID][2][k] = genes_clone.transcriptionFactorSeq[geneID][copy1][k];
+    genes->transcriptionFactorSeq[geneID][3][k] = genes_clone.transcriptionFactorSeq[geneID][copy2][k];
+  }
+
+  //printf("gene=%d, copies=%d, copy1=%d\n", i, genes_clone.copies[geneID], copy1); 
+  if (genes_clone.copies[geneID] - 1 >= copy1) {
+    *lastpos = move_gene_copy(copy1, 0, geneID, &genes_clone, genes, &state_clone, state, *lastpos);
+  }
+
+  //printf("gene=%d, copies=%d, copy2=%d\n", i, genes_clone.copies[geneID], copy2);
+  if (genes_clone.copies[geneID] - 1 >= copy2) {
+    *lastpos = move_gene_copy(copy2, 1, geneID, &genes_clone, genes, &state_clone, state, *lastpos);
+  }
+
+  fflush(stdout);
+
+  /* copy activation state */
+  state->active[geneID][0] = state_clone.active[geneID][copy1];
+  state->active[geneID][1] = state_clone.active[geneID][copy2];
+
+  state->active[geneID][2] = ON_WITH_NUCLEOSOME;
+  state->active[geneID][3] = ON_WITH_NUCLEOSOME;
+
+  /* copy state change state */
+  state->statechangeIDs[ACETYLATION][0][geneID] = state_clone.statechangeIDs[ACETYLATION][copy1][geneID];
+  state->statechangeIDs[ACETYLATION][1][geneID] = state_clone.statechangeIDs[ACETYLATION][copy2][geneID];
+
+  state->statechangeIDs[DEACETYLATION][0][geneID] = state_clone.statechangeIDs[DEACETYLATION][copy1][geneID];
+  state->statechangeIDs[DEACETYLATION][1][geneID] = state_clone.statechangeIDs[DEACETYLATION][copy2][geneID];
+
+  state->statechangeIDs[PICASSEMBLY][0][geneID] = state_clone.statechangeIDs[PICASSEMBLY][copy1][geneID];
+  state->statechangeIDs[PICASSEMBLY][1][geneID] = state_clone.statechangeIDs[PICASSEMBLY][copy2][geneID];
+
+  state->statechangeIDs[TRANSCRIPTINIT][0][geneID] = state_clone.statechangeIDs[TRANSCRIPTINIT][copy1][geneID];
+  state->statechangeIDs[TRANSCRIPTINIT][1][geneID] = state_clone.statechangeIDs[TRANSCRIPTINIT][copy2][geneID];
+
+  state->statechangeIDs[PICDISASSEMBLY][0][geneID] = state_clone.statechangeIDs[PICDISASSEMBLY][copy1][geneID];
+  state->statechangeIDs[PICDISASSEMBLY][1][geneID] = state_clone.statechangeIDs[PICDISASSEMBLY][copy2][geneID];
+
+  state->RTlnKr = state_clone.RTlnKr;
+  state->temperature = state_clone.temperature;
+
+  /* do counts for GillespieRates */
+  // TODO: ultimately maybe these should be moved to "CellState" since they are not cached values
+
+  // TODO: should these should be cumulative sums of the [de]acetylation etc. counts?
+  rates->acetylationCount[0] = rates_clone.acetylationCount[copy1];
+  rates->acetylationCount[1] = rates_clone.acetylationCount[copy2];
+
+  rates->acetylationCount[2] = 0;
+  rates->acetylationCount[3] = 0;
+
+  rates->deacetylationCount[0] = rates_clone.deacetylationCount[copy1];
+  rates->deacetylationCount[1] = rates_clone.deacetylationCount[copy2];
+
+  rates->deacetylationCount[2] = 0;
+  rates->deacetylationCount[3] = 0;
+
+  rates->picAssemblyCount[0] = rates_clone.picAssemblyCount[copy1];
+  rates->picAssemblyCount[1] = rates_clone.picAssemblyCount[copy2];
+  
+  rates->picAssemblyCount[2] = 0;
+  rates->picAssemblyCount[3] = 0;
+
+  rates->transcriptInitCount[0] = rates_clone.transcriptInitCount[copy1];
+  rates->transcriptInitCount[1] = rates_clone.transcriptInitCount[copy2];
+  
+  rates->transcriptInitCount[2] = 0;
+  rates->transcriptInitCount[3] = 0;
+
+  rates->picDisassemblyCount[0] = rates_clone.picDisassemblyCount[copy1];
+  rates->picDisassemblyCount[1] = rates_clone.picDisassemblyCount[copy2];
+
+  rates->picDisassemblyCount[2] = 0;
+  rates->picDisassemblyCount[3] = 0; 
+
+  state->mRNATranscrCount[geneID] = 0;
+  state->mRNACytoCount[geneID] = 0;
+  state->mRNANuclearCount[geneID] = 0;
+  state->mRNATranslCytoCount[geneID] = 0;
+}
+
+void realloc_cell_memory(CellState *state, float **koffvalues) {
+
+  //state->tfBoundIndexes = realloc(state->tfBoundIndexes, 2*(state->tfBoundCount+1)*sizeof(int));
+  state->tfBoundIndexes = realloc(state->tfBoundIndexes, 10*maxbound*sizeof(int));
+
+  //state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 10*state->tfHinderedCount*sizeof(int));
+  state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 100*maxbound*sizeof(int));
+  
+  // reallocate koffvalues memory
+  //*koffvalues = realloc(*koffvalues, 2*(state->tfBoundCount+1)* sizeof(float)); 
+  *koffvalues = realloc(*koffvalues, 100*maxbound*sizeof(float)); 
+
+  if (!state->tfBoundIndexes || !state->tfHinderedIndexes) {
+    LOG_ERROR_NOCELLID("memory allocation error cell\n");
+    exit(1);
+  }
+
+}
 
 void initialize_daughter_cell(int motherID,
                               int daughterID,
@@ -2748,18 +2896,18 @@ void initialize_daughter_cell(int motherID,
   int daughter_copy2 = 2;
   int mother_copy1 = 0;
   int mother_copy2 = 3;
-
-  /* clone mother cell */
-  clone_cell(mother,
-             mother_state,
-             mother_rates,
-             &genes_clone,
-             &state_clone,
-             &rates_clone);
-
+  int lastpos_daughter = 0;
+  int lastpos_mother = 0;
   int original_bind_count = mother->bindSiteCount;
+  int no_replace_mother = (motherID != daughterID) ? 1: 0;  /* set if daughter cell replaces mother 
+                                                               in that case, we discard all updating of 
+                                                               the mother cell */
+  /* clone mother cell */
+  clone_cell(mother, mother_state, mother_rates,
+             &genes_clone, &state_clone, &rates_clone);
 
-  if (mother_state->mRNATranscrTimeEnd != NULL) {
+
+  /*if (mother_state->mRNATranscrTimeEnd != NULL) {
     printf("before delete_queues mother mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
   }
@@ -2767,62 +2915,17 @@ void initialize_daughter_cell(int motherID,
   if (daughter_state->mRNATranscrTimeEnd != NULL) {
     printf("before delete_queues daughter mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
-  }
+    } */
   
   // free the existing memory for the time queue
   delete_queues(daughter_state);
-  delete_queues(mother_state);
+  if (no_replace_mother)
+    delete_queues(mother_state);
 
-  // then reset pointers
-  daughter_state->mRNATranscrTimeEnd = NULL;
-  daughter_state->mRNATranscrTimeEndLast = NULL;
-  daughter_state->mRNATranslTimeEnd = NULL;
-  daughter_state->mRNATranslTimeEndLast = NULL;
-
-  mother_state->mRNATranscrTimeEnd = NULL;
-  mother_state->mRNATranscrTimeEndLast = NULL;
-  mother_state->mRNATranslTimeEnd = NULL;
-  mother_state->mRNATranslTimeEndLast = NULL;
-
-  fflush(stdout);
-
- if (mother_state->mRNATranscrTimeEnd != NULL) {
-    printf("after delete_queues mother mRNATranscrTimeEnd is not NULL\n");
-    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
- }
-
- if (daughter_state->mRNATranscrTimeEnd != NULL) {
-    printf("after delete_queues daughter mRNATranscrTimeEnd is not NULL\n");
-    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
- }
-
-  /* reset the length of TF data structures to zero, we have to reconstruct them */
-  daughter_state->tfBoundCount = 0;
-  daughter_state->tfHinderedCount = 0;
-  mother_state->tfBoundCount = 0;
-  mother_state->tfHinderedCount = 0;
-
-  /* reset S phase state to 0 */
-  daughter_state->in_s_phase = 0;
-  mother_state->in_s_phase = 0;
-
-  daughter_state->division_time = 999999.0;  /* reset division time for this cell */
-  mother_state->division_time = 999999.0;  /* reset division time for this cell */
-
-  /* reset size to appropriate fraction of cell size */
-  daughter_state->cellSize = fraction;
-  mother_state->cellSize = (1-fraction);
-
-  /* TODO: check! growth rate, take instantaneous growth rate just before
-     division, this will be updated after first new time step */
-  daughter_state->growthRate = state_clone.growthRate;
-  mother_state->growthRate = state_clone.growthRate;
-
-  /* first set the genotype of the daughter */
-  /* do first because we may end up resetting the mother cell */
-  
-  int lastpos_daughter = 0;
-  int lastpos_mother = 0;
+  // initialize the state of the new cell
+  initialize_new_cell_state(daughter_state, state_clone, fraction);
+  if (no_replace_mother) 
+    initialize_new_cell_state(mother_state, state_clone, (1-fraction));
 
   LOG_VERBOSE_NOCELLID("[cell %03d] (mother) total tfBoundCount=%d, tfHinderedCount=%d\n", motherID, 
                        state_clone.tfBoundCount, state_clone.tfHinderedCount);
@@ -2830,12 +2933,14 @@ void initialize_daughter_cell(int motherID,
   //print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
   //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
 
+  /* now split up the genes into one or other of the new cells */
   for (i=0; i < NGENES; i++) {
 
     /* reset the number of copies of gene in mother and daughter after
        division to original ploidy */
     daughter->copies[i] = current_ploidy;
-    mother->copies[i] = current_ploidy;
+    if (no_replace_mother)
+      mother->copies[i] = current_ploidy;
 
     // assume diploid for the moment
     //for (p=0; p < current_ploidy; p++) {
@@ -2853,188 +2958,23 @@ void initialize_daughter_cell(int motherID,
     // copy 3 -> copy 1
     // copy 2 -> copy 2
     // copy 3 -> copy 3
-    
-    for (k=0; k < CISREG_LEN; k++) {
-      daughter->cisRegSeq[i][0][k] = genes_clone.cisRegSeq[i][daughter_copy1][k];
-      daughter->cisRegSeq[i][1][k] = genes_clone.cisRegSeq[i][daughter_copy2][k];
-      daughter->cisRegSeq[i][2][k] = genes_clone.cisRegSeq[i][daughter_copy1][k];
-      daughter->cisRegSeq[i][3][k] = genes_clone.cisRegSeq[i][daughter_copy2][k];
 
-      mother->cisRegSeq[i][0][k] = genes_clone.cisRegSeq[i][mother_copy1][k];
-      mother->cisRegSeq[i][1][k] = genes_clone.cisRegSeq[i][mother_copy2][k];
-      mother->cisRegSeq[i][2][k] = genes_clone.cisRegSeq[i][mother_copy1][k];
-      mother->cisRegSeq[i][3][k] = genes_clone.cisRegSeq[i][mother_copy2][k];
+    initialize_new_cell_gene(daughter, genes_clone, 
+                             daughter_state, state_clone,
+                             daughter_rates, rates_clone,
+                             i, daughter_copy1, daughter_copy2, &lastpos_daughter);
+
+    if (no_replace_mother) {
+      initialize_new_cell_gene(mother, genes_clone, 
+                               mother_state, state_clone,
+                               mother_rates, rates_clone,
+                               i, mother_copy1, mother_copy2, &lastpos_mother);
     }
-
-    for (k=0; k < TF_ELEMENT_LEN; k++) {
-      daughter->transcriptionFactorSeq[i][0][k] = genes_clone.transcriptionFactorSeq[i][daughter_copy1][k];
-      daughter->transcriptionFactorSeq[i][1][k] = genes_clone.transcriptionFactorSeq[i][daughter_copy2][k];
-      daughter->transcriptionFactorSeq[i][2][k] = genes_clone.transcriptionFactorSeq[i][daughter_copy1][k];
-      daughter->transcriptionFactorSeq[i][3][k] = genes_clone.transcriptionFactorSeq[i][daughter_copy2][k];
-
-      mother->transcriptionFactorSeq[i][0][k] = genes_clone.transcriptionFactorSeq[i][mother_copy1][k];
-      mother->transcriptionFactorSeq[i][1][k] = genes_clone.transcriptionFactorSeq[i][mother_copy2][k];
-      mother->transcriptionFactorSeq[i][2][k] = genes_clone.transcriptionFactorSeq[i][mother_copy1][k];
-      mother->transcriptionFactorSeq[i][3][k] = genes_clone.transcriptionFactorSeq[i][mother_copy2][k]; 
-    }
-
-    //printf("gene=%d, copies=%d, daughter_copy1=%d\n", i, genes_clone.copies[i], daughter_copy1); 
-    if (genes_clone.copies[i] - 1 >= daughter_copy1) {
-      lastpos_daughter = move_gene_copy(daughter_copy1, 0, i, &genes_clone, daughter, &state_clone, daughter_state, lastpos_daughter);
-    }
-
-    //printf("gene=%d, copies=%d, mother_copy1=%d\n", i, genes_clone.copies[i], mother_copy1); 
-    if (genes_clone.copies[i] - 1 >= mother_copy1) {
-      lastpos_mother = move_gene_copy(mother_copy1, 0, i, &genes_clone, mother, &state_clone, mother_state, lastpos_mother);
-    }
-
-    //printf("gene=%d, copies=%d, daughter_copy2=%d\n", i, genes_clone.copies[i], daughter_copy2);
-    if (genes_clone.copies[i] - 1 >= daughter_copy2) {
-      lastpos_daughter = move_gene_copy(daughter_copy2, 1, i, &genes_clone, daughter, &state_clone, daughter_state, lastpos_daughter);
-    }
-
-    //printf("gene=%d, copies=%d, mother_copy2=%d\n", i, genes_clone.copies[i], mother_copy2); 
-    if (genes_clone.copies[i] - 1 >= mother_copy2) {
-      lastpos_mother = move_gene_copy(mother_copy2, 0, i, &genes_clone, mother, &state_clone, mother_state, lastpos_mother);
-    }
-
-    fflush(stdout);
-
-    /* copy activation state */
-    daughter_state->active[i][0] = state_clone.active[i][daughter_copy1];
-    daughter_state->active[i][1] = state_clone.active[i][daughter_copy2];
-
-    daughter_state->active[i][2] = ON_WITH_NUCLEOSOME;
-    daughter_state->active[i][3] = ON_WITH_NUCLEOSOME;
-
-    mother_state->active[i][0] = state_clone.active[i][mother_copy1];
-    mother_state->active[i][1] = state_clone.active[i][mother_copy2];
-
-    mother_state->active[i][2] = ON_WITH_NUCLEOSOME;
-    mother_state->active[i][3] = ON_WITH_NUCLEOSOME;
-
-
-    /* copy state change state */
-    daughter_state->statechangeIDs[ACETYLATION][0][i] = state_clone.statechangeIDs[ACETYLATION][daughter_copy1][i];
-    daughter_state->statechangeIDs[ACETYLATION][1][i] = state_clone.statechangeIDs[ACETYLATION][daughter_copy2][i];
-
-    mother_state->statechangeIDs[ACETYLATION][0][i] = state_clone.statechangeIDs[ACETYLATION][mother_copy1][i];
-    mother_state->statechangeIDs[ACETYLATION][1][i] = state_clone.statechangeIDs[ACETYLATION][mother_copy2][i];
-
-    daughter_state->statechangeIDs[DEACETYLATION][0][i] = state_clone.statechangeIDs[DEACETYLATION][daughter_copy1][i];
-    daughter_state->statechangeIDs[DEACETYLATION][1][i] = state_clone.statechangeIDs[DEACETYLATION][daughter_copy2][i];
-
-    mother_state->statechangeIDs[DEACETYLATION][0][i] = state_clone.statechangeIDs[DEACETYLATION][mother_copy1][i];
-    mother_state->statechangeIDs[DEACETYLATION][1][i] = state_clone.statechangeIDs[DEACETYLATION][mother_copy2][i];
-
-    daughter_state->statechangeIDs[PICASSEMBLY][0][i] = state_clone.statechangeIDs[PICASSEMBLY][daughter_copy1][i];
-    daughter_state->statechangeIDs[PICASSEMBLY][1][i] = state_clone.statechangeIDs[PICASSEMBLY][daughter_copy2][i];
-
-    mother_state->statechangeIDs[PICASSEMBLY][0][i] = state_clone.statechangeIDs[PICASSEMBLY][mother_copy1][i];
-    mother_state->statechangeIDs[PICASSEMBLY][1][i] = state_clone.statechangeIDs[PICASSEMBLY][mother_copy2][i];
-
-    daughter_state->statechangeIDs[TRANSCRIPTINIT][0][i] = state_clone.statechangeIDs[TRANSCRIPTINIT][daughter_copy1][i];
-    daughter_state->statechangeIDs[TRANSCRIPTINIT][1][i] = state_clone.statechangeIDs[TRANSCRIPTINIT][daughter_copy2][i];
-
-    mother_state->statechangeIDs[TRANSCRIPTINIT][0][i] = state_clone.statechangeIDs[TRANSCRIPTINIT][mother_copy1][i];
-    mother_state->statechangeIDs[TRANSCRIPTINIT][1][i] = state_clone.statechangeIDs[TRANSCRIPTINIT][mother_copy2][i];
-
-    daughter_state->statechangeIDs[PICDISASSEMBLY][0][i] = state_clone.statechangeIDs[PICDISASSEMBLY][daughter_copy1][i];
-    daughter_state->statechangeIDs[PICDISASSEMBLY][1][i] = state_clone.statechangeIDs[PICDISASSEMBLY][daughter_copy2][i];
-
-    mother_state->statechangeIDs[PICDISASSEMBLY][0][i] = state_clone.statechangeIDs[PICDISASSEMBLY][mother_copy1][i];
-    mother_state->statechangeIDs[PICDISASSEMBLY][1][i] = state_clone.statechangeIDs[PICDISASSEMBLY][mother_copy2][i];
-
-    daughter_state->RTlnKr = state_clone.RTlnKr;
-    mother_state->RTlnKr = state_clone.RTlnKr;
-    daughter_state->temperature = state_clone.temperature;
-    mother_state->temperature = state_clone.temperature;
-
-    /* do counts for GillespieRates */
-    // TODO: ultimately maybe these should be moved to "CellState" since they are not cached values
-
-    daughter_rates->acetylationCount[0] = rates_clone.acetylationCount[daughter_copy1];
-    daughter_rates->acetylationCount[1] = rates_clone.acetylationCount[daughter_copy2];
-
-    daughter_rates->acetylationCount[2] = 0;
-    daughter_rates->acetylationCount[3] = 0;
-
-    mother_rates->acetylationCount[0] = rates_clone.acetylationCount[mother_copy1];
-    mother_rates->acetylationCount[1] = rates_clone.acetylationCount[mother_copy2];
-
-    mother_rates->acetylationCount[2] = 0;
-    mother_rates->acetylationCount[3] = 0;
-
-    daughter_rates->deacetylationCount[0] = rates_clone.deacetylationCount[daughter_copy1];
-    daughter_rates->deacetylationCount[1] = rates_clone.deacetylationCount[daughter_copy2];
-
-    daughter_rates->deacetylationCount[2] = 0;
-    daughter_rates->deacetylationCount[3] = 0;
-
-    mother_rates->deacetylationCount[0] = rates_clone.deacetylationCount[mother_copy1];
-    mother_rates->deacetylationCount[1] = rates_clone.deacetylationCount[mother_copy2];
-
-    mother_rates->deacetylationCount[2] = 0;
-    mother_rates->deacetylationCount[3] = 0;
-
-    daughter_rates->picAssemblyCount[0] = rates_clone.picAssemblyCount[daughter_copy1];
-    daughter_rates->picAssemblyCount[1] = rates_clone.picAssemblyCount[daughter_copy2];
-
-    daughter_rates->picAssemblyCount[2] = 0;
-    daughter_rates->picAssemblyCount[3] = 0;
-
-    mother_rates->picAssemblyCount[0] = rates_clone.picAssemblyCount[mother_copy1];
-    mother_rates->picAssemblyCount[1] = rates_clone.picAssemblyCount[mother_copy2];
-
-    mother_rates->picAssemblyCount[2] = 0;
-    mother_rates->picAssemblyCount[3] = 0;
-
-    daughter_rates->transcriptInitCount[0] = rates_clone.transcriptInitCount[daughter_copy1];
-    daughter_rates->transcriptInitCount[1] = rates_clone.transcriptInitCount[daughter_copy2];
-
-    daughter_rates->transcriptInitCount[2] = 0;
-    daughter_rates->transcriptInitCount[3] = 0;
-
-    mother_rates->transcriptInitCount[0] = rates_clone.transcriptInitCount[mother_copy1];
-    mother_rates->transcriptInitCount[1] = rates_clone.transcriptInitCount[mother_copy2];
-
-    mother_rates->transcriptInitCount[2] = 0;
-    mother_rates->transcriptInitCount[3] = 0;
-
-    daughter_rates->picDisassemblyCount[0] = rates_clone.picDisassemblyCount[daughter_copy1];
-    daughter_rates->picDisassemblyCount[1] = rates_clone.picDisassemblyCount[daughter_copy2];
-
-    daughter_rates->picDisassemblyCount[2] = 0;
-    daughter_rates->picDisassemblyCount[3] = 0;
-
-    mother_rates->picDisassemblyCount[0] = rates_clone.picDisassemblyCount[mother_copy1];
-    mother_rates->picDisassemblyCount[1] = rates_clone.picDisassemblyCount[mother_copy2];
-
-    mother_rates->picDisassemblyCount[2] = 0;
-    mother_rates->picDisassemblyCount[3] = 0;
   }
 
-  // reallocate memory
-  //daughter_state->tfBoundIndexes = realloc(daughter_state->tfBoundIndexes, 2*(daughter_state->tfBoundCount+1)*sizeof(int));
-  daughter_state->tfBoundIndexes = realloc(daughter_state->tfBoundIndexes, 10*maxbound*sizeof(int));
-  //mother_state->tfBoundIndexes = realloc(mother_state->tfBoundIndexes, 2*(mother_state->tfBoundCount+1)*sizeof(int));
-  mother_state->tfBoundIndexes = realloc(mother_state->tfBoundIndexes, 10*maxbound*sizeof(int));
-
-  //daughter_state->tfHinderedIndexes = realloc(daughter_state->tfHinderedIndexes, 10*daughter_state->tfHinderedCount*sizeof(int));
-  daughter_state->tfHinderedIndexes = realloc(daughter_state->tfHinderedIndexes, 100*maxbound*sizeof(int));
-  //mother_state->tfHinderedIndexes = realloc(mother_state->tfHinderedIndexes, 10*mother_state->tfHinderedCount*sizeof(int));
-  mother_state->tfHinderedIndexes = realloc(mother_state->tfHinderedIndexes, 100*maxbound*sizeof(int));
-  
-  // reallocate koffvalues memory
-  //*daughter_koffvalues = realloc(*daughter_koffvalues, 2*(daughter_state->tfBoundCount+1)* sizeof(float)); 
-  *daughter_koffvalues = realloc(*daughter_koffvalues, 100*maxbound*sizeof(float)); 
-  //*mother_koffvalues = realloc(*mother_koffvalues, 2*(mother_state->tfBoundCount+1)* sizeof(float)); 
-  *mother_koffvalues = realloc(*mother_koffvalues, 100*maxbound*sizeof(float)); 
-
-  if (!daughter_state->tfBoundIndexes || !mother_state->tfBoundIndexes || 
-      !daughter_state->tfHinderedIndexes || !mother_state->tfHinderedIndexes) {
-    LOG_ERROR_NOCELLID("memory allocation error\n");
-    exit(1);
+  realloc_cell_memory(daughter_state, daughter_koffvalues);
+  if (no_replace_mother) {
+    realloc_cell_memory(mother_state, mother_koffvalues);
   }
 
   /* recompute *all* binding sites in daughter, then relabel sites */
@@ -3051,35 +2991,27 @@ void initialize_daughter_cell(int motherID,
   //print_all_binding_sites(daughter->copies, daughter->allBindingSites, daughter->bindSiteCount, 
   //                        daughter->transcriptionFactorSeq, daughter->cisRegSeq, daughter->tfsStart); 
 
-  /* recompute *all* binding sites in mother, then relabel sites */
-  calc_all_binding_sites(mother->copies, 
-                         mother->cisRegSeq, 
-                         mother->transcriptionFactorSeq, 
-                         &(mother->bindSiteCount),
-                         &(mother->allBindingSites),
-                         mother->hindrancePositions,
-                         mother->tfsPerGene,
-                         mother->tfsStart); 
+  if (no_replace_mother) {
+    /* recompute *all* binding sites in mother, then relabel sites */
+    calc_all_binding_sites(mother->copies, 
+                           mother->cisRegSeq, 
+                           mother->transcriptionFactorSeq, 
+                           &(mother->bindSiteCount),
+                           &(mother->allBindingSites),
+                           mother->hindrancePositions,
+                           mother->tfsPerGene,
+                           mother->tfsStart); 
+  }
 
   //print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
   //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
 
-  LOG_NOCELLID("original number of binding sites=%d should = (mother=%d + daughter=%d) = %d\n", 
-               original_bind_count, mother->bindSiteCount, daughter->bindSiteCount, mother->bindSiteCount + daughter->bindSiteCount);
-
-  /* reset counters */
-  for (i=0; i < NGENES; i++) {
-    daughter_state->mRNATranscrCount[i] = 0;
-    mother_state->mRNATranscrCount[i] =  0;
-    daughter_state->mRNACytoCount[i] = 0;
-    mother_state->mRNACytoCount[i] = 0;
-    daughter_state->mRNANuclearCount[i] = 0;
-    mother_state->mRNANuclearCount[i] = 0;
-    daughter_state->mRNATranslCytoCount[i] = 0;
-    mother_state->mRNATranslCytoCount[i] = 0;
+  if (no_replace_mother) {
+    LOG_NOCELLID("original number of binding sites=%d should = (mother=%d + daughter=%d) = %d\n", 
+                 original_bind_count, mother->bindSiteCount, daughter->bindSiteCount, mother->bindSiteCount + daughter->bindSiteCount);
   }
 
-  if (mother_state->mRNATranscrTimeEnd != NULL) {
+  /*if (mother_state->mRNATranscrTimeEnd != NULL) {
     printf("before split_mRNA mother mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
   }
@@ -3087,7 +3019,7 @@ void initialize_daughter_cell(int motherID,
   if (daughter_state->mRNATranscrTimeEnd != NULL) {
     printf("before split_mRNA daughter mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
-  }
+    }*/
   
   
   /* split up the volume of the cell */
@@ -3095,21 +3027,27 @@ void initialize_daughter_cell(int motherID,
 
     // first protein
     daughter_state->proteinConc[i] = fraction * state_clone.proteinConc[i];
-    mother_state->proteinConc[i] = (1-fraction) * state_clone.proteinConc[i];
-    printf("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
-           daughter_state->proteinConc[i], fraction, mother_state->proteinConc[i], (1-fraction), state_clone.proteinConc[i]);
+    if (no_replace_mother) {
+      mother_state->proteinConc[i] = (1-fraction) * state_clone.proteinConc[i];
+      printf("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
+             daughter_state->proteinConc[i], fraction, mother_state->proteinConc[i], (1-fraction), state_clone.proteinConc[i]);
+    }
 
     // mRNAs in cytoplasm (not translating)
     daughter_state->mRNACytoCount[i] = rint(fraction * state_clone.mRNACytoCount[i]);
-    mother_state->mRNACytoCount[i] =  state_clone.mRNACytoCount[i] - daughter_state->mRNACytoCount[i];
-    printf("daughter=%d, mother=%d of total mRNACytoCount=%d\n", 
-           daughter_state->mRNACytoCount[i], mother_state->mRNACytoCount[i], state_clone.mRNACytoCount[i]);
+    if (no_replace_mother) {
+      mother_state->mRNACytoCount[i] =  state_clone.mRNACytoCount[i] - daughter_state->mRNACytoCount[i];
+      printf("daughter=%d, mother=%d of total mRNACytoCount=%d\n", 
+             daughter_state->mRNACytoCount[i], mother_state->mRNACytoCount[i], state_clone.mRNACytoCount[i]);
+    }
 
     // mRNAs in nucleus
     daughter_state->mRNANuclearCount[i] = rint(fraction * mother_state->mRNANuclearCount[i]);
-    mother_state->mRNANuclearCount[i] =  state_clone.mRNANuclearCount[i] - daughter_state->mRNANuclearCount[i];
-    printf("daughter=%d, mother=%d of total mRNANuclearCount=%d\n", 
-           daughter_state->mRNANuclearCount[i], mother_state->mRNANuclearCount[i], state_clone.mRNANuclearCount[i]);
+    if (no_replace_mother) {
+      mother_state->mRNANuclearCount[i] =  state_clone.mRNANuclearCount[i] - daughter_state->mRNANuclearCount[i];
+      printf("daughter=%d, mother=%d of total mRNANuclearCount=%d\n", 
+             daughter_state->mRNANuclearCount[i], mother_state->mRNANuclearCount[i], state_clone.mRNANuclearCount[i]);
+    }
 
     // mRNAs in cytoplasm only recently
     //daughter_state->mRNATranslCytoCount[i] = rint(fraction * mother_state->mRNATranslCytoCount[i]);
@@ -3148,36 +3086,38 @@ void initialize_daughter_cell(int motherID,
                    daughter_transport,
                    dt);
 
-  /* recompute rates in mother */
-  recalibrate_cell(mother_rates,
-                   mother_state,
-                   mother,
-                   mother_konStates,
-                   mother_koffvalues,
-                   mother_mRNAdecay,
-                   mother_transport,
-                   dt);
+  if (no_replace_mother) {
+    /* recompute rates in mother */
+    recalibrate_cell(mother_rates,
+                     mother_state,
+                     mother,
+                     mother_konStates,
+                     mother_koffvalues,
+                     mother_mRNAdecay,
+                     mother_transport,
+                     dt);
   
-  LOG_VERBOSE_NOCELLID("tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
-         mother_state->tfBoundCount, motherID, daughter_state->tfBoundCount, daughterID);
-
-  LOG_VERBOSE_NOCELLID("tfHinderedCount=%d (motherID=%d), tfHinderedCount=%d (daughterID=%d)\n", 
-         mother_state->tfHinderedCount, motherID, daughter_state->tfHinderedCount, daughterID);
+    LOG_VERBOSE_NOCELLID("tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
+                         mother_state->tfBoundCount, motherID, daughter_state->tfBoundCount, daughterID);
+    
+    LOG_VERBOSE_NOCELLID("tfHinderedCount=%d (motherID=%d), tfHinderedCount=%d (daughterID=%d)\n", 
+                         mother_state->tfHinderedCount, motherID, daughter_state->tfHinderedCount, daughterID);
+  }
 
   /* free up memory created by temporary copy */
 
- if (mother_state->mRNATranscrTimeEnd != NULL) {
+  /*if (mother_state->mRNATranscrTimeEnd != NULL) {
     printf("mother mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
- }
-
- if (daughter_state->mRNATranscrTimeEnd != NULL) {
+  }
+  
+  if (daughter_state->mRNATranscrTimeEnd != NULL) {
     printf("daughter mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
- }
-
- // free the memory associated with temporary copy of mother
- free_mem_CellState(&state_clone);
+    } */
+  
+  /* free the memory associated with temporary copy of mother */
+  free_mem_CellState(&state_clone);
 }
 
 void log_snapshot(GillespieRates *rates,
