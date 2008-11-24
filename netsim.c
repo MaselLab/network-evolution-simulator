@@ -2220,9 +2220,9 @@ void replicate_gene(CellState *state,
   LOG_VERBOSE("number of binding sites before adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
   
   /* do mutation */
-  // TODO: currently disabled, re-enable when multiple cells created
-  // for (p=0; p<2*current_ploidy; p++)
-  //   mutate(genes, geneID, p, 0.01);  
+  // TODO: make mutation rate a parameter 
+  for (p=0; p<2*current_ploidy; p++)
+    mutate(genes, geneID, p, 0.01);  
 
   /* record number of TFBS pre-replication */
   number_tfbs_pre_replication = genes->tfsPerGene[geneID];
@@ -2743,6 +2743,7 @@ void initialize_daughter_cell(int motherID,
   CellState state_clone;
   GillespieRates rates_clone;
 
+  // TODO: these values need to be made random for each gene to model independent assortment
   int daughter_copy1 = 1;
   int daughter_copy2 = 2;
   int mother_copy1 = 0;
@@ -2812,7 +2813,7 @@ void initialize_daughter_cell(int motherID,
   daughter_state->cellSize = fraction;
   mother_state->cellSize = (1-fraction);
 
-  /* TODO: growth rate, take instantaneous growth rate just before
+  /* TODO: check! growth rate, take instantaneous growth rate just before
      division, this will be updated after first new time step */
   daughter_state->growthRate = state_clone.growthRate;
   mother_state->growthRate = state_clone.growthRate;
@@ -3078,16 +3079,16 @@ void initialize_daughter_cell(int motherID,
     mother_state->mRNATranslCytoCount[i] = 0;
   }
 
- if (mother_state->mRNATranscrTimeEnd != NULL) {
+  if (mother_state->mRNATranscrTimeEnd != NULL) {
     printf("before split_mRNA mother mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
- }
-
- if (daughter_state->mRNATranscrTimeEnd != NULL) {
+  }
+  
+  if (daughter_state->mRNATranscrTimeEnd != NULL) {
     printf("before split_mRNA daughter mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
- }
-
+  }
+  
   
   /* split up the volume of the cell */
   for (i=0; i < NGENES; i++) {
@@ -3120,6 +3121,8 @@ void initialize_daughter_cell(int motherID,
     //daughter_state->mRNATranscrCount[i] = rint(fraction * mother_state->mRNATranscrCount[i]);
     //mother_state->mRNATranscrCount[i] =  state_clone.mRNATranscrCount[i] - daughter_state->mRNATranscrCount[i];
 
+    // TODO: in case of transcription, move up to section that splits up the genetic material, as mRNA is actually 
+    // physically attached to the DNA during the replication and doesn't go randomly to one or other of the cells
     // split up mRNATranscrCount, along with FixedTime events
     split_mRNA(&(state_clone.mRNATranscrTimeEnd), &(state_clone.mRNATranscrTimeEndLast), state_clone.mRNATranscrCount,
                &(daughter_state->mRNATranscrTimeEnd), &(daughter_state->mRNATranscrTimeEndLast), daughter_state->mRNATranscrCount,
@@ -3144,10 +3147,6 @@ void initialize_daughter_cell(int motherID,
                    daughter_mRNAdecay,
                    daughter_transport,
                    dt);
-
-  /*for (i=0; i < daughter_state->tfBoundCount; i++) {
-    printf("daughter koffvalues[%d]=%g, rates->koff=%g\n", i, (*daughter_koffvalues)[i], daughter_rates->koff);
-    } */
 
   /* recompute rates in mother */
   recalibrate_cell(mother_rates,
@@ -3565,7 +3564,9 @@ void develop(Genotype genes[POP_SIZE],
              float initProteinConc[NGENES],
              float kdis[NUM_K_DISASSEMBLY],
              int hold_genotype_constant,
-             int output_binding_sites) 
+             int output_binding_sites,
+             int no_fixed_dev_time,
+             int max_divisions)
 {
   /* local variables that don't require per-cell tracking */
   int i, j;
@@ -3593,7 +3594,6 @@ void develop(Genotype genes[POP_SIZE],
                            development time) */
   int divisions = 0;
   //long int timesteps = 0; 
-  int no_fixed_dev_time = 0;  /* switch on/off fixed development time  */
 
   maxbound2 = maxbound;
   maxbound3 = 10*maxbound;
@@ -3682,8 +3682,9 @@ void develop(Genotype genes[POP_SIZE],
     LOG_NOCELLID("[cell=%03d] inserted at time=%g\n", j, t[j]); 
   }
 
-  //while (divisions < 4) {
-  while (t_next < tdevelopment && t_next < state[cell].division_time) {  /* run until development stops */
+  while ((no_fixed_dev_time && divisions < max_divisions) ||    /* no fixed dev time, run until # divisions reached */
+         (!no_fixed_dev_time && t_next < tdevelopment)) {       /* or, if fixed dev time, run until tdevelopment reached */
+  //while (t_next < tdevelopment && t_next < state[cell].division_time) { 
 
     /* get the next cell with the smallest t to advance next */
     //t_next = get_next(&time_queue, &time_queue_end, &cell);
@@ -3725,7 +3726,7 @@ void develop(Genotype genes[POP_SIZE],
 
       // removing pending event in daughter cells from queue
       delete_element_heap(queue, daughterID);
-      printf("removing pending event from queue from cell that will be replaced by daughter cell=%d\n", daughterID);
+      LOG("removing pending event from queue from cell that will be replaced by daughter cell=%d\n", daughterID);
 
       initialize_daughter_cell(motherID,
                                daughterID,

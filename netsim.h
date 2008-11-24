@@ -656,6 +656,8 @@ extern void develop(Genotype [POP_SIZE],
                     float [NGENES],
                     float [NUM_K_DISASSEMBLY],
                     int,
+                    int,
+                    int,
                     int); 
 
 extern void print_time_course(TimeCourse *,

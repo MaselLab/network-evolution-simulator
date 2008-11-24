@@ -38,12 +38,15 @@ int main(int argc, char *argv[])
   int directory_success;
   int hold_genotype_constant = 0;
   int output_binding_sites = 0;
+  int no_fixed_dev_time = 0; /* switch on/off fixed development time  */
+  int max_divisions = 0;
   int curr_seed;
 
   int c;  /* for getopt_long() */
 
   burn_in = 0;  /* don't do burn-in of kon by default */
-  verbose = 0;
+  verbose = 0;  /* no verbose out by default */
+
   initialize_growth_rate_parameters();
 
   /* parse command-line options */
@@ -58,9 +61,14 @@ int main(int argc, char *argv[])
         {"ploidy",  required_argument, 0, 'p'},
         {"timedev",  required_argument, 0, 't'},
         {"criticalsize",  required_argument, 0, 'c'},
+        {"divisions",  required_argument, 0, 's'},
         {"genotypeconst",  no_argument, 0, 'g'},
+        {"nofixedtime",  no_argument, 0, 'n'},
+        {"burnin",  no_argument, 0, 'b'},
         {"kon",  required_argument, 0, 0},
         {"konafter",  required_argument, 0, 0},
+        {"timesphase",  required_argument, 0, 0},
+        {"timeg2phase",  required_argument, 0, 0},
         {"verbose", no_argument,  0, 'v'},
         {"help",  no_argument, 0, 'h'},
         {"outputbindingsites",  no_argument, 0, 'o'},
@@ -69,8 +77,9 @@ int main(int argc, char *argv[])
     
     /* `getopt_long' stores the option index here. */
     int option_index = 0;
+    char *endptr;
     
-    c = getopt_long (argc, argv, "d:r:p:t:c:gvho",
+    c = getopt_long (argc, argv, "d:r:p:t:c:s:gvhonb",
                      long_options, &option_index);
     
     /* Detect the end of the options. */
@@ -83,20 +92,28 @@ int main(int argc, char *argv[])
       if (long_options[option_index].flag != 0)
         break;
       if (strcmp("kon", long_options[option_index].name) == 0) {
-        char *endptr;
         kon  = strtof(optarg, &endptr);
         printf("setting kon=%g\n", kon);
       } else {
         if (strcmp("konafter", long_options[option_index].name) == 0) {
-          char *endptr;
           kon_after_burnin  = strtof(optarg, &endptr);
           printf("setting konafter=%g\n", kon_after_burnin);
           burn_in = 1;
         } else {
-          printf ("option %s", long_options[option_index].name);
-          if (optarg)
-            printf (" with arg %s", optarg);
-          printf ("\n");
+          if (strcmp("timesphase", long_options[option_index].name) == 0) {
+            time_s_phase  = strtof(optarg, &endptr);
+            printf("setting time_s_phase=%g\n", time_s_phase);
+          } else {
+            if (strcmp("timeg2phase", long_options[option_index].name) == 0) {
+              time_g2_phase  = strtof(optarg, &endptr);
+              printf("setting time_g2_phase=%g\n", time_g2_phase);
+            } else {
+              printf ("option %s", long_options[option_index].name);
+              if (optarg)
+                printf (" with arg %s", optarg);
+              printf ("\n");
+            }
+          }
         }
       }
       break;
@@ -109,8 +126,14 @@ int main(int argc, char *argv[])
     case 'p':
       current_ploidy = atoi(optarg);
       break;
+    case 's':
+      max_divisions = atoi(optarg);
+      break;
     case 't':
       tdevelopment = atof(optarg);
+      break;
+    case 'n':
+      no_fixed_dev_time = 1;
       break;
     case 'c':
       critical_size = atof(optarg);
@@ -133,9 +156,14 @@ int main(int argc, char *argv[])
  -r,  --randomseed=SEED     random seed\n\
  -p,  --ploidy=PLOIDY       ploidy (1=haploid, 2=diploid)\n\
  -t,  --timedev=TIME        length of time to run development\n\
+ -n,  --nofixedtime         no fixed development time\n\
+ -s,  --divisions=DIVISONS  maximum number of divisions\n\
  -c,  --criticalsize=SIZE   critical size for cell division\n\
+ -b,  --burnin              whether to do burn-in (off by default)\n\
       --kon=KON             initial kon value\n\
       --konafter=KON        kon value post-burnin\n\
+      --timesphase=TIME     length of S-phase (30 mins by default)\n\
+      --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);
@@ -210,7 +238,8 @@ int main(int argc, char *argv[])
   fclose(fpkdis);
 
   /* now create and run the population of cells */
-  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, initmRNA, initProteinConc, kdis, hold_genotype_constant, output_binding_sites);
+  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, initmRNA, initProteinConc, 
+          kdis, hold_genotype_constant, output_binding_sites, no_fixed_dev_time, max_divisions);
 
   for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"indiv %d\n", j);
