@@ -458,9 +458,21 @@ int main(int argc, char *argv[])
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      int array = 0;
     
+    int fey;
+    for( fey=0; fey<10; fey++){
+         printf("binding site %3d:  ", fey);
+         printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
+         }
+         
     
     qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
            sizeof(struct AllTFBindingSites),(compfn)compare );
+    printf("\n");
+  
+    for( fey=0; fey<10; fey++){
+         printf("binding site %3d:  ", fey);
+         printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
+         }
    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
    system("PAUSE");
      leftEdgePositions = fopen("leftEdgePositions.txt", "w");
