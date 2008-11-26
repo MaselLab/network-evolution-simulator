@@ -2712,8 +2712,10 @@ void clone_cell(Genotype *genes_orig,
               &(state_clone->mRNATranslTimeEnd), &(state_clone->mRNATranslTimeEndLast));
 }
 
-void initialize_new_cell_state(CellState *state, CellState state_clone, double scale)
+void initialize_new_cell_state(CellState *state, CellState state_clone, 
+                               GillespieRates *rates, double scale)
 {
+  int i, j;
   // reset pointers
   state->mRNATranscrTimeEnd = NULL;
   state->mRNATranscrTimeEndLast = NULL;
@@ -2742,11 +2744,56 @@ void initialize_new_cell_state(CellState *state, CellState state_clone, double s
   /* TODO: check! growth rate, take instantaneous growth rate just before
      division, this will be updated after first new time step */
   state->growthRate = state_clone.growthRate;
+
+  /* initialize the rate counts */
+  for (i=0; i < MAX_COPIES; i++) {
+
+    for (j=0; j < NGENES; j++)
+      state->statechangeIDs[ACETYLATION][i][j] = -1;
+
+    rates->acetylationCount[i]=0;
+    rates->deacetylationCount[i]=0;
+    rates->picAssemblyCount[i]=0;
+    rates->transcriptInitCount[i]=0;
+    rates->picDisassemblyCount[i]=0;
+  }
+}
+
+void initialize_new_cell_statechangeIDs(CellState *state,
+                                        CellState state_clone,
+                                        int type,
+                                        int count[MAX_COPIES],
+                                        int clone_count[MAX_COPIES],
+                                        int copy1,
+                                        int copy2,
+                                        int geneID) 
+{
+  int j;
+
+  for (j=0; j < (clone_count[copy1]); j++) {
+    int gene = state_clone.statechangeIDs[type][copy1][j];
+    if (gene == geneID) {
+      state->statechangeIDs[type][0][count[0]] = gene;
+      printf(" schange[type][0][%2d]=%2d (copy %2d)", j, state->statechangeIDs[type][0][count[0]], copy1);
+      (count[0])++;
+    }
+  }
+
+  for (j=0; j < clone_count[copy2]; j++) {
+    if (state_clone.statechangeIDs[type][copy2][j] == geneID) {
+      state->statechangeIDs[type][1][count[1]] = state_clone.statechangeIDs[type][copy2][j];
+      printf(" schange[type][1][%2d]=%2d (copy %2d),", j, state->statechangeIDs[type][1][count[1]], copy2);
+      (count[1])++;
+    }
+  }
+
+  count[2] = 0;
+  count[3] = 0;
 }
 
 void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone, 
                               CellState *state, CellState state_clone,
-                              GillespieRates *rates, GillespieRates rates_clone,
+                              GillespieRates *rates, GillespieRates *rates_clone,
                               int geneID, int copy1, int copy2, int *lastpos)
 {
   int i, j, k;
@@ -2784,58 +2831,42 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
   state->active[geneID][2] = ON_WITH_NUCLEOSOME;
   state->active[geneID][3] = ON_WITH_NUCLEOSOME;
 
-  /* copy state change state */
-  state->statechangeIDs[ACETYLATION][0][geneID] = state_clone.statechangeIDs[ACETYLATION][copy1][geneID];
-  state->statechangeIDs[ACETYLATION][1][geneID] = state_clone.statechangeIDs[ACETYLATION][copy2][geneID];
+  /* copy statechangeID state */
 
-  state->statechangeIDs[DEACETYLATION][0][geneID] = state_clone.statechangeIDs[DEACETYLATION][copy1][geneID];
-  state->statechangeIDs[DEACETYLATION][1][geneID] = state_clone.statechangeIDs[DEACETYLATION][copy2][geneID];
+  /* ACETYLATION */
 
-  state->statechangeIDs[PICASSEMBLY][0][geneID] = state_clone.statechangeIDs[PICASSEMBLY][copy1][geneID];
-  state->statechangeIDs[PICASSEMBLY][1][geneID] = state_clone.statechangeIDs[PICASSEMBLY][copy2][geneID];
+  initialize_new_cell_statechangeIDs(state, state_clone, ACETYLATION,
+                                     rates->acetylationCount, rates_clone->acetylationCount,
+                                     copy1, copy2, geneID);
+  printf(" acetyCount[0]=%2d (clone=%2d)", rates->acetylationCount[0], rates_clone->acetylationCount[copy1]);
+  printf(" acetyCount[1]=%2d (clone=%2d)\n", rates->acetylationCount[1], rates_clone->acetylationCount[copy2]);
 
-  state->statechangeIDs[TRANSCRIPTINIT][0][geneID] = state_clone.statechangeIDs[TRANSCRIPTINIT][copy1][geneID];
-  state->statechangeIDs[TRANSCRIPTINIT][1][geneID] = state_clone.statechangeIDs[TRANSCRIPTINIT][copy2][geneID];
+  /* DEACETYLATION */
 
-  state->statechangeIDs[PICDISASSEMBLY][0][geneID] = state_clone.statechangeIDs[PICDISASSEMBLY][copy1][geneID];
-  state->statechangeIDs[PICDISASSEMBLY][1][geneID] = state_clone.statechangeIDs[PICDISASSEMBLY][copy2][geneID];
+  initialize_new_cell_statechangeIDs(state, state_clone, DEACETYLATION,
+                                     rates->deacetylationCount, rates_clone->deacetylationCount,
+                                     copy1, copy2, geneID);
+  /* PICASSEMBLY */
+
+  initialize_new_cell_statechangeIDs(state, state_clone, PICASSEMBLY,
+                                     rates->picAssemblyCount, rates_clone->picAssemblyCount,
+                                     copy1, copy2, geneID);
+  /* TRANSCRIPTINIT */
+
+  initialize_new_cell_statechangeIDs(state, state_clone, TRANSCRIPTINIT,
+                                     rates->transcriptInitCount, rates_clone->transcriptInitCount,
+                                     copy1, copy2, geneID);
+  /* PICDISASSEMBLY */
+
+  initialize_new_cell_statechangeIDs(state, state_clone, PICDISASSEMBLY,
+                                     rates->picDisassemblyCount, rates_clone->picDisassemblyCount,
+                                     copy1, copy2, geneID);
 
   state->RTlnKr = state_clone.RTlnKr;
   state->temperature = state_clone.temperature;
 
   /* do counts for GillespieRates */
   // TODO: ultimately maybe these should be moved to "CellState" since they are not cached values
-
-  // TODO: should these should be cumulative sums of the [de]acetylation etc. counts?
-  rates->acetylationCount[0] = rates_clone.acetylationCount[copy1];
-  rates->acetylationCount[1] = rates_clone.acetylationCount[copy2];
-
-  rates->acetylationCount[2] = 0;
-  rates->acetylationCount[3] = 0;
-
-  rates->deacetylationCount[0] = rates_clone.deacetylationCount[copy1];
-  rates->deacetylationCount[1] = rates_clone.deacetylationCount[copy2];
-
-  rates->deacetylationCount[2] = 0;
-  rates->deacetylationCount[3] = 0;
-
-  rates->picAssemblyCount[0] = rates_clone.picAssemblyCount[copy1];
-  rates->picAssemblyCount[1] = rates_clone.picAssemblyCount[copy2];
-  
-  rates->picAssemblyCount[2] = 0;
-  rates->picAssemblyCount[3] = 0;
-
-  rates->transcriptInitCount[0] = rates_clone.transcriptInitCount[copy1];
-  rates->transcriptInitCount[1] = rates_clone.transcriptInitCount[copy2];
-  
-  rates->transcriptInitCount[2] = 0;
-  rates->transcriptInitCount[3] = 0;
-
-  rates->picDisassemblyCount[0] = rates_clone.picDisassemblyCount[copy1];
-  rates->picDisassemblyCount[1] = rates_clone.picDisassemblyCount[copy2];
-
-  rates->picDisassemblyCount[2] = 0;
-  rates->picDisassemblyCount[3] = 0; 
 
   state->mRNATranscrCount[geneID] = 0;
   state->mRNACytoCount[geneID] = 0;
@@ -2884,7 +2915,7 @@ void initialize_daughter_cell(int motherID,
                               float dt)
 
 {
-  int i, k, p;
+  int i, j, k, p;
 
   /* clone of cell */
   Genotype genes_clone;
@@ -2923,15 +2954,23 @@ void initialize_daughter_cell(int motherID,
     delete_queues(mother_state);
 
   // initialize the state of the new cell
-  initialize_new_cell_state(daughter_state, state_clone, fraction);
+  initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
   if (no_replace_mother) 
-    initialize_new_cell_state(mother_state, state_clone, (1-fraction));
+    initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
 
   LOG_VERBOSE_NOCELLID("[cell %03d] (mother) total tfBoundCount=%d, tfHinderedCount=%d\n", motherID, 
                        state_clone.tfBoundCount, state_clone.tfHinderedCount);
 
   //print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
   //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
+
+  printf("[cell %03d]: acetylation counts:\n", motherID);
+  int total = 0;
+  for (j=0; j < MAX_COPIES; j++)  {
+    printf(" before mother acetylationCount[%2d]=%2d\n", j, rates_clone.acetylationCount[j]);
+    total += rates_clone.acetylationCount[j];
+  }
+  printf(" before mother total acetylation=%d\n", total);
 
   /* now split up the genes into one or other of the new cells */
   for (i=0; i < NGENES; i++) {
@@ -2959,18 +2998,46 @@ void initialize_daughter_cell(int motherID,
     // copy 2 -> copy 2
     // copy 3 -> copy 3
 
+    // TODO: change this from default for just one gene to test
+
+    /*if (i == 2 || i == 7) {
+    //if (0) {
+      daughter_copy1 = 0;
+      daughter_copy2 = 1;
+      mother_copy1 = 2;
+      mother_copy2 = 3;
+    } else {
+      daughter_copy1 = 1;
+      daughter_copy2 = 2;
+      mother_copy1 = 0;
+      mother_copy2 = 3;
+      }*/
+
+    printf("init daughter, geneID=%2d ", i);
     initialize_new_cell_gene(daughter, genes_clone, 
                              daughter_state, state_clone,
-                             daughter_rates, rates_clone,
+                             daughter_rates, &rates_clone,
                              i, daughter_copy1, daughter_copy2, &lastpos_daughter);
 
     if (no_replace_mother) {
+      printf("init mother  , geneID=%2d ", i);
       initialize_new_cell_gene(mother, genes_clone, 
                                mother_state, state_clone,
-                               mother_rates, rates_clone,
+                               mother_rates, &rates_clone,
                                i, mother_copy1, mother_copy2, &lastpos_mother);
     }
+    printf("\n");
   }
+
+  total = 0;
+  for (j=0; j < MAX_COPIES; j++)  {
+    printf(" after daughter acetylationCount[%2d]=%2d\n", j, daughter_rates->acetylationCount[j]);
+    printf(" after mother acetylationCount[%2d]=%2d\n", j, mother_rates->acetylationCount[j]);
+    total += daughter_rates->acetylationCount[j];
+    total += mother_rates->acetylationCount[j];
+  }
+  printf(" after total acetylation=%d\n", total);
+
 
   realloc_cell_memory(daughter_state, daughter_koffvalues);
   if (no_replace_mother) {
@@ -3029,24 +3096,24 @@ void initialize_daughter_cell(int motherID,
     daughter_state->proteinConc[i] = fraction * state_clone.proteinConc[i];
     if (no_replace_mother) {
       mother_state->proteinConc[i] = (1-fraction) * state_clone.proteinConc[i];
-      printf("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
-             daughter_state->proteinConc[i], fraction, mother_state->proteinConc[i], (1-fraction), state_clone.proteinConc[i]);
+      LOG_NOCELLID("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
+                   daughter_state->proteinConc[i], fraction, mother_state->proteinConc[i], (1-fraction), state_clone.proteinConc[i]);
     }
 
     // mRNAs in cytoplasm (not translating)
     daughter_state->mRNACytoCount[i] = rint(fraction * state_clone.mRNACytoCount[i]);
     if (no_replace_mother) {
       mother_state->mRNACytoCount[i] =  state_clone.mRNACytoCount[i] - daughter_state->mRNACytoCount[i];
-      printf("daughter=%d, mother=%d of total mRNACytoCount=%d\n", 
-             daughter_state->mRNACytoCount[i], mother_state->mRNACytoCount[i], state_clone.mRNACytoCount[i]);
+      LOG_NOCELLID("daughter=%d, mother=%d of total mRNACytoCount=%d\n", 
+                   daughter_state->mRNACytoCount[i], mother_state->mRNACytoCount[i], state_clone.mRNACytoCount[i]);
     }
 
     // mRNAs in nucleus
     daughter_state->mRNANuclearCount[i] = rint(fraction * mother_state->mRNANuclearCount[i]);
     if (no_replace_mother) {
       mother_state->mRNANuclearCount[i] =  state_clone.mRNANuclearCount[i] - daughter_state->mRNANuclearCount[i];
-      printf("daughter=%d, mother=%d of total mRNANuclearCount=%d\n", 
-             daughter_state->mRNANuclearCount[i], mother_state->mRNANuclearCount[i], state_clone.mRNANuclearCount[i]);
+      LOG_NOCELLID("daughter=%d, mother=%d of total mRNANuclearCount=%d\n", 
+                   daughter_state->mRNANuclearCount[i], mother_state->mRNANuclearCount[i], state_clone.mRNANuclearCount[i]);
     }
 
     // mRNAs in cytoplasm only recently
