@@ -222,6 +222,7 @@ struct Genotype {
 typedef struct FixedEvent FixedEvent;
 struct FixedEvent {
   int geneID;
+  int copy;
   float time;
   FixedEvent *next;
 };
@@ -238,6 +239,7 @@ struct CellState {
   int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
   FixedEvent *mRNATranslTimeEnd;      /* times when mRNAs become fully loaded with ribosomes and start producing protein */
   FixedEvent *mRNATranslTimeEndLast; 
+  //int mRNATranscrCount[NGENES][MAX_COPIES];       /* mRNAs which haven't finished transcription yet */
   int mRNATranscrCount[NGENES];       /* mRNAs which haven't finished transcription yet */
   FixedEvent *mRNATranscrTimeEnd;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
   FixedEvent *mRNATranscrTimeEndLast;
@@ -379,6 +381,7 @@ extern void calc_all_binding_sites(int [NGENES],
                                    int [NGENES][MAX_COPIES][2]);
 
 extern int add_fixed_event(int,
+                           int,
                            float,
                            FixedEvent **,
                            FixedEvent **);
@@ -389,11 +392,13 @@ extern void add_time_point(float,
                            TimeCourse **);
 
 extern void add_fixed_event_end(int,
+                                int,
                                 float,
                                 FixedEvent **,
                                 FixedEvent **);
 
 extern void delete_fixed_event(int,
+                               int,
                                int,
                                FixedEvent **,
                                FixedEvent **);
