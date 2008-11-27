@@ -239,8 +239,7 @@ struct CellState {
   int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
   FixedEvent *mRNATranslTimeEnd;      /* times when mRNAs become fully loaded with ribosomes and start producing protein */
   FixedEvent *mRNATranslTimeEndLast; 
-  //int mRNATranscrCount[NGENES][MAX_COPIES];       /* mRNAs which haven't finished transcription yet */
-  int mRNATranscrCount[NGENES];       /* mRNAs which haven't finished transcription yet */
+  int mRNATranscrCount[NGENES][MAX_COPIES];       /* mRNAs which haven't finished transcription yet */
   FixedEvent *mRNATranscrTimeEnd;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
   FixedEvent *mRNATranscrTimeEndLast;
 

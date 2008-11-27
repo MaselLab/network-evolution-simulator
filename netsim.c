@@ -597,9 +597,23 @@ void initialize_cell(CellState *state,
         add_fixed_event(i, -1, ttranslation-t, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
       }
     } 
-    state->mRNATranscrCount[i] = (int) poidev(meanmRNA[i]*ttranscription*mRNAdecay[i],&seed);
-    for (k=0; k < state->mRNATranscrCount[i]; k++)
-      add_fixed_event(i, -1, ran1(&seed)*ttranscription, &(state->mRNATranscrTimeEnd), &(state->mRNATranscrTimeEndLast));
+
+    int total_mRNA_transcribing = (int) poidev(meanmRNA[i]*ttranscription*mRNAdecay[i], &seed);
+    
+    /* split it up evenly between the copies */
+    int mRNA_copy1 = trunc(total_mRNA_transcribing/current_ploidy);
+    int mRNA_copy2 = total_mRNA_transcribing - mRNA_copy1;
+
+    for (j=0; j < MAX_COPIES; j++) {
+      if (j < current_ploidy)  {
+        state->mRNATranscrCount[i][j] = (j==0) ? mRNA_copy1 : mRNA_copy2;
+        LOG_VERBOSE_NOCELLID("initializing state->mRNATranscrCount[%2d][%2d]=%d\n", i, j, state->mRNATranscrCount[i][j]);
+        for (k=0; k < state->mRNATranscrCount[i][j]; k++)
+          add_fixed_event(i, j, ran1(&seed)*ttranscription, &(state->mRNATranscrTimeEnd), &(state->mRNATranscrTimeEndLast));
+      } else {
+        state->mRNATranscrCount[i][j] = 0;
+      }
+    }
     state->proteinConc[i] = initProteinConc[i];
   }
 }
@@ -1095,7 +1109,8 @@ void end_transcription(float *dt,
   *dt = state->mRNATranscrTimeEnd->time - t;
   total = 0;
   for (i=0; i < NGENES; i++) 
-    total += state->mRNATranscrCount[i];
+    for (j=0; j < MAX_COPIES; j++) 
+      total += state->mRNATranscrCount[i][j];
   
   LOG_VERBOSE("\ntranscription event finishes out of %d possible t=%g dt=%g\n", total, t, *dt);
 
@@ -1107,8 +1122,7 @@ void end_transcription(float *dt,
   (state->mRNANuclearCount[i])++;
 
   /* decrease the number of mRNAs undergoing transcription */
-  (state->mRNATranscrCount[i])--;
-  //TODO: implement (state->mRNATranscrCount[i][j])--;
+  (state->mRNATranscrCount[i][j])--;
 
   /* delete the fixed even which has just occurred */
   delete_fixed_event_start(&(state->mRNATranscrTimeEnd), &(state->mRNATranscrTimeEndLast));
@@ -2124,8 +2138,7 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
                       &(state->mRNATranscrTimeEnd), &(state->mRNATranscrTimeEndLast));
 
   /* increase the number mRNAs being transcribed */
-  (state->mRNATranscrCount[geneID])++;
-  // TODO: (state->mRNATranscrCount[geneID][geneCopy])++;                      
+  (state->mRNATranscrCount[geneID][geneCopy])++;                      
 }
 /* -----------------------------------------------------
  * END
@@ -2698,13 +2711,12 @@ void clone_cell(Genotype *genes_orig,
       rates_clone->picAssemblyCount[p] = rates_orig->picAssemblyCount[p];
       rates_clone->transcriptInitCount[p] = rates_orig->transcriptInitCount[p];
       rates_clone->picDisassemblyCount[p] = rates_orig->picDisassemblyCount[p];
-      // TODO:   state_clone->mRNATranscrCount[i][p] = state_orig->mRNATranscrCount[i][p];
+      state_clone->mRNATranscrCount[i][p] = state_orig->mRNATranscrCount[i][p];
     }
     state_clone->proteinConc[i] = state_orig->proteinConc[i];;
     state_clone->mRNACytoCount[i] = state_orig->mRNACytoCount[i];
     state_clone->mRNANuclearCount[i] = state_orig->mRNANuclearCount[i];
     state_clone->mRNATranslCytoCount[i] = state_orig->mRNATranslCytoCount[i];
-    state_clone->mRNATranscrCount[i] = state_orig->mRNATranscrCount[i];
   }
 
   // clone queue and empty original
@@ -2871,7 +2883,8 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
   /* do counts for GillespieRates */
   // TODO: ultimately maybe these should be moved to "CellState" since they are not cached values
 
-  state->mRNATranscrCount[geneID] = 0;
+  for (j=0; j < MAX_COPIES; j++)
+    state->mRNATranscrCount[geneID][j] = 0;
   state->mRNACytoCount[geneID] = 0;
   state->mRNANuclearCount[geneID] = 0;
   state->mRNATranslCytoCount[geneID] = 0;
@@ -3312,8 +3325,10 @@ float do_single_timestep(Genotype *genes,
   LOG_VERBOSE("next stochastic event due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
   
   if (!(state->mRNATranscrTimeEndLast)) {
-    for (i=0;i<NGENES;i++)
-      LOG_VERBOSE("%d transcription events\n", state->mRNATranscrCount[i]);
+    for (i=0; i < NGENES; i++)
+      for (j=0; j < MAX_COPIES; j++) {
+        LOG_VERBOSE("%d transcription events on gene %2d (copy %2d)\n", state->mRNATranscrCount[i][j], i, j);
+      }
   }
   
 
