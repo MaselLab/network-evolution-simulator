@@ -71,7 +71,7 @@ check-multiple-pops:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4" netsim
 # run for 4 divisions with reduced S and G2 phases
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
-	$(subst RUN,multiple-pops,$(subst ORIG,2008-11-26-multiple-pops-r-4-statechange-fix,$(DIFF_CMD)))
+	$(subst RUN,multiple-pops,$(subst ORIG,2008-11-27-multiple-pops-r-4-splitmRNA,$(DIFF_CMD)))
 
 profiling:	netsim-gprof
 
