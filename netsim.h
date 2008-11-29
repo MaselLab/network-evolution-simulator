@@ -315,9 +315,11 @@ long seed ;         /* something is wrong here: changing seed changes nothing */
 int dummyrun;            /* used to change seed */
 float critical_size ; /* critical size at which cell divides, 
                          set to negative to prevent division  */
+float growth_rate_scaling; /* set growth rate scaling factor */
 
 float time_s_phase;  /* length of S phase (default: 30 mins) */
 float time_g2_phase; /* length of G2/mitosis phase (default: 30 mins) */
+int random_replication_time; /* toggle replication times in S phase being random */
 
 /* file output parameters */
 char *output_directory ;

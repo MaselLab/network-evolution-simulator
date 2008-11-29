@@ -63,12 +63,14 @@ int main(int argc, char *argv[])
         {"criticalsize",  required_argument, 0, 'c'},
         {"divisions",  required_argument, 0, 's'},
         {"genotypeconst",  no_argument, 0, 'g'},
+        {"random-replication",  no_argument, 0, 0},
         {"nofixedtime",  no_argument, 0, 'n'},
         {"burnin",  no_argument, 0, 'b'},
         {"kon",  required_argument, 0, 0},
         {"konafter",  required_argument, 0, 0},
         {"timesphase",  required_argument, 0, 0},
         {"timeg2phase",  required_argument, 0, 0},
+        {"growthscaling",  required_argument, 0, 0},
         {"verbose", no_argument,  0, 'v'},
         {"help",  no_argument, 0, 'h'},
         {"outputbindingsites",  no_argument, 0, 'o'},
@@ -94,27 +96,27 @@ int main(int argc, char *argv[])
       if (strcmp("kon", long_options[option_index].name) == 0) {
         kon  = strtof(optarg, &endptr);
         printf("setting kon=%g\n", kon);
-      } else {
-        if (strcmp("konafter", long_options[option_index].name) == 0) {
-          kon_after_burnin  = strtof(optarg, &endptr);
-          printf("setting konafter=%g\n", kon_after_burnin);
-          burn_in = 1;
-        } else {
-          if (strcmp("timesphase", long_options[option_index].name) == 0) {
-            time_s_phase  = strtof(optarg, &endptr);
-            printf("setting time_s_phase=%g\n", time_s_phase);
-          } else {
-            if (strcmp("timeg2phase", long_options[option_index].name) == 0) {
-              time_g2_phase  = strtof(optarg, &endptr);
-              printf("setting time_g2_phase=%g\n", time_g2_phase);
-            } else {
-              printf ("option %s", long_options[option_index].name);
-              if (optarg)
-                printf (" with arg %s", optarg);
-              printf ("\n");
-            }
-          }
-        }
+      } else if (strcmp("konafter", long_options[option_index].name) == 0) {
+        kon_after_burnin  = strtof(optarg, &endptr);
+        printf("setting konafter=%g\n", kon_after_burnin);
+        burn_in = 1;
+      } else if (strcmp("timesphase", long_options[option_index].name) == 0) {
+        time_s_phase  = strtof(optarg, &endptr);
+        printf("setting time_s_phase=%g\n", time_s_phase);
+      } else if (strcmp("timeg2phase", long_options[option_index].name) == 0) {
+        time_g2_phase  = strtof(optarg, &endptr);
+        printf("setting time_g2_phase=%g\n", time_g2_phase);
+      } else if (strcmp("growthscaling", long_options[option_index].name) == 0) {
+        growth_rate_scaling  = strtof(optarg, &endptr);
+        printf("setting growthscaling=%g\n", growth_rate_scaling);
+      } else if (strcmp("random-replication", long_options[option_index].name) == 0) {
+        printf("making replication times random in S phase\n");
+        random_replication_time = 1;
+      } else { 
+        printf ("option %s", long_options[option_index].name);
+        if (optarg)
+          printf (" with arg %s", optarg);
+        printf ("\n");
       }
       break;
     case 'd':
@@ -162,8 +164,11 @@ int main(int argc, char *argv[])
  -b,  --burnin              whether to do burn-in (off by default)\n\
       --kon=KON             initial kon value\n\
       --konafter=KON        kon value post-burnin\n\
+      --random-replication  make replication times in S phase random\n\
       --timesphase=TIME     length of S-phase (30 mins by default)\n\
       --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
+      --growthscaling=GS    amount to accelerate the growth rate\n\
+                              (2.0 by default)\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);

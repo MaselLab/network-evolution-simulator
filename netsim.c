@@ -59,10 +59,10 @@ long seed = 28121;         /* something is wrong here: changing seed changes not
 int dummyrun=4;            /* used to change seed */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
-
+float growth_rate_scaling = 2.0; /* set growth rate scaling factor */
 float time_s_phase = 30.0;  /* length of S phase (default: 30 mins) */
 float time_g2_phase = 30.0; /* length of G2/mitosis phase (default: 30 mins) */
-
+int random_replication_time = 0; /* toggle replication times in S phase being random */
 
 /* file output parameters */
 char *output_directory = "output";
@@ -75,8 +75,7 @@ float protein_aging = 1e-4;
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
 void initialize_growth_rate_parameters() {
-  float hc, gpeak, growth_rate_scaling, Ltf;
-  growth_rate_scaling = 2.0; /* set scaling factor */
+  float hc, gpeak, Ltf;
   gpeak = 0.005776*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min)=0.005776 */
   Pp = 12000;              /* mean gene expression of all proteins is 12064.28 */
   Ltf= 1418;               /* mean gene expression of only TFs is 1418 */
@@ -249,10 +248,10 @@ void initialize_genotype(Genotype *indiv,
 
   /* for each gene determine a time point during the [0, time_s_phase min] S-phase interval */
   for (i=0; i<NGENES; i++) {
-    // TODO: use fixed times while testing, later will switch to random times
-    /* indiv->replication_time[i] = time_s_phase*ran1(&seed); */
-    indiv->replication_time[i] = time_s_phase*(i/(float)NGENES);
-    //indiv->replication_time[i] = 0.0;
+    if (random_replication_time) 
+      indiv->replication_time[i] = time_s_phase*ran1(&seed); 
+    else
+      indiv->replication_time[i] = time_s_phase*(i/(float)NGENES);
     LOG_VERBOSE_NOCELLID("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
   }
 }
