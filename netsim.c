@@ -550,7 +550,11 @@ void initialize_cell(CellState *state,
   int i, j, k, totalmRNA;
   float t;
 
+  /* initialize the ID of the cell */
   state->cellID = cellID;
+
+  /* initialize the founder cell using the current ID */
+  state->founderID = cellID;
 
   /* don't start in S phase */
   state->in_s_phase = 0;
@@ -1440,7 +1444,7 @@ void attempt_tf_binding(Genotype *genes,
         !(k==site)) {
 
       /* check distance from current binding site (k) to the original (site) */
-                      //fprintf(fperrors, "site=%d k=%d\n", genes->allBindingSites[site].leftEdgePos, genes->allBindingSites[k].leftEdgePos);
+      //fprintf(fperrors, "site=%d k=%d\n", genes->allBindingSites[site].leftEdgePos, genes->allBindingSites[k].leftEdgePos);
       posdiff = genes->allBindingSites[site].leftEdgePos - genes->allBindingSites[k].leftEdgePos;
 
       /* if within HIND_LENGTH, we prevent binding by adding to steric hindrance */
@@ -2572,14 +2576,14 @@ void clone_queue(FixedEvent **start_orig,
                  FixedEvent **last_clone) 
 {
   while (*start_orig != NULL) {
-    printf("adding geneID=%d time=%g to new clone, removing from orig\n", (*start_orig)->geneID, (*start_orig)->time);
+    LOG_NOCELLID("adding geneID=%d time=%g to new clone, removing from orig\n", (*start_orig)->geneID, (*start_orig)->time);
     //add_fixed_event((*start_orig)->geneID, (*start_orig)->time, start_clone, last_clone);
     add_fixed_event((*start_orig)->geneID, (*start_orig)->copy, (*start_orig)->time, start_clone, last_clone);
     delete_fixed_event_start(start_orig, last_orig);
   }
 
   if (*start_clone != NULL) {
-    printf("clone queue is not empty: head is: geneID=%d time=%g\n", (*start_clone)->geneID, (*start_clone)->time);
+    LOG_NOCELLID("clone queue is not empty: head is: geneID=%d time=%g\n", (*start_clone)->geneID, (*start_clone)->time);
   }
 }
 
@@ -2605,20 +2609,17 @@ void split_mRNA(FixedEvent **start_clone,
       
       if (ran1(&seed) <= fraction) { /* fraction of time move to daughter */
         count_daughter[geneID]++;
-        //add_fixed_event(geneID, time, start_daughter, last_daughter);
         add_fixed_event(geneID, copy, time, start_daughter, last_daughter);
-        printf("move event at time=%g on gene %d to daughter=%d of total count=%d\n", 
-                 time, geneID, count_daughter[i], count_clone[i]);
+        LOG_NOCELLID("move event at time=%g on gene %d to daughter=%d of total count=%d\n", 
+                     time, geneID, count_daughter[i], count_clone[i]);
       } else {  /* (1-fraction of time move to mother */
         count_mother[geneID]++;
-        //add_fixed_event(geneID, time, start_mother, last_mother);
         add_fixed_event(geneID, copy, time, start_mother, last_mother);
-        printf("move event at time=%g on gene %d to mother=%d of total count=%d\n", 
-               time, geneID, count_daughter[i], count_clone[i]);
+        LOG_NOCELLID("move event at time=%g on gene %d to mother=%d of total count=%d\n", 
+                     time, geneID, count_daughter[i], count_clone[i]);
       }
       /* remove from original queue */
-
-      printf("removing event at time=%g on gene %d from clone of queue\n", time, geneID);
+      LOG_NOCELLID("removing event at time=%g on gene %d from clone of queue\n", time, geneID);
       delete_fixed_event_start(start_clone, last_clone);
     }
   }
@@ -2634,6 +2635,7 @@ void clone_cell(Genotype *genes_orig,
 {
   int i, k, p;
 
+  state_clone->founderID = state_orig->founderID;
   state_clone->in_s_phase = state_orig->in_s_phase;
 
   state_clone->cellSize = state_orig->cellSize;
@@ -2760,6 +2762,11 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
      division, this will be updated after first new time step */
   state->growthRate = state_clone.growthRate;
 
+  /* keep thermodynamic state the same */ 
+
+  state->RTlnKr = state_clone.RTlnKr;
+  state->temperature = state_clone.temperature;
+
   /* initialize the rate counts */
   for (i=0; i < MAX_COPIES; i++) {
 
@@ -2784,12 +2791,11 @@ void initialize_new_cell_statechangeIDs(CellState *state,
                                         int geneID) 
 {
   int j;
-
   for (j=0; j < (clone_count[copy1]); j++) {
     int gene = state_clone.statechangeIDs[type][copy1][j];
     if (gene == geneID) {
       state->statechangeIDs[type][0][count[0]] = gene;
-      printf(" schange[type][0][%2d]=%2d (copy %2d)", j, state->statechangeIDs[type][0][count[0]], copy1);
+      LOG_VERBOSE(" statechangeIDs[%d][0][%2d]=%2d (copy %2d)\n", type, j, state->statechangeIDs[type][0][count[0]], copy1);
       (count[0])++;
     }
   }
@@ -2797,11 +2803,10 @@ void initialize_new_cell_statechangeIDs(CellState *state,
   for (j=0; j < clone_count[copy2]; j++) {
     if (state_clone.statechangeIDs[type][copy2][j] == geneID) {
       state->statechangeIDs[type][1][count[1]] = state_clone.statechangeIDs[type][copy2][j];
-      printf(" schange[type][1][%2d]=%2d (copy %2d),", j, state->statechangeIDs[type][1][count[1]], copy2);
+      LOG_VERBOSE(" statechangeIDs[type][1][%2d]=%2d (copy %2d)\n", type, j, state->statechangeIDs[type][1][count[1]], copy2);
       (count[1])++;
     }
   }
-
   count[2] = 0;
   count[3] = 0;
 }
@@ -2827,12 +2832,10 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
     genes->transcriptionFactorSeq[geneID][3][k] = genes_clone.transcriptionFactorSeq[geneID][copy2][k];
   }
 
-  //printf("gene=%d, copies=%d, copy1=%d\n", i, genes_clone.copies[geneID], copy1); 
   if (genes_clone.copies[geneID] - 1 >= copy1) {
     *lastpos = move_gene_copy(copy1, 0, geneID, &genes_clone, genes, state_clone, state, *lastpos);
   }
 
-  //printf("gene=%d, copies=%d, copy2=%d\n", i, genes_clone.copies[geneID], copy2);
   if (genes_clone.copies[geneID] - 1 >= copy2) {
     *lastpos = move_gene_copy(copy2, 1, geneID, &genes_clone, genes, state_clone, state, *lastpos);
   }
@@ -2847,42 +2850,33 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
   state->active[geneID][3] = ON_WITH_NUCLEOSOME;
 
   /* copy statechangeID state */
+  // TODO: ultimately maybe acteylationCounts etc. should be moved to "CellState"
+  // since they are not cached values
 
   /* ACETYLATION */
-
   initialize_new_cell_statechangeIDs(state, *state_clone, ACETYLATION,
                                      rates->acetylationCount, rates_clone->acetylationCount,
                                      copy1, copy2, geneID);
-  printf(" acetyCount[0]=%2d (clone=%2d)", rates->acetylationCount[0], rates_clone->acetylationCount[copy1]);
-  printf(" acetyCount[1]=%2d (clone=%2d)\n", rates->acetylationCount[1], rates_clone->acetylationCount[copy2]);
 
   /* DEACETYLATION */
-
   initialize_new_cell_statechangeIDs(state, *state_clone, DEACETYLATION,
                                      rates->deacetylationCount, rates_clone->deacetylationCount,
                                      copy1, copy2, geneID);
   /* PICASSEMBLY */
-
   initialize_new_cell_statechangeIDs(state, *state_clone, PICASSEMBLY,
                                      rates->picAssemblyCount, rates_clone->picAssemblyCount,
                                      copy1, copy2, geneID);
   /* TRANSCRIPTINIT */
-
   initialize_new_cell_statechangeIDs(state, *state_clone, TRANSCRIPTINIT,
                                      rates->transcriptInitCount, rates_clone->transcriptInitCount,
                                      copy1, copy2, geneID);
   /* PICDISASSEMBLY */
-
   initialize_new_cell_statechangeIDs(state, *state_clone, PICDISASSEMBLY,
                                      rates->picDisassemblyCount, rates_clone->picDisassemblyCount,
                                      copy1, copy2, geneID);
 
-  state->RTlnKr = state_clone->RTlnKr;
-  state->temperature = state_clone->temperature;
-
-  /* do counts for GillespieRates */
-  // TODO: ultimately maybe these should be moved to "CellState" since they are not cached values
-
+  /* initialize the per-gene (and/or copy) values of the mRNA counts
+     these will be updated later */
   for (j=0; j < MAX_COPIES; j++)
     state->mRNATranscrCount[geneID][j] = 0;
   state->mRNACytoCount[geneID] = 0;
@@ -2890,19 +2884,15 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
   state->mRNATranslCytoCount[geneID] = 0;
 
   /* for transcriping mRNAs: split up the genetic material, as mRNA is
-   actually physically attached to the DNA during the replication and
-   doesn't go randomly to one or other of the cells split up
-   mRNATranscrCount, along with FixedTime events */
-
+     actually physically attached to the DNA during the replication and
+     doesn't go randomly to one or other of the cells split up
+     mRNATranscrCount, along with FixedTime events */
   while ((state_clone->mRNATranscrCount[geneID][copy1] + 
           state_clone->mRNATranscrCount[geneID][copy2]) > 0) {
     for (j=0; j < MAX_COPIES; j++)
-      printf("mRNATranscrCount[%2d][%d]=%d\n", 
-             geneID, j, state_clone->mRNATranscrCount[geneID][j]);
+      LOG_VERBOSE("mRNATranscrCount[%2d][%d]=%d\n", 
+                  geneID, j, state_clone->mRNATranscrCount[geneID][j]);
     
-    if (state_clone->mRNATranscrTimeEnd) 
-      printf("mRNATranscrTimeEnd not NULL copy1=%d, copy2=%d!\n", copy1, copy2);
-
     int geneIDQueue = state_clone->mRNATranscrTimeEnd->geneID;
     int copy = state_clone->mRNATranscrTimeEnd->copy;
     float time = state_clone->mRNATranscrTimeEnd->time;
@@ -2930,8 +2920,8 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
   }
 }
 
-void realloc_cell_memory(CellState *state, float **koffvalues) {
-
+void realloc_cell_memory(CellState *state, float **koffvalues) 
+{
   //state->tfBoundIndexes = realloc(state->tfBoundIndexes, 2*(state->tfBoundCount+1)*sizeof(int));
   state->tfBoundIndexes = realloc(state->tfBoundIndexes, 10*maxbound*sizeof(int));
 
@@ -2946,7 +2936,6 @@ void realloc_cell_memory(CellState *state, float **koffvalues) {
     LOG_ERROR_NOCELLID("memory allocation error cell\n");
     exit(1);
   }
-
 }
 
 void do_cell_division(int motherID,
@@ -2970,7 +2959,7 @@ void do_cell_division(int motherID,
                       float x,
                       float dt)
 {
-  int i, j, k, p;
+  int i, j, k, p, total;
 
   /* clone of cell */
   Genotype genes_clone;
@@ -2991,24 +2980,20 @@ void do_cell_division(int motherID,
   /* clone mother cell */
   clone_cell(mother, mother_state, mother_rates,
              &genes_clone, &state_clone, &rates_clone);
-
-  /*if (mother_state->mRNATranscrTimeEnd != NULL) {
-    printf("before delete_queues mother mRNATranscrTimeEnd is not NULL\n");
-    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
-  }
   
-  if (daughter_state->mRNATranscrTimeEnd != NULL) {
-    printf("before delete_queues daughter mRNATranscrTimeEnd is not NULL\n");
-    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
-    } */
-  
-  // free the existing memory for the time queue
+  /* free the existing memory for the time queue */
   delete_queues(daughter_state);
   if (no_replace_mother)
     delete_queues(mother_state);
 
-  // initialize the state of the new cell
+  /* initialize the state of the new cell */
   initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
+
+  /* set the founderID of the daughter cell from the mother cell */
+  daughter_state->founderID = state_clone.founderID;
+
+  printf("daughter cell %03d is founded by cell %03d\n", daughterID, daughter_state->founderID);
+
   if (no_replace_mother) 
     initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
 
@@ -3018,13 +3003,15 @@ void do_cell_division(int motherID,
   //print_all_binding_sites(mother->copies, mother->allBindingSites, mother->bindSiteCount, 
   //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
 
-  printf("[cell %03d]: acetylation counts:\n", motherID);
-  int total = 0;
-  for (j=0; j < MAX_COPIES; j++)  {
-    printf(" before mother acetylationCount[%2d]=%2d\n", j, rates_clone.acetylationCount[j]);
-    total += rates_clone.acetylationCount[j];
+  if (verbose) {
+    LOG_VERBOSE_NOCELLID("[cell %03d]: acetylation counts:\n", motherID);
+    total = 0;
+    for (j=0; j < MAX_COPIES; j++)  {
+      LOG_VERBOSE_NOCELLID(" before mother acetylationCount[%2d]=%2d\n", j, rates_clone.acetylationCount[j]);
+      total += rates_clone.acetylationCount[j];
+    }
+    LOG_VERBOSE_NOCELLID(" before mother total acetylation=%d\n", total);
   }
-  printf(" before mother total acetylation=%d\n", total);
 
   /* now split up the genes into one or other of the new cells */
   for (i=0; i < NGENES; i++) {
@@ -3069,32 +3056,31 @@ void do_cell_division(int motherID,
       mother_copy2 = 2;
     }
 
-    printf("r=%2g\n", r);
-    printf("init daughter=%2d, geneID=%2d ", daughterID, i);
+    LOG_NOCELLID("initialize daughter=%2d, geneID=%2d\n", daughterID, i);
     initialize_new_cell_gene(daughter, genes_clone, 
                              daughter_state, &state_clone,
                              daughter_rates, &rates_clone,
                              i, daughter_copy1, daughter_copy2, &lastpos_daughter);
 
     if (no_replace_mother) {
-      printf("init mother  , geneID=%2d ", i);
+      LOG_NOCELLID("initialize mother  =%2d, geneID=%2d\n", motherID, i);
       initialize_new_cell_gene(mother, genes_clone, 
                                mother_state, &state_clone,
                                mother_rates, &rates_clone,
                                i, mother_copy1, mother_copy2, &lastpos_mother);
     }
-    printf("\n");
   }
 
-  total = 0;
-  for (j=0; j < MAX_COPIES; j++)  {
-    printf(" after daughter acetylationCount[%2d]=%2d\n", j, daughter_rates->acetylationCount[j]);
-    printf(" after mother acetylationCount[%2d]=%2d\n", j, mother_rates->acetylationCount[j]);
-    total += daughter_rates->acetylationCount[j];
-    total += mother_rates->acetylationCount[j];
+  if (verbose) {
+    total = 0;
+    for (j=0; j < MAX_COPIES; j++)  {
+      LOG_VERBOSE_NOCELLID(" after daughter acetylationCount[%2d]=%2d\n", j, daughter_rates->acetylationCount[j]);
+      LOG_VERBOSE_NOCELLID(" after mother acetylationCount[%2d]=%2d\n", j, mother_rates->acetylationCount[j]);
+      total += daughter_rates->acetylationCount[j];
+      total += mother_rates->acetylationCount[j];
+    }
+    LOG_VERBOSE_NOCELLID(" after total acetylation=%d\n", total);
   }
-  printf(" after total acetylation=%d\n", total);
-
 
   realloc_cell_memory(daughter_state, daughter_koffvalues);
   if (no_replace_mother) {
@@ -3168,7 +3154,6 @@ void do_cell_division(int motherID,
                &(mother_state->mRNATranslTimeEnd), &(mother_state->mRNATranslTimeEndLast), mother_state->mRNATranslCytoCount,
                i, fraction);
   }  
-
   fflush(stdout);
 
   /* recompute rates in daughter */
@@ -3189,18 +3174,6 @@ void do_cell_division(int motherID,
                          mother_state->tfHinderedCount, motherID, daughter_state->tfHinderedCount, daughterID);
   }
 
-  /* free up memory created by temporary copy */
-
-  /*if (mother_state->mRNATranscrTimeEnd != NULL) {
-    printf("mother mRNATranscrTimeEnd is not NULL\n");
-    printf("time=%g, geneID=%d\n", mother_state->mRNATranscrTimeEnd->time, mother_state->mRNATranscrTimeEnd->geneID);
-  }
-  
-  if (daughter_state->mRNATranscrTimeEnd != NULL) {
-    printf("daughter mRNATranscrTimeEnd is not NULL\n");
-    printf("time=%g, geneID=%d\n", daughter_state->mRNATranscrTimeEnd->time, daughter_state->mRNATranscrTimeEnd->geneID);
-    } */
-  
   /* free the memory associated with temporary copy of mother */
   free_mem_CellState(&state_clone);
 }
@@ -3239,9 +3212,7 @@ void log_snapshot(GillespieRates *rates,
   }
   LOG_NOFUNC(" nkon recomputed=%d\n", nkon);
   LOG_NOFUNC("\n");
-
 }
-
 
 float do_single_timestep(Genotype *genes, 
                          CellState *state, 
@@ -3757,6 +3728,7 @@ void develop(Genotype genes[POP_SIZE],
       printf("            into mother=%03d and daughter=%03d\n", motherID, daughterID);
       LOG_NOCELLID("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", 
                    cell, t_next, state[cell].division_time, divisions);
+      LOG_NOCELLID("            into mother=%03d and daughter=%03d\n", motherID, daughterID);
 
       // removing pending event in daughter cells from queue
       delete_element_heap(queue, daughterID);
@@ -3782,15 +3754,7 @@ void develop(Genotype genes[POP_SIZE],
                        x[motherID],
                        dt[motherID]);
 
-      LOG_VERBOSE("AFTER DIVISION: take a new step for mother cell=%d\n", motherID);
-      /*printf("advance time for daughter\n");
-      printf("outside: tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
-             (state[motherID]).tfBoundCount, motherID, (state[daughterID]).tfBoundCount, daughterID);
-      printf("outside in_s_phase=%d\n", (state[motherID]).in_s_phase);
-
-      for (i=0; i < state[daughterID].tfBoundCount; i++) {
-        printf("outside daughter koffvalues[%d]=%g, rates->koff=%g\n", i, (koffvalues[daughterID])[i], (rates[daughterID]).koff);
-        } */
+      LOG("AFTER DIVISION: take a new step for mother cell=%d\n", motherID);
 
       /* advance time for mother */
       do_single_timestep(&(genes[motherID]), 
@@ -3812,7 +3776,7 @@ void develop(Genotype genes[POP_SIZE],
       
       insert_with_priority_heap(queue, motherID, t[motherID]); 
 
-      LOG_VERBOSE("AFTER DIVISION: take a new step for daughter cell=%d\n", daughterID);
+      LOG("AFTER DIVISION: take a new step for daughter cell=%d\n", daughterID);
 
       /* advance time for daughter */
       do_single_timestep(&(genes[daughterID]), 
@@ -3833,10 +3797,6 @@ void develop(Genotype genes[POP_SIZE],
                          no_fixed_dev_time);
 
       insert_with_priority_heap(queue, daughterID, t[daughterID]);
-      
-      // once this cell has divided, stop for debugging
-      //exit(0);
-      //continue;
     }
     else {
       /* put the updated timestep back into the queue  */
@@ -3845,8 +3805,12 @@ void develop(Genotype genes[POP_SIZE],
     }
   }
 
-  /* cleanup data structures */
+  /* output the founder information */
+  for (j = 0; j < POP_SIZE; j++) {
+    printf("cell %03d derived from founder %03d\n", j, state[j].founderID);
+  }
 
+  /* cleanup data structures */
   for (j = 0; j < POP_SIZE; j++) {
     free(koffvalues[j]);
     for (i=0; i<NGENES; i++) {

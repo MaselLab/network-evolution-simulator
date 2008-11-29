@@ -230,6 +230,7 @@ struct FixedEvent {
 typedef struct CellState CellState;
 struct CellState {
   int cellID;                         /* cell ID */
+  int founderID;                      /* keep track of the founder cell */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
   float division_time;                /* current division time */ 
   float cellSize;                     /* size of cell */
