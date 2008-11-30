@@ -200,12 +200,12 @@ void initialize_genotype(Genotype *indiv,
     indiv->copies[p] = current_ploidy;
 
     if (HIND_LENGTH == TF_ELEMENT_LEN) {
-        indiv->hindrancePositions[p]=0;
-      } else  {
+      indiv->hindrancePositions[p]=0;
+    } else  {
       indiv->hindrancePositions[p]=rand()%10;
     }
   } 
-
+  
   calc_all_binding_sites(indiv->copies, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
                          &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions,
                          indiv->tfsPerGene, indiv->tfsStart);
@@ -500,8 +500,7 @@ void delete_fixed_event(int geneID,
   done = 0;
   info = *start;
   while (info) {
-    //if ((info->geneID==geneID && info->copy==p)) {
-    if (info->geneID==geneID) {
+    if ((info->geneID==geneID && info->copy==p)) {
       j++;
       if (j == i) {
         if (info == *start) {
@@ -596,7 +595,6 @@ void initialize_cell(CellState *state,
         (state->mRNACytoCount[i])--;
         (state->mRNATranslCytoCount[i])++;
         LOG_VERBOSE("add translation event time=%g for gene=%d\n", (ttranslation-t), i);
-        //add_fixed_event(i, ttranslation-t, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
         add_fixed_event(i, -1, ttranslation-t, &(state->mRNATranslTimeEnd), &(state->mRNATranslTimeEndLast));
       }
     } 
@@ -1110,12 +1108,15 @@ void end_transcription(float *dt,
   /* recompute the delta-t based on difference between now and the
      time of transcription end */
   *dt = state->mRNATranscrTimeEnd->time - t;
-  total = 0;
-  for (i=0; i < NGENES; i++) 
-    for (j=0; j < MAX_COPIES; j++) 
-      total += state->mRNATranscrCount[i][j];
-  
-  LOG_VERBOSE("\ntranscription event finishes out of %d possible t=%g dt=%g\n", total, t, *dt);
+
+  if (verbose) {
+    total = 0;
+    for (i=0; i < NGENES; i++) 
+      for (j=0; j < MAX_COPIES; j++) 
+        total += state->mRNATranscrCount[i][j];
+    
+    LOG_VERBOSE("\ntranscription event finishes out of %d possible t=%g dt=%g\n", total, t, *dt);
+  }
 
   /* get the gene which is ending transcription */
   i = state->mRNATranscrTimeEnd->geneID;
@@ -1515,8 +1516,6 @@ void reach_s_phase(CellState *state, Genotype *genes, float t) {
     LOG("add replication for geneID=%d at t=%g\n", i, t + genes->replication_time[i]);
 
     /* add the replication event to the queue */
-    //add_fixed_event(i, t + genes->replication_time[i], 
-    //                &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
     add_fixed_event(i, -1, t + genes->replication_time[i], 
                     &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
   }
@@ -2200,15 +2199,15 @@ void replicate_gene(CellState *state,
   int i, j, k, l, p;
   int start_tfbs_pos, end_tfbs_pos, number_tfbs_pre_replication, offset;
   
-  LOG_VERBOSE("duplicating geneID=%d at t=%g\n", geneID, t);
+  LOG("[gene %2d] duplicating at t=%g\n", geneID, t);
   
   /* double the number of copies of gene being replicating */
   genes->copies[geneID] = 2*current_ploidy;
 
-  LOG("before removing all TFs from gene=%d, nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
+  LOG("[gene %2d] before removing all TFs: nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
       geneID, konStates->nkonsum[geneID], konStates->konList[geneID]->site_count, genes->tfsPerGene[geneID],
       konStates->nkon);
-  LOG("before removing all TFs from gene=%d, tfBoundCount=%d, tfHinderedCount=%d\n", geneID, state->tfBoundCount, state->tfHinderedCount);
+  LOG("[gene %2d] before removing all TFs: tfBoundCount=%d, tfHinderedCount=%d\n", geneID, state->tfBoundCount, state->tfHinderedCount);
   
   /* first eject all TFs from this particular gene */
   
@@ -2221,7 +2220,7 @@ void replicate_gene(CellState *state,
     // if we looking at the gene in question
     if (l == geneID) {
       /* remove TF binding and update rates */
-      LOG_VERBOSE("ejecting TF on binding siteID=%d on gene=%d on copy=%d\n", i, l, p);
+      LOG_VERBOSE("[gene %2d] ejecting TF on binding siteID=%d on copy=%d\n", i, l, p);
       remove_tf_binding(genes, state, rates, konStates, i, koffvalues);
     }
   }
@@ -2231,7 +2230,8 @@ void replicate_gene(CellState *state,
     if ((state->active[geneID][p]==OFF_PIC || state->active[geneID][p]==ON_FULL))
       disassemble_PIC(state, genes, geneID, p, rates);
   
-  LOG_VERBOSE("number of binding sites before adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
+  LOG_VERBOSE("[gene %2d] number of binding sites before adding new sites=%d at t=%g\n", 
+              geneID, genes->bindSiteCount, t);
   
   /* do mutation */
   // TODO: make mutation rate a parameter 
@@ -2251,14 +2251,14 @@ void replicate_gene(CellState *state,
   }
   end_tfbs_pos--;  /* always one less than the end point*/
 
-  LOG("geneID=%d has %d TFBS before replication [run from %d to %d]\n", 
+  LOG("[gene %2d] has %d TFBS before replication [run from %d to %d]\n", 
       geneID, number_tfbs_pre_replication, start_tfbs_pos, end_tfbs_pos);
 
-  LOG("after removing all TFs from gene=%d, nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
+  LOG("[gene %2d] after removing all TFs: nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
       geneID, konStates->nkonsum[geneID], konStates->konList[geneID]->site_count, genes->tfsPerGene[geneID],
       konStates->nkon);
 
-  LOG("after removing all TFs from gene=%d, tfBoundCount=%d, tfHinderedCount=%d\n", geneID, state->tfBoundCount, state->tfHinderedCount);  
+  LOG("[gene %2d] after removing all TFs: tfBoundCount=%d, tfHinderedCount=%d\n", geneID, state->tfBoundCount, state->tfHinderedCount);  
 
 
   /* remove all of these old TFBS from konStates, some of them may no
@@ -2291,10 +2291,10 @@ void replicate_gene(CellState *state,
      offset to shift the siteIDs */
   offset = genes->tfsPerGene[geneID] - number_tfbs_pre_replication;
 
-  LOG_VERBOSE("geneID=%d has %d TFBS after replication [run from %d to %d]\n", 
+  LOG_VERBOSE("[gene %2d] has %d TFBS after replication [run from %d to %d]\n", 
               geneID, genes->tfsPerGene[geneID], start_tfbs_pos, end_tfbs_pos + offset);
-  LOG_VERBOSE("shift all TFBS starting at %d by %d\n", end_tfbs_pos + 1, offset);
-  LOG_VERBOSE("number of binding sites after adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
+  LOG_VERBOSE(" shift all TFBS starting at %d by %d\n", end_tfbs_pos + 1, offset);
+  LOG_VERBOSE(" number of binding sites after adding new sites=%d at t=%g\n", genes->bindSiteCount, t);
 
   /* starting at the original ending point, move all sites along by
      'offset'.  Note this assumes that TFBS for a particular gene are
@@ -2304,7 +2304,7 @@ void replicate_gene(CellState *state,
   /* update the konStates data structure to make available the newly
    * created TF binding sites in the full [start, end+offset] region
    */
-  LOG("adding new unbound sites from=%d to=%d\n", start_tfbs_pos, (end_tfbs_pos + offset));
+  LOG("[gene %2d] adding new unbound sites from=%d to=%d\n", geneID, start_tfbs_pos, (end_tfbs_pos + offset));
 
   for (k=start_tfbs_pos; k <= end_tfbs_pos + offset; k++) {
     add_kon(state->proteinConc[genes->allBindingSites[k].tfID],
@@ -2324,9 +2324,9 @@ void replicate_gene(CellState *state,
     /* update the counts for the acetylation */
     rates->acetylationCount[p]++;
     
-    LOG_VERBOSE("[clone acetylation] gene=%d, ploidy=%d statechangeIDs[%d][%d]=%d\n", geneID, p, p, 
+    LOG_VERBOSE("[gene %2d] [clone acetylation]: ploidy=%d statechangeIDs[%d][%d]=%d\n", geneID, p, p, 
                 rates->acetylationCount[p], state->statechangeIDs[ACETYLATION][p][rates->acetylationCount[p]]);
-    LOG_VERBOSE("rates->acetylationCount[%d]=%d\n", p, rates->acetylationCount[p]);
+    LOG_VERBOSE(" rates->acetylationCount[%d]=%d\n", p, rates->acetylationCount[p]);
   }
 }
 
@@ -2648,6 +2648,10 @@ void clone_cell(Genotype *genes_orig,
   state_clone->RTlnKr = state_orig->RTlnKr;
   state_clone->temperature = state_orig->temperature;
 
+  /* copy Genotype */
+  // TODO: check to see how much of these states should be set for all 
+  // genotypes or copied from all genotypes, either way it should be 
+  // copied from the parent cell
   for (i=0; i < NGENES; i++) {
     for (k=0; k < CISREG_LEN; k++) {
       for (p=0; p < MAX_COPIES; p++) {
@@ -2662,8 +2666,15 @@ void clone_cell(Genotype *genes_orig,
     for (p=0; p < MAX_COPIES; p++) {
       genes_clone->tfsStart[i][p][0] =  genes_orig->tfsStart[i][p][0];
       genes_clone->tfsStart[i][p][1] =  genes_orig->tfsStart[i][p][1];
+      genes_clone->activating[i][p]=  genes_orig->activating[i][p];
+      genes_clone->PICdisassembly[i][p]=  genes_orig->PICdisassembly[i][p];
     }
+    genes_clone->tfsPerGene[i] = genes_orig->tfsPerGene[i];
     genes_clone->copies[i] = genes_orig->copies[i];
+    genes_clone->replication_time[i] =  genes_orig->replication_time[i];
+    genes_clone->mRNAdecay[i] =  genes_orig->mRNAdecay[i];
+    genes_clone->proteindecay[i] =  genes_orig->proteindecay[i];
+    genes_clone->translation[i] =  genes_orig->translation[i];
   }
 
   // make a pointer to original all_binding_sites, we don't modify it yet
@@ -2720,12 +2731,28 @@ void clone_cell(Genotype *genes_orig,
     state_clone->mRNATranslCytoCount[i] = state_orig->mRNATranslCytoCount[i];
   }
 
-  // clone queue and empty original
-
+  /* clone queue and empty original */
   clone_queue(&(state_orig->mRNATranscrTimeEnd), &(state_orig->mRNATranscrTimeEndLast),
               &(state_clone->mRNATranscrTimeEnd), &(state_clone->mRNATranscrTimeEndLast));
   clone_queue(&(state_orig->mRNATranslTimeEnd), &(state_orig->mRNATranslTimeEndLast),
               &(state_clone->mRNATranslTimeEnd), &(state_clone->mRNATranslTimeEndLast));
+}
+
+void initialize_new_cell_genotype(Genotype *genes, Genotype genes_clone)
+{
+  int i, j, p;
+
+  /* initialize the non-cisregulatory parts of the genotype */
+  for (i=0; i < NGENES; i++) {
+    for (p=0; p < MAX_COPIES; p++) {
+      genes->activating[i][p]=  genes_clone.activating[i][p];
+      genes->PICdisassembly[i][p]=  genes_clone.PICdisassembly[i][p];
+    }
+    genes->replication_time[i] =  genes_clone.replication_time[i];
+    genes->mRNAdecay[i] =  genes_clone.mRNAdecay[i];
+    genes->proteindecay[i] =  genes_clone.proteindecay[i];
+    genes->translation[i] =  genes_clone.translation[i];
+  }
 }
 
 void initialize_new_cell_state(CellState *state, CellState state_clone, 
@@ -2737,12 +2764,19 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->mRNATranscrTimeEndLast = NULL;
   state->mRNATranslTimeEnd = NULL;
   state->mRNATranslTimeEndLast = NULL;
+  state->replicationTimeEnd = NULL;
+  state->replicationTimeEndLast = NULL;
 
   fflush(stdout);
 
   if (state->mRNATranscrTimeEnd != NULL) {
     printf("after delete_queues  mRNATranscrTimeEnd is not NULL\n");
     printf("time=%g, geneID=%d\n", state->mRNATranscrTimeEnd->time, state->mRNATranscrTimeEnd->geneID);
+  }
+
+  if (state->replicationTimeEnd != NULL) {
+    printf("after delete_queues  replicationTimeEnd is not NULL\n");
+    printf("time=%g, geneID=%d\n", state->replicationTimeEnd->time, state->replicationTimeEnd->geneID);
   }
 
   /* reset the length of TF data structures to zero, we have to reconstruct them */
@@ -2882,19 +2916,21 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
   state->mRNANuclearCount[geneID] = 0;
   state->mRNATranslCytoCount[geneID] = 0;
 
-  /* for transcriping mRNAs: split up the genetic material, as mRNA is
+  /* for transcribing mRNAs: split up the genetic material, as mRNA is
      actually physically attached to the DNA during the replication and
      doesn't go randomly to one or other of the cells split up
      mRNATranscrCount, along with FixedTime events */
-  while ((state_clone->mRNATranscrCount[geneID][copy1] + 
-          state_clone->mRNATranscrCount[geneID][copy2]) > 0) {
+
+  FixedEvent *timeEnd = state_clone->mRNATranscrTimeEnd;
+
+  while (timeEnd != NULL) {
     for (j=0; j < MAX_COPIES; j++)
       LOG_VERBOSE("mRNATranscrCount[%2d][%d]=%d\n", 
                   geneID, j, state_clone->mRNATranscrCount[geneID][j]);
     
-    int geneIDQueue = state_clone->mRNATranscrTimeEnd->geneID;
-    int copy = state_clone->mRNATranscrTimeEnd->copy;
-    float time = state_clone->mRNATranscrTimeEnd->time;
+    int geneIDQueue = timeEnd->geneID;
+    int copy = timeEnd->copy;
+    float time = timeEnd->time;
     
     if (geneIDQueue == geneID && copy == copy1) { 
       state->mRNATranscrCount[geneID][0]++;
@@ -2902,8 +2938,8 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
       printf("move mRNATranscrTime event at time=%g on gene %d copy=%d to copy=0 of total mRNATranscrCount=%d\n", 
              time, geneID, copy1, state_clone->mRNATranscrCount[geneID][copy1]);
       /* remove from original queue */
-      printf("removing mRNATranscrTime event at time=%g on gene %d (copy %d) from clone of queue\n", time, copy1, geneID);
-      delete_fixed_event_start(&(state_clone->mRNATranscrTimeEnd), &(state_clone->mRNATranscrTimeEnd));
+      printf("removing mRNATranscrTime event at time=%g on gene %2d (copy %d) from clone of queue\n", time, geneID, copy1);
+      delete_fixed_event(geneID, copy1, 0, &(state_clone->mRNATranscrTimeEnd), &(state_clone->mRNATranscrTimeEndLast));
       (state_clone->mRNATranscrCount[geneID][copy1])--;
     } else if (geneIDQueue == geneID && copy == copy2) {  
       state->mRNATranscrCount[geneID][1]++;
@@ -2911,10 +2947,11 @@ void initialize_new_cell_gene(Genotype *genes, Genotype genes_clone,
       printf("move mRNATranscrTime event at time=%g on gene %d copy=%d to copy=1 of total mRNATranscrCount=%d\n", 
              time, geneID, copy2, state_clone->mRNATranscrCount[geneID][copy2]);
       /* remove from original queue */
-      printf("removing mRNATranscrTime event at time=%g on gene %d (copy %d) from clone of queue\n", time, copy2, geneID);
-      delete_fixed_event_start(&(state_clone->mRNATranscrTimeEnd), &(state_clone->mRNATranscrTimeEnd));
+      printf("removing mRNATranscrTime event at time=%g on gene %2d (copy %d) from clone of queue\n", time, geneID, copy2);
+      delete_fixed_event(geneID, copy2, 0, &(state_clone->mRNATranscrTimeEnd), &(state_clone->mRNATranscrTimeEndLast));
       (state_clone->mRNATranscrCount[geneID][copy2])--;
     }
+    timeEnd = timeEnd->next;
     fflush(stdout);
   }
 }
@@ -2985,6 +3022,10 @@ void do_cell_division(int motherID,
   if (no_replace_mother)
     delete_queues(mother_state);
 
+  /* initialize the non-cis-regulatory part of the genotype 
+     of the new daughter cell based on clone of mother */
+  initialize_new_cell_genotype(daughter, genes_clone);
+
   /* initialize the state of the new cell */
   initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
 
@@ -3003,13 +3044,13 @@ void do_cell_division(int motherID,
   //                        mother->transcriptionFactorSeq, mother->cisRegSeq, mother->tfsStart); 
 
   if (verbose) {
-    LOG_VERBOSE_NOCELLID("[cell %03d]: acetylation counts:\n", motherID);
+    LOG_NOCELLID("[cell %03d]: acetylation counts:\n", motherID);
     total = 0;
     for (j=0; j < MAX_COPIES; j++)  {
-      LOG_VERBOSE_NOCELLID(" before mother acetylationCount[%2d]=%2d\n", j, rates_clone.acetylationCount[j]);
+      LOG_NOCELLID(" before mother acetylationCount[%2d]=%2d\n", j, rates_clone.acetylationCount[j]);
       total += rates_clone.acetylationCount[j];
     }
-    LOG_VERBOSE_NOCELLID(" before mother total acetylation=%d\n", total);
+    LOG_NOCELLID(" before mother total acetylation=%d\n", total);
   }
 
   /* now split up the genes into one or other of the new cells */
@@ -3073,12 +3114,20 @@ void do_cell_division(int motherID,
   if (verbose) {
     total = 0;
     for (j=0; j < MAX_COPIES; j++)  {
-      LOG_VERBOSE_NOCELLID(" after daughter acetylationCount[%2d]=%2d\n", j, daughter_rates->acetylationCount[j]);
-      LOG_VERBOSE_NOCELLID(" after mother acetylationCount[%2d]=%2d\n", j, mother_rates->acetylationCount[j]);
+      LOG_NOCELLID(" after daughter acetylationCount[%2d]=%2d\n", j, daughter_rates->acetylationCount[j]);
+      LOG_NOCELLID(" after mother acetylationCount[%2d]=%2d\n", j, mother_rates->acetylationCount[j]);
       total += daughter_rates->acetylationCount[j];
       total += mother_rates->acetylationCount[j];
     }
-    LOG_VERBOSE_NOCELLID(" after total acetylation=%d\n", total);
+    LOG_NOCELLID(" after total acetylation=%d\n", total);
+
+    // check that we have emptied the list of transcribing mRNAs
+    total = 0;
+    for (i=0; i < NGENES; i++) 
+      for (j=0; j < MAX_COPIES; j++) 
+        total += state_clone.mRNATranscrCount[i][j];
+    
+    LOG_NOCELLID("mRNATranscrCount=%2d left in state_clone after moving to mother+daughter\n", total);
   }
 
   realloc_cell_memory(daughter_state, daughter_koffvalues);
@@ -3118,6 +3167,11 @@ void do_cell_division(int motherID,
   if (no_replace_mother) {
     LOG_NOCELLID("original number of binding sites=%d should = (mother=%d + daughter=%d) = %d\n", 
                  original_bind_count, mother->bindSiteCount, daughter->bindSiteCount, mother->bindSiteCount + daughter->bindSiteCount);
+    if (original_bind_count != mother->bindSiteCount + daughter->bindSiteCount) {
+      LOG_ERROR_NOCELLID("ERROR: original number of binding sites=%d  != (mother=%d + daughter=%d) = %d\n", 
+                         original_bind_count, mother->bindSiteCount, daughter->bindSiteCount, mother->bindSiteCount + daughter->bindSiteCount);
+      exit(0);
+    }
   }
 
   /* split up the volume of the cell */
@@ -3127,7 +3181,7 @@ void do_cell_division(int motherID,
     daughter_state->proteinConc[i] = fraction * state_clone.proteinConc[i];
     if (no_replace_mother) {
       mother_state->proteinConc[i] = (1-fraction) * state_clone.proteinConc[i];
-      LOG_NOCELLID("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
+      LOG_VERBOSE_NOCELLID("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
                    daughter_state->proteinConc[i], fraction, mother_state->proteinConc[i], (1-fraction), state_clone.proteinConc[i]);
     }
 
@@ -3135,7 +3189,7 @@ void do_cell_division(int motherID,
     daughter_state->mRNACytoCount[i] = rint(fraction * state_clone.mRNACytoCount[i]);
     if (no_replace_mother) {
       mother_state->mRNACytoCount[i] =  state_clone.mRNACytoCount[i] - daughter_state->mRNACytoCount[i];
-      LOG_NOCELLID("daughter=%d, mother=%d of total mRNACytoCount=%d\n", 
+      LOG_VERBOSE_NOCELLID("daughter=%d, mother=%d of total mRNACytoCount=%d\n", 
                    daughter_state->mRNACytoCount[i], mother_state->mRNACytoCount[i], state_clone.mRNACytoCount[i]);
     }
 
@@ -3143,7 +3197,7 @@ void do_cell_division(int motherID,
     daughter_state->mRNANuclearCount[i] = rint(fraction * mother_state->mRNANuclearCount[i]);
     if (no_replace_mother) {
       mother_state->mRNANuclearCount[i] =  state_clone.mRNANuclearCount[i] - daughter_state->mRNANuclearCount[i];
-      LOG_NOCELLID("daughter=%d, mother=%d of total mRNANuclearCount=%d\n", 
+      LOG_VERBOSE_NOCELLID("daughter=%d, mother=%d of total mRNANuclearCount=%d\n", 
                    daughter_state->mRNANuclearCount[i], mother_state->mRNANuclearCount[i], state_clone.mRNANuclearCount[i]);
     }
 
@@ -3235,7 +3289,7 @@ float do_single_timestep(Genotype *genes,
   int event;     /* boolean to keep track of whether FixedEvent has ended */
   int total;           /* total possible translation events */
   
-  float f, df, konrate2, diff, sum, ct, ect;
+  float f, df, konrate2, diff, sum, ct, ect, fixed_time;
 
   if (*t > 0.00005 && burn_in) {
     printf("recalibrating cell!\n");
@@ -3312,12 +3366,14 @@ float do_single_timestep(Genotype *genes,
       }
   }
   
+  /* first check to see if a fixed event occurs in current t->dt window,
+     or in tdevelopment if running for a fixed development time */
+  fixed_time = no_fixed_dev_time ? (*t+*dt) : fminf(*t+*dt, tdevelopment);
 
-  /* first check to see if a fixed event occurs in current t->dt window */
   event = does_fixed_event_end(state->mRNATranslTimeEnd,
                                state->mRNATranscrTimeEnd,
                                state->replicationTimeEnd,
-                               fminf(*t+*dt, tdevelopment));
+                               fixed_time);
   
   /* while there are either transcription or translation events
      occuring in current t->dt window */
@@ -3394,12 +3450,14 @@ float do_single_timestep(Genotype *genes,
             genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
     
     LOG_VERBOSE("next stochastic event (2) due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
-    
+
+    fixed_time = no_fixed_dev_time ? (*t+*dt) : fminf(*t+*dt, tdevelopment);    
+
     /* check to see there aren't more fixed events to do */
     event = does_fixed_event_end(state->mRNATranslTimeEnd, 
                                  state->mRNATranscrTimeEnd, 
                                  state->replicationTimeEnd,
-                                 fminf(tdevelopment, *t+*dt));
+                                 fixed_time);
   } 
 
   /* no remaining fixed events to do in dt, now do stochastic events */

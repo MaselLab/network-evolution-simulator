@@ -94,6 +94,13 @@ void delete_queues(CellState *state) {
     start = start->next;
     free(info);  
     } */
+
+  start = state->replicationTimeEnd;  
+  while (start) {
+    info = start;
+    start = start->next;
+    free(info);
+  }
 }
 
 void free_mem_CellState(CellState *state)
