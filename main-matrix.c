@@ -432,7 +432,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 30;
+    TFBS = 35;
     int *startPos;
     int *hammDist;
     float *diag;
