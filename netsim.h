@@ -232,6 +232,7 @@ struct CellState {
   int cellID;                         /* cell ID */
   int founderID;                      /* keep track of the founder cell */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
+  int divisions;                      /* total number of divisions cell has undergone */
   float division_time;                /* current division time */ 
   float cellSize;                     /* size of cell */
   float growthRate;                   /* total growth rate in the previous deltat */

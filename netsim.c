@@ -560,6 +560,9 @@ void initialize_cell(CellState *state,
   /* start cell size at 0.5 */
   state->cellSize = 0.5;
 
+  /* start cell with no divisions */
+  state->divisions = 0;
+
   /* initialize growth rate to zero (could also be based on 120 min doubling, i.e. 0.00578) */
   state->growthRate = 0.0;
 
@@ -2636,6 +2639,7 @@ void clone_cell(Genotype *genes_orig,
 
   state_clone->founderID = state_orig->founderID;
   state_clone->in_s_phase = state_orig->in_s_phase;
+  state_clone->divisions = state_orig->divisions;
 
   state_clone->cellSize = state_orig->cellSize;
   state_clone->growthRate =  state_orig->growthRate;
@@ -2783,20 +2787,18 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->tfBoundCount = 0;
   state->tfHinderedCount = 0;
 
-  /* reset S phase state to 0 */
-  state->in_s_phase = 0;
-
+  state->in_s_phase = 0;   /* reset S phase state to 0 */
   state->division_time = 999999.0;  /* reset division time for this cell */
+  state->divisions = state_clone.divisions; /* copy division counter */
 
-  /* reset size to appropriate scale of cell size */
-  state->cellSize = scale;
+  // TODO: fix
+  state->cellSize = scale;   /* reset size to appropriate scale of cell size */
 
   /* TODO: check! growth rate, take instantaneous growth rate just before
      division, this will be updated after first new time step */
   state->growthRate = state_clone.growthRate;
 
   /* keep thermodynamic state the same */ 
-
   state->RTlnKr = state_clone.RTlnKr;
   state->temperature = state_clone.temperature;
 
@@ -3025,17 +3027,28 @@ void do_cell_division(int motherID,
   /* initialize the non-cis-regulatory part of the genotype 
      of the new daughter cell based on clone of mother */
   initialize_new_cell_genotype(daughter, genes_clone);
-
   /* initialize the state of the new cell */
   initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
 
   /* set the founderID of the daughter cell from the mother cell */
   daughter_state->founderID = state_clone.founderID;
+  daughter_state->divisions = 0;    /* daughter cell resets divisions */ 
 
-  printf("daughter cell %03d is founded by cell %03d\n", daughterID, daughter_state->founderID);
+  printf("daughter cell %03d is founded by cell %03d with %2d divisions\n", 
+         daughterID, daughter_state->founderID, daughter_state->divisions);
+  LOG_NOCELLID("daughter cell %03d is founded by cell %03d with %2d divisions\n", 
+               daughterID, daughter_state->founderID, daughter_state->divisions);
 
-  if (no_replace_mother) 
+  if (no_replace_mother) {
+    initialize_new_cell_genotype(mother, genes_clone);
     initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
+    mother_state->divisions++;      /* update divisions in mother */
+    printf("mother   cell %03d is founded by cell %03d with %2d divisions\n", 
+         motherID, mother_state->founderID, mother_state->divisions);
+    LOG_NOCELLID("mother   cell %03d is founded by cell %03d with %2d divisions\n", 
+                 motherID, mother_state->founderID, mother_state->divisions);
+
+  }
 
   LOG_VERBOSE_NOCELLID("[cell %03d] (mother) total tfBoundCount=%d, tfHinderedCount=%d\n", motherID, 
                        state_clone.tfBoundCount, state_clone.tfHinderedCount);
@@ -3168,12 +3181,12 @@ void do_cell_division(int motherID,
     LOG_NOCELLID("original number of binding sites=%d should = (mother=%d + daughter=%d) = %d\n", 
                  original_bind_count, mother->bindSiteCount, daughter->bindSiteCount, mother->bindSiteCount + daughter->bindSiteCount);
     if (original_bind_count != mother->bindSiteCount + daughter->bindSiteCount) {
-      LOG_ERROR_NOCELLID("ERROR: original number of binding sites=%d  != (mother=%d + daughter=%d) = %d\n", 
+      LOG_ERROR_NOCELLID("original number of binding sites=%d  != (mother=%d + daughter=%d) = %d\n", 
                          original_bind_count, mother->bindSiteCount, daughter->bindSiteCount, mother->bindSiteCount + daughter->bindSiteCount);
       exit(0);
     }
   }
-
+  
   /* split up the volume of the cell */
   for (i=0; i < NGENES; i++) {
 
@@ -3219,10 +3232,8 @@ void do_cell_division(int motherID,
     recalibrate_cell(mother_rates, mother_state, mother,
                      mother_konStates, mother_koffvalues,
                      mother_mRNAdecay, mother_transport, dt);
-  
     LOG_VERBOSE_NOCELLID("tfBoundCount=%d (motherID=%d), tfBoundCount=%d (daughterID=%d)\n", 
                          mother_state->tfBoundCount, motherID, daughter_state->tfBoundCount, daughterID);
-    
     LOG_VERBOSE_NOCELLID("tfHinderedCount=%d (motherID=%d), tfHinderedCount=%d (daughterID=%d)\n", 
                          mother_state->tfHinderedCount, motherID, daughter_state->tfHinderedCount, daughterID);
   }
@@ -3292,8 +3303,8 @@ float do_single_timestep(Genotype *genes,
   float f, df, konrate2, diff, sum, ct, ect, fixed_time;
 
   if (*t > 0.00005 && burn_in) {
-    printf("recalibrating cell!\n");
-    LOG("recalibrating cell!\n");
+    printf("recalibrating cell after burn-in!\n");
+    LOG("recalibrating cell after burn-in!\n");
     log_snapshot(rates,
                  state,
                  genes,
@@ -3743,7 +3754,7 @@ void develop(Genotype genes[POP_SIZE],
 
   while ((no_fixed_dev_time && divisions < max_divisions) ||    /* no fixed dev time, run until # divisions reached */
          (!no_fixed_dev_time && t_next < tdevelopment)) {       /* or, if fixed dev time, run until tdevelopment reached */
-  //while (t_next < tdevelopment && t_next < state[cell].division_time) { 
+    //while (t_next < tdevelopment && t_next < state[cell].division_time) { 
 
     /* get the next cell with the smallest t to advance next */
     //t_next = get_next(&time_queue, &time_queue_end, &cell);
@@ -3772,24 +3783,21 @@ void develop(Genotype genes[POP_SIZE],
                        no_fixed_dev_time);
 
     if (t_next >= (state[cell]).division_time)  {  /* we have now reached cell division */
+      
       divisions++;     /* increment number of divisions */
       motherID = cell; /* set mother cell as currently dividing cell */
-      do { 
-        daughterID = rint((POP_SIZE-1)*ran1(&seed));  /* choose one other cell randomly as new daughter */
-      } while (daughterID == motherID);   /* TODO: FIXME could be the same as mother */
+      daughterID = rint((POP_SIZE-1)*ran1(&seed));  /* choose one other cell randomly as new daughter */
 
-      //daughterID = (motherID == 0) ? 1 : 0;
+      printf("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d\n", 
+             cell, motherID, daughterID, t_next, state[cell].division_time, divisions);
+      LOG_NOCELLID("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d\n", 
+                   cell, motherID, daughterID, t_next, state[cell].division_time, divisions);
 
-      printf("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", 
-             cell, t_next, state[cell].division_time, divisions);
-      printf("            into mother=%03d and daughter=%03d\n", motherID, daughterID);
-      LOG_NOCELLID("[cell %03d] is dividing at t_next=%g, division_time=%g, total divisions=%d\n", 
-                   cell, t_next, state[cell].division_time, divisions);
-      LOG_NOCELLID("            into mother=%03d and daughter=%03d\n", motherID, daughterID);
-
-      // removing pending event in daughter cells from queue
-      delete_element_heap(queue, daughterID);
-      LOG("removing pending event from queue from cell that will be replaced by daughter cell=%d\n", daughterID);
+      /* removing pending event in daughter cell from queue, if different from the mother */
+      if (daughterID != motherID) {
+        delete_element_heap(queue, daughterID);
+        LOG("removing pending event from queue (length=%3d) replaced by daughter cell=%d\n", queue->n, daughterID);
+      } 
 
       do_cell_division(motherID,
                        daughterID,
@@ -3813,25 +3821,32 @@ void develop(Genotype genes[POP_SIZE],
 
       LOG("AFTER DIVISION: take a new step for mother cell=%d\n", motherID);
 
-      /* advance time for mother */
-      do_single_timestep(&(genes[motherID]), 
-                         &(state[motherID]), 
-                         &(konStates[motherID]), 
-                         &(rates[motherID]), 
-                         &(t[motherID]),
-                         koffvalues[motherID],
-                         transport[motherID],
-                         mRNAdecay[motherID],
-                         &(x[motherID]),
-                         &(dt[motherID]),
-                         &(konrate[motherID]),
-                         timecoursestart[motherID],
-                         timecourselast[motherID],
-                         maxbound2,
-                         maxbound3,
-                         no_fixed_dev_time);
-      
-      insert_with_priority_heap(queue, motherID, t[motherID]); 
+      if (daughterID != motherID) {
+        /* advance time for mother */
+        do_single_timestep(&(genes[motherID]), 
+                           &(state[motherID]), 
+                           &(konStates[motherID]), 
+                           &(rates[motherID]), 
+                           &(t[motherID]),
+                           koffvalues[motherID],
+                           transport[motherID],
+                           mRNAdecay[motherID],
+                           &(x[motherID]),
+                           &(dt[motherID]),
+                           &(konrate[motherID]),
+                           timecoursestart[motherID],
+                           timecourselast[motherID],
+                           maxbound2,
+                           maxbound3,
+                           no_fixed_dev_time);
+        
+        insert_with_priority_heap(queue, motherID, t[motherID]); 
+      } else {
+        printf("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
+               motherID, daughterID);
+        LOG("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
+            motherID, daughterID);
+      }
 
       LOG("AFTER DIVISION: take a new step for daughter cell=%d\n", daughterID);
 
@@ -3864,7 +3879,8 @@ void develop(Genotype genes[POP_SIZE],
 
   /* output the founder information */
   for (j = 0; j < POP_SIZE; j++) {
-    printf("cell %03d derived from founder %03d\n", j, state[j].founderID);
+    printf("cell %03d derived from founder %03d had %2d divisions\n", j, state[j].founderID, state[j].divisions);
+    LOG_NOCELLID("cell %03d derived from founder %03d had %2d divisions\n", j, state[j].founderID, state[j].divisions);
   }
 
   /* cleanup data structures */

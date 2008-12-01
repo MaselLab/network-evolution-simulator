@@ -67,9 +67,9 @@ check-sample-output:	clean
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0 -t 150
 	$(subst RUN,selection,$(subst ORIG,2008-08-29-sample-output-11genes-diploid-r-4,$(DIFF_CMD)))
 
+## run for 4 divisions with reduced S and G2 phases
 check-multiple-pops:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4" netsim
-# run for 4 divisions with reduced S and G2 phases
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
 	$(subst RUN,multiple-pops,$(subst ORIG,2008-11-29-multiple-pops-r-4-genotypecopy,$(DIFF_CMD)))
 
