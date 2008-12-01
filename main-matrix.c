@@ -433,7 +433,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 31;
+    TFBS = 17;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -460,7 +460,7 @@ int main(int argc, char *argv[])
      int array = 0;
     
     int fey;
-    for( fey=0; fey<10; fey++){
+    for( fey=0; fey<TFBS; fey++){
          printf("binding site %3d:  ", fey);
          printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
          }
@@ -470,7 +470,7 @@ int main(int argc, char *argv[])
            sizeof(struct AllTFBindingSites),(compfn)compare );
     printf("\n");
   
-    for( fey=0; fey<10; fey++){
+    for( fey=0; fey<TFBS; fey++){
          printf("binding site %3d:  ", fey);
          printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
          }
@@ -524,7 +524,7 @@ int main(int argc, char *argv[])
               printf("%d\n", viableStates[sh]);
 }
      printf("%d\n", array);
-     //print_vector_MATLAB(array);
+     print_vector_MATLAB(array);
      //arrayT=realloc(arrayT, array*sizeof(struct Ttype));
       /* for(mat=0; mat<TFBS; mat++){
         printf("tf[%d] = %d\n", mat, TFon[mat]);
@@ -538,7 +538,7 @@ int main(int argc, char *argv[])
    // print_arrayT(arrayT,array,viableStates);
     system("PAUSE");
       //printf("HERE in between");
-     //print_arrayT_MATLAB(arrayT,array,viableStates);
+     print_arrayT_MATLAB(arrayT,array,viableStates);
      printf("long=%d\n", sizeof(long));
      printf("hindlength=%d\n", HIND_LENGTH);
       printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
