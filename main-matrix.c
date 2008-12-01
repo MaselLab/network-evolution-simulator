@@ -150,7 +150,8 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
        columnV1 = fopen("columnV1.txt","w");
      if (statesV1 = fopen("statesV1.txt", "w") ){
      if( columnV1 = fopen("columnV1.txt", "w")){
-       int i, p,j,m, tf, row, a;
+       int i, p,j,m, tf,  a;
+       long row;
        int n=0;
        printf("size=%d TFBS= %d\n", size, TFBSites);
        for( i=0;i<size; i++){
@@ -163,9 +164,9 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
         row = viableStates[i];
         for(p=0;p<TFBSites;p++){
      
-          if(!(row & (1<<p))){     
+          if(!(row & (1L<<p))){     
               //need to do decimal to binray here!!!!!!!!  
-             row = viableStates[i] | (1<<p);
+             row = viableStates[i] | (1L<<p);
              if(row!=0 && row!=viableStates[i]){
                 for(j=0;j<size; j++){
                    if(row==viableStates[j]){
@@ -181,7 +182,7 @@ void transitions(int size, long *viableStates, int TFBSites, struct Ttype *array
                  }
               }
           }else{
-              row = viableStates[i] ^ (1<<p);
+              row = viableStates[i] ^ (1L<<p);
               if(row != viableStates[i]){     
                  for( j=0;j<size; j++){   
                     if(row==viableStates[j]){
@@ -432,7 +433,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 32;
+    TFBS = 35;
     int *startPos;
     int *hammDist;
     float *diag;
