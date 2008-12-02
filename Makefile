@@ -41,7 +41,7 @@ main-matrix-32bit: clean
 	make EXTRACFLAGS="-m32" main-matrix
 
 ## common command for doing regression test diff
-DIFF_CMD := @diff -r  --exclude=tfsbound.dat --exclude=.svn --exclude=NOTES --exclude=cellsize.dat --exclude=growthrate.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
+DIFF_CMD := @diff -r  --exclude=tfsbound*.dat --exclude=.svn --exclude=NOTES --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
 
 ## check specific directory
 check-haploid:	clean

@@ -47,8 +47,6 @@ int main(int argc, char *argv[])
   burn_in = 0;  /* don't do burn-in of kon by default */
   verbose = 0;  /* no verbose out by default */
 
-  initialize_growth_rate_parameters();
-
   /* parse command-line options */
   while (1) {
     static struct option long_options[] =
@@ -212,22 +210,26 @@ int main(int argc, char *argv[])
   fperrors = fopen(fperrors_name, "w");
 
   /* create output files for cell size */
-  sprintf(fp_cellsize_name, "%s/cellsize.dat", output_directory);
-  if ((fp_cellsize = fopen(fp_cellsize_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
+  for (j = 0; j < POP_SIZE; j++) {
+    sprintf(fp_cellsize_name, "%s/cellsize-%03d.dat", output_directory, j);
+    if ((fp_cellsize[j] = fopen(fp_cellsize_name,"w"))==NULL)
+      fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
 
-  /* create output files for growth rate */
-  sprintf(fp_growthrate_name, "%s/growthrate.dat", output_directory);
-  if ((fp_growthrate = fopen(fp_growthrate_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
+    /* create output files for growth rate */
+    sprintf(fp_growthrate_name, "%s/growthrate-%03d.dat", output_directory, j);
+    if ((fp_growthrate[j] = fopen(fp_growthrate_name,"w"))==NULL)
+      fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
 
-  sprintf(fp_tfsbound_name, "%s/tfsbound.dat", output_directory);
-  if ((fp_tfsbound = fopen(fp_tfsbound_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
+    sprintf(fp_tfsbound_name, "%s/tfsbound-%03d.dat", output_directory, j);
+    if ((fp_tfsbound[j] = fopen(fp_tfsbound_name,"w"))==NULL)
+      fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
+  }
 
   /* slight hack to initialize seed  */
   if (!hold_genotype_constant)
     for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+
+  initialize_growth_rate_parameters();
 
   /* initialize protein concentrations */
   for (i=0; i<NGENES; i++) {
@@ -259,7 +261,9 @@ int main(int argc, char *argv[])
     free(indivs[j].allBindingSites);
   }
   fclose(fperrors);
-  fclose(fp_cellsize);
-  fclose(fp_growthrate);
-  fclose(fp_tfsbound);
+  for (j = 0; j < POP_SIZE; j++) {
+    fclose(fp_cellsize[j]);
+    fclose(fp_growthrate[j]);
+    fclose(fp_tfsbound[j]);
+  }
 }

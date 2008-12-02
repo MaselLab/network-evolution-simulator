@@ -326,9 +326,9 @@ int random_replication_time; /* toggle replication times in S phase being random
 char *output_directory ;
 int verbose ;
 FILE *fperrors;
-FILE *fp_cellsize;
-FILE *fp_growthrate;
-FILE *fp_tfsbound;
+FILE *fp_cellsize[POP_SIZE];
+FILE *fp_growthrate[POP_SIZE];
+FILE *fp_tfsbound[POP_SIZE];
 
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */
@@ -436,13 +436,15 @@ extern void change_mRNA_cytoplasm(int,
 extern void calc_koff(int,
                       AllTFBindingSites *,
                       CellState *,
-                      float *);
+                      float *,
+                      float);
 
 extern void scan_nearby_sites(int,
                               AllTFBindingSites *,
                               CellState *,
                               GillespieRates *,
-                              float *);
+                              float *,
+                              float);
 
 extern void remove_kon(int,
                        int,
@@ -523,7 +525,8 @@ extern void remove_tf_binding(Genotype *,
                               GillespieRates *,
                               KonStates *,
                               int,
-                              float []);
+                              float [],
+                              float);
 
 extern void attempt_tf_binding(Genotype *,
                                CellState *,
@@ -532,7 +535,8 @@ extern void attempt_tf_binding(Genotype *,
                                KonStates *,
                                int *,
                                int *,
-                               int);
+                               int,
+                               float);
 
 extern void add_time_points(float,
                             float [NGENES],
@@ -551,17 +555,18 @@ extern float compute_tprime(float, float, float, float);
 extern float compute_integral(float, float, float, float, float, float, float, float, float);
 
 extern float compute_growth_rate_dimer(float *,
-                                float , 
-                                float ,
-                                float [NGENES],
-                                int [NGENES],
-                                float,
-                                float,
-                                float, 
-                                float,
-                                float,
-                                float,
-                                float);
+                                       float , 
+                                       float ,
+                                       float [NGENES],
+                                       int [NGENES],
+                                       float,
+                                       float,
+                                       float, 
+                                       float,
+                                       float,
+                                       float,
+                                       float,
+                                       int);
 
 extern void update_protein_conc_cell_size(float[],
                                           CellState *,

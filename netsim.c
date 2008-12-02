@@ -56,7 +56,7 @@ float tdevelopment=120.0;  /* default maximum development time: can be changed a
 int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
-int dummyrun=4;            /* used to change seed */
+int dummyrun = 4;          /* used to change seed */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
 float growth_rate_scaling = 2.0; /* set growth rate scaling factor */
@@ -179,12 +179,13 @@ void print_tf_occupancy(CellState *state,
     bound_count[geneID][geneCopy]++;
   }
 
-  fprintf(fp_tfsbound, "%g %d ", t, state->tfBoundCount);
+  // TODO: currently comment-out generation of TF bound information
+  fprintf(fp_tfsbound[state->cellID], "%g %d ", t, state->tfBoundCount);
   for (i = 0; i < NGENES; i++) 
     for (j = 0; j < MAX_COPIES; j++) 
-      fprintf(fp_tfsbound, "%d ", bound_count[i][j]);
+      fprintf(fp_tfsbound[state->cellID], "%d ", bound_count[i][j]);
 
-  fprintf(fp_tfsbound, "\n");
+  fprintf(fp_tfsbound[state->cellID], "\n");
 }
 
 void initialize_genotype(Genotype *indiv, 
@@ -707,7 +708,8 @@ void change_mRNA_cytoplasm(int i,
 void calc_koff(int k,
                AllTFBindingSites *allBindingSites,
                CellState *state,
-               float *koff)
+               float *koff,
+               float t)
 {
   float Gibbs;  /*free energy in kJ/mol*/
   int posdiff, front, back, i, j;
@@ -721,9 +723,9 @@ void calc_koff(int k,
       posdiff = allBindingSites[k].leftEdgePos - allBindingSites[state->tfBoundIndexes[j]].leftEdgePos;
       //printf("diff=%d\n", posdiff);
       if (abs(posdiff) < HIND_LENGTH) {/*Phey*/
-        LOG_ERROR("steric hindrance has been breached with site %d (at pos %d, strand %d on copy %d of gene %d), %d away from site %d \
-                   (at pos %d, strand %d on copy %d of gene %d)\n",
-                  k, allBindingSites[k].leftEdgePos, allBindingSites[k].strand, allBindingSites[k].geneCopy, allBindingSites[k].cisregID,
+        LOG_ERROR("t=%g steric hindrance breached with site %d (at pos %d, strand %d copy %d gene %d), %d away from site %d \
+                   (at pos %d, strand %d copy %d of gene %d)\n",
+                  t, k, allBindingSites[k].leftEdgePos, allBindingSites[k].strand, allBindingSites[k].geneCopy, allBindingSites[k].cisregID,
                   posdiff, state->tfBoundIndexes[j], allBindingSites[state->tfBoundIndexes[j]].leftEdgePos, 
                   allBindingSites[state->tfBoundIndexes[j]].strand, allBindingSites[state->tfBoundIndexes[j]].geneCopy, 
                   allBindingSites[state->tfBoundIndexes[j]].cisregID, allBindingSites[state->tfBoundIndexes[j]].strand);
@@ -748,7 +750,8 @@ void scan_nearby_sites(int indexChanged,
                        AllTFBindingSites *allBindingSites,
                        CellState *state,
                        GillespieRates *rates,
-                       float *koffvalues)
+                       float *koffvalues,
+                       float t)
 {
   int posdiff,j,i;
   float diff;
@@ -774,7 +777,7 @@ void scan_nearby_sites(int indexChanged,
         diff = -koffvalues[j];
 
         /* recompute koffvalues */
-        calc_koff(state->tfBoundIndexes[j], allBindingSites, state, &(koffvalues[j]));
+        calc_koff(state->tfBoundIndexes[j], allBindingSites, state, &(koffvalues[j]), t);
 
         /* calculating how koff changes  */
         diff += koffvalues[j];
@@ -1277,7 +1280,8 @@ void remove_tf_binding(Genotype *genes,
                        GillespieRates *rates,
                        KonStates *konStates,
                        int site,
-                       float koffvalues[])
+                       float koffvalues[],
+                       float t)
 {
   int i, j, k, bound, siteID, geneID, geneCopy, transcriptrule, oldstate, numactive;
 
@@ -1287,8 +1291,8 @@ void remove_tf_binding(Genotype *genes,
   while ((state->tfBoundIndexes[i] != site) && (i < state->tfBoundCount)) 
     i++;
   if (i == state->tfBoundCount) {  /* couldn't find the site */
-    LOG_ERROR("remove_tf_binding could not find site %d with %d possibilities\n Bound sites are\n",
-            site, state->tfBoundCount);
+    LOG_ERROR("t=%g could not find site %d with %d possibilities\n Bound sites are\n",
+              t, site, state->tfBoundCount);
     for (j = 0; j < state->tfBoundCount; j++)  {
       LOG_NOFUNC("%d\n", state->tfBoundIndexes[j]);
     }
@@ -1367,7 +1371,7 @@ void remove_tf_binding(Genotype *genes,
     revise_activity_state(geneID, geneCopy, genes, state, rates);
 
     /* when TF unbinds adjust the co-operativity at close sites */
-    scan_nearby_sites(site, genes->allBindingSites, state, rates, koffvalues);        
+    scan_nearby_sites(site, genes->allBindingSites, state, rates, koffvalues, t);
   }
 }
 
@@ -1378,7 +1382,8 @@ void attempt_tf_binding(Genotype *genes,
                         KonStates *konStates,
                         int *maxbound2,
                         int *maxbound3,
-                        int site)
+                        int site,
+                        float t)
 {
   int geneID, geneCopy, k, posdiff, site2;
 
@@ -1414,7 +1419,7 @@ void attempt_tf_binding(Genotype *genes,
              state->proteinConc[genes->allBindingSites[site].tfID]);
 
   /* recompute the koffvalues */
-  calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[state->tfBoundCount]));
+  calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[state->tfBoundCount]), t);
 
   LOG_VERBOSE("new koff = %g is number %d\n",
               (*koffvalues)[state->tfBoundCount], (state->tfBoundCount+1));
@@ -1428,7 +1433,7 @@ void attempt_tf_binding(Genotype *genes,
   (state->tfBoundCount)++;
 
   /* adjust co-operative binding in context of new TF */
-  scan_nearby_sites(site, genes->allBindingSites, state, rates, *koffvalues);
+  scan_nearby_sites(site, genes->allBindingSites, state, rates, *koffvalues, t);
 
   /* get the gene that the TF is binding to */
   geneID = genes->allBindingSites[site].cisregID;
@@ -1515,12 +1520,16 @@ void reach_s_phase(CellState *state, Genotype *genes, float t) {
   /* set the state as being in S phase */
   state->in_s_phase = 1;
 
-  for (i=0; i < NGENES; i++) {
-    LOG("add replication for geneID=%d at t=%g\n", i, t + genes->replication_time[i]);
+  // only add replication events if S phase and G2 phase have non-zero length
+  // otherwise just jump to division
+  if (time_s_phase + time_g2_phase > 0.0) {
+    for (i=0; i < NGENES; i++) {
+      LOG("add replication for geneID=%d at t=%g\n", i, t + genes->replication_time[i]);
 
-    /* add the replication event to the queue */
-    add_fixed_event(i, -1, t + genes->replication_time[i], 
-                    &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
+      /* add the replication event to the queue */
+      add_fixed_event(i, -1, t + genes->replication_time[i], 
+                      &(state->replicationTimeEnd), &(state->replicationTimeEndLast));
+    }
   }
 }
 
@@ -1543,7 +1552,9 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                                 float deltat,
                                 float c,
                                 float ect,
-                                float ect1) {
+                                float ect1,
+                                int cellID) 
+{
   int i;
   float instantaneous_growth_rate;
   float total_alpha_s = 0.0;
@@ -1608,7 +1619,10 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
   if (instantaneous_growth_rate < 0.0)
     instantaneous_growth_rate = 0.0;
   
-  fprintf(fp_growthrate, "%g %g %g %g %g %g\n", t, instantaneous_growth_rate, *integrated_growth_rate, P, s_mRNA, c);
+  // TODO: current disable printing out growth rate information
+#if 0
+  fprintf(fp_growthrate[cellID], "%g %g %g %g %g %g\n", t, instantaneous_growth_rate, *integrated_growth_rate, P, s_mRNA, c);
+#endif
 
   return (instantaneous_growth_rate);
 }
@@ -1670,9 +1684,10 @@ void update_protein_conc_cell_size(float proteinConc[],
                                                             genes->translation[SELECTION_GENE], state->mRNACytoCount[SELECTION_GENE], 
                                                             genes->translation, state->mRNACytoCount, 
                                                             L, L_next, t, dt, 
-                                                            konStates->konvalues[SELECTION_GENE][KON_PROTEIN_DECAY_INDEX], ect, ect1);
+                                                            konStates->konvalues[SELECTION_GENE][KON_PROTEIN_DECAY_INDEX], ect, ect1,
+                                                            state->cellID);
       state->cellSize = (state->cellSize)*exp(integrated_growth_rate);
-      fprintf(fp_cellsize, "%g %g\n", t, state->cellSize);
+      fprintf(fp_cellsize[state->cellID], "%g %g\n", t, state->cellSize);
     }
 
   }
@@ -1891,7 +1906,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
   
   /* bind siteID, only if found */
   if (siteID != -1)
-    attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, siteID);
+    attempt_tf_binding(genes, state, rates, &koffvalues, konStates, &maxbound2, &maxbound3, siteID, t);
 
   /* calculate the number of TFs bound */
   calc_num_bound(state->proteinConc, state->tfBoundCount);
@@ -1904,7 +1919,25 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
   int i, j = -1;
   int site;
 
-  while (j < state->tfBoundCount && x>0) {
+  if (state->tfBoundCount <= 0) {
+    LOG_ERROR("tfBoundCount=%d, t=%g, dt=%g, x=%g, rates->koff=%g\n", state->tfBoundCount, t, dt, x, rates->koff);
+    // TODO: disable jump to critical size to stop sim
+    // state->cellSize = critical_size; 
+    
+    for (i=0; i < NGENES; i++) {
+      int k;
+      LOG_ERROR("[gene %2d]: mRNA nuclear=%d, cyto=%d, transl=%d, transcribing ", 
+                i, state->mRNANuclearCount[i], state->mRNACytoCount[i], state->mRNATranslCytoCount[i]);
+      for (k=0; k < MAX_COPIES; k++)
+        LOG_NOFUNC("copy%d=%d ", k, state->mRNATranscrCount[i][k]);
+      LOG_NOFUNC("\n");
+    }
+    LOG_ERROR("cell has appeared to cease functioning, didn't reach division\n");
+    // TODO: disable
+    // return;
+  }
+
+  while (j < state->tfBoundCount && x > 0) {
     j++;
     x -= koffvalues[j];
   }
@@ -1912,14 +1945,14 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
     float konrate2 = 0.0;
     for (i = 0; i < state->tfBoundCount; i++) 
       konrate2 += koffvalues[i];
-    LOG_WARNING("koffvalues add up to %g instead of rates->koff=%g\n",
-                konrate2, rates->koff);
+    LOG_WARNING("t=%g koffvalues add up to %g instead of rates->koff=%g\n",
+                t, konrate2, rates->koff);
     rates->koff = konrate2;
     j--; /* a bit of a fudge for rounding error, really should move on to rates->transport, but too complicated for something so minor */
   } 
   site = state->tfBoundIndexes[j];
-  LOG_VERBOSE("koff event %d of %d at site %d\n", j, state->tfBoundCount,site);
-  if (j < 0) { LOG_ERROR("koff event %d of %d at site %d\n", j, state->tfBoundCount,site); }
+  LOG_VERBOSE("t=%g koff event %d of %d at site %d\n", t, j, state->tfBoundCount,site);
+  if (j < 0) { LOG_ERROR("t=%g koff event %d of %d at site %d\n", t, j, state->tfBoundCount,site); }
   
   /* update protein concentration before removing TF */
   update_protein_conc_cell_size(state->proteinConc, state, genes, dt, 
@@ -1928,7 +1961,7 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
                                 state->proteinConc);
   
   /* remove TF binding from 'site' */
-  remove_tf_binding(genes, state, rates, konStates, site, koffvalues);
+  remove_tf_binding(genes, state, rates, konStates, site, koffvalues, t);
   calc_num_bound(state->proteinConc, state->tfBoundCount);
 }
 
@@ -2224,7 +2257,7 @@ void replicate_gene(CellState *state,
     if (l == geneID) {
       /* remove TF binding and update rates */
       LOG_VERBOSE("[gene %2d] ejecting TF on binding siteID=%d on copy=%d\n", i, l, p);
-      remove_tf_binding(genes, state, rates, konStates, i, koffvalues);
+      remove_tf_binding(genes, state, rates, konStates, i, koffvalues, t);
     }
   }
 
@@ -2430,7 +2463,8 @@ void recalibrate_cell(GillespieRates *rates,
   /* recompute koffvalues for all sites */
   for (i=0; i < state->tfBoundCount; i++) {
     int site = state->tfBoundIndexes[i];
-    calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[i]));
+    // TODO: should get real time from simulation, will add later
+    calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[i]), 9999.0);
     rates->koff += (*koffvalues)[i];
   }
 
@@ -3298,7 +3332,7 @@ float do_single_timestep(Genotype *genes,
   int i, j, k;
 
   int event;     /* boolean to keep track of whether FixedEvent has ended */
-  int total;           /* total possible translation events */
+  int total;     /* total possible translation events */
   
   float f, df, konrate2, diff, sum, ct, ect, fixed_time;
 
@@ -3346,9 +3380,12 @@ float do_single_timestep(Genotype *genes,
     LOG("at t=%g add division time=%g, cellSize=%g\n", *t, state->division_time, state->cellSize);
   }
   
+  // TODO: currently disable printing out the TF occupancy
+#if 0
   print_tf_occupancy(state, genes->allBindingSites, *t);
+#endif
   
-  *x=expdev(&seed);        /* draw random number */
+  *x = expdev(&seed);        /* draw random number */
 
   /* recompute rates */
   // currently disabled
@@ -3367,6 +3404,11 @@ float do_single_timestep(Genotype *genes,
   /* do first Gillespie step to chose next event */
   calc_dt(x, dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
           state->mRNACytoCount, state->mRNATranslCytoCount);
+
+  if (*dt < 0.0) {
+    LOG_ERROR("dt=%g is negative after calc_dt, t=%g\n", *dt, *t);
+  }
+
   
   LOG_VERBOSE("next stochastic event due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
   
@@ -3454,6 +3496,7 @@ float do_single_timestep(Genotype *genes,
     /* advance time by the dt */
     *t += *dt;
     *x -= (*dt)*(*konrate);
+
     LOG_VERBOSE("dt=%g t=%g fixed event old x=%g new x=%g\n", *dt, *t, (*x)+(*dt)*(*konrate), *x);
     
     /* re-compute a new dt */
@@ -3587,7 +3630,13 @@ float do_single_timestep(Genotype *genes,
                        * events should be exhaustive
                        */
                       
-                      LOG_ERROR("[cell %03d] no event assigned: x=%g\n", state->cellID, *x);
+                      LOG_ERROR("[cell %03d] t=%g no event assigned: x=%g\n", state->cellID, *t, *x);
+                      
+                      if (*t > 1000.0) {
+                        LOG_ERROR("should probably stop cell run, has been running for > 1000 mins\n");
+                        // TODO
+                        // state->cellSize = critical_size;
+                      }
                     }
                   }
                 }
