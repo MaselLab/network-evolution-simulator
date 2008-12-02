@@ -209,13 +209,14 @@ int main(int argc, char *argv[])
   sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
   fperrors = fopen(fperrors_name, "w");
 
-  /* create output files for cell size */
+  /* create output files for cell size, growth rate, TFs */
   for (j = 0; j < POP_SIZE; j++) {
     sprintf(fp_cellsize_name, "%s/cellsize-%03d.dat", output_directory, j);
     if ((fp_cellsize[j] = fopen(fp_cellsize_name,"w"))==NULL)
       fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
 
-    /* create output files for growth rate */
+    // TODO: currently disable
+#if 0
     sprintf(fp_growthrate_name, "%s/growthrate-%03d.dat", output_directory, j);
     if ((fp_growthrate[j] = fopen(fp_growthrate_name,"w"))==NULL)
       fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
@@ -223,8 +224,9 @@ int main(int argc, char *argv[])
     sprintf(fp_tfsbound_name, "%s/tfsbound-%03d.dat", output_directory, j);
     if ((fp_tfsbound[j] = fopen(fp_tfsbound_name,"w"))==NULL)
       fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
+#endif
   }
-
+  
   /* slight hack to initialize seed  */
   if (!hold_genotype_constant)
     for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
@@ -232,15 +234,16 @@ int main(int argc, char *argv[])
   initialize_growth_rate_parameters();
 
   /* initialize protein concentrations */
-  for (i=0; i<NGENES; i++) {
+  for (i=0; i < NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
   }
 
   /* get the kdis.txt values */
-  fpkdis = fopen("kdis.txt","r");
+  if ((fpkdis = fopen("kdis.txt","r"))==NULL)
+    fprintf(fperrors,"error: Can't open %s file\n", "kdis.txt");
   for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
-    fscanf(fpkdis,"%f", &kdis[j]);
+    fscanf(fpkdis, "%f", &kdis[j]);
   }
   fclose(fpkdis);
 
@@ -263,7 +266,10 @@ int main(int argc, char *argv[])
   fclose(fperrors);
   for (j = 0; j < POP_SIZE; j++) {
     fclose(fp_cellsize[j]);
+    // TODO: currently disable
+#if 0
     fclose(fp_growthrate[j]);
     fclose(fp_tfsbound[j]);
+#endif
   }
 }
