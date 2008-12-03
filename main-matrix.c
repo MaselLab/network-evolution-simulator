@@ -145,11 +145,12 @@ void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
       
 } 
   
-void transitions(int size, unsigned long *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
+void transitions(int startSite,int size, unsigned long *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
        statesV1 = fopen("statesV1.txt", "w");
        columnV1 = fopen("columnV1.txt","w");
      if (statesV1 = fopen("statesV1.txt", "w") ){
      if( columnV1 = fopen("columnV1.txt", "w")){
+      
        int i, p,j,m, tf,  a;
        unsigned long row;
        int n=0;
@@ -158,7 +159,7 @@ void transitions(int size, unsigned long *viableStates, int TFBSites, struct Tty
           arrayT[n].col = i;
           arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
          printf("viableStates:%d, col num:%d\n",viableStates[i], i);
-       fprintf(statesV1,"%.1f \n", viableStates[i]);
+       fprintf(statesV1,"%d \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
         m=0;
         row = viableStates[i];
@@ -433,7 +434,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 17;
+    TFBS = 35;
     int *startPos;
     int *hammDist;
     float *diag;
@@ -500,19 +501,21 @@ int main(int argc, char *argv[])
      printf("\n");
      int lem;
       int bob;
-     for(lem =0; lem<TFBS; lem++){
-             startPos[lem] = indiv.allBindingSites[lem].leftEdgePos;
-             hammDist[lem] = indiv.allBindingSites[lem].hammingDist;
-             TFon[lem] = indiv.allBindingSites[lem].tfID;
+      int startSite=0;
+     for(lem =startSite; lem<TFBS+startSite; lem++){
+             startPos[lem-startSite] = indiv.allBindingSites[lem].leftEdgePos;
+             hammDist[lem-startSite] = indiv.allBindingSites[lem].hammingDist;
+             TFon[lem-startSite] = indiv.allBindingSites[lem].tfID;
              bob = indiv.allBindingSites[lem].tfID;
              //printf("bob= %d\n", bob);
-             Kon[lem] = initProteinConc[bob]*kon;
+             Kon[lem-startSite] = initProteinConc[bob]*kon;
              
              printf("%d", indiv.allBindingSites[lem].leftEdgePos);
-             printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
-             printf(" Kon[lem] = %f\n", Kon[lem]);
+             printf(" Hd = %d   tf = %d", hammDist[lem-startSite], TFon[lem-startSite]);
+             printf(" Kon[lem] = %f\n", Kon[lem-startSite]);
             
      }
+     system("PAUSE");
      /*int mat;
      for(mat=0; mat<TFBS; mat++){
         printf("tf[%d] = %d\n", mat, TFon[mat]);
@@ -530,7 +533,7 @@ int main(int argc, char *argv[])
         printf("tf[%d] = %d\n", mat, TFon[mat]);
      }*/
      system("PAUSE");
-     transitions(array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
+     transitions(startSite,array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
       // system("PAUSE");
       //addRowOnes(arrayT, array);
       //printf("HERE");
