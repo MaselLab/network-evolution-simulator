@@ -231,6 +231,7 @@ typedef struct CellState CellState;
 struct CellState {
   int cellID;                         /* cell ID */
   int founderID;                      /* keep track of the founder cell */
+  int burn_in;                        /* keep track of whether burn-in has finished */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
   int divisions;                      /* total number of divisions cell has undergone */
   float division_time;                /* current division time */ 
@@ -309,11 +310,14 @@ float kon; /* lower value is so things run faster */
 float kon_after_burnin; 
 int burn_in;
 
-float tdevelopment;  /* default maximum development time: can be changed at runtime */
+float tdevelopment;  /* default development time: can be changed at runtime */
+float timemax;       /* set an upper limit to development time */
 int current_ploidy;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output;
 long seed ;         /* something is wrong here: changing seed changes nothing */
-int dummyrun;            /* used to change seed */
+int dummyrun;       /* used to change seed */
+int recompute_koff; /* toggle whether to recompute certain features at each time to avoid
+                       compounding rounding error */
 float critical_size ; /* critical size at which cell divides, 
                          set to negative to prevent division  */
 float growth_rate_scaling; /* set growth rate scaling factor */
@@ -327,6 +331,7 @@ char *output_directory ;
 int verbose ;
 FILE *fperrors;
 FILE *fp_cellsize[POP_SIZE];
+FILE *fp_koff[POP_SIZE];
 FILE *fp_growthrate[POP_SIZE];
 FILE *fp_tfsbound[POP_SIZE];
 
@@ -414,7 +419,8 @@ extern void initialize_cell(CellState *,
                             int [NGENES],
                             float [NGENES],
                             float [NGENES],
-                            float [NGENES]);
+                            float [NGENES],
+                            int);
 
 extern void calc_time (float, 
                        float, 

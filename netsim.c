@@ -52,11 +52,14 @@ float kon_after_burnin=1e-4; /* lower value is so things run faster */
    and 89% of the proteins being in the nucleus*/
 int burn_in = 0;
 
-float tdevelopment=120.0;  /* default maximum development time: can be changed at runtime */
+float tdevelopment = 120.0;/* default  development time: can be changed at runtime */
+float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
 int dummyrun = 4;          /* used to change seed */
+int recompute_koff = 0;    /* toggle whether to recompute certain features at each time to avoid
+                              compounding rounding error (off by default) */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
 float growth_rate_scaling = 2.0; /* set growth rate scaling factor */
@@ -544,7 +547,8 @@ void initialize_cell(CellState *state,
                      int copies[NGENES],
                      float mRNAdecay[NGENES],
                      float meanmRNA[NGENES],
-                     float initProteinConc[NGENES])
+                     float initProteinConc[NGENES],
+                     int burn_in)
 {
   int i, j, k, totalmRNA;
   float t;
@@ -557,6 +561,9 @@ void initialize_cell(CellState *state,
 
   /* don't start in S phase */
   state->in_s_phase = 0;
+
+  /* initialize whether to do kon burn-in or not */
+  state->burn_in = burn_in;
 
   /* start cell size at 0.5 */
   state->cellSize = 0.5;
@@ -680,7 +687,7 @@ void calc_kon_rate(float t,
     }
   }
   *konrate = kon*r/t;
-  LOG_VERBOSE_NOCELLID("r=%g t=%g konrate=%g\n",r,t,*konrate);
+  LOG_VERBOSE_NOCELLID("r=%g t=%g konrate=%g\n", r, t, *konrate);
 }
 
 /* must have already updated proteinConc first */
@@ -768,8 +775,8 @@ void scan_nearby_sites(int indexChanged,
       posdiff = allBindingSites[indexChanged].leftEdgePos - allBindingSites[state->tfBoundIndexes[j]].leftEdgePos;
       //printf("diff3=%d\n", posdiff);
       if (abs(posdiff) < HIND_LENGTH) { /* within HIND_LENGTH: bad: shouldn't happen Phey*/
-        LOG_ERROR("steric hindrance 2 has been breached with site %d %d away from site %d\n",
-                  indexChanged, posdiff, state->tfBoundIndexes[j]);
+        LOG_ERROR("t=%g steric hindrance 2 has been breached with site %d %d away from site %d\n",
+                  t, indexChanged, posdiff, state->tfBoundIndexes[j]);
       }
       if (abs(posdiff) < cooperative_distance) {  /* within 20, adjust koff */
 
@@ -1341,7 +1348,7 @@ void remove_tf_binding(Genotype *genes,
       }
     }    
 
-    /* reduce the koff rate by the mount */
+    /* reduce the koff rate by the amount */
     rates->koff -= koffvalues[i];
 
     /* one less bound site */
@@ -2461,12 +2468,14 @@ void recalibrate_cell(GillespieRates *rates,
   }
 
   /* recompute koffvalues for all sites */
+  float temprate = 0.0;
   for (i=0; i < state->tfBoundCount; i++) {
     int site = state->tfBoundIndexes[i];
     // TODO: should get real time from simulation, will add later
     calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[i]), 9999.0);
-    rates->koff += (*koffvalues)[i];
+    temprate += (*koffvalues)[i];
   }
+  rates->koff = temprate;
 
   /* now update with kon */
   rates->salphc *= kon;
@@ -2673,6 +2682,7 @@ void clone_cell(Genotype *genes_orig,
 
   state_clone->founderID = state_orig->founderID;
   state_clone->in_s_phase = state_orig->in_s_phase;
+  state_clone->burn_in = state_orig->burn_in;
   state_clone->divisions = state_orig->divisions;
 
   state_clone->cellSize = state_orig->cellSize;
@@ -2822,6 +2832,8 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->tfHinderedCount = 0;
 
   state->in_s_phase = 0;   /* reset S phase state to 0 */
+  // TODO: check to see whether we want burn-in at the birth of each new cell ?
+  state->burn_in = 0;      /* only do burn-in at beginning of runs */
   state->division_time = 999999.0;  /* reset division time for this cell */
   state->divisions = state_clone.divisions; /* copy division counter */
 
@@ -3284,12 +3296,13 @@ void log_snapshot(GillespieRates *rates,
                   float mRNAdecay[NGENES],
                   float transport[NGENES],
                   float konrate,
-                  float x)
+                  float x,
+                  float t)
 {
   int i, p, nkon = 0;
 
-  LOG("snapshot:\n x=%g, koff=%g = %d (tfBoundCount) * %g (koff/tfBoundCount)\n transport=%g\n decay=%g\n",
-      x, rates->koff, state->tfBoundCount, rates->koff/(float)state->tfBoundCount, 
+  LOG("snapshot at time=%g:\n x=%g, koff=%g = %d (tfBoundCount) * %g (koff/tfBoundCount)\n transport=%g\n decay=%g\n",
+      t, x, rates->koff, state->tfBoundCount, rates->koff/(float)state->tfBoundCount, 
       rates->transport, rates->mRNAdecay);
   LOG_NOFUNC(" rates->salphc=%g\n rates->maxSalphc=%g rates->minSalphc=%g\n", rates->salphc, rates->maxSalphc, rates->minSalphc);
   LOG_NOFUNC(" konrate=%g\n", konrate);
@@ -3336,9 +3349,20 @@ float do_single_timestep(Genotype *genes,
   
   float f, df, konrate2, diff, sum, ct, ect, fixed_time;
 
-  if (*t > 0.00005 && burn_in) {
-    printf("recalibrating cell after burn-in!\n");
-    LOG("recalibrating cell after burn-in!\n");
+  if (recompute_koff) {
+    // TODO: check drift from koff every 5 mins
+    //int trunc_time = trunc(*t);
+    //if ((trunc_time % 5) == 0) {
+    float temprate = 0.0;
+    for (i = 0; i < state->tfBoundCount; i++) 
+      temprate += koffvalues[i];
+    fprintf(fp_koff[state->cellID], "%g %g\n", *t, rates->koff - temprate);
+    rates->koff = temprate;
+  }
+  
+  if (*t > 0.00005 && state->burn_in) {
+    printf("recalibrating cell %3d after burn-in!\n", state->cellID);
+    LOG("recalibrating cell %3d after burn-in!\n", state->cellID);
     log_snapshot(rates,
                  state,
                  genes,
@@ -3347,9 +3371,11 @@ float do_single_timestep(Genotype *genes,
                  mRNAdecay,
                  transport, 
                  *konrate,
-                 *x);
+                 *x,
+                 *t);
 
     kon = kon_after_burnin;
+
     recalibrate_cell(rates,
                      state,
                      genes,
@@ -3358,7 +3384,12 @@ float do_single_timestep(Genotype *genes,
                      mRNAdecay,
                      transport,
                      *dt); 
-    
+
+    // TODO: check!
+    /* compute total konrate (which is constant over the Gillespie step) */
+    if (konStates->nkon==0) *konrate = (-rates->salphc);
+    else calc_kon_rate(*dt, konStates, konrate); 
+
     log_snapshot(rates,
                  state,
                  genes,
@@ -3367,8 +3398,9 @@ float do_single_timestep(Genotype *genes,
                  mRNAdecay,
                  transport,
                  *konrate,
-                 *x);
-    burn_in = 0;
+                 *x,
+                 *t);
+    state->burn_in = 0;
   } 
 
   
@@ -3381,7 +3413,7 @@ float do_single_timestep(Genotype *genes,
   }
   
   // TODO: currently disable printing out the TF occupancy
-#if 0
+#if 1
   print_tf_occupancy(state, genes->allBindingSites, *t);
 #endif
   
@@ -3540,12 +3572,12 @@ float do_single_timestep(Genotype *genes,
                    mRNAdecay,
                    transport, 
                    *konrate,
-                   *x);
+                   *x,
+                   *t);
     }
     /* JM: kon generally could be handled better, with more direct
      * references to konStates->nkonsum, probably a bit vulnerable to rounding
-     * error
-     */
+     * error */
     
     /* 
      * STOCHASTIC EVENT: a TF unbinds (koff) 
@@ -3733,7 +3765,7 @@ void develop(Genotype genes[POP_SIZE],
       for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
         ran1(&seed);
    
-    initialize_cell(&state[j], j, genes[j].copies, genes[j].mRNAdecay, initmRNA, initProteinConc);
+    initialize_cell(&state[j], j, genes[j].copies, genes[j].mRNAdecay, initmRNA, initProteinConc, burn_in);
 
     /* print binding sites */
     if (output_binding_sites) 
@@ -3831,6 +3863,20 @@ void develop(Genotype genes[POP_SIZE],
                        maxbound3,
                        no_fixed_dev_time);
 
+    // TODO: cleanup
+    /* abort if a population of one cell, undergoing a single division
+       exceeds an maximum upper limit */
+    if (POP_SIZE==1 && max_divisions==1 && timemax > 0.0) {
+      if (t_next > timemax) {
+        printf("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
+               cell, t_next, timemax);
+
+        LOG_ERROR("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
+                  cell, t_next, timemax);
+        break;
+      }
+    }
+
     if (t_next >= (state[cell]).division_time)  {  /* we have now reached cell division */
       
       divisions++;     /* increment number of divisions */
@@ -3848,26 +3894,30 @@ void develop(Genotype genes[POP_SIZE],
         LOG("removing pending event from queue (length=%3d) replaced by daughter cell=%d\n", queue->n, daughterID);
       } 
 
-      do_cell_division(motherID,
-                       daughterID,
-                       &(genes[motherID]),
-                       &(state[motherID]),
-                       &(rates[motherID]),
-                       &(konStates[motherID]),
-                       &(koffvalues[motherID]),
-                       transport[motherID],
-                       mRNAdecay[motherID],
-                       &(genes[daughterID]),
-                       &(state[daughterID]),
-                       &(rates[daughterID]),
-                       &(konStates[daughterID]),
-                       &(koffvalues[daughterID]),
-                       transport[daughterID],
-                       mRNAdecay[daughterID],
-                       0.44,
-                       x[motherID],
-                       dt[motherID]);
-
+      if (time_s_phase + time_g2_phase > 0.0) {
+        do_cell_division(motherID,
+                         daughterID,
+                         &(genes[motherID]),
+                         &(state[motherID]),
+                         &(rates[motherID]),
+                         &(konStates[motherID]),
+                         &(koffvalues[motherID]),
+                         transport[motherID],
+                         mRNAdecay[motherID],
+                         &(genes[daughterID]),
+                         &(state[daughterID]),
+                         &(rates[daughterID]),
+                         &(konStates[daughterID]),
+                         &(koffvalues[daughterID]),
+                         transport[daughterID],
+                         mRNAdecay[daughterID],
+                         0.44,
+                         x[motherID],
+                         dt[motherID]);
+      } else {
+        LOG("Skip division S phase and G2 phase have zero length\n", motherID);
+      }
+        
       LOG("AFTER DIVISION: take a new step for mother cell=%d\n", motherID);
 
       if (daughterID != motherID) {

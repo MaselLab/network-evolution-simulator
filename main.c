@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
   FILE *fpout, *fpkdis;
   char fperrors_name[80];
   char fp_cellsize_name[80];
+  char fp_koff_name[80];
   char fp_growthrate_name[80];
   char fp_tfsbound_name[80];
   int i, j, k, gen;
@@ -58,10 +59,12 @@ int main(int argc, char *argv[])
         {"randomseed", required_argument, 0, 'r'},
         {"ploidy",  required_argument, 0, 'p'},
         {"timedev",  required_argument, 0, 't'},
+        {"timemax",  required_argument, 0, 0},
         {"criticalsize",  required_argument, 0, 'c'},
         {"divisions",  required_argument, 0, 's'},
         {"genotypeconst",  no_argument, 0, 'g'},
         {"random-replication",  no_argument, 0, 0},
+        {"recompute-koff",  no_argument, 0, 0},
         {"nofixedtime",  no_argument, 0, 'n'},
         {"burnin",  no_argument, 0, 'b'},
         {"kon",  required_argument, 0, 0},
@@ -107,9 +110,15 @@ int main(int argc, char *argv[])
       } else if (strcmp("growthscaling", long_options[option_index].name) == 0) {
         growth_rate_scaling  = strtof(optarg, &endptr);
         printf("setting growthscaling=%g\n", growth_rate_scaling);
+      } else if (strcmp("timemax", long_options[option_index].name) == 0) {
+        timemax  = strtof(optarg, &endptr);
+        printf("setting timemax=%g\n", timemax);
       } else if (strcmp("random-replication", long_options[option_index].name) == 0) {
         printf("making replication times random in S phase\n");
         random_replication_time = 1;
+      } else if (strcmp("recompute-koff", long_options[option_index].name) == 0) {
+        printf("recompute rates->koff\n");
+        recompute_koff = 1;
       } else { 
         printf ("option %s", long_options[option_index].name);
         if (optarg)
@@ -156,6 +165,8 @@ int main(int argc, char *argv[])
  -r,  --randomseed=SEED     random seed\n\
  -p,  --ploidy=PLOIDY       ploidy (1=haploid, 2=diploid)\n\
  -t,  --timedev=TIME        length of time to run development\n\
+ -t,  --timemax=TIME        set a maximum length of time to run development\n\
+                             (no upper limit by default)\n\
  -n,  --nofixedtime         no fixed development time\n\
  -s,  --divisions=DIVISONS  maximum number of divisions\n\
  -c,  --criticalsize=SIZE   critical size for cell division\n\
@@ -167,6 +178,7 @@ int main(int argc, char *argv[])
       --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
       --growthscaling=GS    amount to accelerate the growth rate\n\
                               (2.0 by default)\n\
+      --recompute-koff      recompute koff every time step\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);
@@ -215,16 +227,20 @@ int main(int argc, char *argv[])
     if ((fp_cellsize[j] = fopen(fp_cellsize_name,"w"))==NULL)
       fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
 
+    sprintf(fp_koff_name, "%s/koff-%03d.dat", output_directory, j);
+    if ((fp_koff[j] = fopen(fp_koff_name,"w"))==NULL)
+      fprintf(fperrors,"error: Can't open %s file\n", fp_koff_name);
+
+
     // TODO: currently disable
 #if 0
     sprintf(fp_growthrate_name, "%s/growthrate-%03d.dat", output_directory, j);
     if ((fp_growthrate[j] = fopen(fp_growthrate_name,"w"))==NULL)
       fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
-
+#endif
     sprintf(fp_tfsbound_name, "%s/tfsbound-%03d.dat", output_directory, j);
     if ((fp_tfsbound[j] = fopen(fp_tfsbound_name,"w"))==NULL)
       fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
-#endif
   }
   
   /* slight hack to initialize seed  */
@@ -266,10 +282,11 @@ int main(int argc, char *argv[])
   fclose(fperrors);
   for (j = 0; j < POP_SIZE; j++) {
     fclose(fp_cellsize[j]);
+    fclose(fp_koff[j]);
     // TODO: currently disable
 #if 0
     fclose(fp_growthrate[j]);
-    fclose(fp_tfsbound[j]);
 #endif
+    fclose(fp_tfsbound[j]);
   }
 }

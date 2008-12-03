@@ -41,7 +41,7 @@ main-matrix-32bit: clean
 	make EXTRACFLAGS="-m32" main-matrix
 
 ## common command for doing regression test diff
-DIFF_CMD := @diff -r  --exclude=tfsbound*.dat --exclude=.svn --exclude=NOTES --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
+DIFF_CMD := @diff -r --exclude=.svn --exclude=NOTES --exclude=koff*.dat  --exclude=tfsbound*.dat  --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
 
 ## check specific directory
 check-haploid:	clean
@@ -80,13 +80,14 @@ run-full-pops: clean
 ##	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 20 --timesphase 1.0 --timeg2phase 0.0 --random-replication --growthscaling=10.0  --kon 0.2225 --konafter 1e-4
 
 run-gs:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim
-	for ((g=100;g>=20;g-=40)); do \
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-gs
+	for ((gs=10;gs>=0;gs-=1)); do  \
+	   g=$$(qalc -t "round(10^(2*$${gs}/10))"); \
 	   for ((rand=04;rand<14;rand+=1)); do  \
 	     echo "random number=" $${rand} "growth rate scaling=" $${g} ; \
-	     dir=$${g}-$$(printf "%02d" $${rand}); \
+	     dir=$$(printf "%03g" $${g})-$$(printf "%02d" $${rand}); \
 	     echo $${dir} ; \
-	     ./netsim -r $${rand} -p 2 -d growthscaling/$${dir} -c 1.0 -n -s 1 --timesphase 0.0 --timeg2phase 0.0 --growth $${g} --kon 0.2225 --konafter 1e-4 ; \
+	     time ./netsim-gs -r $${rand} -p 2 -d growthscaling/$${dir} -c 1.0 -n -s 1 --timemax=1000.0 --timesphase 0.0 --timeg2phase 0.0 --growth $${g} --kon 0.2225 --konafter 1e-4 --random-replication --recompute-koff ; \
 	   done \
 	done	
 
@@ -94,4 +95,4 @@ run-gs:	clean
 profiling:	netsim-gprof
 
 clean:
-	rm -f netsim netsim-check netsim-gprof $(OBJS)
+	rm -f netsim netsim-gs netsim-full-500 netsim-check netsim-gprof $(OBJS)
