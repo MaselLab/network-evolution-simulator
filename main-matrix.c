@@ -119,7 +119,7 @@ void configure(int bindSite, int *bits, int *numStates, unsigned long *statesArr
            //convertToDecimal(bits, TFBS);
            printf("%d\n", TFBS);
            statesArray[(*numStates)] = convertToDecimal(bits, TFBS);
-           printf("numstates=%d, %d convert=%d\n", (*numStates), statesArray[(*numStates)], convertToDecimal(bits, TFBS));
+           printf("numstates=%d, %lu convert=%lu\n", (*numStates), statesArray[(*numStates)], convertToDecimal(bits, TFBS));
            (*numStates)++;
            //for(i=0; i<TFBS; i++){
              // printf("%d", bits[i]);
@@ -148,10 +148,10 @@ void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
 void transitions(int startSite,int size, unsigned long *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
        statesV1 = fopen("statesV1.txt", "w");
        columnV1 = fopen("columnV1.txt","w");
-     if (statesV1 = fopen("statesV1.txt", "w") ){
-     if( columnV1 = fopen("columnV1.txt", "w")){
+     if ((statesV1 = fopen("statesV1.txt", "w"))) {
+     if ((columnV1 = fopen("columnV1.txt", "w"))) {
       
-       int i, p,j,m, tf,  a;
+       int i, p, j, m, a;
        unsigned long row;
        int n=0;
        printf("size=%d TFBS= %d\n", size, TFBSites);
@@ -159,7 +159,7 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
           arrayT[n].col = i;
           arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
          printf("viableStates:%lu, col num:%d\n",viableStates[i], i);
-       fprintf(statesV1,"%d \n", viableStates[i]);
+       fprintf(statesV1,"%lu \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
         m=0;
         row = viableStates[i];
@@ -220,7 +220,7 @@ void print_arrayT(struct Ttype *arrayT, int size, unsigned long *viableStates){
        while (q < arrayT[p].rowCount) {
           //if(arrayT[p].row[q].rownum!=4){
          //printf("rownum=%d\n", &(arrayT[p].row[q].rownum));
-          printf( "%d  %d | %d  %d  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
+          printf( "%d  %ld | %ld  %lu  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
     	 // }else{
               //printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
           //}//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
@@ -243,9 +243,9 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
        q=0;
        while (q < arrayT[p].rowCount) {
            if(arrayT[p].row[q].rownum!=4){
-           printf(" %d      %d      %f\n", p,arrayT[p].row[q].rownum,  *arrayT[p].row[q].kval); 
+           printf(" %d      %ld      %f\n", p,arrayT[p].row[q].rownum,  *arrayT[p].row[q].kval); 
            }else{
-                printf(" %d      %d      %d\n", p,arrayT[p].row[q].rownum,  1);  
+                printf(" %d      %ld      %d\n", p,arrayT[p].row[q].rownum,  1);  
            }
            q++;
        }
@@ -259,7 +259,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
     //system("PAUSE");
    
     sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
-     if (sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w")){
+    if ((sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w"))) {
         //ask alex about this line of code...
        //fprintf(sparseMatrixV1, "1Row  Column  Value\n\n");
         //printf( "1Row  Column  Value\n\n");
@@ -268,7 +268,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
       int q=0;
        while (q < arrayT[p].rowCount) {
        if(arrayT[p].row[q].rownum!=4){
-       fprintf(sparseMatrixV1, "%d,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval);
+       fprintf(sparseMatrixV1, "%ld,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval);
       }else{} 
       // printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
        q++;
@@ -287,7 +287,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
 void print_vector_MATLAB(int size){
      int i;
       bVector = fopen("bVector.txt", "w");
-     if (bVector = fopen("bVector.txt", "w")){
+      if ((bVector = fopen("bVector.txt", "w"))) {
        for(i=0; i<size; i++){
          if(i!=4){
             fprintf(bVector, "%d\n", 0);
@@ -303,7 +303,7 @@ int main(int argc, char *argv[])
 {
   FILE *fpkdis;
   char fperrors_name[80];
-  int i, j, k;
+  int i, j;
   Genotype indiv;
   float initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
 
@@ -359,13 +359,14 @@ int main(int argc, char *argv[])
 #endif
 #endif
 
-  if (directory_success==-1) 
+  if (directory_success==-1) {
     if (errno == EEXIST) {
       fprintf(stderr, "directory '%s' already exists\n", output_directory);
     } else {
       fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
       exit(-1);
     }
+  }
 
   sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
   fperrors = fopen(fperrors_name, "w");
@@ -425,7 +426,7 @@ int main(int argc, char *argv[])
   /* print binding sites */
   /*print_all_binding_sites(indiv.ploidy, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq); 
-  printf("tfsPerGene = %d", indiv.tfsPerGene);
+			  printf("tfsPerGene = %d", indiv.tfsPerGene); */
 
 
   /* Jasmin:
@@ -478,7 +479,7 @@ int main(int argc, char *argv[])
    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
    system("PAUSE");
      leftEdgePositions = fopen("leftEdgePositions.txt", "w");
-     if (leftEdgePositions = fopen("leftEdgePositions.txt", "w")){
+     if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
    for (i=0; i <indiv.tfsPerGene[0] ; i++) {
        if(indiv.allBindingSites[i].cisregID ==1){
           printf("One:%d  LeftEdge:%d\n", i, indiv.allBindingSites[i].leftEdgePos);
