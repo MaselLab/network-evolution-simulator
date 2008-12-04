@@ -11,6 +11,7 @@ int main(int argc, char *argv[])
 
   for (i=0; i<10; i++) {
     printf("%d ran1=%g\n", i, ran1(&seed));
+    printf("%d gasdev=%g\n", i, gasdev(&seed));
   }
 }
 

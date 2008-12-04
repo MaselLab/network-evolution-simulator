@@ -207,6 +207,8 @@ void initialize_genotype(Genotype *indiv,
       indiv->hindrancePositions[p]=0;
     } else  {
       indiv->hindrancePositions[p]=rand()%10;
+      //TODO: check this
+      //indiv->hindrancePositions[p]=rand()%[HIND_LENGTH - TF_ELEMENT_LEN];
     }
   } 
   
