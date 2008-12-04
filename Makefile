@@ -29,6 +29,10 @@ main-matrix: main-matrix.c $(OBJS) $(OTHER)
 qtest: qtest.c $(OBJS) priority-queue.o 
 	$(CC) $(CFLAGS) $(OBJS) priority-queue.o -o $@ $(LIBS) qtest.c
 
+rnd_test: rnd_test.c random.o
+	$(CC) $(CFLAGS) random.o -o $@ $(LIBS) rnd_test.c
+
+
 netsim: $(OBJS)
 netsim-gs: $(OBJS)
 netsim-full-500: $(OBJS)
@@ -77,7 +81,7 @@ check-multiple-pops:	clean
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500
-##	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 20 --timesphase 1.0 --timeg2phase 0.0 --random-replication --growthscaling=10.0  --kon 0.2225 --konafter 1e-4
+	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 20 --timesphase 1.0 --timeg2phase 0.0 --random-replication --growthscaling=10.0  --kon 0.2225 --konafter 1e-4
 
 run-gs:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-gs
