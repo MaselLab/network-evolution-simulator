@@ -120,11 +120,13 @@ void initialize_sequence(char *Seq,
     fourth = third + current_element;
     //printf("first=%d, second=%d, third=%d, fourth=%d\n", first, second, third, fourth); 
     x = ran1(&seed);
+    
     Seq[first] = set_base_pair(x);
     /* clone the randomly chosen sequence for all other sites */
     Seq[second] = Seq[first];
     Seq[third] = Seq[first];
     Seq[fourth] = Seq[first];
+    if(((len/ploidy)-i)<10){ printf("random num %d %c in initialize_seq: %.2f\n",i, Seq[first], x);}
   }
   //printf("length: %d, sequence is %s\n", strlen(Seq), Seq);
 }
@@ -206,10 +208,10 @@ void initialize_genotype(Genotype *indiv,
     if (HIND_LENGTH == TF_ELEMENT_LEN) {
       indiv->hindrancePositions[p]=0;
     } else  {
-      indiv->hindrancePositions[p]=rand()%10;
-      //TODO: check this
-      //indiv->hindrancePositions[p]=rand()%[HIND_LENGTH - TF_ELEMENT_LEN];
+      indiv->hindrancePositions[p]=rint(ran1(&seed)*(HIND_LENGTH - TF_ELEMENT_LEN));
+      //indiv->hindrancePositions[p]=rand()%10;
     }
+    printf("hindrance position for copy %d: %d\n", p, indiv->hindrancePositions[p]);
   } 
   
   calc_all_binding_sites(indiv->copies, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
