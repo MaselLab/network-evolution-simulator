@@ -126,7 +126,6 @@ void initialize_sequence(char *Seq,
     Seq[second] = Seq[first];
     Seq[third] = Seq[first];
     Seq[fourth] = Seq[first];
-    if(((len/ploidy)-i)<10){ printf("random num %d %c in initialize_seq: %.2f\n",i, Seq[first], x);}
   }
   //printf("length: %d, sequence is %s\n", strlen(Seq), Seq);
 }

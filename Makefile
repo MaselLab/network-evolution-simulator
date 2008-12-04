@@ -1,7 +1,7 @@
 all: netsim
 
 CC = gcc
-CFLAGS = -g -std=c99 $(EXTRACFLAGS)
+CFLAGS = -g -std=c99 $(EXTRACFLAGS) -Wall
 #  -O3 -pg
 OBJS = random.o lib.o netsim.o priority-queue.o
 LIBS = -lm
