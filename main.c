@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- 
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
  * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
@@ -23,18 +23,20 @@
 
 int main(int argc, char *argv[])
 {
-  FILE *fpout, *fpkdis;
+  FILE *fpkdis;
   char fperrors_name[80];
   char fp_cellsize_name[80];
   char fp_koff_name[80];
+#if 0
   char fp_growthrate_name[80];
+#endif
   char fp_tfsbound_name[80];
-  int i, j, k, gen;
+  int i, j;
   CellState state[POP_SIZE];
   Genotype indivs[POP_SIZE];
   TimeCourse *timecoursestart[POP_SIZE][NGENES]; /* array of pointers to list starts */
   TimeCourse *timecourselast[POP_SIZE][NGENES];
-  float initmRNA[NGENES], initProteinConc[NGENES], x, kdis[NUM_K_DISASSEMBLY];
+  float initmRNA[NGENES], initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
 
   int directory_success;
   int hold_genotype_constant = 0;
@@ -209,13 +211,14 @@ int main(int argc, char *argv[])
 #endif
 #endif
 
-  if (directory_success==-1) 
+  if (directory_success==-1) {
     if (errno == EEXIST) {
       fprintf(stderr, "directory '%s' already exists\n", output_directory);
     } else {
       fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
       exit(-1);
     }
+  }
 
   /* create error output file */
   sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);

@@ -8,8 +8,7 @@
 /* add an element to the queue with an associated priority */
 int insert_with_priority(FixedEvent **queue, FixedEvent **end, int cell, float time) {
   int pos;
-  //pos = add_fixed_event(cell, time, queue, end);
-  pos = add_fixed_event(cell, 0, time, queue, end);
+  pos = add_fixed_event(cell, -1, time, queue, end);
   if (queue == NULL) 
     printf("queue is empty after adding an event\n");
   return pos;
@@ -31,13 +30,13 @@ float get_next(FixedEvent **queue, FixedEvent **end, int *cell) {
 }
 
 void delete_element(FixedEvent **queue, FixedEvent **end, int cell, float time) {
-  //delete_fixed_event(cell, (int) trunc(time), queue, end);
-  delete_fixed_event(cell, 0, (int) trunc(time), queue, end);
+  delete_fixed_event(cell, -1, (int) trunc(time), queue, end);
 }
 
 /* look at the element with highest priority without removing it */
 float peek_at_next(FixedEvent *queue, FixedEvent *end, int *cell) {
-  //
+  // TODO: implement, if necessary
+  return 0.0;
 }
 
 /*  Author: Shane Saunders 

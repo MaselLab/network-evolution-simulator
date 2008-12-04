@@ -12,7 +12,7 @@ float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *,
              float x, GillespieRates *rates, KonStates *konStates, float x1, float x2, float xacc)
 {
   int j,done;
-  float df,dx,dxold,f,fh,fl,xtemp;
+  float df,dx,dxold,f,fh,fl;
   float temp,xh,xl,rts;
   
   (*funcd)(x1, x, rates, konStates, &fl, &df);
