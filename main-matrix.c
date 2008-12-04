@@ -158,7 +158,7 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
        for( i=0;i<size; i++){
           arrayT[n].col = i;
           arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
-         printf("viableStates:%d, col num:%d\n",viableStates[i], i);
+         printf("viableStates:%lu, col num:%d\n",viableStates[i], i);
        fprintf(statesV1,"%d \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
         m=0;
@@ -501,7 +501,7 @@ int main(int argc, char *argv[])
      printf("\n");
      int lem;
       int bob;
-      int startSite=0;
+      int startSite=3;
      for(lem =startSite; lem<TFBS+startSite; lem++){
              startPos[lem-startSite] = indiv.allBindingSites[lem].leftEdgePos;
              hammDist[lem-startSite] = indiv.allBindingSites[lem].hammingDist;
@@ -524,7 +524,7 @@ int main(int argc, char *argv[])
      configure(0,bits,&array,viableStates,TFBS,startPos);
     int sh;
     for(sh=0; sh<array; sh++){
-              printf("%d\n", viableStates[sh]);
+              printf("%lu\n", viableStates[sh]);
 }
      printf("%d\n", array);
      print_vector_MATLAB(array);
