@@ -8,10 +8,13 @@ long seed = 28121;
 int main(int argc, char *argv[])
 {
   int i;
+  int r;
 
-  for (i=0; i<10; i++) {
+  for (i=0; i<100; i++) {
     printf("%d ran1=%g\n", i, ran1(&seed));
     printf("%d gasdev=%g\n", i, gasdev(&seed));
+    r = rand()%10;
+    printf("%d rand(): %d\n", i, r);
   }
 }
 
