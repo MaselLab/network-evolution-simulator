@@ -17,7 +17,7 @@
 
 
 
-int array_size = 400;
+int array_size = 1700;
 
 FILE *sparseMatrixV1;
 FILE *statesV1;
@@ -435,7 +435,7 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
     int TFBS;
-    TFBS = 35;
+    TFBS = 60;
     int *startPos;
     int *hammDist;
     float *diag;
