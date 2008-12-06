@@ -308,16 +308,17 @@ int main(int argc, char *argv[])
   float initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
 
   int c, directory_success;
-  int hold_genotype_constant = 0;
   int curr_seed;
-
+  int TFBS;
+  
+  TFBS = 31;
   verbose = 0;
 
   /* change to get a different genotype */
   dummyrun = 4;
 
   /* parse command-line options */
-  while ((c = getopt (argc, argv, "hvgd:r:p:t:c:")) != -1) {
+  while ((c = getopt (argc, argv, "hvd:r:p:w:a:")) != -1) {
     switch (c)
       {
       case 'd':
@@ -329,20 +330,17 @@ int main(int argc, char *argv[])
       case 'p':
         current_ploidy = atoi(optarg);
         break;
-      case 't':
-        tdevelopment = atof(optarg);
+      case 'w':
+        TFBS = atoi(optarg);
         break;
-      case 'c':
-        critical_size = atof(optarg);
-        break;
-      case 'g':
-        hold_genotype_constant = 1;
-        break;
-      case 'v':
+      case 'a':
+        array_size = atoi(optarg);
+        break;        
+     case 'v':
         verbose = 1;
         break;
       case 'h':
-        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-g] [-p PLOIDY] [-t DEVELOPMENTTIME] [-c CRITICALSIZE]\n", argv[0]);
+        fprintf(stderr, "%s [-d DIRECTORY] [-r DUMMYRUN] [-h] [-p PLOIDY] [-w WINDOWSIZE] [-a ARRAYSIZE]\n", argv[0]);
         exit(0);
         break;
       default:
@@ -434,8 +432,7 @@ int main(int argc, char *argv[])
      //system("PAUSE");
     //int sitePos[10];
     //int transFactor[10];
-    int TFBS;
-    TFBS = 31;
+
     int *startPos;
     int *hammDist;
     float *diag;
@@ -543,7 +540,7 @@ int main(int argc, char *argv[])
     system("PAUSE");
       //printf("HERE in between");
      print_arrayT_MATLAB(arrayT,array,viableStates);
-     printf("long=%d\n", sizeof(long));
+     printf("long=%ud\n", sizeof(long));
      printf("hindlength=%d\n", HIND_LENGTH);
       printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
        system("PAUSE");
