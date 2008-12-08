@@ -17,7 +17,7 @@
 
 
 
-int array_size = 200;
+int array_size = 2500;
 
 FILE *sparseMatrixV1;
 FILE *statesV1;
@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 31;
+  TFBS = 60;
   verbose = 0;
 
   /* change to get a different genotype */
@@ -499,7 +499,7 @@ int main(int argc, char *argv[])
      printf("\n");
      int lem;
       int bob;
-      int startSite=3;
+      int startSite=0;
      for(lem =startSite; lem<TFBS+startSite; lem++){
              startPos[lem-startSite] = indiv.allBindingSites[lem].leftEdgePos;
              hammDist[lem-startSite] = indiv.allBindingSites[lem].hammingDist;
