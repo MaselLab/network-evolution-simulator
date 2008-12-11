@@ -243,9 +243,11 @@ void print_arrayT(struct Ttype *arrayT, int size){
     
      configure(0,bits,&array,viableStates,TFBS);
      system("PAUSE");
-     //printf("viableStates=%d\n", viableStates[14]);
-     //printf("array=%d\n", array);
      
+     
+     printf("viableStates=%d\n", viableStates[14]);
+    printf("array=%d\n", array);
+    
      transitions(array,viableStates,TFBS,arrayT,kon,koff,hammDist, diag);
      print_arrayT(arrayT,array);
      
