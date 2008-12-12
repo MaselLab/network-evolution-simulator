@@ -17,7 +17,7 @@
 
 
 
-int array_size = 4000;
+int array_size = 1000;
 
 FILE *sparseMatrixV1;
 FILE *statesV1;
@@ -108,23 +108,22 @@ void configure(int bindSite, int *bits, int *numStates, unsigned long *statesArr
         bits[TFBS-1] = 0;
         statesArray[(*numStates)] = convertToDecimal(bits, TFBS);
         (*numStates)++;
-       // int i;
-       // for(i=0; i<TFBS; i++){
-          // printf("%d", bits[i]);
-       
-        //}
-        //printf("\n");
+       int i;
+        for(i=0; i<TFBS; i++){
+          printf("%d", bits[i]);
+          }
+        printf("\n");
         if(!isHindered(bindSite, bits,startPos)){
            bits[TFBS-1]=1;
            //convertToDecimal(bits, TFBS);
-           printf("%d\n", TFBS);
+           //printf("%d\n", TFBS);
            statesArray[(*numStates)] = convertToDecimal(bits, TFBS);
-           printf("numstates=%d, %lu convert=%lu\n", (*numStates), statesArray[(*numStates)], convertToDecimal(bits, TFBS));
+           //printf("numstates=%d, %lu convert=%lu\n", (*numStates), statesArray[(*numStates)], convertToDecimal(bits, TFBS));
            (*numStates)++;
-           //for(i=0; i<TFBS; i++){
-             // printf("%d", bits[i]);
-           //}
-          // printf("\n");
+           for(i=0; i<TFBS; i++){
+              printf("%d", bits[i]);
+           }
+           printf("\n");
         }
       } 
           //system("PAUSE");
@@ -297,10 +296,37 @@ void print_vector_MATLAB(int size){
        }
      }
 }
+
+int TestByteOrder()
+{
+   short int word = 0x0001;
+   char *byte = (char *) &word;
+   return byte[0];
+   //return(byte[0] ? LITTLE_ENDIAN : BIG_ENDIAN);
+}
   
 
 int main(int argc, char *argv[])
 {
+    /*NOTE: To make following code compatible with all platfroms and structures need to implement doe
+    for 4 types: 
+        - 32bit Little-Endian
+        - 32bit Big-Endian
+        - 64bit Little-Endian
+        - 64bit Big-Endian
+    Current code wirtten for 64bit Big-Endian
+    */
+    
+    //Check Endianess of system
+    int testEndian = TestByteOrder();
+    if(testEndian==1){printf("%d = LittleEndian\n\n", testEndian);}
+    else{printf("%d = BigEndian--WARNING: This code will not work correctly on BigEndian systems!\n\n", testEndian);}
+    
+    //Check platform of system
+    int testPlatform = sizeof(long);
+    if(testPlatform == 4){printf("32-bit : Number of Binding Sites cannot exceed 32sites\n\n");}
+    else{printf("64-bit\n\n");}
+    
   FILE *fpkdis;
   char fperrors_name[80];
   int i, j;
@@ -311,7 +337,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 56;
+  TFBS = 20;
   verbose = 0;
 
   /* change to get a different genotype */
@@ -501,15 +527,15 @@ int main(int argc, char *argv[])
      int max =0;
      int startPlus;
       int bob;
-      int startSite=2;
+      int startSite=0;
       startPlus = startSite;
-      while((indiv.allBindingSites[startPlus].leftEdgePos)<(indiv.allBindingSites[startSite].leftEdgePos + 44)){
+      while((indiv.allBindingSites[startPlus].leftEdgePos)<(indiv.allBindingSites[startSite].leftEdgePos )){
            startPlus++;
            max++;
       }
       printf("max=%d\n", max);
       //system("PAUSE");
-     for(lem =startSite; lem<max; lem++){
+     for(lem =startSite; lem<TFBS; lem++){
              startPos[lem-startSite] = indiv.allBindingSites[lem].leftEdgePos;
              hammDist[lem-startSite] = indiv.allBindingSites[lem].hammingDist;
              TFon[lem-startSite] = indiv.allBindingSites[lem].tfID;
