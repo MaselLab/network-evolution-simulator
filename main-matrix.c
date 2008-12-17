@@ -559,6 +559,44 @@ int main(int argc, char *argv[])
     for(sh=0; sh<array; sh++){
               printf("%lu\n", viableStates[sh]);
 }
+ 
+     int y;
+     int ones, twos, none;
+     unsigned long *onesArray, *twosArray, *noneArray;
+     noneArray=malloc(60*sizeof(unsigned long));
+     onesArray= malloc(20*sizeof(unsigned long));
+     twosArray = malloc(20*sizeof(unsigned long));
+     ones =0;
+     twos=0;
+     none =0;
+     for(y=0; y<array; y++){
+         printf("%lu\n",viableStates[y]);    
+           
+        if(((viableStates[y])>>1)%2==1 ){
+           twosArray[twos] = viableStates[y];
+           twos++;
+        }else if((viableStates[y]-1)%2==0){
+              onesArray[ones] = viableStates[y];
+              ones++;
+        } else{
+               noneArray[none] = viableStates[y];
+               none++;
+        }
+     }        
+      printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
+      
+      for(y=0; y<ones; y++){
+         printf("%lu\n", onesArray[y]);
+         }
+         printf("twosArray\n");
+      for(y=0; y<twos; y++){
+         printf("%lu\n", twosArray[y]);
+         }
+         printf("noneArray\n");
+      for(y=0; y<none; y++){
+         printf("%lu\n", noneArray[y]);
+         } 
+ 
      printf("%d\n", array);
      print_vector_MATLAB(array);
      //arrayT=realloc(arrayT, array*sizeof(struct Ttype));
