@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 20;
+  TFBS = 15;
   verbose = 0;
 
   /* change to get a different genotype */
