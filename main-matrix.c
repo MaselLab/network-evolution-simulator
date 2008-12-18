@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 15;
+  TFBS = 18;
   verbose = 0;
 
   /* change to get a different genotype */
@@ -524,28 +524,31 @@ int main(int argc, char *argv[])
    
      printf("\n");
      int lem;
-     int max =0;
-     int startPlus;
+     int startSite;
+     startSite=0;
       int bob;
-      int startSite=0;
+    /* int max =0;
+     int startPlus;
+     
+      int startSite=2;
       startPlus = startSite;
       while((indiv.allBindingSites[startPlus].leftEdgePos)<(indiv.allBindingSites[startSite].leftEdgePos )){
            startPlus++;
            max++;
       }
-      printf("max=%d\n", max);
+      printf("max=%d\n", max);*/
       //system("PAUSE");
-     for(lem =startSite; lem<TFBS; lem++){
-             startPos[lem-startSite] = indiv.allBindingSites[lem].leftEdgePos;
-             hammDist[lem-startSite] = indiv.allBindingSites[lem].hammingDist;
-             TFon[lem-startSite] = indiv.allBindingSites[lem].tfID;
-             bob = indiv.allBindingSites[lem].tfID;
+     for(lem =0; lem<TFBS; lem++){
+             startPos[lem] = indiv.allBindingSites[lem+startSite].leftEdgePos;
+             hammDist[lem] = indiv.allBindingSites[lem+startSite].hammingDist;
+             TFon[lem] = indiv.allBindingSites[lem+startSite].tfID;
+             bob = indiv.allBindingSites[lem+startSite].tfID;
              //printf("bob= %d\n", bob);
-             Kon[lem-startSite] = initProteinConc[bob]*kon;
+             Kon[lem] = initProteinConc[bob]*kon;
              
-             printf("%d", indiv.allBindingSites[lem].leftEdgePos);
-             printf(" Hd = %d   tf = %d", hammDist[lem-startSite], TFon[lem-startSite]);
-             printf(" Kon[lem] = %f\n", Kon[lem-startSite]);
+             printf("%d", indiv.allBindingSites[lem+startSite].leftEdgePos);
+             printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
+             printf(" Kon[lem] = %f\n", Kon[lem]);
             
      }
      system("PAUSE");
@@ -553,8 +556,10 @@ int main(int argc, char *argv[])
      for(mat=0; mat<TFBS; mat++){
         printf("tf[%d] = %d\n", mat, TFon[mat]);
      }*/
+    
      printf("\n");
      configure(0,bits,&array,viableStates,TFBS,startPos);
+      //system("PAUSE");
     int sh;
     for(sh=0; sh<array; sh++){
               printf("%lu\n", viableStates[sh]);
