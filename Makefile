@@ -49,12 +49,12 @@ DIFF_CMD := @diff -r --exclude=.svn --exclude=NOTES --exclude=koff*.dat  --exclu
 
 ## check specific directory
 check-haploid:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DNO_SEPARATE_GENE -DPOP_SIZE=1" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DNO_SEPARATE_GENE -DPOP_SIZE=1 -DUSE_RAND=1" netsim-check
 	./netsim-check -r 4 -p 1 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2008-08-29-haploid-dilution-hind-15-r-4,$(DIFF_CMD)))
 
 check-diploid:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE -DPOP_SIZE=1" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE -DPOP_SIZE=1 -DUSE_RAND=1" netsim-check
 	./netsim-check -r 4 -p 2 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2008-08-29-diploid-dilution-hind-15-r-4,$(DIFF_CMD)))
 
@@ -75,7 +75,7 @@ check-sample-output:	clean
 
 ## run for 4 divisions with reduced S and G2 phases
 check-multiple-pops:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4" netsim
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4 -DUSE_RAND=1" netsim
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
 	$(subst RUN,multiple-pops,$(subst ORIG,2008-11-29-multiple-pops-r-4-genotypecopy,$(DIFF_CMD)))
 

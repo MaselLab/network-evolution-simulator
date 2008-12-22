@@ -207,8 +207,13 @@ void initialize_genotype(Genotype *indiv,
     if (HIND_LENGTH == TF_ELEMENT_LEN) {
       indiv->hindrancePositions[p]=0;
     } else  {
+      // TODO: only keep until new regression output is generated
+#ifdef USE_RAND
+      indiv->hindrancePositions[p]=rand()%10;
+#else
       indiv->hindrancePositions[p]=rint(ran1(&seed)*(HIND_LENGTH - TF_ELEMENT_LEN));
-      //indiv->hindrancePositions[p]=rand()%10;
+#endif
+
     }
   } 
   
@@ -3663,7 +3668,10 @@ void do_single_timestep(Genotype *genes,
                        * events should be exhaustive
                        */
                       
-                      LOG_ERROR("[cell %03d] t=%g no event assigned: x=%g\n", state->cellID, *t, *x);
+                      LOG_ERROR("[cell %03d] t=%g no event assigned: x=%g, recalibrate cell\n", state->cellID, *t, *x);
+
+                      recalibrate_cell(rates, state, genes, konStates, &koffvalues,
+                                       mRNAdecay, transport, *dt); 
                       
                       if (*t > 1000.0) {
                         LOG_ERROR("should probably stop cell run, has been running for > 1000 mins\n");
