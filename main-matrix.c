@@ -342,6 +342,7 @@ int main(int argc, char *argv[])
 
   /* change to get a different genotype */
   dummyrun = 4;
+  current_ploidy = 1;
 
   /* parse command-line options */
   while ((c = getopt (argc, argv, "hvd:r:p:w:a:")) != -1) {
