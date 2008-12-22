@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 18;
+  TFBS = 30;
   verbose = 0;
 
   /* change to get a different genotype */
@@ -568,9 +568,9 @@ int main(int argc, char *argv[])
      int y;
      int ones, twos, none;
      unsigned long *onesArray, *twosArray, *noneArray;
-     noneArray=malloc(60*sizeof(unsigned long));
-     onesArray= malloc(20*sizeof(unsigned long));
-     twosArray = malloc(20*sizeof(unsigned long));
+     noneArray=malloc(500*sizeof(unsigned long));
+     onesArray= malloc(200*sizeof(unsigned long));
+     twosArray = malloc(200*sizeof(unsigned long));
      ones =0;
      twos=0;
      none =0;
