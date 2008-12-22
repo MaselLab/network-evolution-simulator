@@ -507,20 +507,26 @@ int main(int argc, char *argv[])
        if(indiv.allBindingSites[i].cisregID ==1){
           printf("One:%d  LeftEdge:%d\n", i, indiv.allBindingSites[i].leftEdgePos);
           }
+    
     fprintf(leftEdgePositions, "binding site %3d:  ", i);
-    //printf("       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
-    //printf("         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
-    //printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
-    //printf(" transcription-factor: %3d", indiv.allBindingSites[i].tfID);
-    //printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
-    //printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+    
+    printf( "binding site %3d:  ", i);
+    printf("       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
+    printf("         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
+    printf(" (sequence %.*s)\n", CISREG_LEN, cisRegSeq[indiv.allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
+    printf(" transcription-factor: %3d", indiv.allBindingSites[i].tfID);
+    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
+    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+    
     fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
-    //printf("  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
-    //printf("               strand: %3d\n", indiv.allBindingSites[i].strand);
-    //printf("         Hamming dist: %3d\n", indiv.allBindingSites[i].hammingDist); 
+    
+    printf( "%d\n", indiv.allBindingSites[i].leftEdgePos);
+    printf("  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
+    printf("               strand: %3d\n", indiv.allBindingSites[i].strand);
+    printf("         Hamming dist: %3d\n", indiv.allBindingSites[i].hammingDist); 
   }}
    
-  // system("PAUSE");
+   system("PAUSE");
    
      printf("\n");
      int lem;
