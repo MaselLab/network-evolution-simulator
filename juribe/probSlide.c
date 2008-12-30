@@ -8,6 +8,23 @@ static unsigned long statesA[NUM] = {0,1,2,4,8,16,32,64,128,256,512,1024,2048,40
 static float probs[NUM] = {.0009,.0417,.0417,.0138,.0138,.1184,.1184,.0417,.0417,.1885,.1885,.0064,.0064,.0889,.0889};
 static int prev[8] = {1,0,0,0,0,0,0,0};
 
+void convertFile( char *fileName, float *vect, int size){
+     int n;
+     FILE *file;
+     file = fopen(fileName, "r");
+     if(file==NULL){
+        printf("Unable to open file!");
+     } else {
+         for(n=0; n<size; n++){
+            int success = fscanf(file, "  %f", &(vect[n]));
+            if (!success) {
+               printf("The file ran out of input. Check the size parameter to convertFile.\n");              
+            }
+         }
+         
+         fclose(file);
+     }
+}
 
 void probSlide(int *statesArray, float *prob, float *outcome, int size, float *previous){
      //separate into 00, 01, 10
@@ -108,8 +125,17 @@ int main(int argc, char *argv[]){
     }
     outcome = malloc(20*sizeof(float));
     
+    float *vector;
+    vector = malloc(474*sizeof(float));
+    
+    convertFile("b.txt", vector, 474);
+    int n;
+    for(n=0; n<474; n++){
+            printf( "%f\n", (vector[n]));
+    }
     probSlide(states, prob, outcome, NUM, previous);
-    printf("\n");
+    
+    /*printf("\n");
     int k;
     for (k=0; k<3; k++){
         printf("%.4f\n", outcome[k]);
@@ -117,7 +143,7 @@ int main(int argc, char *argv[]){
     printf("\n");
     for (k=0; k<3; k++){
         printf("%.4f\n", previous[k]);
-    }
+    }*/
     system("PAUSE");
 }
     

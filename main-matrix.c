@@ -280,7 +280,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
           count++;
           }
       }
-    //fclose(sparseMatrixV1);
+    fclose(sparseMatrixV1);
 }
 
 void print_vector_MATLAB(int size){
@@ -294,6 +294,7 @@ void print_vector_MATLAB(int size){
             fprintf(bVector, "%d\n", 1);
          }
        }
+       fclose(bVector);
      }
 }
 
@@ -305,6 +306,108 @@ int TestByteOrder()
    //return(byte[0] ? LITTLE_ENDIAN : BIG_ENDIAN);
 }
   
+  
+void convertFile1( char *fileName, unsigned long *vect, int size){
+     int n;
+     FILE *file;
+     file = fopen(fileName, "r");
+     if(file==NULL){
+        printf("Unable to open file!");
+     } else {
+         for(n=0; n<size; n++){
+            int success = fscanf(file, "  %lu", &(vect[n]));
+            if (!success) {
+               printf("The file ran out of input. Check the size parameter to convertFile.\n");              
+            }
+         }
+         
+         fclose(file);
+     }
+}
+
+void convertFile( char *fileName, float *vect, int size){
+     int n;
+     FILE *file;
+     file = fopen(fileName, "r");
+     if(file==NULL){
+        printf("Unable to open file!");
+     } else {
+         for(n=0; n<size; n++){
+            int success = fscanf(file, "  %f", &(vect[n]));
+            if (!success) {
+               printf("The file ran out of input. Check the size parameter to convertFile.\n");              
+            }
+         }
+         
+         fclose(file);
+     }
+}
+
+void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size, float *previous){
+     //separate into 00, 01, 10
+     int y;
+     int ones, twos, none;
+     float *onesArray, *twosArray, *noneArray;
+     noneArray=malloc(50*sizeof(float));
+     onesArray= malloc(20*sizeof(float));
+     twosArray = malloc(20*sizeof(float));
+     ones =0;
+     twos=0;
+     none =0;
+     system("PAUSE");
+     for(y=0; y<size; y++){
+         printf("%lu\n",statesArray[y]);    
+           
+        if(((statesArray[y])>>1)%2==1 ){
+           twosArray[twos] = prob[y];
+           twos++;
+        }else if((statesArray[y]-1)%2==0){
+              onesArray[ones] = prob[y];
+              ones++;
+        } else{
+               noneArray[none] = prob[y];
+               none++;
+        }
+     }        
+      printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
+      
+      for(y=0; y<ones; y++){
+         printf("%.4f\n", onesArray[y]);
+         }
+         printf("twosArray\n");
+      for(y=0; y<twos; y++){
+         printf("%.4f\n", twosArray[y]);
+         }
+         printf("noneArray\n");
+      for(y=0; y<none; y++){
+         printf("%.4f\n", noneArray[y]);
+         }  
+      //Add up probabilities
+      
+      float sum1, sum2, sum0;
+      sum1 = 0;
+      sum2 = 0;
+      sum0 = 0;
+      for(y=0; y<ones; y++){
+         sum1 += onesArray[y];
+         }
+      for(y=0; y<twos; y++){
+         sum2 += twosArray[y];
+         }
+      for(y=0; y<none; y++){
+         sum0 += noneArray[y];
+         }
+         //normalize to previous
+      outcome[0] = sum0*previous[0];
+      outcome[1] = sum1*previous[0];
+      outcome[2] = sum2*previous[0];
+      printf("\n%.4f %.4f %.4f\n", sum0, sum1, sum2); 
+       
+     int g;   
+     for(g=0; g<3; g++){
+        previous[g] = outcome[g];
+        }       
+}
 
 int main(int argc, char *argv[])
 {
@@ -337,7 +440,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 31;
+  TFBS = 10;
   verbose = 0;
 
   /* change to get a different genotype */
@@ -633,6 +736,38 @@ int main(int argc, char *argv[])
     system("PAUSE");
       //printf("HERE in between");
      print_arrayT_MATLAB(arrayT,array,viableStates);
+     system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"");
+     
+   unsigned long *statesS;
+   statesS = malloc(array*sizeof(unsigned long));
+   float *prob;
+   float *outcome;
+   float *previous;
+   previous = malloc(10*sizeof(float));
+   float prev[10] = {1,0,0,0,0,0,0,0,0,0};
+    int pi;
+    for(pi=0; pi<10; pi++){
+       previous[pi]=prev[pi];
+    }
+    
+    system("PAUSE");
+   
+    outcome = malloc( array*sizeof(float));
+    
+    float *vector;
+    vector = malloc(array*sizeof(float));
+    
+    convertFile1("statesV1.txt", statesS, array);
+    
+    convertFile("b.txt", vector, array);
+    int n;
+    for(n=0; n<array; n++){
+            printf( "%f\n", (vector[n]));
+    }
+    probSlide(statesS, vector, outcome, array, previous);
+   
+    system("PAUSE");
+     
      printf("long=%ud\n", sizeof(long));
      printf("hindlength=%d\n", HIND_LENGTH);
       printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
