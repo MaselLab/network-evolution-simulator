@@ -761,9 +761,9 @@ int main(int argc, char *argv[])
 
      print_arrayT_MATLAB(arrayT,array,viableStates);
      
-     if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")==-1 ){
+     if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")!=0){
                        printf("Problem running Matlab.");
-                       exit(0);   
+                       exit(1);   
      }else{
         printf("\n");
      }
