@@ -645,6 +645,9 @@ int main(int argc, char *argv[])
      int startSite;
      startSite=0;
       int bob;
+   
+      
+      
     /* int max =0;
      int startPlus;
      
@@ -733,14 +736,19 @@ int main(int argc, char *argv[])
       //printf("HERE");
       system("PAUSE");
    // print_arrayT(arrayT,array,viableStates);
-    system("PAUSE");
+   // system("PAUSE");
       //printf("HERE in between");
      print_arrayT_MATLAB(arrayT,array,viableStates);
-     system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"");
+     if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")==-1 ){
+                       printf("Problem running Matlab.");
+                       exit(0);   
+     }else{
+        printf("\n");
+     }
      
    unsigned long *statesS;
    statesS = malloc(array*sizeof(unsigned long));
-   float *prob;
+   //float *prob;
    float *outcome;
    float *previous;
    previous = malloc(10*sizeof(float));
@@ -768,10 +776,10 @@ int main(int argc, char *argv[])
    
     system("PAUSE");
      
-     printf("long=%ud\n", sizeof(long));
-     printf("hindlength=%d\n", HIND_LENGTH);
-      printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
-       system("PAUSE");
+     //printf("long=%ud\n", sizeof(long));
+    // printf("hindlength=%d\n", HIND_LENGTH);
+      //printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
+     //  system("PAUSE");
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
    int d;
