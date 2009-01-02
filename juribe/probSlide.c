@@ -120,17 +120,20 @@ int main(int argc, char *argv[]){
     for(i=0; i<NUM; i++){
        prob[i]=probs[i];
     }
+    system("PAUSE");
      for(i=0; i<NUM; i++){
        printf("%.4f\n",prob[i]);
     }
     outcome = malloc(20*sizeof(float));
     
     float *vector;
-    vector = malloc(474*sizeof(float));
+    vector = malloc(16*sizeof(float));
+    system("PAUSE");
     
-    convertFile("b.txt", vector, 474);
+    convertFile("b.txt", vector, 16);
     int n;
-    for(n=0; n<474; n++){
+    
+    for(n=0; n<16; n++){
             printf( "%f\n", (vector[n]));
     }
     probSlide(states, prob, outcome, NUM, previous);
