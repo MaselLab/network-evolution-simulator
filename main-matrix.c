@@ -10,6 +10,7 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include "engine.h"
 
 #include "random.h"
 #include "lib.h"
@@ -403,7 +404,7 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
       outcome[1] = sum1*previous[0];
       outcome[2] = sum2*previous[0];
       printf("\n%.4f %.4f %.4f\n", sum0, sum1, sum2); 
-       
+      printf("\n%.4f %.4f %.4f\n", outcome[0], outcome[1], outcome[2]); 
      int g;   
      for(g=0; g<3; g++){
         previous[g] = outcome[g];
@@ -761,6 +762,15 @@ int main(int argc, char *argv[])
 
      print_arrayT_MATLAB(arrayT,array,viableStates);
      
+     /*Engine *ep;
+     if(!(ep= engOpen(NULL))){
+              printf("Problem running Matlab.");
+              exit(1);
+     }
+     engEvalString(ep,"pVect");
+     engClose(ep);*/
+            
+     
      if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")!=0){
                        printf("Problem running Matlab.");
                        exit(1);   
@@ -797,15 +807,27 @@ int main(int argc, char *argv[])
     }
     
     probSlide(statesS, vector, outcome, array, previous);
-   populateFinal(outcome[0], outcome[1], outcome[2], final,pow(2,startSite));
+    int posNum;
+    if(finalPos==0){
+       posNum=1;
+    }else{
+       posNum = 2*finalPos + 1;
+    }
+    printf("\n OUTCOME \n");
+    for(n=0; n<3; n++){
+             printf("%f\n", outcome[n]);
+    }
+    printf("\n");
+   populateFinal(outcome[0], outcome[1], outcome[2], final,posNum);
    printf("FINAL\n");
-   for(i=0; i<(pow(2,startSite)+2); i++){
+   for(i=0; i<(posNum+2); i++){
        printf("%.4f\n", final[i]);
     }
     system("PAUSE");
      int nextS = nextStartSite(startSite, leftEdgePos);
      startSite = nextS;
-     printf("startSiteHERE = %d\n", startSite);
+     finalPos++;
+     printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
      system("PAUSE");
    }
      //printf("long=%ud\n", sizeof(long));
