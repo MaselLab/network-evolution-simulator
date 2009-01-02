@@ -88,10 +88,13 @@ void probSlide(int *statesArray, float *prob, float *outcome, int size, float *p
      int g;   
      for(g=0; g<3; g++){
         previous[g] = outcome[g];
-        }
-        
-      
-         
+        }     
+}
+
+void populateFinal(float zero, float ones, float twos, float *final, int nextSite){
+     final[0] = zero;
+     final[nextSite] = ones;
+     final[nextSite+1] = twos;
 }
 
 int main(int argc, char *argv[]){
@@ -100,11 +103,19 @@ int main(int argc, char *argv[]){
    float *prob;
    float *outcome;
    float *previous;
+   float *final;
    previous = malloc(10*sizeof(float));
+   final = malloc(16*sizeof(float));
    
    //previous[0]=1;
+   populateFinal(.9163,.0417,.0417,final,1);
     
     int i;
+    printf("FINAL\n");
+    for(i=0; i<3; i++){
+       printf("%.4f\n", final[i]);
+    }
+    printf("\n");
     for(i=0; i<10; i++){
        previous[i]=prev[i];
     }
@@ -137,6 +148,11 @@ int main(int argc, char *argv[]){
             printf( "%f\n", (vector[n]));
     }
     probSlide(states, prob, outcome, NUM, previous);
+    populateFinal(outcome[0],outcome[1], outcome[2], final, 3);
+    printf("FINAL\n");
+    for(i=0; i<5; i++){
+       printf("%.4f\n", final[i]);
+    }
     
     /*printf("\n");
     int k;

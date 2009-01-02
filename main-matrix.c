@@ -205,6 +205,7 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
        n++;
        }
      }}
+     fclose(statesV1);
   }
   
 void print_arrayT(struct Ttype *arrayT, int size, unsigned long *viableStates){
@@ -357,7 +358,7 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
      system("PAUSE");
      for(y=0; y<size; y++){
          printf("%lu\n",statesArray[y]);    
-           
+     //}    
         if(((statesArray[y])>>1)%2==1 ){
            twosArray[twos] = prob[y];
            twos++;
@@ -407,6 +408,24 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
      for(g=0; g<3; g++){
         previous[g] = outcome[g];
         }       
+}
+
+int nextStartSite(int startSite, int *startPos){
+    int next;
+    int basePairNum;
+    basePairNum = startPos[startSite];
+    printf("startSite = %d\n basePairNum = %d\n",startSite, basePairNum);
+    next = basePairNum;
+    while(next==basePairNum){
+       next++;
+    }
+    return next;
+}
+
+void populateFinal(float zero, float ones, float twos, float *final, int nextSite){
+     final[0] = zero;
+     final[nextSite] = ones;
+     final[nextSite+1] = twos;
 }
 
 int main(int argc, char *argv[])
@@ -563,15 +582,18 @@ int main(int argc, char *argv[])
     //int sitePos[10];
     //int transFactor[10];
 
+    int *leftEdgePos;
     int *startPos;
     int *hammDist;
     float *diag;
     int *TFon;
+    float *final;
+    final = malloc(array_size*sizeof(float));
     
       //populate Kon
     float Kon[TFBS];
     
-    
+    leftEdgePos = malloc(indiv.tfsPerGene[0]*sizeof(int));
     startPos=malloc(TFBS*sizeof(int));
     //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
@@ -586,79 +608,82 @@ int main(int argc, char *argv[])
     viableStates = malloc((array_size)*sizeof(unsigned long));
     arrayT = malloc(array_size*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
-     int array = 0;
+     int array = 0; 
+     
+     int finalPos =0;
+     
+    float *previous;
+   previous = malloc(10*sizeof(float));
+   float prev[10] = {1,0,0,0,0,0,0,0,0,0};
+    int pi;
+    for(pi=0; pi<10; pi++){
+       previous[pi]=prev[pi];
+    }
     
     int fey;
     for( fey=0; fey<TFBS; fey++){
          printf("binding site %3d:  ", fey);
          printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
          }
+         
     leftEdgePositions = fopen("leftEdgePositions.txt", "w");
      if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
-    fprintf(leftEdgePositions , "\n");
-     for (i=0; i <indiv.tfsPerGene[0] ; i++) {     
-         fprintf(leftEdgePositions, "binding site %3d:  ", i);
-         fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
-    }
-    fprintf(leftEdgePositions, "\n");
-    
-    qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
-           sizeof(struct AllTFBindingSites),(compfn)compare );
-    printf("\n");
-  
-    for( fey=0; fey<TFBS; fey++){
-         printf("binding site %3d:  ", fey);
-         printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
+         fprintf(leftEdgePositions , "\n");
+         for (i=0; i <indiv.tfsPerGene[0] ; i++) {  
+             fprintf(leftEdgePositions, "binding site %3d:  ", i);
+             fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
          }
-   printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
-   system("PAUSE");
-     //leftEdgePositions = fopen("leftEdgePositions.txt", "w");
-    // if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
-   for (i=0; i <indiv.tfsPerGene[0] ; i++) {
-       /*if(indiv.allBindingSites[i].cisregID ==1){
-          printf("One:%d  LeftEdge:%d\n", i, indiv.allBindingSites[i].leftEdgePos);
-          }*/
+         fprintf(leftEdgePositions, "\n");
     
-    fprintf(leftEdgePositions, "binding site %3d:  ", i);
+         qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
+            sizeof(struct AllTFBindingSites),(compfn)compare );
+         printf("\n");
+  
+         for( fey=0; fey<TFBS; fey++){
+             printf("binding site %3d:  ", fey);
+             printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
+         }
+         printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
+         system("PAUSE");
+               //leftEdgePositions = fopen("leftEdgePositions.txt", "w");
+                // if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
+         for (i=0; i <indiv.tfsPerGene[0] ; i++) {
+              /*if(indiv.allBindingSites[i].cisregID ==1){
+                  printf("One:%d  LeftEdge:%d\n", i, indiv.allBindingSites[i].leftEdgePos);
+               }*/
     
-    /*fprintf( leftEdgePositions, "binding site %3d:  ", i);
-    fprintf(leftEdgePositions, "       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
-    fprintf(leftEdgePositions, "         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
-    fprintf(leftEdgePositions, " (sequence %.*s)\n", CISREG_LEN, indiv.cisRegSeq[indiv.allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
-    fprintf(leftEdgePositions, " transcription-factor: %3d", indiv.allBindingSites[i].tfID);
-    fprintf(leftEdgePositions, " (sequence: %.*s)\n", TF_ELEMENT_LEN, indiv.transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
-    fprintf(leftEdgePositions, "  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+              fprintf(leftEdgePositions, "binding site %3d:  ", i);
+              leftEdgePos[i] =  indiv.allBindingSites[i].leftEdgePos;
+            /*fprintf( leftEdgePositions, "binding site %3d:  ", i);
+            fprintf(leftEdgePositions, "       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
+            fprintf(leftEdgePositions, "         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
+            fprintf(leftEdgePositions, " (sequence %.*s)\n", CISREG_LEN, indiv.cisRegSeq[indiv.allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
+            fprintf(leftEdgePositions, " transcription-factor: %3d", indiv.allBindingSites[i].tfID);
+            fprintf(leftEdgePositions, " (sequence: %.*s)\n", TF_ELEMENT_LEN, indiv.transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
+            fprintf(leftEdgePositions, "  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+            
+            */
+              fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
     
-    */
-    fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
-    
-    /*//fprintf(leftEdgePositions,  "%d\n", indiv.allBindingSites[i].leftEdgePos);
-    fprintf(leftEdgePositions, "  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
-    fprintf(leftEdgePositions, "               strand: %3d\n", indiv.allBindingSites[i].strand);
-    fprintf(leftEdgePositions, "         Hamming dist: %3d\n\n", indiv.allBindingSites[i].hammingDist); 
-  */}}
-   
-   system("PAUSE");
+            /*//fprintf(leftEdgePositions,  "%d\n", indiv.allBindingSites[i].leftEdgePos);
+            fprintf(leftEdgePositions, "  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
+            fprintf(leftEdgePositions, "               strand: %3d\n", indiv.allBindingSites[i].strand);
+            fprintf(leftEdgePositions, "         Hamming dist: %3d\n\n", indiv.allBindingSites[i].hammingDist); 
+           */}
+    }
+    fclose(leftEdgePositions);
+    printf("leftEdgePos[1] = %d", leftEdgePos[1]);
+    system("PAUSE");
    
      printf("\n");
-     int lem;
      int startSite;
      startSite=0;
-      int bob;
-   
-      
-      
-    /* int max =0;
-     int startPlus;
+     //while loop for sliding window
+     while(startSite<indiv.tfsPerGene[0]){
+     int lem;
      
-      int startSite=2;
-      startPlus = startSite;
-      while((indiv.allBindingSites[startPlus].leftEdgePos)<(indiv.allBindingSites[startSite].leftEdgePos )){
-           startPlus++;
-           max++;
-      }
-      printf("max=%d\n", max);*/
-      //system("PAUSE");
+     int bob;
+      
      for(lem =0; lem<TFBS; lem++){
              startPos[lem] = indiv.allBindingSites[lem+startSite].leftEdgePos;
              hammDist[lem] = indiv.allBindingSites[lem+startSite].hammingDist;
@@ -669,22 +694,23 @@ int main(int argc, char *argv[])
              
              printf("%d", indiv.allBindingSites[lem+startSite].leftEdgePos);
              printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
-             printf(" Kon[lem] = %f\n", Kon[lem]);
-            
-     }
+             printf(" Kon[lem] = %f\n", Kon[lem]);    
+        }
      system("PAUSE");
-     /*int mat;
-     for(mat=0; mat<TFBS; mat++){
-        printf("tf[%d] = %d\n", mat, TFon[mat]);
-     }*/
+     
+    /* printf("startPos[0] = %d\n", startPos[0]);
+      int hello;
+      hello = nextStartSite(0,startPos);
+      printf("hello = %d\n",hello);
+      system("PAUSE");*/
     
      printf("\n");
      configure(0,bits,&array,viableStates,TFBS,startPos);
-      //system("PAUSE");
+
     int sh;
     for(sh=0; sh<array; sh++){
               printf("%lu\n", viableStates[sh]);
-}
+     }
  
      int y;
      int ones, twos, none;
@@ -724,21 +750,17 @@ int main(int argc, char *argv[])
          } 
  
      printf("%d\n", array);
+     
      print_vector_MATLAB(array);
-     //arrayT=realloc(arrayT, array*sizeof(struct Ttype));
-      /* for(mat=0; mat<TFBS; mat++){
-        printf("tf[%d] = %d\n", mat, TFon[mat]);
-     }*/
+     
      system("PAUSE");
+     
      transitions(startSite,array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
-      // system("PAUSE");
-      //addRowOnes(arrayT, array);
-      //printf("HERE");
-      system("PAUSE");
-   // print_arrayT(arrayT,array,viableStates);
-   // system("PAUSE");
-      //printf("HERE in between");
+  
+     system("PAUSE");
+
      print_arrayT_MATLAB(arrayT,array,viableStates);
+     
      if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")==-1 ){
                        printf("Problem running Matlab.");
                        exit(0);   
@@ -748,15 +770,14 @@ int main(int argc, char *argv[])
      
    unsigned long *statesS;
    statesS = malloc(array*sizeof(unsigned long));
-   //float *prob;
    float *outcome;
-   float *previous;
+/*   float *previous;
    previous = malloc(10*sizeof(float));
    float prev[10] = {1,0,0,0,0,0,0,0,0,0};
     int pi;
     for(pi=0; pi<10; pi++){
        previous[pi]=prev[pi];
-    }
+    }*/
     
     system("PAUSE");
    
@@ -768,14 +789,25 @@ int main(int argc, char *argv[])
     convertFile1("statesV1.txt", statesS, array);
     
     convertFile("b.txt", vector, array);
+    
     int n;
+    printf("\nvector\n");
     for(n=0; n<array; n++){
             printf( "%f\n", (vector[n]));
     }
+    
     probSlide(statesS, vector, outcome, array, previous);
-   
+   populateFinal(outcome[0], outcome[1], outcome[2], final,pow(2,startSite));
+   printf("FINAL\n");
+   for(i=0; i<(pow(2,startSite)+2); i++){
+       printf("%.4f\n", final[i]);
+    }
     system("PAUSE");
-     
+     int nextS = nextStartSite(startSite, leftEdgePos);
+     startSite = nextS;
+     printf("startSiteHERE = %d\n", startSite);
+     system("PAUSE");
+   }
      //printf("long=%ud\n", sizeof(long));
     // printf("hindlength=%d\n", HIND_LENGTH);
       //printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
@@ -785,7 +817,7 @@ int main(int argc, char *argv[])
    int d;
      for (d=0; d<array; d++) {
        free(arrayT[d].row);
-  }   
+     }   
   
   free(arrayT);
   free(startPos);
