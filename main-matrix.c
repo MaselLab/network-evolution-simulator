@@ -10,7 +10,7 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include "engine.h"
+//#include "engine.h"
 
 #include "random.h"
 #include "lib.h"
@@ -403,6 +403,7 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
       outcome[0] = sum0*previous[0];
       outcome[1] = sum1*previous[0];
       outcome[2] = sum2*previous[0];
+      printf("previous[0]=%f\n", previous[0]);
       printf("\n%.4f %.4f %.4f\n", sum0, sum1, sum2); 
       printf("\n%.4f %.4f %.4f\n", outcome[0], outcome[1], outcome[2]); 
      int g;   
@@ -417,10 +418,11 @@ int nextStartSite(int startSite, int *startPos){
     basePairNum = startPos[startSite];
     printf("startSite = %d\n basePairNum = %d\n",startSite, basePairNum);
     next = basePairNum;
-    while(next==basePairNum){
-       next++;
+    int hey = startSite+1;
+    while(next==startPos[hey]){
+      hey++;
     }
-    return next;
+    return hey;
 }
 
 void populateFinal(float zero, float ones, float twos, float *final, int nextSite){
@@ -609,7 +611,7 @@ int main(int argc, char *argv[])
     viableStates = malloc((array_size)*sizeof(unsigned long));
     arrayT = malloc(array_size*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
-     int array = 0; 
+     int totalArray = 0; 
      
      int finalPos =0;
      
@@ -679,9 +681,12 @@ int main(int argc, char *argv[])
      printf("\n");
      int startSite;
      startSite=0;
+     
+     
      //while loop for sliding window
      while(startSite<indiv.tfsPerGene[0]){
      int lem;
+     int array =0;
      
      int bob;
       
@@ -821,13 +826,16 @@ int main(int argc, char *argv[])
    populateFinal(outcome[0], outcome[1], outcome[2], final,posNum);
    printf("FINAL\n");
    for(i=0; i<(posNum+2); i++){
-       printf("%.4f\n", final[i]);
+       printf("%f\n", final[i]);
     }
     system("PAUSE");
+    printf("previous Start Site= %d\n", startSite);
      int nextS = nextStartSite(startSite, leftEdgePos);
      startSite = nextS;
      finalPos++;
      printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
+     totalArray += array;
+     printf("TotalArray=%d\n", totalArray);
      system("PAUSE");
    }
      //printf("long=%ud\n", sizeof(long));
@@ -837,7 +845,7 @@ int main(int argc, char *argv[])
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
    int d;
-     for (d=0; d<array; d++) {
+     for (d=0; d<totalArray; d++) {
        free(arrayT[d].row);
      }   
   
