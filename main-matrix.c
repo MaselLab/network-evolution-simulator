@@ -374,15 +374,15 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
       printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
       
       for(y=0; y<ones; y++){
-         printf("%.4f\n", onesArray[y]);
+         printf("%f\n", onesArray[y]);
          }
          printf("twosArray\n");
       for(y=0; y<twos; y++){
-         printf("%.4f\n", twosArray[y]);
+         printf("%f\n", twosArray[y]);
          }
          printf("noneArray\n");
       for(y=0; y<none; y++){
-         printf("%.4f\n", noneArray[y]);
+         printf("%f\n", noneArray[y]);
          }  
       //Add up probabilities
       
@@ -462,7 +462,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 10;
+  TFBS = 7;
   verbose = 0;
 
   /* change to get a different genotype */
