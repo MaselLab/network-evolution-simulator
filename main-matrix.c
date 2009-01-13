@@ -404,8 +404,8 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
       outcome[1] = sum1*previous[0];
       outcome[2] = sum2*previous[0];
       printf("previous[0]=%f\n", previous[0]);
-      printf("\n%.4f %.4f %.4f\n", sum0, sum1, sum2); 
-      printf("\n%.4f %.4f %.4f\n", outcome[0], outcome[1], outcome[2]); 
+      printf("\n%f %f %f\n", sum0, sum1, sum2); 
+      printf("\n%f %f %f\n", outcome[0], outcome[1], outcome[2]); 
      int g;   
      for(g=0; g<3; g++){
         previous[g] = outcome[g];
