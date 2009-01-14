@@ -433,13 +433,13 @@ void populateFinal(float zero, float ones, float twos, float *final, int nextSit
 
 int main(int argc, char *argv[])
 {
-    /*NOTE: To make following code compatible with all platfroms and structures need to implement doe
+    /*NOTE: To make following code compatible with all platfroms and structures need to implement code
     for 4 types: 
         - 32bit Little-Endian
         - 32bit Big-Endian
         - 64bit Little-Endian
         - 64bit Big-Endian
-    Current code wirtten for 64bit Big-Endian
+    Current code written for 64bit Big-Endian
     */
     
     //Check Endianess of system
@@ -462,7 +462,7 @@ int main(int argc, char *argv[])
   int curr_seed;
   int TFBS;
   
-  TFBS = 7;
+  TFBS = 10;
   verbose = 0;
 
   /* change to get a different genotype */
@@ -766,7 +766,7 @@ int main(int argc, char *argv[])
      system("PAUSE");
 
      print_arrayT_MATLAB(arrayT,array,viableStates);
-     
+     system("PAUSE");
      /*Engine *ep;
      if(!(ep= engOpen(NULL))){
               printf("Problem running Matlab.");
