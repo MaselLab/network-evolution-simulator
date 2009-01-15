@@ -15,7 +15,7 @@
 
 #define BUFSIZE 256
 
-//static double Areal[6] = { 1, 2, 3, 4, 5, 6 };
+static double Areal[6] = { 1, 2, 3, 4, 5, 6 };
 
 int PASCAL WinMain (HINSTANCE hInstance,
                     HINSTANCE hPrevInstance,
@@ -24,10 +24,11 @@ int PASCAL WinMain (HINSTANCE hInstance,
 
 {
 	Engine *ep;
-	//mxArray *T = NULL, *a = NULL, *d = NULL;
+	//mxArray *result = NULL, *b = NULL;
+	mxArray *T = NULL, *a = NULL, *d = NULL;
 	char buffer[BUFSIZE+1];
-//	double *Dreal, *Dimag;
-	//double time[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    double *Dreal, *Dimag;
+	double time[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 
 	/*
 	 * Start the MATLAB engine 
@@ -48,29 +49,51 @@ int PASCAL WinMain (HINSTANCE hInstance,
 	/* 
 	 * Create a variable from our data
 	 */
-	//T = mxCreateDoubleMatrix(1, 10, mxREAL);
-	//memcpy((char *) mxGetPr(T), (char *) time, 10*sizeof(double));
+	T = mxCreateDoubleMatrix(1, 10, mxREAL);
+	memcpy((char *) mxGetPr(T), (char *) time, 10*sizeof(double));
 
 	/*
 	 * Place the variable T into the MATLAB workspace
 	 */
-	//engPutVariable(ep, "T", T);
+	engPutVariable(ep, "T", T);
 
 	/*
 	 * Evaluate a function of time, distance = (1/2)g.*t.^2
 	 * (g is the acceleration due to gravity)
 	 */
-	engEvalString(ep, "load sparseMatrixV1.txt;");
+	 engEvalString(ep, "D = .5.*(-9.8).*T.^2;");
 
+/* *************************************************************************
+    My code
+    
+	engEvalString(ep, "pVectCheck;");
+    engEvalString(ep, "load sparseMatrixV1.txt");
+	engEvalString(ep, "A = spconvert(sparseMatrixV1);");
+	if ((result = engGetVariable(ep,"A")) == NULL)
+	      printf("Oops! You didn't create a variable X.\n\n");
+    system("PAUSE");
+	engEvalString(ep, "[a] = textread('bVector.txt', '', 'delimiter', ',');");
+	engEvalString(ep, "b = A\a;");
+	if((b=engGetVariable(ep,"b")) == NULL){
+           sprintf(buffer, "B is NULL");
+           printf("Oops! No b calculated!");
+    }
+    printf("after b\n");
+    system("PAUSE");
+	engEvalString(ep, "save b.txt b -ascii;");
+   **************************************************************************
+*/
+	
 	/*
 	 * Plot the result
 	 */
-	engEvalString(ep, "A = spconvert(sparseMatrixV1);");
-	engEvalString(ep, "[a] = textread('bVector.txt', '', 'delimiter', ',');");
-	engEvalString(ep, "b = A\a;");
-	engEvalString(ep, "save b.txt b -ascii;");
+	engEvalString(ep, "plot(T,D);");
+	engEvalString(ep, "title('Position vs. Time for a falling object');");
+	engEvalString(ep, "xlabel('Time (seconds)');");
+	engEvalString(ep, "ylabel('Position (meters)');");
 
-	/*
+    
+    /*
 	 * PART II
 	 *
 	 * For the second half of this demonstration, we will create another mxArray
@@ -78,38 +101,48 @@ int PASCAL WinMain (HINSTANCE hInstance,
 	 * 
 	 */
 	  
-	// a = mxCreateDoubleMatrix(3, 2, mxREAL);         
-	// memcpy((char *) mxGetPr(a), (char *) Areal, 6*sizeof(double));
-	 //engPutVariable(ep, "A", a); 
+	 a = mxCreateDoubleMatrix(3, 2, mxREAL);         
+	 memcpy((char *) mxGetPr(a), (char *) Areal, 6*sizeof(double));
+	 engPutVariable(ep, "A", a); 
 
 	 /*
 	 * Calculate the eigen value
 	 */
-	// engEvalString(ep, "d = eig(A*A')");
+	 engEvalString(ep, "d = eig(A*A')");
 
 	 /*
 	 * Use engOutputBuffer to capture MATLAB output. Ensure first that
 	 * the buffer is always NULL terminated.
 	 */
-//	 buffer[BUFSIZE] = '\0';
-//	 engOutputBuffer(ep, buffer, BUFSIZE);
+	 buffer[BUFSIZE] = '\0';
+	 engOutputBuffer(ep, buffer, BUFSIZE);
 
 	 /*
 	 * the evaluate string returns the result into the
 	 * output buffer.
 	 */
-//	 engEvalString(ep, "whos");
-//	 MessageBox ((HWND)NULL, (LPSTR)buffer, (LPSTR) "MATLAB - whos", MB_OK);
+	 engEvalString(ep, "whos");
+	 MessageBox ((HWND)NULL, (LPSTR)buffer, (LPSTR) "MATLAB - whos", MB_OK);
 	
 	 /*
 	 * Get the eigen value mxArray
 	 */
-//	 d = engGetVariable(ep, "d");
+	 d = engGetVariable(ep, "d");
 	 engClose(ep);
-     sprintf(buffer,"Hello ");
+    
+    /* sprintf(buffer,"Hello\n");
+     if(b==NULL){
+        sprintf(buffer,"b=NULL");
+       // system("PAUSE");
+     }else{
+        Dreal = mxGetPr(b);
+        sprintf(buffer,"b[0] : %g", Dreal[1]);
+     }
    	 MessageBox ((HWND)NULL, (LPSTR)buffer, (LPSTR)"Engwindemo.c", MB_OK);
-    	
-	/* if (d == NULL) {
+    
+     mxDestroyArray(result);
+     mxDestroyArray(b);	*/ 
+	 if (d == NULL) {
 			MessageBox ((HWND)NULL, (LPSTR)"Get Array Failed", (LPSTR)"Engwindemo.c", MB_OK);
 		}
 	else {		
@@ -124,10 +157,10 @@ int PASCAL WinMain (HINSTANCE hInstance,
 	} 
 
 	
-	 * We're done! Free memory, close MATLAB engine and exit.
+	 /* We're done! Free memory, close MATLAB engine and exit.
 	 */
-//	mxDestroyArray(T);
-	//mxDestroyArray(a);
+	mxDestroyArray(T);
+	mxDestroyArray(a);
 	
 	return(0);
 }
