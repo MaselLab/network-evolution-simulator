@@ -766,7 +766,7 @@ int main(int argc, char *argv[])
      system("PAUSE");
 
      print_arrayT_MATLAB(arrayT,array,viableStates);
-     system("PAUSE");
+    // system("PAUSE");
      /*Engine *ep;
      if(!(ep= engOpen(NULL))){
               printf("Problem running Matlab.");
