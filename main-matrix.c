@@ -724,6 +724,13 @@ int main(int argc, char *argv[])
      int array =0;
      
      int bob;
+     
+      TFBS =0;
+      while(indiv.allBindingSites[TFBS].leftEdgePos < numBp+startSite){
+         TFBS++;
+  }
+  printf("TFBS inside=%d\n", TFBS);
+  system("PAUSE");
       
      for(lem =0; lem<TFBS; lem++){
              startPos[lem] = indiv.allBindingSites[lem+startSite].leftEdgePos;
