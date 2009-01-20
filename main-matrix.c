@@ -412,6 +412,37 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
         }       
 }
 
+void sortOnesTwos(int array, int ones, int twos, int none, unsigned long *onesArray, unsigned long *twosArray, unsigned long *noneArray, unsigned long *viableStates){
+      int y;
+      for(y=0; y<array; y++){
+         printf("%lu\n",viableStates[y]);    
+           
+        if(((viableStates[y])>>1)%2==1 ){
+           twosArray[twos] = viableStates[y];
+           twos++;
+        }else if((viableStates[y]-1)%2==0){
+              onesArray[ones] = viableStates[y];
+              ones++;
+        } else{
+               noneArray[none] = viableStates[y];
+               none++;
+        }
+     }        
+      printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
+      
+      for(y=0; y<ones; y++){
+         printf("%lu\n", onesArray[y]);
+         }
+         printf("twosArray\n");
+      for(y=0; y<twos; y++){
+         printf("%lu\n", twosArray[y]);
+         }
+         printf("noneArray\n");
+      for(y=0; y<none; y++){
+         printf("%lu\n", noneArray[y]);
+         } 
+}
+ 
 int nextStartSite(int startSite, int *startPos){
     int next;
     int basePairNum;
@@ -460,9 +491,11 @@ int main(int argc, char *argv[])
 
   int c, directory_success;
   int curr_seed;
+  int numBp;
   int TFBS;
   
-  TFBS = 12;
+  numBp = 30;
+  
   verbose = 0;
 
   /* change to get a different genotype */
@@ -573,6 +606,17 @@ int main(int argc, char *argv[])
   /* create sequences and binding site matrix */
   initialize_genotype(&indiv, kdis);
   
+  qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
+            sizeof(struct AllTFBindingSites),(compfn)compare );
+         printf("\n");
+         
+         TFBS =0;
+      while(indiv.allBindingSites[TFBS].leftEdgePos < numBp){
+         TFBS++;
+  }
+  printf("TFBS=%d\n", TFBS);
+  system("PAUSE");
+  
   /* print binding sites */
  /* print_all_binding_sites(indiv.copies, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq, indiv.tfsStart); 
@@ -584,7 +628,7 @@ int main(int argc, char *argv[])
      //system("PAUSE");
     //int sitePos[10];
     //int transFactor[10];
-
+  
     int *leftEdgePos;
     int *startPos;
     int *hammDist;
@@ -622,12 +666,6 @@ int main(int argc, char *argv[])
     for(pi=0; pi<10; pi++){
        previous[pi]=prev[pi];
     }
-    
-    int fey;
-    for( fey=0; fey<TFBS; fey++){
-         printf("binding site %3d:  ", fey);
-         printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
-         }
          
     leftEdgePositions = fopen("leftEdgePositions.txt", "w");
      if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
@@ -637,11 +675,8 @@ int main(int argc, char *argv[])
              fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
          }
          fprintf(leftEdgePositions, "\n");
-    
-         qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
-            sizeof(struct AllTFBindingSites),(compfn)compare );
-         printf("\n");
-  
+
+         int fey;
          for( fey=0; fey<TFBS; fey++){
              printf("binding site %3d:  ", fey);
              printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
@@ -718,7 +753,7 @@ int main(int argc, char *argv[])
               printf("%lu\n", viableStates[sh]);
      }
  
-     int y;
+    // int y;
      int ones, twos, none;
      unsigned long *onesArray, *twosArray, *noneArray;
      noneArray=malloc(500*sizeof(unsigned long));
@@ -727,7 +762,9 @@ int main(int argc, char *argv[])
      ones =0;
      twos=0;
      none =0;
-     for(y=0; y<array; y++){
+     
+     sortOnesTwos(array, ones, twos, none, onesArray, twosArray, noneArray, viableStates);
+     /*for(y=0; y<array; y++){
          printf("%lu\n",viableStates[y]);    
            
         if(((viableStates[y])>>1)%2==1 ){
@@ -753,7 +790,7 @@ int main(int argc, char *argv[])
          printf("noneArray\n");
       for(y=0; y<none; y++){
          printf("%lu\n", noneArray[y]);
-         } 
+         } */
  
      printf("%d\n", array);
      

@@ -97,17 +97,18 @@ int PASCAL WinMain (HINSTANCE hInstance,
 	/*
 	 * Plot the result
 	 */
-	 error = fopen("error.txt", "w");
+/*	 error = fopen("error.txt", "w");
     if ((error = fopen("error.txt", "w"))) {
-       int err = engEvalString(ep, "load sparseMatrixV1.txt;");
+       int err = engEvalString(ep, "load ('C:/Documents and Settings/juribe/My Documents/network-project-code/sparseMatrixV1.txt');");
 	   fprintf(error, "%d\n",err);
     }
-    fclose(error);
+    fclose(error);*/
+    engEvalString(ep, "load ('C:/Documents and Settings/juribe/My Documents/network-project-code/sparseMatrixV1.txt');");
     engEvalString(ep, "A=spconvert(sparseMatrixV1);");
-    engEvalString(ep, "[a] = textread('bVector.txt', '', 'delimiter', ',');");
+    engEvalString(ep, "[a] = textread('C:/Documents and Settings/juribe/My Documents/network-project-code/bVector.txt', '', 'delimiter', ',');");
     engEvalString(ep, "b = A\\a;");
-    engEvalString(ep, "save b.txt b -ascii;");
-    engEvalString(ep,"pwd");
+    engEvalString(ep, "save 'C:/Documents and Settings/juribe/My Documents/network-project-code/b.txt' b -ascii;");
+    //engEvalString(ep,"pwd");
 	/*engEvalString(ep, "title('Position vs. Time for a falling object');");
 	engEvalString(ep, "xlabel('Time (seconds)');");
 	engEvalString(ep, "ylabel('Position (meters)');");*/
