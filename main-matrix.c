@@ -451,7 +451,7 @@ int nextStartSite(int startSite, int *startPos){
     basePairNum = startPos[startSite];
     printf("startSite = %d\n basePairNum = %d\n",startSite, basePairNum);
     next = basePairNum;
-    int hey = startSite+1;
+    int hey = startSite+2;
     while(next==startPos[hey]){
       hey++;
     }
