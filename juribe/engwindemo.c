@@ -13,7 +13,7 @@
 #include <string.h>
 #include "engine.h"
 
-#define BUFSIZE 5000
+#define BUFSIZE 250
 
 FILE *error;
 
@@ -45,7 +45,7 @@ int PASCAL WinMain (HINSTANCE hInstance,
 		exit(-1);
 	}
 	buffer[BUFSIZE] = '\0';
-	engOutputBuffer(ep, buffer, 5000);
+	engOutputBuffer(ep, buffer, BUFSIZE);
  //engSetVisible(ep, 1);
 	/*
 	 * PART I
@@ -103,11 +103,17 @@ int PASCAL WinMain (HINSTANCE hInstance,
 	   fprintf(error, "%d\n",err);
     }
     fclose(error);*/
-    engEvalString(ep, "load ('C:/Documents and Settings/juribe/My Documents/network-project-code/sparseMatrixV1.txt');");
+    
+    engEvalString(ep, "pVectRevised");
+    /*engEvalString(ep, "load ('C:/Documents and Settings/juribe/My Documents/network-project-code/sparseMatrixV1.txt');");
     engEvalString(ep, "A=spconvert(sparseMatrixV1);");
     engEvalString(ep, "[a] = textread('C:/Documents and Settings/juribe/My Documents/network-project-code/bVector.txt', '', 'delimiter', ',');");
     engEvalString(ep, "b = A\\a;");
     engEvalString(ep, "save 'C:/Documents and Settings/juribe/My Documents/network-project-code/b.txt' b -ascii;");
+    */
+    
+    
+    
     //engEvalString(ep,"pwd");
 	/*engEvalString(ep, "title('Position vs. Time for a falling object');");
 	engEvalString(ep, "xlabel('Time (seconds)');");

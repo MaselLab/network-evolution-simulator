@@ -1,3 +1,4 @@
+#include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -10,13 +11,14 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <errno.h>
-//#include "engine.h"
+
+#include "engine.h"
 
 #include "random.h"
 #include "lib.h"
 #include "netsim.h"
 
-
+#define BUFSIZE 250
 
 int array_size = 1000;
 
@@ -494,7 +496,15 @@ int main(int argc, char *argv[])
   int numBp;
   int TFBS;
   
-  numBp = 30;
+  numBp = 40;
+  
+  Engine *ep;
+    if(!(ep= engOpen(NULL))){
+              printf("Problem running Matlab.");
+              system("PAUSE");
+              exit(1);
+     } 
+  
   
   verbose = 0;
 
@@ -611,7 +621,7 @@ int main(int argc, char *argv[])
          printf("\n");
          
          TFBS =0;
-      while(indiv.allBindingSites[TFBS].leftEdgePos < numBp){
+      while(((indiv.allBindingSites[TFBS].leftEdgePos)+ (HIND_LENGTH-1)) < numBp){
          TFBS++;
   }
   printf("TFBS=%d\n", TFBS);
@@ -716,7 +726,7 @@ int main(int argc, char *argv[])
      printf("\n");
      int startSite;
      startSite=0;
-     
+     int totalTFBS =0;
      
      //while loop for sliding window
      while(startSite<indiv.tfsPerGene[0]){
@@ -726,7 +736,7 @@ int main(int argc, char *argv[])
      int bob;
      
       TFBS =0;
-      while(indiv.allBindingSites[TFBS].leftEdgePos < numBp+startSite){
+      while(((indiv.allBindingSites[TFBS].leftEdgePos)+(14)) < numBp+startSite){
          TFBS++;
   }
   printf("TFBS inside=%d\n", TFBS);
@@ -754,7 +764,7 @@ int main(int argc, char *argv[])
     
      printf("\n");
      configure(0,bits,&array,viableStates,TFBS,startPos);
-
+     printf("HERE!!!!!! array=%d\n", array);
     int sh;
     for(sh=0; sh<array; sh++){
               printf("%lu\n", viableStates[sh]);
@@ -771,33 +781,6 @@ int main(int argc, char *argv[])
      none =0;
      
      sortOnesTwos(array, ones, twos, none, onesArray, twosArray, noneArray, viableStates);
-     /*for(y=0; y<array; y++){
-         printf("%lu\n",viableStates[y]);    
-           
-        if(((viableStates[y])>>1)%2==1 ){
-           twosArray[twos] = viableStates[y];
-           twos++;
-        }else if((viableStates[y]-1)%2==0){
-              onesArray[ones] = viableStates[y];
-              ones++;
-        } else{
-               noneArray[none] = viableStates[y];
-               none++;
-        }
-     }        
-      printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
-      
-      for(y=0; y<ones; y++){
-         printf("%lu\n", onesArray[y]);
-         }
-         printf("twosArray\n");
-      for(y=0; y<twos; y++){
-         printf("%lu\n", twosArray[y]);
-         }
-         printf("noneArray\n");
-      for(y=0; y<none; y++){
-         printf("%lu\n", noneArray[y]);
-         } */
  
      printf("%d\n", array);
      
@@ -810,22 +793,25 @@ int main(int argc, char *argv[])
      system("PAUSE");
 
      print_arrayT_MATLAB(arrayT,array,viableStates);
-    // system("PAUSE");
-     /*Engine *ep;
-     if(!(ep= engOpen(NULL))){
+     system("PAUSE");
+    
+    /*if(!(ep= engOpen(NULL))){
               printf("Problem running Matlab.");
+              system("PAUSE");
               exit(1);
-     }
-     engEvalString(ep,"pVect");
-     engClose(ep);*/
-            
+     }*/
      
-     if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")!=0){
+     engEvalString(ep,"pVectRevised");
+     //engClose(ep);
+     
+      printf("matlab done\n");     
+     
+     /*if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")!=0){
                        printf("Problem running Matlab.");
                        exit(1);   
      }else{
         printf("\n");
-     }
+     }*/
      
    unsigned long *statesS;
    statesS = malloc(array*sizeof(unsigned long));
@@ -880,8 +866,11 @@ int main(int argc, char *argv[])
      printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
      totalArray += array;
      printf("TotalArray=%d\n", totalArray);
+     totalTFBS += TFBS;
+     printf("Total TFBS=%d\n", totalTFBS);
      system("PAUSE");
    }
+   engClose(ep);
      //printf("long=%ud\n", sizeof(long));
     // printf("hindlength=%d\n", HIND_LENGTH);
       //printf("tfsPerGene = %d", indiv.tfsPerGene[0]);

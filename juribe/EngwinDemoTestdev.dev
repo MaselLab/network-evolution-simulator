@@ -1,6 +1,6 @@
 [Project]
 FileName=EngwinDemoTestdev.dev
-Name=Project1
+Name=EngWinDemo
 UnitCount=4
 Type=0
 Ver=1
@@ -18,7 +18,7 @@ Icon=
 ExeOutput=
 ObjectOutput=
 OverrideOutput=0
-OverrideOutputName=
+OverrideOutputName=EngwinDemoTestdev.exe
 HostApplication=
 Folders=
 CommandLine=
@@ -27,7 +27,7 @@ CustomMakefile=
 IncludeVersionInfo=0
 SupportXPThemes=0
 CompilerSet=0
-CompilerSettings=
+CompilerSettings=0000000000000000000000
 
 [Unit1]
 FileName=engine.h
