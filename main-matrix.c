@@ -316,25 +316,6 @@ int TestByteOrder()
    return byte[0];
    //return(byte[0] ? LITTLE_ENDIAN : BIG_ENDIAN);
 }
-  
-/*Converts a text file into a vector of unsigned longs*/  
-void convertFile1( char *fileName, unsigned long *vect, int size){
-     int n;
-     FILE *file;
-     file = fopen(fileName, "r");
-     if(file==NULL){
-        printf("Unable to open file!");
-     } else {
-         for(n=0; n<size; n++){
-            int success = fscanf(file, "  %lu", &(vect[n]));
-            if (!success) {
-               printf("The file ran out of input. Check the size parameter to convertFile.\n");              
-            }
-         }
-         
-         fclose(file);
-     }
-}
 
 /*Converts a text file into a vector of floats*/
 void convertFile( char *fileName, float *vect, int size){
