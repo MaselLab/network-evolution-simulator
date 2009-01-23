@@ -35,6 +35,7 @@ int intcmp(const void *a, const void *b)
     return *(int *)a - *(int *)b;
 }
 
+/*Reorders binding sites from smallest leftEdgePosition to largest leftEdgePosition */
 int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
     if(elem1->leftEdgePos < elem2->leftEdgePos)
         return -1;
@@ -44,17 +45,20 @@ int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
          return 0;
 }
 
- struct Rowtype {
+/*Holds the row number and value of non-zero entry in matrix*/
+struct Rowtype {
     long rownum;
     float *kval;
 };
-    
+
+/*Holds the column number and all the Rowtypes in that column*/   
 struct Ttype {
   int col;
   struct Rowtype *row;
   int rowCount;
 };  
 
+/*Converts the given binary configuration (*bits) into a decimal*/
 unsigned long convertToDecimal(int *bits, int TFBS){
      int n = TFBS-1;
      int count =0;
@@ -77,15 +81,16 @@ unsigned long convertToDecimal(int *bits, int TFBS){
      return decimal;
 }              
 
+/*Determines whether the given site (bindSite) is hindered given the binary configuration (*bits) 
+   and the start positions of all other sites (*startPos)
+   returns 1 if site is hindered
+           0 if site not hindered*/
 int isHindered(int bindSite, int *bits, int *startPos){
     int s = bindSite-1;
     int count=0;
-    //printf("%d\n", s);
-    //printf("%d\n", startPos[bindSite]);
     int check = startPos[bindSite]-(HIND_LENGTH);
     if(check<0){
         check=0;}
-    //printf("%d\n", check);
     while(s>=0 && startPos[s] <= startPos[bindSite] && startPos[s] >= check){
        if(bits[s] == 1){
           return 1;
@@ -94,10 +99,12 @@ int isHindered(int bindSite, int *bits, int *startPos){
           count++;
        }
     }
-    //printf("%d\n",count);
     return 0;
   }
-  
+ 
+ /*Generates all possible configurations given a start site (bindSite), the number of binding sites (TFBS), and 
+    the start positions of all binding sites (*startPos)
+    *statesArray is an array of all the configurations */ 
 void configure(int bindSite, int *bits, int *numStates, unsigned long *statesArray, int TFBS, int *startPos){
 
      if(bindSite<TFBS-1){
@@ -129,25 +136,27 @@ void configure(int bindSite, int *bits, int *numStates, unsigned long *statesArr
            printf("\n");
         }
       } 
-          //system("PAUSE");
   }
 
+/*Populates the diagonal entries in the transition matrix*/
 void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
       
     int x;
     float value=0;
     diag[col]=0;
-          for (x=0; x<m; x++) {
-             value -= *(arrayT[n].row[x].kval);
-          }
-      //printf("%d   %.2f  %.2f\n", col, diag[col], value);
-      diag[col]=value;
-      arrayT[n].row[m].rownum = col;
-      arrayT[n].row[m].kval = &(diag[col]); 
+    for (x=0; x<m; x++) {
+      value -= *(arrayT[n].row[x].kval);
+    }
+    diag[col]=value;
+    arrayT[n].row[m].rownum = col;
+    arrayT[n].row[m].kval = &(diag[col]); 
       
 } 
-  
+
+/*Populates non-daigonal entries in the transition matrix, then calls diagonal() to populate the diagonal entries.
+  All rates are stored in arrayT, which is an array of the Ttype structs or an array of column vectors*/  
 void transitions(int startSite,int size, unsigned long *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
+       //States and column files used for debugging and testing. statesV1.txt has the list of states in decimal, columnV1 has the list of columns.
        statesV1 = fopen("statesV1.txt", "w");
        columnV1 = fopen("columnV1.txt","w");
      if ((statesV1 = fopen("statesV1.txt", "w"))) {
@@ -167,38 +176,34 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
         row = viableStates[i];
         for(p=0;p<TFBSites;p++){
      
-          if(!(row & (1L<<p))){     
-              //need to do decimal to binray here!!!!!!!!  
+          if(!(row & (1L<<p))){   
+              //R-C SWITCH: row = viableStates[i] ^ (1L<<p);    
              row = viableStates[i] | (1L<<p);
              if(row!=0 && row!=viableStates[i]){
+              //R_C SWITCH: if(row!=viableStates[i]){
                 for(j=0;j<size; j++){
                    if(row==viableStates[j]){
                       arrayT[n].row[m].rownum = j;
                       a = hammDist[p];
-                      arrayT[n].row[m].kval = &(koff[a]);
+                       arrayT[n].row[m].kval = &(koff[a]);
                       m++;
-                     // printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
-                      //printf("koff=%f\n", koff[a]);
-                     //printf("    col=%d, rownum=%d, j=%d, p=%d\n",row, &(arrayT[n].row[m].rownum),j, p);
-                     //printf(" %d  %d  \n", i, j);
                    }
                  }
               }
           }else{
+              //R-C SWITCH: row = viableStates[i]|(1<<p);
+              //R-C SWITCH: if(row!=0 && row!=viableStates[i]){
               row = viableStates[i] ^ (1L<<p);
               if(row != viableStates[i]){     
                  for( j=0;j<size; j++){   
                     if(row==viableStates[j]){
-                    
                       arrayT[n].row[m].rownum = j;
+                      a = hammDist[p];
                       arrayT[n].row[m].kval = &(kon[p]);
                       m++;
-                      //printf("rownum=%d, j=%d\n", arrayT[n].row[m].rownum, j);
-                      //printf("    col=%d, rownum=%d, j=%d, p=%d\n", row, &(arrayT[n].row[m].rownum),j, p);
-                     //printf(" %d  %d  \n", i, j);
                     }
                   }
-              }//printf("\n");
+              }
           }
        }
        diagonal(i,diag, arrayT, m, n);
@@ -210,45 +215,43 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
      }}
      fclose(statesV1);
   }
-  
+
+/*Prints the entries in arrayT. Prints the column, row, configuration in binary of column, 
+  configuration in binary of row and rate */   
 void print_arrayT(struct Ttype *arrayT, int size, unsigned long *viableStates){
      int p, q;  
      printf("%d\n",size); 
-     //printf("CHECK:%d  %d | %d  %d  %d\n", 64,arrayT[64].row[0].rownum, viableStates[64], viableStates[arrayT[64].row[0].rownum],  *arrayT[64].row[0].kval ); 
-   //  system("PAUSE");
     p=0;  
     while (p < size) {
        q=0;
-       //printf("rowCount=%d, q=%d\n",  arrayT[p].rowCount,q);
        while (q < arrayT[p].rowCount) {
-          //if(arrayT[p].row[q].rownum!=4){
-         //printf("rownum=%d\n", &(arrayT[p].row[q].rownum));
-          printf( "%d  %lu | %lu  %lu  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval); 
-    	 // }else{
-              //printf( "%d  %d | %d  %d  %d\n",p,arrayT[p].row[q].rownum, viableStates[p], viableStates[arrayT[p].row[q].rownum],  1);   
-          //}//printf( "col%d: %d\n",q, arrayT[p].col[q].colnum);
-	     // printf( "Value%d: %.2f\n",q, *arrayT[p].row[q].kval);     
+          printf( "%d  %lu | %lu  %lu  %.2f\n",p,(arrayT[p].row[q].rownum), viableStates[p], viableStates[arrayT[p].row[q].rownum],*arrayT[p].row[q].kval);   
     	  q++;
        }
        p++; 
        //printf("%d\n", size);  
-      // system("PAUSE"); 
     }
-    //system("PAUSE"):
     printf("\n");
 } 
 
+/*Prints column, row, and rate to a text file to pass to Matlab*/
 void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableStates){
+     //First part prints to the console
      int p, q;  
      printf("\n Col   Row      kval\n"); 
     p=0;  
     while (p < size) {
        q=0;
        while (q < arrayT[p].rowCount) {
+            /*R-C SWITCH : if(p!=4){
+              printf("%d     %lu      %f\n",p,arrayT[p].row[q].rownum,   *arrayT[p].row[q].kval); 
+              }else{        
+                  printf("%d     %lu       %d\n",p, arrayT[p].row[q].rownum,  1); 
+                  }*/
            if(arrayT[p].row[q].rownum!=4){
-           printf(" %d      %lu      %f\n", p,arrayT[p].row[q].rownum,  *arrayT[p].row[q].kval); 
+              printf("%d     %lu      %f\n",p,arrayT[p].row[q].rownum,   *arrayT[p].row[q].kval);                             
            }else{
-                printf(" %d      %lu      %d\n", p,arrayT[p].row[q].rownum,  1);  
+                 printf("%d     %lu       %d\n",p, arrayT[p].row[q].rownum,  1); 
            }
            q++;
        }
@@ -259,27 +262,27 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
           printf(" %d     %d    %d\n", count, 4, 1);
           count++;
           }
-    //system("PAUSE");
-   
+   //Second part prints to sparseAMtrixV1.txt
     sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
     if ((sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w"))) {
         //ask alex about this line of code...
-       //fprintf(sparseMatrixV1, "1Row  Column  Value\n\n");
-        //printf( "1Row  Column  Value\n\n");
-        int p=0;  
+    int p=0;  
       while (p < size) {
       int q=0;
        while (q < arrayT[p].rowCount) {
+            /*R-C SWITCH: if(p!=4){
+                      fprintf(sparseMatrixV1, "%ld,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval);
+                      }*/
        if(arrayT[p].row[q].rownum!=4){
        fprintf(sparseMatrixV1, "%ld,   %d,   %f\n" ,arrayT[p].row[q].rownum +1,p+1,  *arrayT[p].row[q].kval);
       }else{} 
-      // printf( "%d,   %d,   %.2f\n\n", arrayT[6].row, arrayT[6].col[3].colnum, *arrayT[6].col[3].kval);
        q++;
        }
        p++;
       }
      int count=0;
        while(count<size){
+             //R-C SWITCH: fprintf(sparseMatrixV1," %d     %d    %d\n",  count+1,5, 1);            
           fprintf(sparseMatrixV1," %d     %d    %d\n", 5, count+1, 1);
           count++;
           }
@@ -287,6 +290,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
     fclose(sparseMatrixV1);
 }
 
+/*Prints the "0" vector. All 0 vector except for one entry is 1 to make sure entries in x vector sum to 1*/
 void print_vector_MATLAB(int size){
      int i;
       bVector = fopen("bVector.txt", "w");
@@ -302,6 +306,9 @@ void print_vector_MATLAB(int size){
      }
 }
 
+/*Determines if system is Little Endian or Big Endian
+  returns 1 if little
+          0 if big*/
 int TestByteOrder()
 {
    short int word = 0x0001;
@@ -310,7 +317,7 @@ int TestByteOrder()
    //return(byte[0] ? LITTLE_ENDIAN : BIG_ENDIAN);
 }
   
-  
+/*Converts a text file into a vector of unsigned longs*/  
 void convertFile1( char *fileName, unsigned long *vect, int size){
      int n;
      FILE *file;
@@ -329,6 +336,7 @@ void convertFile1( char *fileName, unsigned long *vect, int size){
      }
 }
 
+/*Converts a text file into a vector of floats*/
 void convertFile( char *fileName, float *vect, int size){
      int n;
      FILE *file;
@@ -342,11 +350,11 @@ void convertFile( char *fileName, float *vect, int size){
                printf("The file ran out of input. Check the size parameter to convertFile.\n");              
             }
          }
-         
          fclose(file);
      }
 }
 
+/*Determines probability of left most binding sites and fixes these probabilities*/
 void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size, float *previous){
      //separate into 00, 01, 10
      int y;
@@ -445,19 +453,21 @@ void sortOnesTwos(int array, int ones, int twos, int none, unsigned long *onesAr
          } 
 }
  
+/*Finds the next start site*/
 int nextStartSite(int startSite, int *startPos){
     int next;
     int basePairNum;
     basePairNum = startPos[startSite];
     printf("startSite = %d\n basePairNum = %d\n",startSite, basePairNum);
     next = basePairNum;
-    int hey = startSite+2;
+    int hey = startSite+1;
     while(next==startPos[hey]){
       hey++;
     }
     return hey;
 }
 
+/*Populates the final x-vector*/
 void populateFinal(float zero, float ones, float twos, float *final, int nextSite){
      final[0] = zero;
      final[nextSite] = ones;
@@ -472,7 +482,7 @@ int main(int argc, char *argv[])
         - 32bit Big-Endian
         - 64bit Little-Endian
         - 64bit Big-Endian
-    Current code written for 64bit Big-Endian
+    Current code written for 32bit Little-Endian
     */
     
     //Check Endianess of system
@@ -495,16 +505,16 @@ int main(int argc, char *argv[])
   int curr_seed;
   int numBp;
   int TFBS;
+
+  numBp = 40;//Size of first sliding window in basse pairs
   
-  numBp = 40;
-  
+  //Opens Matlab engine
   Engine *ep;
-    if(!(ep= engOpen(NULL))){
-              printf("Problem running Matlab.");
-              system("PAUSE");
-              exit(1);
-     } 
-  
+  if(!(ep= engOpen(NULL))){
+      printf("Problem running Matlab.");
+      system("PAUSE");
+      exit(1);
+  } 
   
   verbose = 0;
 
@@ -581,15 +591,16 @@ int main(int argc, char *argv[])
 
   /* initialize protein and mRNA concentrations */
   /* Jasmin: you can use these initial concentrations for computing your kons */
+  
+  /*Creates array of inial protein concentrations for computig kons*/
   for (i=0; i<NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     //printf("%f\n", initProteinConc[i]);
   }
- // printf("\n");
- 
-  
+
     
-    //populate Koff
+   /*populate Koff. There are 5 possible koff rates: koff w/0 mismatches, koff w/1 mismatch, koff w/2 mismatches, 
+      Koff w/cooperativity on one side, koff w/cooperativity on 2 sides. Cooperativity is not implemented yet.*/
     float Koff[5];
     float Gibbs;
     float RTlnKr;
@@ -599,9 +610,7 @@ int main(int argc, char *argv[])
     int jo;
     for( jo=0; jo<3; jo++){
          Gibbs = (((float) jo)/3.0 - 1.0) * RTlnKr;
-         //printf("\n gibbs = %f\n", Gibbs);
          koffCheck = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
-         //printf("\n koffCheck = %f\n", koffCheck);
          Koff[jo] = koffCheck;
     }
     int jojo;
@@ -616,13 +625,15 @@ int main(int argc, char *argv[])
   /* create sequences and binding site matrix */
   initialize_genotype(&indiv, kdis);
   
+  /*Sort binding sites from smallest leftEdgePosition to largets leftEdgePosition*/
   qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
          printf("\n");
-         
-         TFBS =0;
-      while(((indiv.allBindingSites[TFBS].leftEdgePos)+ (HIND_LENGTH-1)) < numBp){
-         TFBS++;
+  
+  /*Find number of binding sites completely within sliding window*/       
+  TFBS =0;
+  while(((indiv.allBindingSites[TFBS].leftEdgePos)+ (HIND_LENGTH-1)) < numBp){
+     TFBS++;
   }
   printf("TFBS=%d\n", TFBS);
   system("PAUSE");
@@ -631,14 +642,8 @@ int main(int argc, char *argv[])
  /* print_all_binding_sites(indiv.copies, indiv.allBindingSites, indiv.bindSiteCount, 
 			  indiv.transcriptionFactorSeq, indiv.cisRegSeq, indiv.tfsStart); 
 			  printf("tfsPerGene = %d", indiv.tfsPerGene); */
-
-
-  /* Jasmin:
-     pseudo-code for looping (see also print_all_binding_sites in netsim.c):*/
-     //system("PAUSE");
-    //int sitePos[10];
-    //int transFactor[10];
-  
+   
+   /*Create arrays to store information in indiv.allBindingSites*/
     int *leftEdgePos;
     int *startPos;
     int *hammDist;
@@ -647,59 +652,52 @@ int main(int argc, char *argv[])
     float *final;
     final = malloc(array_size*sizeof(float));
     
-      //populate Kon
+    //populate Kon. Kons depend on TF concentrations
     float Kon[TFBS];
     
+    //allocate memory for these arrays
     leftEdgePos = malloc(indiv.tfsPerGene[0]*sizeof(int));
     startPos=malloc(TFBS*sizeof(int));
-    //startPos=malloc(indiv.tfsPerGene[0]*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
     diag = malloc(array_size*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
-    //Kon = malloc(TFBS*sizeof(float));
       
-    int *bits = calloc(TFBS, sizeof(int));
-    unsigned long *viableStates;
-    struct Ttype *arrayT;
+    int *bits = calloc(TFBS, sizeof(int));//array of bits to create configurations
+    unsigned long *viableStates;//array of viable states
+    struct Ttype *arrayT;//array of column vectors for transition matrix
     
     viableStates = malloc((array_size)*sizeof(unsigned long));
     arrayT = malloc(array_size*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
-     int totalArray = 0; 
+    
+     int totalArray = 0; //total number of possible configurations
      
      int finalPos =0;
      
-    float *previous;
+   //Creates a vector of probabilities so first iteration can normalize to 1
+   float *previous;
    previous = malloc(10*sizeof(float));
    float prev[10] = {1,0,0,0,0,0,0,0,0,0};
     int pi;
     for(pi=0; pi<10; pi++){
        previous[pi]=prev[pi];
     }
-         
+    
+    /*Prints all leftEdgePositions to file. Used for debugging and testing purposes*/    
     leftEdgePositions = fopen("leftEdgePositions.txt", "w");
      if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
-         fprintf(leftEdgePositions , "\n");
-         for (i=0; i <indiv.tfsPerGene[0] ; i++) {  
-             fprintf(leftEdgePositions, "binding site %3d:  ", i);
-             fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
-         }
-         fprintf(leftEdgePositions, "\n");
 
-         int fey;
-         for( fey=0; fey<TFBS; fey++){
-             printf("binding site %3d:  ", fey);
-             printf("%d\n", indiv.allBindingSites[fey].leftEdgePos);
+         int f;
+         for( f=0; f<TFBS; f++){
+             printf("binding site %3d:  ", f);
+             printf("%d\n", indiv.allBindingSites[f].leftEdgePos);
          }
          printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
          system("PAUSE");
-               //leftEdgePositions = fopen("leftEdgePositions.txt", "w");
-                // if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
+
+         //Stores leftEdgePositions of each site on the first gene in leftEdgePos[] array and prints to file. 
+         //Commented code is to print other information
          for (i=0; i <indiv.tfsPerGene[0] ; i++) {
-              /*if(indiv.allBindingSites[i].cisregID ==1){
-                  printf("One:%d  LeftEdge:%d\n", i, indiv.allBindingSites[i].leftEdgePos);
-               }*/
-    
               fprintf(leftEdgePositions, "binding site %3d:  ", i);
               leftEdgePos[i] =  indiv.allBindingSites[i].leftEdgePos;
             /*fprintf( leftEdgePositions, "binding site %3d:  ", i);
@@ -720,57 +718,52 @@ int main(int argc, char *argv[])
            */}
     }
     fclose(leftEdgePositions);
-    printf("leftEdgePos[1] = %d", leftEdgePos[1]);
     system("PAUSE");
    
-     printf("\n");
-     int startSite;
-     startSite=0;
-     int totalTFBS =0;
+   printf("\n");
+   int startSite;
+   startSite=0;
+   int totalTFBS =0;
      
-     //while loop for sliding window
-     while(startSite<indiv.tfsPerGene[0]){
+     //Main while loop for sliding window #1
+   while(startSite<indiv.tfsPerGene[0]){
      int lem;
      int array =0;
-     
      int bob;
      
-      TFBS =0;
-      while(((indiv.allBindingSites[TFBS].leftEdgePos)+(14)) < numBp+startSite){
-         TFBS++;
-  }
-  printf("TFBS inside=%d\n", TFBS);
-  system("PAUSE");
-      
-     for(lem =0; lem<TFBS; lem++){
-             startPos[lem] = indiv.allBindingSites[lem+startSite].leftEdgePos;
-             hammDist[lem] = indiv.allBindingSites[lem+startSite].hammingDist;
-             TFon[lem] = indiv.allBindingSites[lem+startSite].tfID;
-             bob = indiv.allBindingSites[lem+startSite].tfID;
-             //printf("bob= %d\n", bob);
-             Kon[lem] = initProteinConc[bob]*kon;
-             
-             printf("%d", indiv.allBindingSites[lem+startSite].leftEdgePos);
-             printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
-             printf(" Kon[lem] = %f\n", Kon[lem]);    
-        }
+     //Find number of sites within sliding window. Changes with startSite
+     TFBS =0;
+     while(((indiv.allBindingSites[TFBS].leftEdgePos)+(14)) < numBp+startSite){
+        TFBS++;
+     }
+     printf("TFBS inside=%d\n", TFBS);
      system("PAUSE");
      
-    /* printf("startPos[0] = %d\n", startPos[0]);
-      int hello;
-      hello = nextStartSite(0,startPos);
-      printf("hello = %d\n",hello);
-      system("PAUSE");*/
-    
+     //populate startpos, hammDist, TFon, Kon for specified number of binding sites 
+     for(lem =0; lem<TFBS; lem++){
+        startPos[lem] = indiv.allBindingSites[lem+startSite].leftEdgePos;
+        hammDist[lem] = indiv.allBindingSites[lem+startSite].hammingDist;
+        TFon[lem] = indiv.allBindingSites[lem+startSite].tfID;
+        bob = indiv.allBindingSites[lem+startSite].tfID;
+        Kon[lem] = initProteinConc[bob]*kon;
+             
+        printf("%d", indiv.allBindingSites[lem+startSite].leftEdgePos);
+        printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
+        printf(" Kon[lem] = %f\n", Kon[lem]);    
+     }
+     system("PAUSE");
      printf("\n");
+     
+     //Generate states for given binding sites and hinderances
      configure(0,bits,&array,viableStates,TFBS,startPos);
-     printf("HERE!!!!!! array=%d\n", array);
+     printf("HERE array=%d\n", array);
+    
     int sh;
     for(sh=0; sh<array; sh++){
               printf("%lu\n", viableStates[sh]);
      }
- 
-    // int y;
+     
+     //Look at left most binding sites
      int ones, twos, none;
      unsigned long *onesArray, *twosArray, *noneArray;
      noneArray=malloc(500*sizeof(unsigned long));
@@ -780,19 +773,24 @@ int main(int argc, char *argv[])
      twos=0;
      none =0;
      
+     //Sort x-vector into those configurations that left most sites bound or unbound
      sortOnesTwos(array, ones, twos, none, onesArray, twosArray, noneArray, viableStates);
  
      printf("%d\n", array);
      
+     //Print the "0" vector to a text file
      print_vector_MATLAB(array);
      
      system("PAUSE");
      
+     //populate transition matrix
      transitions(startSite,array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
   
      system("PAUSE");
-
+     
+     //print non-sero entries to text file  
      print_arrayT_MATLAB(arrayT,array,viableStates);
+     //print_arrayT(arrayT, array, viableStates);
      system("PAUSE");
     
     /*if(!(ep= engOpen(NULL))){
@@ -801,10 +799,12 @@ int main(int argc, char *argv[])
               exit(1);
      }*/
      
+     
+     //matlab call to m-file pVectRevised
      engEvalString(ep,"pVectRevised");
      //engClose(ep);
      
-      printf("matlab done\n");     
+     printf("matlab done\n");     
      
      /*if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")!=0){
                        printf("Problem running Matlab.");
@@ -813,26 +813,16 @@ int main(int argc, char *argv[])
         printf("\n");
      }*/
      
-   unsigned long *statesS;
-   statesS = malloc(array*sizeof(unsigned long));
+  
    float *outcome;
-/*   float *previous;
-   previous = malloc(10*sizeof(float));
-   float prev[10] = {1,0,0,0,0,0,0,0,0,0};
-    int pi;
-    for(pi=0; pi<10; pi++){
-       previous[pi]=prev[pi];
-    }*/
-    
-    system("PAUSE");
+   system("PAUSE");
    
     outcome = malloc( array*sizeof(float));
     
     float *vector;
     vector = malloc(array*sizeof(float));
     
-    convertFile1("statesV1.txt", statesS, array);
-    
+    //Get solution vector from matlab and store in vector
     convertFile("b.txt", vector, array);
     
     int n;
@@ -841,25 +831,33 @@ int main(int argc, char *argv[])
             printf( "%f\n", (vector[n]));
     }
     
-    probSlide(statesS, vector, outcome, array, previous);
+    //Get probabilities of left most sites being bound or unbound and fix these probabilites
+    probSlide(viableStates, vector, outcome, array, previous);
+    
     int posNum;
     if(finalPos==0){
        posNum=1;
     }else{
        posNum = 2*finalPos + 1;
     }
+    //Prints the outcome of the collapsed probabilities
     printf("\n OUTCOME \n");
     for(n=0; n<3; n++){
              printf("%f\n", outcome[n]);
     }
     printf("\n");
+    
+   //Populate the final vector of probabilities with fixed probabilities
    populateFinal(outcome[0], outcome[1], outcome[2], final,posNum);
+   //prints the final fixed probabilities
    printf("FINAL\n");
    for(i=0; i<(posNum+2); i++){
        printf("%f\n", final[i]);
     }
     system("PAUSE");
+    
     printf("previous Start Site= %d\n", startSite);
+     //Find the next starting posittion
      int nextS = nextStartSite(startSite, leftEdgePos);
      startSite = nextS;
      finalPos++;
@@ -871,10 +869,7 @@ int main(int argc, char *argv[])
      system("PAUSE");
    }
    engClose(ep);
-     //printf("long=%ud\n", sizeof(long));
-    // printf("hindlength=%d\n", HIND_LENGTH);
-      //printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
-     //  system("PAUSE");
+
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
    int d;
@@ -891,5 +886,4 @@ int main(int argc, char *argv[])
   free(diag);
   /* close error file */
   fclose(fperrors);
-  //fclose(sparseMatrixV1);
 }
