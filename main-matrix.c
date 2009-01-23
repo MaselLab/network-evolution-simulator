@@ -149,8 +149,7 @@ void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
     }
     diag[col]=value;
     arrayT[n].row[m].rownum = col;
-    arrayT[n].row[m].kval = &(diag[col]); 
-      
+    arrayT[n].row[m].kval = &(diag[col]);     
 } 
 
 /*Populates non-daigonal entries in the transition matrix, then calls diagonal() to populate the diagonal entries.
@@ -262,7 +261,7 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
           printf(" %d     %d    %d\n", count, 4, 1);
           count++;
           }
-   //Second part prints to sparseAMtrixV1.txt
+   //Second part prints to sparseMatrixV1.txt
     sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
     if ((sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w"))) {
         //ask alex about this line of code...
