@@ -169,7 +169,7 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
           arrayT[n].col = i;
           arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
          printf("viableStates:%lu, col num:%d\n",viableStates[i], i);
-       fprintf(statesV1,"%lu \n", viableStates[i]);
+         fprintf(statesV1,"%lu \n", viableStates[i]);
          fprintf(columnV1,"%d\n",i);
         m=0;
         row = viableStates[i];
@@ -188,7 +188,7 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
                       m++;
                    }
                  }
-              }
+               }
           }else{
               //R-C SWITCH: row = viableStates[i]|(1<<p);
               //R-C SWITCH: if(row!=0 && row!=viableStates[i]){
@@ -201,17 +201,18 @@ void transitions(int startSite,int size, unsigned long *viableStates, int TFBSit
                       arrayT[n].row[m].kval = &(kon[p]);
                       m++;
                     }
-                  }
+                 }
               }
           }
-       }
+        }
        diagonal(i,diag, arrayT, m, n);
        m++;
        arrayT[n].rowCount = m;
       // printf("rowCount=%d\n",  arrayT[n].rowCount);
        n++;
-       }
+      }
      }}
+     fclose(columnV1);
      fclose(statesV1);
   }
 
@@ -334,6 +335,16 @@ void convertFile( char *fileName, float *vect, int size){
      }
 }
 
+int countMultiples(unsigned long *statesArray, int *startPos, int startSite){
+    int start = startPos[startSite +1];
+    printf("\nStart=%d\n", startSite);
+    int count=1;
+    while(start==startSite){
+        count++;
+    } 
+    return count;
+}
+
 /*Determines probability of left most binding sites and fixes these probabilities*/
 void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size, float *previous){
      //separate into 00, 01, 10
@@ -375,7 +386,6 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
          printf("%f\n", noneArray[y]);
          }  
       //Add up probabilities
-      
       float sum1, sum2, sum0;
       sum1 = 0;
       sum2 = 0;
@@ -389,7 +399,7 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
       for(y=0; y<none; y++){
          sum0 += noneArray[y];
          }
-         //normalize to previous
+      //normalize to previous
       outcome[0] = sum0*previous[0];
       outcome[1] = sum1*previous[0];
       outcome[2] = sum2*previous[0];
@@ -440,11 +450,11 @@ int nextStartSite(int startSite, int *startPos){
     basePairNum = startPos[startSite];
     printf("startSite = %d\n basePairNum = %d\n",startSite, basePairNum);
     next = basePairNum;
-    int hey = startSite+1;
-    while(next==startPos[hey]){
-      hey++;
+    int h = startSite+1;
+    while(next==startPos[h]){
+      h++;
     }
-    return hey;
+    return h;
 }
 
 /*Populates the final x-vector*/
@@ -516,7 +526,7 @@ int main(int argc, char *argv[])
         current_ploidy = atoi(optarg);
         break;
       case 'w':
-        TFBS = atoi(optarg);
+        numBp = atoi(optarg);
         break;
       case 'a':
         array_size = atoi(optarg);
@@ -575,7 +585,7 @@ int main(int argc, char *argv[])
   /*Creates array of inial protein concentrations for computig kons*/
   for (i=0; i<NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
-    //printf("%f\n", initProteinConc[i]);
+    printf("%f\n", initProteinConc[i]);
   }
 
     
@@ -738,10 +748,12 @@ int main(int argc, char *argv[])
      configure(0,bits,&array,viableStates,TFBS,startPos);
      printf("HERE array=%d\n", array);
     
-    int sh;
+    int mult=countMultiples(viableStates, startPos, startSite);
+    printf("\n MULT = %d\n", mult);
+    /*int sh;
     for(sh=0; sh<array; sh++){
               printf("%lu\n", viableStates[sh]);
-     }
+     }*/
      
      //Look at left most binding sites
      int ones, twos, none;
