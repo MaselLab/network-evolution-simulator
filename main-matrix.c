@@ -351,9 +351,9 @@ void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size
      int y;
      int ones, twos, none;
      float *onesArray, *twosArray, *noneArray;
-     noneArray=malloc(50*sizeof(float));
-     onesArray= malloc(20*sizeof(float));
-     twosArray = malloc(20*sizeof(float));
+     noneArray=malloc(300*sizeof(float));
+     onesArray= malloc(200*sizeof(float));
+     twosArray = malloc(200*sizeof(float));
      ones =0;
      twos=0;
      none =0;
@@ -585,7 +585,7 @@ int main(int argc, char *argv[])
   /*Creates array of inial protein concentrations for computig kons*/
   for (i=0; i<NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
-    printf("%f\n", initProteinConc[i]);
+    //printf("%f\n", initProteinConc[i]);
   }
 
     
@@ -615,7 +615,7 @@ int main(int argc, char *argv[])
   /* create sequences and binding site matrix */
   initialize_genotype(&indiv, kdis);
   
-  /*Sort binding sites from smallest leftEdgePosition to largets leftEdgePosition*/
+  /*Sort binding sites from smallest leftEdgePosition to largest leftEdgePosition*/
   qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
          printf("\n");
