@@ -349,12 +349,9 @@ int countMultiples(unsigned long *statesArray, int *startPos, int startSite){
 }
 
 void leftMostSites1(int size, unsigned long *states, int mult, int **array, int *count){
-    printf("HERE\n");
     int mask = 01;
     int i,p,h,j;
     int count1;
-
- 
     j=0;
     
     for(i=0; i<size; i++){
@@ -418,8 +415,8 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
       printf("count1.1=%d\n", count[h]);
     }
    printf("\n");
-   printf("array[1][0]=%f\n", array[0][1]);
-   printf("count[0]=%d\n", count[0]);
+   //printf("array[1][0]=%f\n", array[0][1]);
+   //printf("count[0]=%d\n", count[0]);
    printf("\n");
 
    system("PAUSE");
@@ -452,209 +449,6 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
         }     
  }  
      
-/*void probSlide2(unsigned long *statesArray, float *prob, float *outcome, int size, float *previous, int mult){
-     int y;
-     float *onesArray, *noneArray, *twosArray, *threesArray, *foursArray;
-     noneArray=malloc(300*sizeof(float));
-     onesArray= malloc(200*sizeof(float));
-     twosArray= malloc(200*sizeof(float));
-     threesArray= malloc(200*sizeof(float));
-     foursArray= malloc(200*sizeof(float));
-    
-     system("PAUSE");
-     
-     int mask = 01;
-    int i,p,h,j;
-    int c0, c1,c2,c3,c4;
-    c0=0;
-    c1=0;
-    c2=0;
-    c3=0;
-    c4=0;
- 
-     for(i=0; i<size; i++){
-              printf("%lu    %f\n", statesArray[i], prob[i]);
-     }
-     printf("\n\n");
-    j=0;
-    
-    for(i=0; i<size; i++){
-        if((statesArray[i]) % (int)pow(2, mult)==0){
-               noneArray[j] = prob[i];
-               j++;
-               printf("%f\n",prob[i]);
-        }
-    }
-     for(h=0; h<mult; h++){    
-      for(i=0; i<size; i++){
-        p = statesArray[i] >> h; 
-        if(mask & p){
-            if(h==0){
-              onesArray[c1]=prob[i];
-              c1++;
-            }
-            else if(h==1){
-               twosArray[c2]=prob[i];
-               c2++;
-            }else if(h==2){
-                  threesArray[c3]=prob[i];
-                  c3++;
-            }else{
-                  foursArray[c4]=prob[i];
-                  c4++;
-            }
-            printf("%f\n",prob[i]);
-        }
-      }
-      c0=j;
-      printf("c0=%d c1=%d c2=%d c3=%d c4=%d\n", c0,c1,c2,c3,c4);
-    }
-   
-   system("PAUSE");
-   for(y=0; y<c0; y++){
-         printf("%f\n", onesArray[y]);
-         }
-         printf("noneArray\n");
-      for(y=0; y<c1; y++){
-         printf("%f\n", noneArray[y]);
-         }  
-      //Add up probabilities
-      float sum1, sum0, sum2, sum3, sum4;
-      sum0 = 0;
-      sum1 = 0;
-      sum2 = 0;
-      sum3 = 0;
-      sum4 = 0;
-      for(y=0; y<c1; y++){
-         sum1 += onesArray[y];
-         }
-      for(y=0; y<c0; y++){
-         sum0 += noneArray[y];
-         }
-         for(y=0; y<c2; y++){
-         sum1 += twosArray[y];
-         }
-       for(y=0; y<c3; y++){
-         sum0 += threesArray[y];
-         }
-         for(y=0; y<c4; y++){
-         sum1 += foursArray[y];
-         }
-      
-      //normalize to previous
-      outcome[0] = sum0*previous[0];
-      outcome[1] = sum1*previous[0];
-      outcome[2] = sum2*previous[0];
-      outcome[3] = sum3*previous[0];
-      outcome[4] = sum4*previous[0];
-      printf("previous[0]=%f\n", previous[0]);
-      printf("\n%f %f %f %f %f \n", sum0, sum1, sum2, sum3, sum4); 
-      printf("\n%f %f %f %f %f\n", outcome[0], outcome[1], outcome[2], outcome[3],outcome[4]); 
-     int g;   
-     for(g=0; g<mult+1; g++){
-        previous[g] = outcome[g];
-        }     
- }   */    
-
-
-
-/*Determines probability of left most binding sites and fixes these probabilities*/
-/*void probSlide(unsigned long *statesArray, float *prob, float *outcome, int size, float *previous){
-     //separate into 00, 01, 10
-     int y;
-     int ones, twos, none;
-     float *onesArray, *twosArray, *noneArray;
-     noneArray=malloc(300*sizeof(float));
-     onesArray= malloc(200*sizeof(float));
-     twosArray = malloc(200*sizeof(float));
-     ones =0;
-     twos=0;
-     none =0;
-     system("PAUSE");
-     for(y=0; y<size; y++){
-         printf("%lu\n",statesArray[y]);    
-     //}    
-        if(((statesArray[y])>>1)%2==1 ){
-           twosArray[twos] = prob[y];
-           twos++;
-        }else if((statesArray[y]-1)%2==0){
-              onesArray[ones] = prob[y];
-              ones++;
-        } else{
-               noneArray[none] = prob[y];
-               none++;
-        }
-     }        
-      printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
-      
-      for(y=0; y<ones; y++){
-         printf("%f\n", onesArray[y]);
-         }
-         printf("twosArray\n");
-      for(y=0; y<twos; y++){
-         printf("%f\n", twosArray[y]);
-         }
-         printf("noneArray\n");
-      for(y=0; y<none; y++){
-         printf("%f\n", noneArray[y]);
-         }  
-      //Add up probabilities
-      float sum1, sum2, sum0;
-      sum1 = 0;
-      sum2 = 0;
-      sum0 = 0;
-      for(y=0; y<ones; y++){
-         sum1 += onesArray[y];
-         }
-      for(y=0; y<twos; y++){
-         sum2 += twosArray[y];
-         }
-      for(y=0; y<none; y++){
-         sum0 += noneArray[y];
-         }
-      //normalize to previous
-      outcome[0] = sum0*previous[0];
-      outcome[1] = sum1*previous[0];
-      outcome[2] = sum2*previous[0];
-      printf("previous[0]=%f\n", previous[0]);
-      printf("\n%f %f %f\n", sum0, sum1, sum2); 
-      printf("\n%f %f %f\n", outcome[0], outcome[1], outcome[2]); 
-     int g;   
-     for(g=0; g<3; g++){
-        previous[g] = outcome[g];
-        }       
-}*/
-
-/*void sortOnesTwos(int array, int ones, int twos, int none, unsigned long *onesArray, unsigned long *twosArray, unsigned long *noneArray, unsigned long *viableStates){
-      int y;
-      for(y=0; y<array; y++){
-         printf("%lu\n",viableStates[y]);    
-           
-        if(((viableStates[y])>>1)%2==1 ){
-           twosArray[twos] = viableStates[y];
-           twos++;
-        }else if((viableStates[y]-1)%2==0){
-              onesArray[ones] = viableStates[y];
-              ones++;
-        } else{
-               noneArray[none] = viableStates[y];
-               none++;
-        }
-     }        
-      printf("\n none=%d, ones=%d, twos=%d\n\nonesArray\n",none, ones, twos); 
-      
-      for(y=0; y<ones; y++){
-         printf("%lu\n", onesArray[y]);
-         }
-         printf("twosArray\n");
-      for(y=0; y<twos; y++){
-         printf("%lu\n", twosArray[y]);
-         }
-         printf("noneArray\n");
-      for(y=0; y<none; y++){
-         printf("%lu\n", noneArray[y]);
-         } 
-}*/
  
 /*Finds the next start site*/
 int nextStartSite(int startSite, int *startPos){
@@ -680,20 +474,6 @@ void populateFinal1(float *outcome,int mult, float *final, int nextSite){
      }
 }
 
-/*void populateFinal2(float zero, float ones, float twos, float threes, float fours, float *final, int nextSite){
-     final[0] = zero;
-     final[nextSite] = ones;
-     final[nextSite+1] = twos;
-     final[nextSite+2] = threes;
-     final[nextSite+3] = fours;
-}*/
-
-/*Populates the final x-vector*/
-/*void populateFinal(float zero, float ones, float twos, float *final, int nextSite){
-     final[0] = zero;
-     final[nextSite] = ones;
-     final[nextSite+1] = twos;
-}*/
 
 int main(int argc, char *argv[])
 {
@@ -982,6 +762,7 @@ int main(int argc, char *argv[])
     int mult=countMultiples(viableStates, startPos, startSite);
     printf("\n MULT = %d\n", mult);
     system("PAUSE");
+   
     int **leftArray;
     leftArray = malloc((mult+1)*sizeof(int *));
     for(i=0;i<(mult+1);i++){
@@ -997,65 +778,9 @@ int main(int argc, char *argv[])
     
     int *countArray;
     countArray= malloc((mult+1)*sizeof(int));
-    //leftMostSites1(array, viableStates, mult, leftArray, countArray);
-       
-       
-    /*   int ja;
-       printf("\n");
-       for(ja=0; ja<ones1; ja++){
-         printf("%lu\n", onesArray1[ja]);
-       } 
-       printf("\n");
-       for(ja=0; ja<none1; ja++){
-         printf("%lu\n", noneArray1[ja]);
-       }*/
+    
     system("PAUSE"); 
-  //}
-    /*int sh;
-    for(sh=0; sh<array; sh++){
-              printf("%lu\n", viableStates[sh]);
-     }*/
-     
-     //Look at left most binding sites
-    /* else{
-     int none, one, two, three, four ;
-     unsigned long *noneArray, *onesArray, *twosArray, *threesArray, *foursArray;
-     noneArray=malloc(500*sizeof(unsigned long));
-     onesArray= malloc(200*sizeof(unsigned long));
-     twosArray = malloc(200*sizeof(unsigned long));
-     threesArray = malloc(200*sizeof(unsigned long));
-     foursArray = malloc(200*sizeof(unsigned long));
-      none =0;
-     one =0;
-     two=0;
-     three=0;
-     four=0;
-     leftMostSites2(array, viableStates, 1, noneArray, onesArray, twosArray, threesArray, foursArray, none, one, two, three, four);
-     int j;
-    printf("\n");
-    for(j=0; j<one; j++){
-       printf("%lu\n", onesArray[j]);
-    }
-    printf("\n");
-    for(j=0; j<two; j++){
-       printf("%lu\n", twosArray[j]);
-    }
-    printf("\n");
-    for(j=0; j<three; j++){
-       printf("%lu\n", threesArray[j]);
-    }
-     printf("\n");
-    for(j=0; j<four; j++){
-       printf("%lu\n", foursArray[j]);
-    }
-    printf("\n");
-    for(j=0; j<none; j++){
-       printf("%lu\n", noneArray[j]);
-    }
-     }*/
-     //Sort x-vector into those configurations that left most sites bound or unbound
-     //sortOnesTwos(array, ones, twos, none, onesArray, twosArray, noneArray, viableStates);
- 
+  
      printf("%d\n", array);
      printf("HERE!");
      //Print the "0" vector to a text file
