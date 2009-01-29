@@ -654,14 +654,24 @@ int main(int argc, char *argv[])
     struct Ttype *arrayT;//array of column vectors for transition matrix
     
      int totalArray = 0; //total number of possible configurations
-     int finalPos =0;
-     int f;
-     int pi;
-     int startSite;
-   int totalTFBS =0;
-   int lem;
-     int array;
-     int bob;
+     int finalPos =0;//tracks how far final vector has been populated
+     int f, pi,lem, bob, n;//counters
+     int startSite, posNum, totalBp, nextS, numStates, mult;
+         /*startSite - tracks left most binding site or sliding window
+           posNum - next avaliable spot in final vector
+           totalBp - tracks how many base-pairs have been considered
+           nextS - next site to be considered
+           numStates - number of possible configurations
+           mult - how many sites begin at a binding site*/
+     int totalTFBS =0;//tracks total number of sites considered (not right)
+     int **leftArray;//partitions configurations by left-most sites
+    float **probArray;//partitions probability vector
+    int *countArray;//tracks how many configurations in each partition
+    float *outcome, *vector;/*outcome - probability outcome of each iteration
+                              vector - probability vector returned by matlab*/
+    
+ 
+    
 
     //allocate memory for these arrays
     leftEdgePos = malloc(indiv.tfsPerGene[0]*sizeof(int));
@@ -717,22 +727,19 @@ int main(int argc, char *argv[])
             fprintf(leftEdgePositions, "         Hamming dist: %3d\n\n", indiv.allBindingSites[i].hammingDist); 
            */}
     }
-    fclose(leftEdgePositions);
-    system("PAUSE");
-   
+   fclose(leftEdgePositions);
+   system("PAUSE");
    printf("\n");
    
-   startSite=0;
+   startSite=0;//start at left- most site
    
-     
-     //Main while loop for sliding window #1
+   //Main while loop for sliding window #1
    while(startSite<indiv.tfsPerGene[0]){
-      array =0;
-
-     
+      numStates =0;//initialize number of configurations
+      
      //Find number of sites within sliding window. Changes with startSite
-     TFBS =0;
-     while(((indiv.allBindingSites[TFBS].leftEdgePos)+(14)) < numBp+startSite){
+     TFBS = 0;
+     while(((indiv.allBindingSites[TFBS].leftEdgePos)+(HIND_LENGTH-1)) < numBp+startSite){
         TFBS++;
      }
      printf("TFBS inside=%d\n", TFBS);
@@ -754,45 +761,36 @@ int main(int argc, char *argv[])
      printf("\n");
      
      //Generate states for given binding sites and hinderances
-     configure(0,bits,&array,viableStates,TFBS,startPos);
+     configure(0,bits,&numStates,viableStates,TFBS,startPos);
+    
      //printf("HERE array=%d\n", array);
     printf("startSite=%d\n", startSite);
-    int mult=countMultiples(viableStates, startPos, startSite);
+    //count how many different sites begin at same place (usually only 1)
+    mult=countMultiples(viableStates, startPos, startSite);
     printf("\n MULT = %d\n", mult);
     system("PAUSE");
    
-    int **leftArray;
+    //allocate memory to leftArray, probArray and countArray
     leftArray = malloc((mult+1)*sizeof(int *));
+    probArray = malloc((mult+1)*sizeof(float *));
     for(i=0;i<(mult+1);i++){
        leftArray[i]= malloc(100*sizeof(int));
-    }
-    float **probArray;
-    probArray = malloc((mult+1)*sizeof(float *));
-    
-    
-    for(i=0;i<(mult+1);i++){
        probArray[i]= malloc(100*sizeof(float));
     }
-    
-    int *countArray;
     countArray= malloc((mult+1)*sizeof(int));
-    
     system("PAUSE"); 
-  
-     printf("%d\n", array);
-    
+    printf("%d\n", numStates);
+
      //Print the "0" vector to a text file
-     print_vector_MATLAB(array);
-     
+     print_vector_MATLAB(numStates);
      system("PAUSE");
      
      //populate transition matrix
-     transitions(startSite,array,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
-  
+     transitions(startSite,numStates,viableStates,TFBS,arrayT, Kon, Koff, hammDist, diag, TFon);
      system("PAUSE");
      
      //print non-sero entries to text file  
-     print_arrayT_MATLAB(arrayT,array,viableStates);
+     print_arrayT_MATLAB(arrayT,numStates,viableStates);
      //print_arrayT(arrayT, array, viableStates);
      system("PAUSE");
     
@@ -802,11 +800,9 @@ int main(int argc, char *argv[])
               exit(1);
      }
      
-     
      //matlab call to m-file pVectRevised
      engEvalString(ep,"pVectRevised");
-     //engClose(ep);
-     
+     //engClose(ep); 
      printf("matlab done\n");     
      
      /*if(system("matlab -nodisplay -nojvm -nodesktop -nosplash -r \"pVect; exit;\"")!=0){
@@ -815,28 +811,21 @@ int main(int argc, char *argv[])
      }else{
         printf("\n");
      }*/
-     
-  
-   float *outcome;
    system("PAUSE");
    
-    outcome = malloc( array*sizeof(float));
-    
-    float *vector;
-    vector = malloc(array*sizeof(float));
+   //allocate memory for outcome and vector
+    outcome = malloc( numStates*sizeof(float));
+    vector = malloc(numStates*sizeof(float));
     
     //Get solution vector from matlab and store in vector
-    convertFile("b.txt", vector, array);
-    
-    int n;
+    convertFile("b.txt", vector, numStates);
     printf("\nvector\n");
-    for(n=0; n<array; n++){
+    for(n=0; n<numStates; n++){
             printf( "%f\n", (vector[n]));
     }
     
     //Get probabilities of left most sites being bound or unbound and fix these probabilites
-   
-    probSlide1(viableStates, vector, outcome, array, previous, mult, probArray, countArray);
+    probSlide1(viableStates, vector, outcome, numStates, previous, mult, probArray, countArray);
     printf("\n");
     /*for(i=0; i<(mult); i++){
           for(j=0; j<countArray[i]; j++){
@@ -845,47 +834,55 @@ int main(int argc, char *argv[])
           printf("\n");
        }*/
     //printf("finalPos=%d\n", finalPos);
-    int posNum;
+    
+    //find next available slot in the final probability vector
     if(finalPos==0){
        posNum=1;
     }else{
        posNum = mult+finalPos ;
     }
+    
     //Prints the outcome of the collapsed probabilities
     printf("\n OUTCOME \n");
     for(n=0; n<mult+1; n++){
              printf("%f\n", outcome[n]);
     }
     printf("\n");
-    printf("posNum=%d\n", posNum);
+    printf("posNum=%d\n", posNum);//next available position in final vector
    
     
    //Populate the final vector of probabilities with fixed probabilities
-     populateFinal1(outcome, mult, final, posNum);
-   //prints the final fixed probabilities
+   populateFinal1(outcome, mult, final, posNum);
+   
+   //Prints the final fixed probabilities
    printf("\nFINAL\n");
    for(i=0; i<(posNum+mult); i++){
        printf("%f\n", final[i]);
     }
-     printf("\n");
+    printf("\n");
     system("PAUSE");
     
+    
+    //Find the next starting posittion
     printf("previous Start Site= %d\n", startSite);
-     //Find the next starting posittion
-     int nextS = nextStartSite(startSite, leftEdgePos);
-     startSite = nextS;
-     finalPos++;
-     printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
-     totalArray += array;
+    nextS = nextStartSite(startSite, leftEdgePos);
+    startSite = nextS;
+    finalPos++;
+    printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
+     
+     //Probably unnecessary
+     totalArray += numStates;
     // printf("TotalArray=%d\n", totalArray);
      totalTFBS += TFBS;
     // printf("Total TFBS=%d\n", totalTFBS);
-    int totalBp=numBp;
+    
+    //Finds the total number of base pairs 
+     totalBp=numBp;
     totalBp+=startPos[startSite]-1;
     printf("totalBp=%d\n", totalBp);
-     system("PAUSE");
-     
-   }
+     system("PAUSE");  
+   }//end of main while loop
+   
    engClose(ep);
 
   /* free dynamically allocated all binding sites list */
@@ -893,7 +890,12 @@ int main(int argc, char *argv[])
    int d;
      for (d=0; d<totalArray; d++) {
        free(arrayT[d].row);
-     }   
+     } 
+     for(d=0;d<mult; d++){
+        free(leftArray[d]);
+        free(probArray[d]);
+     }  
+     
   
   free(arrayT);
   free(startPos);
@@ -902,6 +904,12 @@ int main(int argc, char *argv[])
   free(hammDist);
   free(TFon);
   free(diag);
+  free(leftArray);
+  free(probArray);
+  free(outcome);
+  free(vector);
+  free(countArray);
+  free(previous);
   /* close error file */
   fclose(fperrors);
 }
