@@ -338,8 +338,8 @@ void convertFile( char *fileName, float *vect, int size){
 int countMultiples(unsigned long *statesArray, int *startPos, int startSite){
     int start = startPos[0];
     //int count=0;
-    printf("sP[0]=%d, sP[1]=%d, sp[2]=%d, sp[3]=%d\n", startPos[0], startPos[1], startPos[2], startPos[3]);
-    printf("\nStart=%d startPos+1=%d startPos=%d\n", startSite,startPos[1],startPos[0]);
+    //printf("sP[0]=%d, sP[1]=%d, sp[2]=%d, sp[3]=%d\n", startPos[0], startPos[1], startPos[2], startPos[3]);
+    //printf("\nStart=%d startPos+1=%d startPos=%d\n", startSite,startPos[1],startPos[0]);
     int count=1;
     while(start==startPos[count]){
         count++;
@@ -392,7 +392,7 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
         if((statesArray[i]) % (int)pow(2, mult)==0){
                array[0][j] = (prob[i]);
                sumCheck += prob[i];
-               printf("%f\n",prob[i]);
+               //printf("%f\n",prob[i]);
                printf("%d %d   %f\n",0,j,array[0][j]);
                j++;
         }
@@ -431,8 +431,8 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
               sum=0;
         for(x=0; x<(count[y]); x++){
                  sum += (array[y][x]);
-          printf("%f\n", array[y][x]);
-          printf("    %f\n", sum);
+          //printf("%f\n", array[y][x]);
+          //printf("    %f\n", sum);
         }
         //printf("outcome[%d] = %f == %f\n", y, outcome[y], outcome[y]*previous[0]);
        outcome[y+1]= sum*previous[0];
@@ -441,7 +441,7 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
     
       //normalize to previous
       
-      printf("previous[0]=%f\n", previous[0]);
+      //printf("previous[0]=%f\n", previous[0]);
      
      int g;   
      for(g=0; g<mult; g++){
@@ -469,8 +469,8 @@ void populateFinal1(float *outcome,int mult, float *final, int nextSite){
      final[0] = outcome[0];
      for(i=0;i<(mult); i++){
        final[nextSite+i] = outcome[i+1];
-       printf("final[%d]=%f\n", nextSite+i, final[nextSite+mult]);
-       printf("outcome[%d]=%f\n", nextSite+i, outcome[i+1]);
+       //printf("final[%d]=%f\n", nextSite+i, final[nextSite+mult]);
+       //printf("outcome[%d]=%f\n", nextSite+i, outcome[i+1]);
      }
 }
 
@@ -645,41 +645,40 @@ int main(int argc, char *argv[])
 			  printf("tfsPerGene = %d", indiv.tfsPerGene); */
    
    /*Create arrays to store information in indiv.allBindingSites*/
-    int *leftEdgePos;
-    int *startPos;
-    int *hammDist;
-    float *diag;
-    int *TFon;
-    float *final;
-    final = malloc(array_size*sizeof(float));
+    int *leftEdgePos, *startPos, *hammDist, *TFon; 
+    float *diag, *final, *previous;
+    float Kon[TFBS];//populate Kon. Kons depend on TF concentrations
     
-    //populate Kon. Kons depend on TF concentrations
-    float Kon[TFBS];
+    int *bits = calloc(TFBS, sizeof(int));//array of bits to create configurations
+    unsigned long *viableStates;//array of viable states
+    struct Ttype *arrayT;//array of column vectors for transition matrix
     
+     int totalArray = 0; //total number of possible configurations
+     int finalPos =0;
+     int f;
+     int pi;
+     int startSite;
+   int totalTFBS =0;
+   int lem;
+     int array;
+     int bob;
+
     //allocate memory for these arrays
     leftEdgePos = malloc(indiv.tfsPerGene[0]*sizeof(int));
     startPos=malloc(TFBS*sizeof(int));
     hammDist = malloc(TFBS *sizeof(int));
     diag = malloc(array_size*sizeof(float));
     TFon = malloc(TFBS*sizeof(int));
+    final = malloc(array_size*sizeof(float));
+    previous = malloc(10*sizeof(float));
       
-    int *bits = calloc(TFBS, sizeof(int));//array of bits to create configurations
-    unsigned long *viableStates;//array of viable states
-    struct Ttype *arrayT;//array of column vectors for transition matrix
-    
     viableStates = malloc((array_size)*sizeof(unsigned long));
     arrayT = malloc(array_size*sizeof(struct Ttype));
     // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
-    
-     int totalArray = 0; //total number of possible configurations
-     
-     int finalPos =0;
      
    //Creates a vector of probabilities so first iteration can normalize to 1
-   float *previous;
-   previous = malloc(10*sizeof(float));
    float prev[10] = {1,0,0,0,0,0,0,0,0,0};
-    int pi;
+ 
     for(pi=0; pi<10; pi++){
        previous[pi]=prev[pi];
     }
@@ -688,7 +687,7 @@ int main(int argc, char *argv[])
     leftEdgePositions = fopen("leftEdgePositions.txt", "w");
      if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
 
-         int f;
+       
          for( f=0; f<TFBS; f++){
              printf("binding site %3d:  ", f);
              printf("%d\n", indiv.allBindingSites[f].leftEdgePos);
@@ -722,15 +721,14 @@ int main(int argc, char *argv[])
     system("PAUSE");
    
    printf("\n");
-   int startSite;
+   
    startSite=0;
-   int totalTFBS =0;
+   
      
      //Main while loop for sliding window #1
    while(startSite<indiv.tfsPerGene[0]){
-     int lem;
-     int array =0;
-     int bob;
+      array =0;
+
      
      //Find number of sites within sliding window. Changes with startSite
      TFBS =0;
@@ -782,7 +780,7 @@ int main(int argc, char *argv[])
     system("PAUSE"); 
   
      printf("%d\n", array);
-     printf("HERE!");
+    
      //Print the "0" vector to a text file
      print_vector_MATLAB(array);
      
@@ -839,14 +837,14 @@ int main(int argc, char *argv[])
     //Get probabilities of left most sites being bound or unbound and fix these probabilites
    
     probSlide1(viableStates, vector, outcome, array, previous, mult, probArray, countArray);
-    printf("WTF\n\n");
-    for(i=0; i<(mult); i++){
+    printf("\n");
+    /*for(i=0; i<(mult); i++){
           for(j=0; j<countArray[i]; j++){
                    printf("%f\n", probArray[i][j]);
           }
           printf("\n");
-       }
-    printf("finalPos=%d\n", finalPos);
+       }*/
+    //printf("finalPos=%d\n", finalPos);
     int posNum;
     if(finalPos==0){
        posNum=1;
@@ -865,10 +863,11 @@ int main(int argc, char *argv[])
    //Populate the final vector of probabilities with fixed probabilities
      populateFinal1(outcome, mult, final, posNum);
    //prints the final fixed probabilities
-   printf("FINAL\n");
+   printf("\nFINAL\n");
    for(i=0; i<(posNum+mult); i++){
        printf("%f\n", final[i]);
     }
+     printf("\n");
     system("PAUSE");
     
     printf("previous Start Site= %d\n", startSite);
@@ -878,9 +877,12 @@ int main(int argc, char *argv[])
      finalPos++;
      printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
      totalArray += array;
-     printf("TotalArray=%d\n", totalArray);
+    // printf("TotalArray=%d\n", totalArray);
      totalTFBS += TFBS;
-     printf("Total TFBS=%d\n", totalTFBS);
+    // printf("Total TFBS=%d\n", totalTFBS);
+    int totalBp=numBp;
+    totalBp+=startPos[startSite]-1;
+    printf("totalBp=%d\n", totalBp);
      system("PAUSE");
      
    }
