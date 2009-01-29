@@ -335,6 +335,7 @@ void convertFile( char *fileName, float *vect, int size){
      }
 }
 
+/*Counts how many different sites begin at the same base-pair*/
 int countMultiples(unsigned long *statesArray, int *startPos, int startSite){
     int start = startPos[0];
     //int count=0;
@@ -348,6 +349,7 @@ int countMultiples(unsigned long *statesArray, int *startPos, int startSite){
     return count;
 }
 
+/*Partitions configurations according to left-most sites*/
 void leftMostSites1(int size, unsigned long *states, int mult, int **array, int *count){
     int mask = 01;
     int i,p,h,j;
@@ -380,6 +382,7 @@ void leftMostSites1(int size, unsigned long *states, int mult, int **array, int 
     }
 }
 
+/*Computes final probabilities according to left-most sites partition*/
 void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int size, float *previous, int mult, float **array, int *count){
     int mask = 01;
     int i,p,h,j;
@@ -435,21 +438,16 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
           //printf("    %f\n", sum);
         }
         //printf("outcome[%d] = %f == %f\n", y, outcome[y], outcome[y]*previous[0]);
-       outcome[y+1]= sum*previous[0];
+       outcome[y+1]= sum*previous[0];//normalize to previous
        printf("sum=%f sum*prev=%f\n", sum, outcome[y+1]);
     } 
     
-      //normalize to previous
-      
-      //printf("previous[0]=%f\n", previous[0]);
-     
      int g;   
      for(g=0; g<mult; g++){
         previous[g] = outcome[g];
         }     
  }  
      
- 
 /*Finds the next start site*/
 int nextStartSite(int startSite, int *startPos){
     int next;
@@ -590,7 +588,7 @@ int main(int argc, char *argv[])
    *  modifiable part starts here
    **********************************************************************/
 
-  /* initialize protein and mRNA concentrations */
+  /* Initialize protein and mRNA concentrations */
   /* Jasmin: you can use these initial concentrations for computing your kons */
   
   /*Creates array of inial protein concentrations for computig kons*/
@@ -600,7 +598,7 @@ int main(int argc, char *argv[])
   }
 
     
-   /*populate Koff. There are 5 possible koff rates: koff w/0 mismatches, koff w/1 mismatch, koff w/2 mismatches, 
+   /*Populate Koff. There are 5 possible koff rates: koff w/0 mismatches, koff w/1 mismatch, koff w/2 mismatches, 
       Koff w/cooperativity on one side, koff w/cooperativity on 2 sides. Cooperativity is not implemented yet.*/
     float Koff[5];
     float Gibbs;
@@ -608,13 +606,14 @@ int main(int argc, char *argv[])
     float koffCheck;
     float temperature = 293.0;
     RTlnKr = GasConstant * temperature * log(Kr);
-    int jo;
+    
+    int jo, jojo;
     for( jo=0; jo<3; jo++){
          Gibbs = (((float) jo)/3.0 - 1.0) * RTlnKr;
          koffCheck = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
          Koff[jo] = koffCheck;
     }
-    int jojo;
+    
     for(jojo=0; jojo<3; jojo++){
        printf("Koff[%d] = %f\n", jojo, Koff[jojo]);
     }
