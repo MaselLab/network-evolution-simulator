@@ -160,64 +160,64 @@ void diagonal(int col, float *diag, struct Ttype *arrayT, int m, int n){
 
 /*Populates non-daigonal entries in the transition matrix, then calls diagonal() to populate the diagonal entries.
   All rates are stored in arrayT, which is an array of the Ttype structs or an array of column vectors*/  
-void transitions(int startSite,int size, unsigned long *viableStates, int TFBSites, struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
-  //States and column files used for debugging and testing. statesV1.txt has the list of states in decimal, columnV1 has the list of columns.
+void transitions(int startSite,int size, unsigned long *viableStates, int TFBSites,
+                 struct Ttype *arrayT, float kon[], float koff[5],int *hammDist, float *diag, int *TFon){
+  /*States and column files used for debugging and testing. statesV1.txt has the list of states in decimal, 
+      columnV1 has the list of columns.*/
   statesV1 = fopen("statesV1.txt", "w");
   columnV1 = fopen("columnV1.txt","w");
   if ((statesV1 = fopen("statesV1.txt", "w"))) {
     if ((columnV1 = fopen("columnV1.txt", "w"))) {
-      
       int i, p, j, m, a;
       unsigned long row;
       int n=0;
       printf("size=%d TFBS= %d\n", size, TFBSites);
       for( i=0;i<size; i++){
-	arrayT[n].col = i;
-	arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
-	printf("viableStates:%lu, col num:%d\n",viableStates[i], i);
-	fprintf(statesV1,"%lu \n", viableStates[i]);
-	fprintf(columnV1,"%d\n",i);
+        arrayT[n].col = i;
+        arrayT[n].row = malloc((array_size)*sizeof(struct Rowtype));
+        printf("viableStates:%lu, col num:%d\n",viableStates[i], i);
+	    fprintf(statesV1,"%lu \n", viableStates[i]);
+	    fprintf(columnV1,"%d\n",i);
         m=0;
         row = viableStates[i];
         for(p=0;p<TFBSites;p++){
-	  
           if(!(row & (1L<<p))){   
-	    //R-C SWITCH: row = viableStates[i] ^ (1L<<p);    
-	    row = viableStates[i] | (1L<<p);
-	    if(row!=0 && row!=viableStates[i]){
-              //R_C SWITCH: if(row!=viableStates[i]){
-	      for(j=0;j<size; j++){
-		if(row==viableStates[j]){
-		  arrayT[n].row[m].rownum = j;
-		  a = hammDist[p];
-		  arrayT[n].row[m].kval = &(koff[a]);
-		  m++;
-		}
-	      }
-	    }
+	              //R-C SWITCH: row = viableStates[i] ^ (1L<<p);    
+             row = viableStates[i] | (1L<<p);
+	         if(row!=0 && row!=viableStates[i]){
+                 //R_C SWITCH: if(row!=viableStates[i]){
+	           for(j=0;j<size; j++){
+		         if(row==viableStates[j]){
+		           arrayT[n].row[m].rownum = j;
+		           a = hammDist[p];
+		           arrayT[n].row[m].kval = &(koff[a]);
+		           m++;
+		         }
+	           }
+	         }
           }else{
-	    //R-C SWITCH: row = viableStates[i]|(1<<p);
-	    //R-C SWITCH: if(row!=0 && row!=viableStates[i]){
-	    row = viableStates[i] ^ (1L<<p);
-	    if(row != viableStates[i]){     
-	      for( j=0;j<size; j++){   
-		if(row==viableStates[j]){
-		  arrayT[n].row[m].rownum = j;
-		  a = hammDist[p];
-		  arrayT[n].row[m].kval = &(kon[p]);
-		  m++;
-		}
-	      }
-	    }
+	            //R-C SWITCH: row = viableStates[i]|(1<<p);
+	            //R-C SWITCH: if(row!=0 && row!=viableStates[i]){
+	        row = viableStates[i] ^ (1L<<p);
+	        if(row != viableStates[i]){     
+	          for( j=0;j<size; j++){   
+		        if(row==viableStates[j]){
+		          arrayT[n].row[m].rownum = j;
+		          a = hammDist[p];
+		          arrayT[n].row[m].kval = &(kon[p]);
+		          m++;
+		        }
+              }
+            }
           }
         }
-	diagonal(i,diag, arrayT, m, n);
-	m++;
-	arrayT[n].rowCount = m;
-	// printf("rowCount=%d\n",  arrayT[n].rowCount);
-	n++;
-      }
-    }}
+	  diagonal(i,diag, arrayT, m, n);
+	  m++;
+	  arrayT[n].rowCount = m;
+	  // printf("rowCount=%d\n",  arrayT[n].rowCount);
+	  n++;
+    }
+  }}
   fclose(columnV1);
   fclose(statesV1);
 }
@@ -271,7 +271,6 @@ void print_arrayT_MATLAB(struct Ttype *arrayT, int size, unsigned long *viableSt
   //Second part prints to sparseMatrixV1.txt
   sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w");
   if ((sparseMatrixV1 = fopen("sparseMatrixV1.txt", "w"))) {
-    //ask alex about this line of code...
     int p=0;  
     while (p < size) {
       int q=0;
@@ -378,9 +377,9 @@ void leftMostSites1(int size, unsigned long *states, int mult, int **array, int 
     for(i=0; i<size; i++){
       p = states[i] >> h; 
       if(mask & p){
-	array[h+1][count1]=states[i];
-	printf("%d\n", array[h+1][count1]);
-	count1++;
+        array[h+1][count1]=states[i];
+	    printf("%d\n", array[h+1][count1]);
+	    count1++;
       }
     }
     count[h+1]=count1;
@@ -415,9 +414,9 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
     for(i=0; i<size; i++){
       p = statesArray[i] >> h; 
       if(mask & p){
-	array[h][count1]=prob[i];
-	printf("%d %d  %f\n",(h), count1 ,array[h][count1]);
-	count1++;
+	    array[h][count1]=prob[i];
+	    printf("%d %d  %f\n",(h), count1 ,array[h][count1]);
+	    count1++;
       }
     }
     count[h]=count1;
@@ -433,8 +432,8 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
   //Add up probabilities
   int y,x;
   float sum;
-  outcome[0] = sumCheck*previous[0];
-  printf("previous[0]=%f\n", previous[0]);
+  outcome[0] = sumCheck*(*previous);
+  printf("previous[0]=%f\n", (*previous));
   printf("sumCheck=%f sumCheck*prev=%f\n", sumCheck, outcome[0]);
   for(y=0; y<mult; y++){
     sum=0;
@@ -444,14 +443,12 @@ void probSlide1(unsigned long *statesArray, float *prob, float *outcome, int siz
       //printf("    %f\n", sum);
     }
     //printf("outcome[%d] = %f == %f\n", y, outcome[y], outcome[y]*previous[0]);
-    outcome[y+1]= sum*previous[0];//normalize to previous
+    outcome[y+1]= sum*(*previous);//normalize to previous
     printf("sum=%f sum*prev=%f\n", sum, outcome[y+1]);
   } 
-  
-  int g;   
-  for(g=0; g<mult; g++){
-    previous[g] = outcome[g];
-  }     
+
+    *previous = outcome[0];
+       
 }  
 
 /*Finds the next start site*/
@@ -651,16 +648,16 @@ int main(int argc, char *argv[])
   
   /*Create arrays to store information in indiv.allBindingSites*/
   int *leftEdgePos, *startPos, *hammDist, *TFon; 
-  float *diag, *final, *previous;
+  float *diag, *final, previous;
   float Kon[TFBS];//populate Kon. Kons depend on TF concentrations
   
   int *bits = calloc(TFBS, sizeof(int));//array of bits to create configurations
   unsigned long *viableStates;//array of viable states
   struct Ttype *arrayT;//array of column vectors for transition matrix
   
-  int totalArray = 0; //total number of possible configurations
+  
   int finalPos =0;//tracks how far final vector has been populated
-  int f, pi,lem, bob, n;//counters
+  int f,lem, bob, n;//counters
   int startSite, posNum, totalBp, nextS, numStates, mult;
   /*startSite - tracks left most binding site or sliding window
     posNum - next avaliable spot in final vector
@@ -668,7 +665,7 @@ int main(int argc, char *argv[])
     nextS - next site to be considered
     numStates - number of possible configurations
     mult - how many sites begin at a binding site*/
-  int totalTFBS =0;//tracks total number of sites considered (not right)
+  
   int **leftArray;//partitions configurations by left-most sites
   float **probArray;//partitions probability vector
   int *countArray;//tracks how many configurations in each partition
@@ -682,24 +679,23 @@ int main(int argc, char *argv[])
   diag = malloc(array_size*sizeof(float));
   TFon = malloc(TFBS*sizeof(int));
   final = malloc(array_size*sizeof(float));
-  previous = malloc(10*sizeof(float));
+  //previous = malloc(1*sizeof(float));
   
   viableStates = malloc((array_size)*sizeof(unsigned long));
   arrayT = malloc(array_size*sizeof(struct Ttype));
   // arrayT = malloc((pow(2,TFBS))*sizeof(struct Ttype));
      
-  //Creates a vector of probabilities so first iteration can normalize to 1
-  float prev[10] = {1,0,0,0,0,0,0,0,0,0};
+  //First iteration normalizes to 1
+  previous=1;
+  /*float prev[10] = {1,0,0,0,0,0,0,0,0,0};
   
   for (pi=0; pi<10; pi++){
     previous[pi]=prev[pi];
-  }
+  }*/
   
   /*Prints all leftEdgePositions to file. Used for debugging and testing purposes*/    
   leftEdgePositions = fopen("leftEdgePositions.txt", "w");
   if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
-    
-    
     for( f=0; f<TFBS; f++) {
       printf("binding site %3d:  ", f);
       printf("%d\n", indiv.allBindingSites[f].leftEdgePos);
@@ -770,7 +766,6 @@ int main(int argc, char *argv[])
     //count how many different sites begin at same place (usually only 1)
     mult=countMultiples(viableStates, startPos, startSite);
     printf("\n MULT = %d\n", mult);
-    system("PAUSE");
    
     //allocate memory to leftArray, probArray and countArray
     leftArray = malloc((mult+1)*sizeof(int *));
@@ -827,7 +822,7 @@ int main(int argc, char *argv[])
     }
     
     //Get probabilities of left most sites being bound or unbound and fix these probabilites
-    probSlide1(viableStates, vector, outcome, numStates, previous, mult, probArray, countArray);
+    probSlide1(viableStates, vector, outcome, numStates, &previous, mult, probArray, countArray);
     printf("\n");
     /*for(i=0; i<(mult); i++){
           for(j=0; j<countArray[i]; j++){
@@ -835,13 +830,13 @@ int main(int argc, char *argv[])
           }
           printf("\n");
        }*/
-    //printf("finalPos=%d\n", finalPos);
+    printf("finalPos=%d\n", finalPos);
     
     //find next available slot in the final probability vector
     if (finalPos==0) {
        posNum=1;
     } else {
-       posNum = mult+finalPos ;
+       posNum = 1+finalPos ;
     }
     
     //Prints the outcome of the collapsed probabilities
@@ -868,20 +863,16 @@ int main(int argc, char *argv[])
     //Find the next starting posittion
     printf("previous Start Site= %d\n", startSite);
     nextS = nextStartSite(startSite, leftEdgePos);
-    startSite = nextS;
-    finalPos++;
-    printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
-     
-    //Probably unnecessary
-    totalArray += numStates;
-    // printf("TotalArray=%d\n", totalArray);
-    totalTFBS += TFBS;
-    // printf("Total TFBS=%d\n", totalTFBS);
+    
+    finalPos+=mult;
     
     //Finds the total number of base pairs 
     totalBp=numBp;
+    startSite = nextS;
+    printf("startSiteHERE = %d finalPos=%d\n", startSite, finalPos);
     totalBp+=startPos[startSite]-1;
     printf("totalBp=%d\n", totalBp);
+    printf("\n\n END OF ITERATION!\n\n");
     system("PAUSE");  
   }//end of main while loop
   
@@ -890,7 +881,7 @@ int main(int argc, char *argv[])
   /* free dynamically allocated all binding sites list */
   free(indiv.allBindingSites);
   int d;
-  for (d=0; d<totalArray; d++) {
+  for (d=0; d<numStates; d++) {
     free(arrayT[d].row);
   } 
   for(d=0;d<mult; d++){
@@ -911,7 +902,7 @@ int main(int argc, char *argv[])
   free(outcome);
   free(vector);
   free(countArray);
-  free(previous);
+//  free(previous);
   /* close error file */
   fclose(fperrors);
 }
