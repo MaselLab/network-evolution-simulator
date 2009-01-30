@@ -1,3 +1,9 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* 
+ * Computes probability cloud of occupancy of transcription factors in cis-regulatory regions
+ * Authors: Jasmin Uribe, Alex Lancaster
+ * Copyright (c) 2008, 2009 Arizona Board of Regents (University of Arizona)
+ */
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
