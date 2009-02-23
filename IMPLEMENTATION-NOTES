@@ -47,8 +47,19 @@ ChangeSCyto       change_mRNA_cytoplasm
 Defines
 -------
 
-TFGENES  total number of TF genes
-NGENES   total number of all genes + selection gene = TFGENES + 1
+NPROTEINS total number of proteins (normally equal to NGENES)
+TFGENES   total number of transcription factors (TFs)
+NGENES    total number of cisreg genes
+          including genes for encoding TFs and metabolic genes under selection
+          usually this equal to TFGENES + 1, however, if the library is used in 
+          standalone manner, e.g. tfonly, NGENES=1 and TFGENES could be larger
+
+When used in the whole cell model, NPROTEINS = TFGENES + 1 = NGENES
+however, in general, there could be proteins (e.g. from outside the
+cell) that aren't controlled by the NGENES cisreg genes.  The current
+code doesn't officially support that yet, however, but the groundwork
+is being laid by splitting out TFGENES from NPROTEINS.
+
 
 New enum indices
 -----------------
