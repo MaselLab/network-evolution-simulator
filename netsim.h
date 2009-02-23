@@ -22,13 +22,27 @@
 #endif
 
 #ifdef  NO_SEPARATE_GENE
+#ifndef TFGENES
 #define TFGENES 10          /* number of genes encoding TFs */
-#define NGENES TFGENES      /* total number of genes */
-#define SELECTION_GENE 9    /* index of selection gene */
+#endif
+#ifndef NGENES
+#define NGENES TFGENES      /* total number of cisreg genes */
+#endif
+#ifndef NPROTEINS
+#define NPROTEINS TFGENES   /* total number of types of proteins */
+#endif
+#define SELECTION_GENE (NGENES-1)    /* index of selection gene */
 #else
-#define TFGENES 10          /* number of genes encoding TFs */
-#define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
-#define SELECTION_GENE TFGENES   /* index of selection gene */
+#ifndef TFGENES               /* number of genes encoding TFs */
+#define TFGENES 10
+#endif
+#ifndef NGENES
+#define NGENES (TFGENES+1)    /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
+#endif
+#ifndef NPROTEINS             /* number of proteins: TODO: must be equal to the number of genes currently */
+#define NPROTEINS (TFGENES+1)
+#endif
+#define SELECTION_GENE (NGENES-1)   /* index of selection gene: always the last gene */
 #endif
 
 #define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
@@ -166,14 +180,17 @@ struct KonStates {
   /* number of currently *available* binding sites */
   int nkon;
 
-  /* list of structs  */
-  KonList *konList[NGENES];
+  /* list of structs: need one for each protein */
+  // TODO: currently KonList has cached information for both TF proteins and non-TF
+  // proteins, may want to split this out at some point
+  KonList *konList[NPROTEINS];
 
   // check
-  // TODO: remove, this is redundant with konList above
+  // TODO: may remove, could be redundant with konList above
   //
-  /* number of available binding sites for a given TF */
-  int nkonsum[NGENES];
+  /* number of available binding sites for a given TF, TODO: currently
+     includes non-TFs for which this should always be zero */
+  int nkonsum[NPROTEINS];
 
   /* konvalues are rates of binding with:
    * element 0 is (protein - salphc)/c
@@ -182,7 +199,7 @@ struct KonStates {
    * second index is which TF binds 
    * The kon term is left out of all of them for computational efficiency
    */
-  float konvalues[NGENES][3];
+  float konvalues[NPROTEINS][3];
 };
 
 typedef struct AllTFBindingSites AllTFBindingSites;
@@ -200,8 +217,8 @@ struct AllTFBindingSites {
 typedef struct Genotype Genotype;
 struct Genotype {
   char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN];
-  char transcriptionFactorSeq[NGENES][MAX_COPIES][TF_ELEMENT_LEN];
-  int hindrancePositions[NGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
+  char transcriptionFactorSeq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
+  int hindrancePositions[TFGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int bindSiteCount;
   AllTFBindingSites *allBindingSites;
   int tfsPerGene[NGENES];               /* cache number of TFs per gene */
@@ -249,7 +266,7 @@ struct CellState {
   FixedEvent *replicationTimeEnd;     /* times when gene duplicates */
   FixedEvent *replicationTimeEndLast;    
 
-  float proteinConc[NGENES];
+  float proteinConc[NPROTEINS];
   int tfBoundCount;
   int *tfBoundIndexes;                /* tfBoundIndexes lists just bound TFs according to binding site index in all_binding_sites */
   int tfHinderedCount;
@@ -349,12 +366,12 @@ extern void initialize_parameters();
 
 extern void initialize_growth_rate_parameters();
 
-extern void initialize_sequence(char [], int, int);
+extern void initialize_sequence(char [], int, int, int);
 
 extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
-                                    char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
+                                    char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                     char [NGENES][MAX_COPIES][CISREG_LEN],
                                     int [NGENES][MAX_COPIES][2]);
 
@@ -371,20 +388,20 @@ extern void mutate(Genotype *,
                    float);
 
 extern int calc_all_binding_sites_copy(char [NGENES][MAX_COPIES][CISREG_LEN],
-                                       char [NGENES][MAX_COPIES][TF_ELEMENT_LEN],
+                                       char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                        int ,
                                        AllTFBindingSites **,
                                        int *,
                                        int ,
                                        int ,
-                                       int [NGENES]);
+                                       int [TFGENES]);
 
 extern void calc_all_binding_sites(int [NGENES],
                                    char[NGENES][MAX_COPIES][CISREG_LEN],
-                                   char[NGENES][MAX_COPIES][TF_ELEMENT_LEN],
+                                   char[TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                    int *,
                                    AllTFBindingSites **,
-                                   int [NGENES],
+                                   int [TFGENES],
                                    int [NGENES],
                                    int [NGENES][MAX_COPIES][2]);
 
@@ -419,7 +436,7 @@ extern void initialize_cell(CellState *,
                             int [NGENES],
                             float [NGENES],
                             float [NGENES],
-                            float [NGENES],
+                            float [NPROTEINS],
                             int);
 
 extern void calc_time (float, 
@@ -545,12 +562,12 @@ extern void attempt_tf_binding(Genotype *,
                                float);
 
 extern void add_time_points(float,
-                            float [NGENES],
+                            float [NPROTEINS],
                             TimeCourse **,
                             TimeCourse **);
 
 extern void add_integer_time_points(float,
-                                    int [NGENES],
+                                    int [NPROTEINS],
                                     TimeCourse **,
                                     TimeCourse **);
 
@@ -606,11 +623,11 @@ extern void transport_event(GillespieRates *,
 
 extern void tf_binding_event(GillespieRates *, CellState *, Genotype *, 
                              KonStates *, float *, TimeCourse **, TimeCourse **,
-                             float, float, float, int, int);
+                             float, float, float, int, int, int);
 
 extern void tf_unbinding_event(GillespieRates *, CellState *, Genotype *, 
                                KonStates *, float *, TimeCourse **, TimeCourse **,
-                               float, float, float, float);
+                               float, float, float, float, int);
 
 extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, 
                              KonStates *, float *, TimeCourse **, TimeCourse **,
@@ -660,8 +677,8 @@ extern void do_single_timestep(Genotype *,
                                float *,
                                float *,
                                float *,
-                               TimeCourse *[NGENES],
-                               TimeCourse *[NGENES],
+                               TimeCourse *[NPROTEINS],
+                               TimeCourse *[NPROTEINS],
                                int,
                                int,
                                int) ;
@@ -672,7 +689,7 @@ extern void develop(Genotype [POP_SIZE],
                     TimeCourse *[POP_SIZE][NGENES], 
                     float, /* in Kelvin */
                     float [NGENES],
-                    float [NGENES],
+                    float [NPROTEINS],
                     float [NUM_K_DISASSEMBLY],
                     int,
                     int,

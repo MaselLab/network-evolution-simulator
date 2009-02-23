@@ -32,6 +32,8 @@ qtest: qtest.c $(OBJS) priority-queue.o
 rnd_test: rnd_test.c random.o
 	$(CC) $(CFLAGS) random.o -o $@ $(LIBS) rnd_test.c
 
+tfonly: tfonly.c $(OBJS) $(OTHER)
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) tfonly.c
 
 netsim: $(OBJS)
 netsim-gs: $(OBJS)
@@ -43,6 +45,9 @@ netsim-bigtf: $(OBJS)
 
 main-matrix-32bit: clean
 	make EXTRACFLAGS="-m32" main-matrix
+
+tfonly-clean: clean
+	make EXTRACFLAGS="-DTFGENES=10 -DNGENES=1 -DNPROTEINS=10" tfonly
 
 ## common command for doing regression test diff
 DIFF_CMD := @diff -r --exclude=.svn --exclude=NOTES --exclude=koff*.dat  --exclude=tfsbound*.dat  --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
@@ -66,7 +71,7 @@ check-replication:	clean
 check-selection:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0
-	$(subst RUN,selection,$(subst ORIG,2008-09-25-selection-r-4,$(DIFF_CMD)))
+	$(subst RUN,selection,$(subst ORIG,2009-02-23-after-nprotein-change-selection-r4,$(DIFF_CMD)))
 
 check-sample-output:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection
@@ -77,7 +82,7 @@ check-sample-output:	clean
 check-multiple-pops:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4 -DUSE_RAND=1" netsim
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
-	$(subst RUN,multiple-pops,$(subst ORIG,2008-11-29-multiple-pops-r-4-genotypecopy,$(DIFF_CMD)))
+	$(subst RUN,multiple-pops,$(subst ORIG,2009-02-23-after-nprotein-change-multiple-pops-r4,$(DIFF_CMD)))
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500
