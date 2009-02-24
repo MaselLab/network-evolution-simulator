@@ -4059,3 +4059,48 @@ void print_time_course(TimeCourse *start,
   }
   fclose(fpout);  
 }
+
+void create_output_directory(char *output_directory) {
+  int directory_success;
+
+  /* create output directory if needed */
+#ifdef __unix__
+  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
+#else 
+#ifdef __WIN32__
+  directory_success = mkdir(output_directory);
+#endif
+#endif
+
+  if (directory_success==-1) {
+    if (errno == EEXIST) {
+      fprintf(stderr, "directory '%s' already exists\n", output_directory);
+    } else {
+      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
+      exit(-1);
+    }
+  }
+
+}
+
+void create_output_file(char prefix[80], char *output_directory, FILE **fp, int index) {
+  char file_name[80];
+  if (index != -1) 
+    sprintf(file_name, "%s/%s-%03d.dat", output_directory, prefix, index);
+  else    /* if index is -1, use prefix as name of file, unadorned with .dat */
+    sprintf(file_name, "%s/%s", output_directory, prefix);
+  if ((*fp = fopen(file_name,"w"))==NULL)
+    fprintf(fperrors,"error: Can't open %s file\n", file_name);
+}
+
+void read_kdisassembly(float kdis[NUM_K_DISASSEMBLY]) {
+  int j;
+  FILE *fpkdis;
+  /* get the kdis.txt values */
+  if ((fpkdis = fopen("kdis.txt","r"))==NULL)
+    fprintf(fperrors,"error: Can't open %s file\n", "kdis.txt");
+  for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
+    fscanf(fpkdis, "%f", &kdis[j]);
+  }
+  fclose(fpkdis);
+}

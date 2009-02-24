@@ -706,6 +706,12 @@ extern void develop(Genotype [POP_SIZE],
 extern void print_time_course(TimeCourse *,
                               int, int);
 
+extern void create_output_directory(char *);
+
+extern void create_output_file(char [80], char *, FILE **, int);
+
+extern void read_kdisassembly(float [NUM_K_DISASSEMBLY]);
+
 extern void log_snapshot(GillespieRates *,
                          CellState *,
                          Genotype *,

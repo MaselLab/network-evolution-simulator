@@ -23,14 +23,6 @@
 
 int main(int argc, char *argv[])
 {
-  FILE *fpkdis;
-  char fperrors_name[80];
-  char fp_cellsize_name[80];
-  char fp_koff_name[80];
-#if 0
-  char fp_growthrate_name[80];
-#endif
-  char fp_tfsbound_name[80];
   int i, j;
   CellState state[POP_SIZE];
   Genotype indivs[POP_SIZE];
@@ -38,7 +30,6 @@ int main(int argc, char *argv[])
   TimeCourse *timecourselast[POP_SIZE][NGENES];
   float initmRNA[NGENES], initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
 
-  int directory_success;
   int hold_genotype_constant = 0;
   int output_binding_sites = 0;
   int no_fixed_dev_time = 0; /* switch on/off fixed development time  */
@@ -201,49 +192,21 @@ int main(int argc, char *argv[])
       printf ("%s ", argv[optind++]);
     putchar ('\n');
   }
-  
-  /* create output directory if needed */
-#ifdef __unix__
-  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
-#else 
-#ifdef __WIN32__
-  directory_success = mkdir(output_directory);
-#endif
-#endif
 
-  if (directory_success==-1) {
-    if (errno == EEXIST) {
-      fprintf(stderr, "directory '%s' already exists\n", output_directory);
-    } else {
-      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
-      exit(-1);
-    }
-  }
+  /* create output directory if needed */
+  create_output_directory(output_directory);
 
   /* create error output file */
-  sprintf(fperrors_name, "%s/netsimerrors.txt", output_directory);
-  fperrors = fopen(fperrors_name, "w");
+  create_output_file("netsimerrors.txt", output_directory, &(fperrors), -1);
 
   /* create output files for cell size, growth rate, TFs */
   for (j = 0; j < POP_SIZE; j++) {
-    sprintf(fp_cellsize_name, "%s/cellsize-%03d.dat", output_directory, j);
-    if ((fp_cellsize[j] = fopen(fp_cellsize_name,"w"))==NULL)
-      fprintf(fperrors,"error: Can't open %s file\n", fp_cellsize_name);
-
-    sprintf(fp_koff_name, "%s/koff-%03d.dat", output_directory, j);
-    if ((fp_koff[j] = fopen(fp_koff_name,"w"))==NULL)
-      fprintf(fperrors,"error: Can't open %s file\n", fp_koff_name);
-
-
-    // TODO: currently disable
-#if 0
-    sprintf(fp_growthrate_name, "%s/growthrate-%03d.dat", output_directory, j);
-    if ((fp_growthrate[j] = fopen(fp_growthrate_name,"w"))==NULL)
-      fprintf(fperrors,"error: Can't open %s file\n", fp_growthrate_name);
+    create_output_file("cellsize", output_directory, &(fp_cellsize[j]), j);
+    create_output_file("koff", output_directory, &(fp_koff[j]), j);
+#if 0 // TODO: currently disable
+    create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
 #endif
-    sprintf(fp_tfsbound_name, "%s/tfsbound-%03d.dat", output_directory, j);
-    if ((fp_tfsbound[j] = fopen(fp_tfsbound_name,"w"))==NULL)
-      fprintf(fperrors,"error: Can't open %s file\n", fp_tfsbound_name);
+    create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
   }
   
   /* slight hack to initialize seed  */
@@ -259,12 +222,7 @@ int main(int argc, char *argv[])
   }
 
   /* get the kdis.txt values */
-  if ((fpkdis = fopen("kdis.txt","r"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", "kdis.txt");
-  for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
-    fscanf(fpkdis, "%f", &kdis[j]);
-  }
-  fclose(fpkdis);
+  read_kdisassembly(kdis);
 
   /* now create and run the population of cells */
   develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, initmRNA, initProteinConc, 
