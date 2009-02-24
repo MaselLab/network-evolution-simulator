@@ -699,4 +699,16 @@ extern void develop(Genotype [POP_SIZE],
 extern void print_time_course(TimeCourse *,
                               int, int);
 
+extern void log_snapshot(GillespieRates *,
+                         CellState *,
+                         Genotype *,
+                         KonStates *,
+                         float **,
+                         float [NGENES],
+                         float [NGENES],
+                         float ,
+                         float ,
+                         float );
+
+
 #endif /* !FILE_NETSIM_SEEN */

@@ -359,30 +359,41 @@ int main(int argc, char *argv[])
            rates.koff, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total);
 
     print_tf_occupancy(&state, genotype.allBindingSites, t);
+
+    log_snapshot(&rates,
+                 &state,
+                 &genotype,
+                 &konStates,
+                 &koffvalues,
+                 mRNAdecay,
+                 transport, 
+                 konrate,
+                 x,
+                 t);
     
+
     for (i=0; i < TFGENES; i++)
       printf("protein[%d]=%g\n", i, state.proteinConc[i]);
 
     if (t+dt < tdevelopment) {
-    
+
       /* 
-       * STOCHASTIC EVENT: a TF unbinds (koff) 
+       * STOCHASTIC EVENT: TF binding event
        */
-      if (x < rates.koff) {  
-        tf_unbinding_event(&rates, &state, &genotype, &konStates, koffvalues,
-                            timecoursestart,  timecourselast, (konrate), dt, t, x, 0);
+      if (x < rates.salphc + (konrate)) {   /* add variable (salphc) and constant (konrate) */
+        tf_binding_event(&rates, &state, &genotype, &konStates, koffvalues,
+                         timecoursestart, timecourselast, (konrate), dt, t, 
+                         maxbound2, maxbound3, 0);
       } else {
-        x -= rates.koff;  
+        x -= (rates.salphc + (konrate));        
         /* 
-         * STOCHASTIC EVENT: TF binding event
+         * STOCHASTIC EVENT: a TF unbinds (koff) 
          */
-        if (x < rates.salphc + (konrate)) {   /* add variable (salphc) and constant (konrate) */
-          tf_binding_event(&rates, &state, &genotype, &konStates, koffvalues,
-                           timecoursestart, timecourselast, (konrate), dt, t, 
-                           maxbound2, maxbound3, 0);
+        if (x < rates.koff) {  
+          tf_unbinding_event(&rates, &state, &genotype, &konStates, koffvalues,
+                             timecoursestart,  timecourselast, (konrate), dt, t, x, 0);
         } else {
-          
-          //x -= (rates.salphc + (konrate));
+          //x -= rates.koff;  
           /*
            * FALLBACK: shouldn't get here, previous
            * events should be exhaustive
