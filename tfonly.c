@@ -316,22 +316,7 @@ int main(int argc, char *argv[])
 
   /* initialize cached data structure: allocate memory */
 
-  for (i=0; i < NPROTEINS; i++){
-    konStates.konList[i] = malloc(sizeof(KonList));
-    konStates.konList[i]->available_sites = malloc(genotype.bindSiteCount*sizeof(int));
-  }
-    
-  //state.tfBoundIndexes = realloc(state.tfBoundIndexes, maxbound2*sizeof(int));
-  state.tfBoundIndexes = malloc(maxbound2*sizeof(int));
-  koffvalues = malloc(maxbound2*sizeof(float)); 
-  //state.tfHinderedIndexes = realloc(state.tfHinderedIndexes, 2*maxbound3*sizeof(int));
-  state.tfHinderedIndexes = malloc(2*maxbound3*sizeof(int));
-  
-  if (!konStates.konvalues || !state.tfBoundIndexes || !koffvalues ||
-      !state.tfHinderedIndexes || !konStates.konList) {
-    LOG_ERROR_NOCELLID("memory allocation error\n");
-    exit(1);
-  }
+  initialize_cell_cache(&state, genotype, &konStates, &koffvalues, maxbound2, maxbound3);  
 
   printf("state.tfBoundCount=%d, state.tfHinderedCount=%d\n", state.tfBoundCount, state.tfHinderedCount);
 

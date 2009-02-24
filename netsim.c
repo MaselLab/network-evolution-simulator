@@ -646,6 +646,32 @@ void initialize_cell(CellState *state,
   }
 }
 
+void initialize_cell_cache(CellState *state,
+                           Genotype genes,
+                           KonStates *konStates,
+                           float **koffvalues,
+                           int maxbound2,
+                           int maxbound3)
+{
+  int i;
+  /* number of possible binding sites */
+  // TODO: currently create for all proteins, not just TFs, as we need info for protein decay
+  for (i=0; i < NPROTEINS; i++){
+    konStates->konList[i] = malloc(sizeof(KonList));
+    konStates->konList[i]->available_sites = malloc(genes.bindSiteCount*sizeof(int));
+  }
+  
+  state->tfBoundIndexes = realloc(state->tfBoundIndexes, maxbound2*sizeof(int));
+  *koffvalues = malloc(maxbound2*sizeof(float)); 
+  state->tfHinderedIndexes = realloc(state->tfHinderedIndexes, 2*maxbound3*sizeof(int));
+  
+  if (!konStates->konvalues || !state->tfBoundIndexes || !koffvalues ||
+      !state->tfHinderedIndexes || !konStates->konList) {
+    LOG_ERROR("memory allocation error at start of develop\n");
+    exit(1);
+  }
+}
+
 /* could perhaps be a little faster with option to skip *df calculation for first 2 calls */
 void calc_time (float t, 
                 float x, 
@@ -3816,23 +3842,9 @@ void develop(Genotype genes[POP_SIZE],
     } 
 
     add_time_points((float) 0.0, state[j].proteinConc, timecoursestart[j], timecourselast[j]);
-    
-    /* number of possible binding sites */
-    // TODO: currently create for all proteins, not just TFs, as we need info for protein decay
-    for (i=0; i < NPROTEINS; i++){
-      konStates[j].konList[i] = malloc(sizeof(KonList));
-      konStates[j].konList[i]->available_sites = malloc(genes[j].bindSiteCount*sizeof(int));
-    }
-    
-    state[j].tfBoundIndexes = realloc(state[j].tfBoundIndexes, maxbound2*sizeof(int));
-    koffvalues[j] = malloc(maxbound2*sizeof(float)); 
-    state[j].tfHinderedIndexes = realloc(state[j].tfHinderedIndexes, 2*maxbound3*sizeof(int));
-    
-    if (!konStates[j].konvalues || !state[j].tfBoundIndexes || !koffvalues[j] ||
-        !state[j].tfHinderedIndexes || !konStates[j].konList) {
-      LOG_ERROR("memory allocation error at start of develop\n");
-      exit(1);
-    }
+
+    /* initialize konStates data structures */
+    initialize_cell_cache(&(state[j]), genes[j], &(konStates[j]), &(koffvalues[j]), maxbound2, maxbound3);
 
     /* initialize transcriptional state of genes */
     calc_from_state(&genes[j], &state[j], &rates[j], &konStates[j], transport[j], mRNAdecay[j]);

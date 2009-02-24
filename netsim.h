@@ -439,6 +439,13 @@ extern void initialize_cell(CellState *,
                             float [NPROTEINS],
                             int);
 
+extern void initialize_cell_cache(CellState *,
+                                  Genotype,
+                                  KonStates *,
+                                  float **,
+                                  int,
+                                  int);
+
 extern void calc_time (float, 
                        float, 
                        GillespieRates *,
