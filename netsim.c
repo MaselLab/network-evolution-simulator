@@ -141,15 +141,29 @@ void print_all_binding_sites(int copies[NGENES],
 {
   int i, j;
 
-  for (i=0; i < NGENES; i++) {
-    for (j=0; j < copies[i]; j++) {
+  // TODO: tidy up logic, a bit messy now, but works
+  /* loop through the maximum of either the number of genes or number
+     of TFs, as they can now be different */
+  int max_elements = NGENES >= TFGENES ? NGENES : TFGENES;
+
+  for (i=0; i < max_elements; i++) {
+    j=0; 
+    /* if copies for this element isn't set, still print out the TFs */
+    while (i >= NGENES || j < copies[i]) {
       if (i < TFGENES) 
         printf("TF sequence gene %2d (copy %d): %.*s\n", i, j, TF_ELEMENT_LEN, transcriptionFactorSeq[i][j]);
       else
         printf("            gene %2d (copy %d) does not encode a TF\n", i, j);
-      printf("cis-reg     gene %2d (copy %d): %.*s\n", i, j, CISREG_LEN, cisRegSeq[i][j]);
-      printf("ID range    gene %2d (copy %d): [%3d, %3d]\n", i, j, tfsStart[i][j][0], tfsStart[i][j][1]);
-      printf("\n");
+      if (i < NGENES) {
+        printf("cis-reg     gene %2d (copy %d): %.*s\n", i, j, CISREG_LEN, cisRegSeq[i][j]);
+        printf("ID range    gene %2d (copy %d): [%3d, %3d]\n", i, j, tfsStart[i][j][0], tfsStart[i][j][1]);
+        printf("\n");
+      } else {
+        printf("            gene %2d (copy %d): no cis-reg gene here\n", i, j);
+        printf("\n");
+        break;       /* run out of cisreg genes skip to next element */
+      }
+      j++;
     }
   } 
 
