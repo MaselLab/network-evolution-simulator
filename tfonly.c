@@ -45,6 +45,9 @@ int main(int argc, char *argv[])
 
   int hold_genotype_constant = 0;
   int output_binding_sites = 0;
+  // TODO, FIXME: problem with commenting these out
+  // simulation goes haywire, probably an uninitialized variable issue
+  // will look at later - AKL
   int no_fixed_dev_time = 0; /* switch on/off fixed development time  */
   int max_divisions = 0;
   int curr_seed;
@@ -63,21 +66,12 @@ int main(int argc, char *argv[])
            We distinguish them by their indices. */
         {"directory",  required_argument, 0, 'd'},
         {"randomseed", required_argument, 0, 'r'},
-        {"ploidy",  required_argument, 0, 'p'},
         {"timedev",  required_argument, 0, 't'},
-        {"timemax",  required_argument, 0, 0},
-        {"criticalsize",  required_argument, 0, 'c'},
-        {"divisions",  required_argument, 0, 's'},
         {"genotypeconst",  no_argument, 0, 'g'},
-        {"random-replication",  no_argument, 0, 0},
         {"recompute-koff",  no_argument, 0, 0},
-        {"nofixedtime",  no_argument, 0, 'n'},
         {"burnin",  no_argument, 0, 'b'},
         {"kon",  required_argument, 0, 0},
         {"konafter",  required_argument, 0, 0},
-        {"timesphase",  required_argument, 0, 0},
-        {"timeg2phase",  required_argument, 0, 0},
-        {"growthscaling",  required_argument, 0, 0},
         {"verbose", no_argument,  0, 'v'},
         {"help",  no_argument, 0, 'h'},
         {"outputbindingsites",  no_argument, 0, 'o'},
@@ -88,7 +82,7 @@ int main(int argc, char *argv[])
     int option_index = 0;
     char *endptr;
     
-    c = getopt_long (argc, argv, "d:r:p:t:c:s:gvhonb",
+    c = getopt_long (argc, argv, "d:r:t:s:gvhob",
                      long_options, &option_index);
     
     /* Detect the end of the options. */
@@ -107,21 +101,6 @@ int main(int argc, char *argv[])
         kon_after_burnin  = strtof(optarg, &endptr);
         printf("setting konafter=%g\n", kon_after_burnin);
         burn_in = 1;
-      } else if (strcmp("timesphase", long_options[option_index].name) == 0) {
-        time_s_phase  = strtof(optarg, &endptr);
-        printf("setting time_s_phase=%g\n", time_s_phase);
-      } else if (strcmp("timeg2phase", long_options[option_index].name) == 0) {
-        time_g2_phase  = strtof(optarg, &endptr);
-        printf("setting time_g2_phase=%g\n", time_g2_phase);
-      } else if (strcmp("growthscaling", long_options[option_index].name) == 0) {
-        growth_rate_scaling  = strtof(optarg, &endptr);
-        printf("setting growthscaling=%g\n", growth_rate_scaling);
-      } else if (strcmp("timemax", long_options[option_index].name) == 0) {
-        timemax  = strtof(optarg, &endptr);
-        printf("setting timemax=%g\n", timemax);
-      } else if (strcmp("random-replication", long_options[option_index].name) == 0) {
-        printf("making replication times random in S phase\n");
-        random_replication_time = 1;
       } else if (strcmp("recompute-koff", long_options[option_index].name) == 0) {
         printf("recompute rates->koff\n");
         recompute_koff = 1;
@@ -138,20 +117,8 @@ int main(int argc, char *argv[])
     case 'r':
       dummyrun = atoi(optarg);
       break;
-    case 'p':
-      current_ploidy = atoi(optarg);
-      break;
-    case 's':
-      max_divisions = atoi(optarg);
-      break;
     case 't':
       tdevelopment = atof(optarg);
-      break;
-    case 'n':
-      no_fixed_dev_time = 1;
-      break;
-    case 'c':
-      critical_size = atof(optarg);
       break;
     case 'g':
       hold_genotype_constant = 1;
@@ -169,21 +136,10 @@ int main(int argc, char *argv[])
  -o,  --outputbindingsites  print out binding sites\n\
  -d,  --directory=DIRECTORY directory to store output\n\
  -r,  --randomseed=SEED     random seed\n\
- -p,  --ploidy=PLOIDY       ploidy (1=haploid, 2=diploid)\n\
  -t,  --timedev=TIME        length of time to run development\n\
- -t,  --timemax=TIME        set a maximum length of time to run development\n\
-                             (no upper limit by default)\n\
- -n,  --nofixedtime         no fixed development time\n\
- -s,  --divisions=DIVISONS  maximum number of divisions\n\
- -c,  --criticalsize=SIZE   critical size for cell division\n\
  -b,  --burnin              whether to do burn-in (off by default)\n\
       --kon=KON             initial kon value\n\
       --konafter=KON        kon value post-burnin\n\
-      --random-replication  make replication times in S phase random\n\
-      --timesphase=TIME     length of S-phase (30 mins by default)\n\
-      --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
-      --growthscaling=GS    amount to accelerate the growth rate\n\
-                              (2.0 by default)\n\
       --recompute-koff      recompute koff every time step\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
@@ -210,8 +166,7 @@ int main(int argc, char *argv[])
   create_output_directory(output_directory);
   /* create error output file */
   create_output_file("netsimerrors.txt", output_directory, &(fperrors), -1);
-  /* create output files for cell size, growth rate, TFs */
-  create_output_file("cellsize", output_directory, &(fp_cellsize[0]), 0);
+  /* create output files for koff values and TF occupancies */
   create_output_file("koff", output_directory, &(fp_koff[0]), 0);
   create_output_file("tfsbound", output_directory, &(fp_tfsbound[0]), 0);
   
@@ -247,9 +202,9 @@ int main(int argc, char *argv[])
   for (i=0; i < NGENES; i++) 
     genotype.mRNAdecay[i] = 0;
 
-  /* output binding sites */
-  print_all_binding_sites(genotype.copies, genotype.allBindingSites, genotype.bindSiteCount, 
-                          genotype.transcriptionFactorSeq, genotype.cisRegSeq, genotype.tfsStart); 
+  if (output_binding_sites)  /* if command-line option was passed in */
+    print_all_binding_sites(genotype.copies, genotype.allBindingSites, genotype.bindSiteCount, 
+                            genotype.transcriptionFactorSeq, genotype.cisRegSeq, genotype.tfsStart); 
 
   /* set cell temperature and value of RTlnKr constant */
   state.temperature = 293.0;
@@ -365,11 +320,6 @@ int main(int argc, char *argv[])
   free(genotype.allBindingSites);
 
   fclose(fperrors);
-  fclose(fp_cellsize[0]);
   fclose(fp_koff[0]);
-  // TODO: currently disable
-#if 0
-  fclose(fp_growthrate[0]);
-#endif
   fclose(fp_tfsbound[0]);
 }
