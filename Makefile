@@ -50,7 +50,7 @@ tfonly-clean: clean
 	make EXTRACFLAGS="-DTFGENES=10 -DNGENES=1 -DNPROTEINS=10" tfonly
 
 ## common command for doing regression test diff
-DIFF_CMD := @diff -r --exclude=.svn --exclude=NOTES --exclude=koff*.dat  --exclude=tfsbound*.dat  --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
+DIFF_CMD := @diff -r --exclude=rounding*.dat --exclude=.svn --exclude=NOTES --exclude=koff*.dat  --exclude=tfsbound*.dat  --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"
 
 ## check specific directory
 check-haploid:	clean

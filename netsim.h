@@ -133,22 +133,38 @@ enum { ACETYLATION = 0,
 typedef struct GillespieRates GillespieRates;
 struct GillespieRates {
   float koff;              /* rates[0] */
+  int koff_operations;
   float transport;         /* rates[1] */
+  int transport_operations;
   float mRNAdecay;         /* rates[2] */
+  int mRNAdecay_operations;
   float picDisassembly;    /* rates[3] */
+  int picDisassembly_operations;
   float salphc;            /* rates[4] */
+  int salphc_operations;
 
   /* the following are cached values to avoid recomputation not
      actually part of the Gillespie rates */
   float maxSalphc;         /* rates[5] */
+  int maxSalphc_operations;
   float minSalphc;         /* rates[6] */
+  int minSalphc_operations;
 
   /* number of genes in the following states */
   int acetylationCount[MAX_COPIES];       
+  int acetylationCount_operations;
+
   int deacetylationCount[MAX_COPIES];     
+  int deacetylationCount_operations;
+
   int picAssemblyCount[MAX_COPIES];       
+  int picAssemblyCount_operations;       
+
   int transcriptInitCount[MAX_COPIES];    
+  int transcriptInitCount_operations;
+
   int picDisassemblyCount[MAX_COPIES];    
+  int picDisassemblyCount_operations;
 
   /* total, including above */
   float total;
@@ -351,6 +367,7 @@ FILE *fp_cellsize[POP_SIZE];
 FILE *fp_koff[POP_SIZE];
 FILE *fp_growthrate[POP_SIZE];
 FILE *fp_tfsbound[POP_SIZE];
+FILE *fp_rounding[POP_SIZE];
 
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */

@@ -207,6 +207,11 @@ int main(int argc, char *argv[])
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
 #endif
     create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
+    create_output_file("rounding", output_directory, &(fp_rounding[j]), j);
+    // print header
+    fprintf(fp_rounding[j], "t koff transport mRNAdecay picDisassembly salphc maxSalphc minSalphc \
+          acetylationCount deacetylationCount picAssemblyCount \
+          transcriptInitCount picDisassemblyCount\n");
   }
   
   /* slight hack to initialize seed  */
@@ -249,5 +254,6 @@ int main(int argc, char *argv[])
     fclose(fp_growthrate[j]);
 #endif
     fclose(fp_tfsbound[j]);
+    fclose(fp_rounding[j]);
   }
 }
