@@ -221,11 +221,13 @@ int main(int argc, char *argv[])
   /* initialize cached data structure: allocate memory */
 
   initialize_cell_cache(&state, genotype, &konStates, &koffvalues, maxbound2, maxbound3);  
+  rates.total = 0.0; //LOCAL HACK FIXME
 
   printf("state.tfBoundCount=%d, state.tfHinderedCount=%d\n", state.tfBoundCount, state.tfHinderedCount);
 
   /* initialize transcriptional state of genotype */
   calc_from_state(&genotype, &state, &rates, &konStates, transport, mRNAdecay);
+
 
   printf("rates.koff=%g, rates.salphc=%g, rates.maxSalphc=%g, rates.minSalphc=%g, rates.total=%g\n", 
          rates.koff, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total);
@@ -235,12 +237,13 @@ int main(int argc, char *argv[])
     /* compute total konrate (which is constant over the Gillespie step) */
     if (konStates.nkon==0) konrate = (-rates.salphc);
     else calc_kon_rate(dt, &konStates, &konrate); 
+
+    x = expdev(&seed);        /* draw random number */
     
     /* do first Gillespie step to chose next event */
     calc_dt(&x, &dt, &rates, &konStates, mRNAdecay, genotype.mRNAdecay,
             state.mRNACytoCount, state.mRNATranslCytoCount);
 
-    x = expdev(&seed);        /* draw random number */
 
     printf("t=%g, dt=%g state.tfBoundCount=%d, state.tfHinderedCount=%d\n", 
            t, dt, state.tfBoundCount, state.tfHinderedCount);
