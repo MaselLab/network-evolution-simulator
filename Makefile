@@ -71,7 +71,7 @@ check-replication:	clean
 check-selection:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0
-	$(subst RUN,selection,$(subst ORIG,2009-02-23-after-nprotein-change-selection-r4,$(DIFF_CMD)))
+	$(subst RUN,selection,$(subst ORIG,2009-03-03-after-rounding-fixes-selection-r-4,$(DIFF_CMD)))
 
 check-sample-output:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection

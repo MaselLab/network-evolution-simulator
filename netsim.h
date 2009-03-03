@@ -351,6 +351,7 @@ long seed ;         /* something is wrong here: changing seed changes nothing */
 int dummyrun;       /* used to change seed */
 int recompute_koff; /* toggle whether to recompute certain features at each time to avoid
                        compounding rounding error */
+int recompute_kon;
 float critical_size ; /* critical size at which cell divides, 
                          set to negative to prevent division  */
 float growth_rate_scaling; /* set growth rate scaling factor */

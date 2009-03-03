@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
         {"genotypeconst",  no_argument, 0, 'g'},
         {"random-replication",  no_argument, 0, 0},
         {"recompute-koff",  no_argument, 0, 0},
+        {"recompute-kon",  no_argument, 0, 0},
         {"nofixedtime",  no_argument, 0, 'n'},
         {"burnin",  no_argument, 0, 'b'},
         {"kon",  required_argument, 0, 0},
@@ -112,6 +113,9 @@ int main(int argc, char *argv[])
       } else if (strcmp("recompute-koff", long_options[option_index].name) == 0) {
         printf("recompute rates->koff\n");
         recompute_koff = 1;
+      } else if (strcmp("recompute-kon", long_options[option_index].name) == 0) {
+        printf("recompute rates->kon\n");
+        recompute_kon = 1;
       } else { 
         printf ("option %s", long_options[option_index].name);
         if (optarg)
@@ -171,7 +175,8 @@ int main(int argc, char *argv[])
       --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
       --growthscaling=GS    amount to accelerate the growth rate\n\
                               (2.0 by default)\n\
-      --recompute-koff      recompute koff every time step\n\
+      --recompute-koff      recompute koff rates after a fixed number of operations\n\
+      --recompute-kon       recompute kon rates after a fixed number of operations\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);

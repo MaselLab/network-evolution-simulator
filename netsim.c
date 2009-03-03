@@ -60,6 +60,7 @@ long seed = 28121;         /* something is wrong here: changing seed changes not
 int dummyrun = 4;          /* used to change seed */
 int recompute_koff = 0;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
+int recompute_kon = 0;
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
 float growth_rate_scaling = 2.0; /* set growth rate scaling factor */
@@ -807,7 +808,7 @@ void calc_koff(int k,
                   posdiff, state->tfBoundIndexes[j], allBindingSites[state->tfBoundIndexes[j]].leftEdgePos, 
                   allBindingSites[state->tfBoundIndexes[j]].strand, allBindingSites[state->tfBoundIndexes[j]].geneCopy, 
                   allBindingSites[state->tfBoundIndexes[j]].cisregID);
-        //exit(-1);
+        exit(-1);
       }
       if (abs(posdiff) < cooperative_distance) {
         if (posdiff>0) front++; else back++;
@@ -1801,11 +1802,17 @@ void update_protein_conc_cell_size(float proteinConc[],
     /* update protein decay rates due to dilution caused by growth */
     adjusted_decay = genes->proteindecay[i] + state->growthRate;
 
-    /* if this results in a zero decay rate, use protein aging term */
-    if (adjusted_decay > 0.0)
+    /* if this results in a very small or zero decay rate, use protein aging term */
+    // TODO: check 
+    //if (adjusted_decay > 0.0)
+    if (adjusted_decay > protein_aging)
       konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = adjusted_decay;
     else 
       konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = protein_aging;
+
+    if (konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] < 1e-10) {
+      LOG_WARNING("protein=%02d, protein_decay=%g, genes->proteindecay=%g, protein_aging=%g\n", i, adjusted_decay, genes->proteindecay[i], protein_aging);
+    }
 
     LOG_VERBOSE("prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
 
@@ -2010,7 +2017,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
       
       LOG_VERBOSE("selecting TF: %d, konrate2: %g, total_konrate2: %g, x: %g\n", k, konrate2_for_TF, total_konrate2, x); 
       
-      while (l < konStates->konList[k]->site_count && x > konrate2) {
+      while (l < (konStates->konList[k]->site_count - 1) && x > konrate2) {
         /* this will record the last binding site before we
            reach the appropriate binding site  */
         l++;
@@ -2018,7 +2025,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genes,
         /* get ID of site */
         siteID = konStates->konList[k]->available_sites[l];
         
-        LOG_VERBOSE("l: %d, site: %d, binds to TF: %d, x = %g\n", l, siteID, k, x); 
+        LOG_VERBOSE("l: %d, site: %d, binds to TF: %d, x = %g (site_count=%d)\n", l, siteID, k, x, konStates->konList[k]->site_count); 
         
         /* adjust random number */
         konrate2 = konrate2_for_TF;
@@ -2095,7 +2102,7 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
   } 
   site = state->tfBoundIndexes[j];
   LOG_VERBOSE("t=%g koff event %d of %d at site %d\n", t, j, state->tfBoundCount,site);
-  if (j < 0) { LOG_ERROR("t=%g koff event %d of %d at site %d\n", t, j, state->tfBoundCount,site); }
+  if (j < 0) { LOG_ERROR("t=%g (x=%g) koff event %d of %d at site %d\n", t, x, j, state->tfBoundCount,site); exit(-1); }
   
   if (update_protein_flag) 
     /* update protein concentration before removing TF */
@@ -2561,7 +2568,7 @@ void recalibrate_cell(GillespieRates *rates,
   /* regenerate konStates */
   for (i=0; i < NPROTEINS; i++) {
     /* if protein decay is otherwise going to be zero, use aging term */
-    protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
+    protein_decay = genes->proteindecay[i] > 0.0 ? genes->proteindecay[i] : protein_aging;
     salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
     konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
@@ -2669,6 +2676,117 @@ void recalibrate_cell(GillespieRates *rates,
   } 
 }
 
+// TODO: refactor to use this functions in  recalibrate_cell() to avoid code duplication.
+
+void recompute_kon_rates(GillespieRates *rates,
+                         CellState *state,
+                         Genotype *genes,
+                         KonStates *konStates,
+                         float *koffvalues) 
+{
+  int j, k;
+  float salphc;
+  float orig_rates = rates->salphc;
+
+  LOG("BEFORE rates->total=%g, rates->salphc=%g\n",   rates->total, rates->salphc);
+  // subtract off current salphc from total
+  rates->total -= rates->salphc;
+
+  int i;
+  float protein_decay;
+  for (i=0; i < NPROTEINS; i++) {
+    // if protein decay is otherwise going to be zero, use aging term 
+    protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
+    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
+    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
+    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
+    konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
+  }
+  
+  // reset rates
+  rates->salphc=0.0;
+  rates->salphc_operations=0;
+
+  rates->maxSalphc=0.0;
+  rates->maxSalphc_operations=0;
+
+  rates->minSalphc=0.0;
+  rates->minSalphc_operations=0;
+
+  // go over all the currently unbound and increment salphc
+  for (k=0; k < genes->bindSiteCount; k++) {
+    int siteID;
+    int tfID = genes->allBindingSites[k].tfID;
+    
+    int notbound = 1;
+    j = 0;
+    while (j < state->tfBoundCount && notbound) {
+      siteID = state->tfBoundIndexes[j];
+      if (siteID == k)  // site is not available, don't add to kon 
+        notbound = 0;
+      j++;
+    }
+    int nothindered = 1;
+    j = 0;
+    while (j < state->tfHinderedCount && nothindered) {
+      siteID = state->tfHinderedIndexes[j][0];
+      if (siteID == k)  // site is not available, don't add to kon 
+        nothindered = 0;
+      j++;
+    }
+
+    if (notbound && nothindered) {
+
+      salphc = konStates->konvalues[tfID][KON_SALPHC_INDEX];
+
+      LOG_VERBOSE("for unbound site %03d [tfID=%02d] adding salphc=%g to rates->salphc=%g\n", k, tfID, salphc, rates->salphc);
+
+      rates->salphc += salphc;
+      rates->salphc_operations++;
+
+
+      rates->maxSalphc += fmaxf(state->proteinConc[tfID], salphc);
+      rates->maxSalphc_operations++;
+
+      rates->minSalphc += fminf(state->proteinConc[tfID], salphc);
+      rates->minSalphc_operations++;
+    } 
+  }
+  rates->salphc = kon*rates->salphc;
+
+  // now that it is recomputed, add it back to total
+  rates->total += rates->salphc;
+  LOG("AFTER rates->total=%g, rates->salphc=%g, percent difference=%g\n",   
+      rates->total, rates->salphc, 100.0*(fabs(rates->salphc-orig_rates)/rates->salphc));
+}
+
+// TODO: refactor to use this functions in  recalibrate_cell() to avoid code duplication.
+void recompute_koff_rates(GillespieRates *rates,
+                          CellState *state,
+                          Genotype *genes,
+                          KonStates *konStates,
+                          float *koffvalues,
+                          float t) 
+{
+  int i;
+  float orig_rates = rates->koff;
+  float temprate = 0.0;
+
+  LOG("BEFORE rates->total=%g, rates->koff=%g\n",   rates->total, rates->koff);
+  /* subtract off current koff from total */
+  rates->total -= rates->koff;
+  
+  for (i = 0; i < state->tfBoundCount; i++) 
+    temprate += koffvalues[i];
+  fprintf(fp_koff[state->cellID], "%g %g\n", t, rates->koff - temprate);
+  rates->koff = temprate;
+  rates->koff_operations = 0;
+  
+  rates->total += rates->koff;
+
+  LOG("AFTER rates->total=%g, rates->koff=%g, percent difference=%g\n",   
+      rates->total, rates->koff, 100.0*(fabs(rates->koff-orig_rates)/rates->koff));
+}
 
 /*
  * recompute rates from scratch to avoid compounding rounding error
@@ -3534,19 +3652,20 @@ void do_single_timestep(Genotype *genes,
   int total;     /* total possible translation events */
   
   float konrate2, fixed_time;
-  // float f, diff, df, sum, ct, ect;
 
-  if (recompute_koff) {
-    // TODO: check drift from koff every 5 mins
-    //int trunc_time = trunc(*t);
-    //if ((trunc_time % 5) == 0) {
-    float temprate = 0.0;
-    for (i = 0; i < state->tfBoundCount; i++) 
-      temprate += koffvalues[i];
-    fprintf(fp_koff[state->cellID], "%g %g\n", *t, rates->koff - temprate);
-    rates->koff = temprate;
-    rates->koff_operations = 0;
+  /* if asked, check for rounding error and recompute rates */
+
+  /* check drift from koff every 1e6 operations */
+  if (recompute_koff && (rates->koff_operations >= 1e6 || rates->koff < 0.0)) {
+    LOG("(t=%g) after %d operations recompute koff rates\n", *t, rates->koff_operations);
+    recompute_koff_rates(rates, state, genes, konStates, koffvalues, *t);
   }
+
+  /* check drift from various kon rates every 1e6 operations */
+  if (recompute_kon && (rates->salphc_operations >= 1e6 || rates->salphc < 0.0)) {
+    LOG("(t=%g) after %d operations recompute kon rates\n", *t, rates->salphc_operations);
+    recompute_kon_rates(rates, state, genes, konStates, koffvalues);
+  } 
   
   if (*t > 0.00005 && state->burn_in) {
     printf("recalibrating cell %3d after burn-in!\n", state->cellID);
@@ -3575,8 +3694,12 @@ void do_single_timestep(Genotype *genes,
 
     // TODO: check!
     /* compute konrate (which is constant over the Gillespie step) */
-    if (konStates->nkon==0) *konrate = (-rates->salphc);   /* all binding sites are occupied, total rate of binding is zero */
-    else calc_kon_rate(*dt, konStates, konrate);           /* otherwise compute konrate */
+    if (konStates->nkon==0) {
+      *konrate = (-rates->salphc);    /* all binding sites are occupied, total rate of binding is zero */
+      LOG_WARNING("konStates->nkon=%d, konrate=%g\n", konStates->nkon, *konrate);
+    } else  {
+      calc_kon_rate(*dt, konStates, konrate);           /* otherwise compute konrate */
+    }
 
     log_snapshot(rates,
                  state,
@@ -3591,7 +3714,6 @@ void do_single_timestep(Genotype *genes,
     state->burn_in = 0;
   } 
 
-  
   /* compute S-phase offsets */
   if (critical_size > 0.0 && state->cellSize >= critical_size && !state->in_s_phase)  { /* run until checkpoint reached */
     reach_s_phase(state, genes, *t);
@@ -3608,11 +3730,8 @@ void do_single_timestep(Genotype *genes,
   
   *x = expdev(&seed);        /* draw random number */
 
-  /* recompute rates */
-  // currently disabled
-  // recompute_rates(rates, state, genes, konStates, koffvalues) ;
-  
   /* check for rounding error */
+  // TODO 2009-03-03: will remove very soon after more testing
   if (rates->koff < 0.0){
     konrate2 = 0.0;
     for (i=0; i < state->tfBoundCount; i++) konrate2 += koffvalues[i];
@@ -3630,7 +3749,6 @@ void do_single_timestep(Genotype *genes,
     LOG_ERROR("dt=%g is negative after calc_dt, t=%g\n", *dt, *t);
   }
 
-  
   LOG_VERBOSE("next stochastic event due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
   
   if (!(state->mRNATranscrTimeEndLast)) {
@@ -3741,8 +3859,30 @@ void do_single_timestep(Genotype *genes,
   if (*t+*dt < tdevelopment || no_fixed_dev_time) {
     
     /* compute konrate (which is constant over the Gillespie step) */
-    if (konStates->nkon==0) *konrate = (-rates->salphc);  /* all binding sites are occupied, total rate of binding is zero */
-    else calc_kon_rate(*dt, konStates, konrate);          /* otherwise compute konrate */
+    if (konStates->nkon==0) {
+      *konrate = (-rates->salphc);    /* all binding sites are occupied, total rate of binding is zero */
+      LOG_ERROR("konStates->nkon=%d, konrate=%g\n", konStates->nkon, *konrate);
+    } else  {
+      calc_kon_rate(*dt, konStates, konrate);           /* otherwise compute konrate */
+    }
+
+    // TODO: FIXME 
+    // do sanity check on total rates first
+    if (!(rates->total + *konrate > 0.0)) {
+      log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
+      LOG_ERROR("x should always be >0 t=%g (x=%g) rates->total=%g, konrate=%g, recalibrate cell!\n", *t, *x, rates->total, *konrate); 
+      //recompute_kon_rates(rates, state, genes, konStates, koffvalues);
+      //recompute_koff_rates(rates, state, genes, konStates, koffvalues, *t);
+      recalibrate_cell(rates, state, genes, konStates, &koffvalues, mRNAdecay, transport, *dt); 
+      calc_kon_rate(*dt, konStates, konrate);           /* also recompute konrate */
+      log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
+
+      // TODO: probably should mark cell as "dead" in this case,
+      // i.e. no TFs bound, no activity etc., and remove from queue.
+      if (!(rates->total + *konrate > 0.0)) {  // if still wrong, exit
+        exit(-1);
+      }
+    }
     
     /* 
      * choose a new uniform random number weighted by the
@@ -4096,8 +4236,6 @@ void develop(Genotype genes[POP_SIZE],
         LOG("Skip division for cell=%03d S phase and G2 phase have zero length\n", motherID);
       }
         
-      LOG("AFTER DIVISION: take a new step for mother cell=%3d\n", motherID);
-
       if (daughterID != motherID) {
         /* advance time for mother */
         do_single_timestep(&(genes[motherID]), 
@@ -4116,7 +4254,8 @@ void develop(Genotype genes[POP_SIZE],
                            maxbound2,
                            maxbound3,
                            no_fixed_dev_time);
-        
+
+        LOG("AFTER DIVISION: add new timestep to queue for mother cell=%03d at t=%g\n", motherID, t[motherID]);
         insert_with_priority_heap(queue, motherID, t[motherID]); 
       } else {
         printf("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
@@ -4124,8 +4263,6 @@ void develop(Genotype genes[POP_SIZE],
         LOG("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
             motherID, daughterID);
       }
-
-      LOG("AFTER DIVISION: take a new step for daughter cell=%d\n", daughterID);
 
       /* advance time for daughter */
       do_single_timestep(&(genes[daughterID]), 
@@ -4145,6 +4282,7 @@ void develop(Genotype genes[POP_SIZE],
                          maxbound3,
                          no_fixed_dev_time);
 
+      LOG("AFTER DIVISION: add new timestep in queue for daughter cell=%03d at t=%g\n", daughterID, t[daughterID]);
       insert_with_priority_heap(queue, daughterID, t[daughterID]);
     }
     else {
