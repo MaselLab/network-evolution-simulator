@@ -2526,163 +2526,11 @@ void replicate_gene(CellState *state,
   }
 }
 
-void recalibrate_cell(GillespieRates *rates,
-                      CellState *state,
-                      Genotype *genes,
-                      KonStates *konStates,
-                      float **koffvalues,
-                      float mRNAdecay[NGENES],
-                      float transport[NGENES],
-                      float dt) 
-{
-  int i, j, k;
-  float protein_decay;
-  float salphc = 0.0;
-  int siteID, tfID;
-
-  /* reset the total rate for current step */
-  rates->total=0.0;
-  
-  /* reset all rates and operations */
-  rates->koff=0.0;
-  rates->koff_operations=0;
-
-  rates->transport=0.0;
-  rates->transport_operations=0;
-
-  rates->mRNAdecay=0.0;
-  rates->mRNAdecay_operations=0;
-
-  rates->picDisassembly=0.0;
-  rates->picDisassembly_operations=0;
-
-  rates->salphc=0.0;
-  rates->salphc_operations=0;
-
-  rates->maxSalphc=0.0;
-  rates->maxSalphc_operations=0;
-
-  rates->minSalphc=0.0;
-  rates->minSalphc_operations=0;
-
-  /* regenerate konStates */
-  for (i=0; i < NPROTEINS; i++) {
-    /* if protein decay is otherwise going to be zero, use aging term */
-    protein_decay = genes->proteindecay[i] > 0.0 ? genes->proteindecay[i] : protein_aging;
-    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
-    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
-    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
-    konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
-    konStates->nkonsum[i] = 0;  
-    konStates->konList[i]->site_count = 0;
-  }
-  konStates->nkon = 0;   /* initialize to zero */
-
-  /* regenerate konStates and rates->{salphc,maxSalphc,minSalphc} */
-
-  for (k=0; k < genes->bindSiteCount; k++) {
-    tfID = genes->allBindingSites[k].tfID;
-    
-    int notbound = 1;
-    j = 0;
-    while (j < state->tfBoundCount && notbound) {
-      siteID = state->tfBoundIndexes[j];
-      if (siteID == k)  // site is not available, don't add to kon 
-        notbound = 0;
-      j++;
-    }
-    int nothindered = 1;
-    j = 0;
-    while (j < state->tfHinderedCount && nothindered) {
-      siteID = state->tfHinderedIndexes[j][0];
-      if (siteID == k)  // site is not available, don't add to kon 
-        nothindered = 0;
-      j++;
-    }
-
-    if (notbound && nothindered) {
-
-      salphc = konStates->konvalues[tfID][KON_SALPHC_INDEX];
-      rates->salphc += salphc;
-      rates->salphc_operations++;
-
-      rates->maxSalphc += fmaxf(state->proteinConc[tfID], salphc);
-      rates->maxSalphc_operations++;
-
-      rates->minSalphc += fminf(state->proteinConc[tfID], salphc);
-      rates->minSalphc_operations++;
-
-      // update the list of sites that bind for a particular TF, i
-      konStates->konList[tfID]->available_sites[konStates->konList[tfID]->site_count] = k;
-      (konStates->konList[tfID]->site_count)++;
-      (konStates->nkonsum[tfID])++;
-      konStates->nkon++;
-    } /* else {
-      if (notbound == 0)
-        printf("not adding siteID=%d for TF=%d to konStates (bound)\n", k, tfID);
-      else
-        printf("not adding siteID=%d for TF=%d to konStates (hindered)\n", k, tfID);
-    } */
-  }
-
-  for (i=0; i < NGENES; i++) {
-    /* transport rates */
-    transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
-    rates->transport += transport[i];
-    rates->transport_operations++;
-
-    /* regenerate decay rates */
-    mRNAdecay[i] = genes->mRNAdecay[i] * ((float) state->mRNACytoCount[i] + (float) state->mRNATranslCytoCount[i]);
-    rates->mRNAdecay += mRNAdecay[i];
-    rates->mRNAdecay_operations++;
-
-  }
-
-  /* recompute koffvalues for all sites */
-  float temprate = 0.0;
-  for (i=0; i < state->tfBoundCount; i++) {
-    int site = state->tfBoundIndexes[i];
-    // TODO: should get real time from simulation, will add later
-    calc_koff(site, genes->allBindingSites, state, &((*koffvalues)[i]), 9999.0);
-    temprate += (*koffvalues)[i];
-  }
-  rates->koff = temprate;
-
-  /* now update with kon */
-  rates->salphc *= kon;
-  rates->salphc_operations++;
-
-  rates->maxSalphc *= kon;
-  rates->maxSalphc_operations++;
-
-  rates->minSalphc *= kon;
-  rates->minSalphc_operations++;
-
-  /* recompute and cache the total rate in data structure */
-  rates->total += rates->koff;
-  rates->total += rates->transport;
-  rates->total += rates->mRNAdecay;
-  rates->total += rates->picDisassembly;
-  rates->total += rates->salphc;
-
-  /* 
-   * convert the counts back into rates using the constants 
-   */
-  for (j=0; j < MAX_COPIES; j++) {
-    rates->total += (float) rates->acetylationCount[j] * acetylate;
-    rates->total += (float) rates->deacetylationCount[j] * deacetylate;
-    rates->total += (float) rates->picAssemblyCount[j] * PICassembly;
-    rates->total += (float) rates->transcriptInitCount[j] * transcriptinit;    
-  } 
-}
-
-// TODO: refactor to use this functions in  recalibrate_cell() to avoid code duplication.
-
 void recompute_kon_rates(GillespieRates *rates,
                          CellState *state,
                          Genotype *genes,
                          KonStates *konStates,
-                         float *koffvalues) 
+                         int recalibrate) 
 {
   int j, k;
   float salphc;
@@ -2692,17 +2540,6 @@ void recompute_kon_rates(GillespieRates *rates,
   // subtract off current salphc from total
   rates->total -= rates->salphc;
 
-  int i;
-  float protein_decay;
-  for (i=0; i < NPROTEINS; i++) {
-    // if protein decay is otherwise going to be zero, use aging term 
-    protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
-    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
-    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
-    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
-    konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
-  }
-  
   // reset rates
   rates->salphc=0.0;
   rates->salphc_operations=0;
@@ -2744,17 +2581,26 @@ void recompute_kon_rates(GillespieRates *rates,
       rates->salphc += salphc;
       rates->salphc_operations++;
 
-
       rates->maxSalphc += fmaxf(state->proteinConc[tfID], salphc);
       rates->maxSalphc_operations++;
 
       rates->minSalphc += fminf(state->proteinConc[tfID], salphc);
       rates->minSalphc_operations++;
+
+      // TODO: check
+      // only do if recalibrating state of cell from scratch
+      if (recalibrate) {
+        // update the list of sites that bind for a particular TF, i
+        konStates->konList[tfID]->available_sites[konStates->konList[tfID]->site_count] = k;
+        (konStates->konList[tfID]->site_count)++;
+        (konStates->nkonsum[tfID])++;
+        konStates->nkon++;
+      }
     } 
   }
   rates->salphc = kon*rates->salphc;
 
-  // now that it is recomputed, add it back to total
+  /* now that it is recomputed, add salphc back to total */
   rates->total += rates->salphc;
   LOG("AFTER rates->total=%g, rates->salphc=%g, percent difference=%g\n",   
       rates->total, rates->salphc, 100.0*(fabs(rates->salphc-orig_rates)/rates->salphc));
@@ -2764,7 +2610,6 @@ void recompute_kon_rates(GillespieRates *rates,
 void recompute_koff_rates(GillespieRates *rates,
                           CellState *state,
                           Genotype *genes,
-                          KonStates *konStates,
                           float *koffvalues,
                           float t) 
 {
@@ -2776,21 +2621,115 @@ void recompute_koff_rates(GillespieRates *rates,
   /* subtract off current koff from total */
   rates->total -= rates->koff;
   
-  for (i = 0; i < state->tfBoundCount; i++) 
+  for (i = 0; i < state->tfBoundCount; i++) {
+    int site = state->tfBoundIndexes[i];
+    calc_koff(site, genes->allBindingSites, state, &(koffvalues[i]), t);
     temprate += koffvalues[i];
+  }
   fprintf(fp_koff[state->cellID], "%g %g\n", t, rates->koff - temprate);
   rates->koff = temprate;
   rates->koff_operations = 0;
-  
-  rates->total += rates->koff;
 
+  /* add back new koff */
+  rates->total += rates->koff;
   LOG("AFTER rates->total=%g, rates->koff=%g, percent difference=%g\n",   
       rates->total, rates->koff, 100.0*(fabs(rates->koff-orig_rates)/rates->koff));
 }
 
+void recalibrate_cell(GillespieRates *rates,
+                      CellState *state,
+                      Genotype *genes,
+                      KonStates *konStates,
+                      float **koffvalues,
+                      float mRNAdecay[NGENES],
+                      float transport[NGENES],
+                      float dt) 
+{
+  int i, j; //, k;
+  float protein_decay;
+  float salphc = 0.0;
+  //int siteID, tfID;
+
+  /* reset the total rate for current step */
+  rates->total=0.0;
+  
+  /* reset all rates and operations */
+  rates->koff=0.0;
+  rates->koff_operations=0;
+
+  rates->transport=0.0;
+  rates->transport_operations=0;
+
+  rates->mRNAdecay=0.0;
+  rates->mRNAdecay_operations=0;
+
+  rates->picDisassembly=0.0;
+  rates->picDisassembly_operations=0;
+
+  rates->salphc=0.0;
+  rates->salphc_operations=0;
+
+  rates->maxSalphc=0.0;
+  rates->maxSalphc_operations=0;
+
+  rates->minSalphc=0.0;
+  rates->minSalphc_operations=0;
+
+  /* regenerate konStates */
+  for (i=0; i < NPROTEINS; i++) {
+    /* if protein decay is otherwise going to be zero, use aging term */
+    protein_decay = genes->proteindecay[i] > 0.0 ? genes->proteindecay[i] : protein_aging;
+    salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
+    konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
+    konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
+    konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
+    konStates->nkonsum[i] = 0;  
+    konStates->konList[i]->site_count = 0;
+  }
+  konStates->nkon = 0;   /* initialize to zero */
+
+  /* regenerate konStates and rates->{salphc,maxSalphc,minSalphc} */
+  recompute_kon_rates(rates, state, genes, konStates, 1);
+
+  for (i=0; i < NGENES; i++) {
+    /* transport rates */
+    transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
+    rates->transport += transport[i];
+    rates->transport_operations++;
+
+    /* regenerate decay rates */
+    mRNAdecay[i] = genes->mRNAdecay[i] * ((float) state->mRNACytoCount[i] + (float) state->mRNATranslCytoCount[i]);
+    rates->mRNAdecay += mRNAdecay[i];
+    rates->mRNAdecay_operations++;
+
+  }
+
+  /* recompute koffvalues for all sites */
+  recompute_koff_rates(rates, state, genes, *koffvalues, 9999.0);
+
+  /* recompute and cache the total rate in data structure */
+  rates->total += rates->transport;
+  rates->total += rates->mRNAdecay;
+  rates->total += rates->picDisassembly;
+
+  /* 
+   * convert the counts back into rates using the constants 
+   */
+  for (j=0; j < MAX_COPIES; j++) {
+    rates->total += (float) rates->acetylationCount[j] * acetylate;
+    rates->total += (float) rates->deacetylationCount[j] * deacetylate;
+    rates->total += (float) rates->picAssemblyCount[j] * PICassembly;
+    rates->total += (float) rates->transcriptInitCount[j] * transcriptinit;    
+  } 
+}
+
+
+
 /*
  * recompute rates from scratch to avoid compounding rounding error
  */
+// TODO: cleanup to call recompute_*_rates calls, but without requiring
+// a complete recalibrate_cell() call
 void recompute_rates(GillespieRates *rates,
                      CellState *state,
                      Genotype *genes,
@@ -3095,7 +3034,7 @@ void initialize_new_cell_genotype(Genotype *genes, Genotype genes_clone)
 }
 
 void initialize_new_cell_state(CellState *state, CellState state_clone, 
-                               GillespieRates *rates, double scale)
+                               GillespieRates *rates, double newCellSize)
 {
   int i, j;
   // reset pointers
@@ -3128,11 +3067,11 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->division_time = 999999.0;  /* reset division time for this cell */
   state->divisions = state_clone.divisions; /* copy division counter */
 
-  // TODO: fix
-  state->cellSize = scale;   /* reset size to appropriate scale of cell size */
+  state->cellSize = newCellSize;   /* reset cell size */
 
   /* TODO: check! growth rate, take instantaneous growth rate just before
      division, this will be updated after first new time step */
+  // TODO, check that this is always inherited always from mother cell
   state->growthRate = state_clone.growthRate;
 
   /* keep thermodynamic state the same */ 
@@ -3376,7 +3315,10 @@ void do_cell_division(int motherID,
      of the new daughter cell based on clone of mother */
   initialize_new_cell_genotype(daughter, genes_clone);
   /* initialize the state of the new cell */
+  /* also reset size to appropriate scale of cell size */
   initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
+  // TODO: fix to use scale according to the current size as per below
+  //initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction*state_clone.cellSize);
 
   /* set the founderID of the daughter cell from the mother cell */
   daughter_state->founderID = state_clone.founderID;
@@ -3390,6 +3332,8 @@ void do_cell_division(int motherID,
   if (no_replace_mother) {
     initialize_new_cell_genotype(mother, genes_clone);
     initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
+    // TODO (see above)
+    //initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction)*state_clone.cellSize);
     mother_state->divisions++;      /* update divisions in mother */
     printf("mother   cell %03d is founded by cell %03d with %2d divisions\n", 
          motherID, mother_state->founderID, mother_state->divisions);
@@ -3657,14 +3601,14 @@ void do_single_timestep(Genotype *genes,
 
   /* check drift from koff every 1e6 operations */
   if (recompute_koff && (rates->koff_operations >= 1e6 || rates->koff < 0.0)) {
-    LOG("(t=%g) after %d operations recompute koff rates\n", *t, rates->koff_operations);
-    recompute_koff_rates(rates, state, genes, konStates, koffvalues, *t);
+    LOG_WARNING("(t=%g) after %d operations recompute koff rates\n", *t, rates->koff_operations);
+    recompute_koff_rates(rates, state, genes, koffvalues, *t);
   }
 
   /* check drift from various kon rates every 1e6 operations */
   if (recompute_kon && (rates->salphc_operations >= 1e6 || rates->salphc < 0.0)) {
-    LOG("(t=%g) after %d operations recompute kon rates\n", *t, rates->salphc_operations);
-    recompute_kon_rates(rates, state, genes, konStates, koffvalues);
+    LOG_WARNING("(t=%g) after %d operations recompute kon rates\n", *t, rates->salphc_operations);
+    recompute_kon_rates(rates, state, genes, konStates, 0);
   } 
   
   if (*t > 0.00005 && state->burn_in) {
@@ -3871,8 +3815,8 @@ void do_single_timestep(Genotype *genes,
     if (!(rates->total + *konrate > 0.0)) {
       log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
       LOG_ERROR("x should always be >0 t=%g (x=%g) rates->total=%g, konrate=%g, recalibrate cell!\n", *t, *x, rates->total, *konrate); 
-      //recompute_kon_rates(rates, state, genes, konStates, koffvalues);
-      //recompute_koff_rates(rates, state, genes, konStates, koffvalues, *t);
+      //recompute_kon_rates(rates, state, genes, konStates, 0);
+      //recompute_koff_rates(rates, state, koffvalues, *t);
       recalibrate_cell(rates, state, genes, konStates, &koffvalues, mRNAdecay, transport, *dt); 
       calc_kon_rate(*dt, konStates, konrate);           /* also recompute konrate */
       log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
