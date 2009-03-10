@@ -82,7 +82,7 @@ check-sample-output:	clean
 check-multiple-pops:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4 -DUSE_RAND=1" netsim
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
-	$(subst RUN,multiple-pops,$(subst ORIG,2009-02-23-after-nprotein-change-multiple-pops-r4,$(DIFF_CMD)))
+	$(subst RUN,multiple-pops,$(subst ORIG,2009-03-10-after-genotype-multiple-pops-r-4,$(DIFF_CMD)))
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500

@@ -132,6 +132,30 @@ void initialize_sequence(char *Seq,
   //printf("length: %d, sequence is %s\n", strlen(Seq), Seq);
 }
 
+void print_genotype(Genotype *genotype, int genotypeID) {
+  int i, p;
+
+  printf("[genotype %03d] hindPos: ", genotypeID);
+  for (i=0; i < TFGENES; i++) {
+    printf("%d ", genotype->hindrancePositions[i]);
+  }
+  printf("\n");
+
+  for (i=0; i < NGENES; i++) {
+    printf("[genotype %03d gene %02d] ", genotypeID, i);
+    printf("repl=%g, ", genotype->replication_time[i]);
+    printf("mRNAdy=%g, ", genotype->mRNAdecay[i]);
+    printf("protdy=%g, ", genotype->proteindecay[i]);
+    printf("transl=%g, ", genotype->translation[i]);
+
+    for (p=0; p < MAX_COPIES; p++) {
+      printf("act[%d]=%d, ", p, genotype->activating[i][p]);
+      printf("PICd[%d]=%g ", p, genotype->PICdisassembly[i][p]);
+    }
+    printf("\n");
+  }
+}
+
 
 void print_all_binding_sites(int copies[NGENES],
                              AllTFBindingSites *allBindingSites, 
@@ -220,19 +244,13 @@ void print_rounding(CellState *state, GillespieRates *rates, float t)
           rates->transcriptInitCount_operations, rates->picDisassemblyCount_operations);
 }
 
-
-void initialize_genotype(Genotype *indiv, 
-                         float kdis[])
+void initialize_genotype_fixed(Genotype *indiv, 
+                               float kdis[],
+                               int genotypeID)
 {
   int i, j, p;
-  
-  initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*MAX_COPIES*NGENES, MAX_COPIES, NGENES);
-  initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*MAX_COPIES*TFGENES, MAX_COPIES, TFGENES);
 
-  /* start number of copies of gene at current_ploidy */
-  for (p=0; p < NGENES; p++) {
-    indiv->copies[p] = current_ploidy;
-  }
+  LOG_NOCELLID("[genotype %03d] activators vs repressors ", genotypeID);
 
   /* initialize hindrance for all TFGENES */
   for (p=0; p < TFGENES; p++) {
@@ -248,12 +266,6 @@ void initialize_genotype(Genotype *indiv,
 
     }
   } 
-  
-  calc_all_binding_sites(indiv->copies, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
-                         &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions,
-                         indiv->tfsPerGene, indiv->tfsStart);
-
-  LOG_NOCELLID("activators vs repressors ");
   
   for (i=0; i < NGENES; i++) {
     indiv->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -295,8 +307,55 @@ void initialize_genotype(Genotype *indiv,
       indiv->replication_time[i] = time_s_phase*ran1(&seed); 
     else
       indiv->replication_time[i] = time_s_phase*(i/(float)NGENES);
-    LOG_VERBOSE_NOCELLID("offset for replication time after S-phase starts: %g\n", indiv->replication_time[i]);
+    LOG_VERBOSE_NOCELLID("[genotype %03d] offset for replication time after S-phase starts: %g\n", genotypeID, indiv->replication_time[i]);
   }
+}
+
+void initialize_genotype(Genotype *indiv, 
+                         Genotype clone,
+                         float kdis[],
+                         int genotypeID)
+{
+  int i, k, p;
+  
+  initialize_sequence((char *)indiv->cisRegSeq, CISREG_LEN*MAX_COPIES*NGENES, MAX_COPIES, NGENES);
+
+  /* within a replicate:
+   * initialize all individuals with the same:
+   *
+   * TF sequence
+   * hindrance positions
+   * per-gene replication times
+   * mRNA and protein decay rates
+   * translation rates
+   * activators or inhibitors
+   * PIC disassembly rates
+   */
+  // if initializing the first cell, then create from scratch
+  if (genotypeID == 0) {
+    initialize_sequence((char *)indiv->transcriptionFactorSeq, TF_ELEMENT_LEN*MAX_COPIES*TFGENES, MAX_COPIES, TFGENES);
+    initialize_genotype_fixed(indiv, kdis, genotypeID);
+  // otherwise clone it from the first instance
+  } else {
+    // TODO: FIXME: should refactor this to have common code to clone TF sequences
+    for (i=0; i < TFGENES; i++) {
+      for (k=0; k < TF_ELEMENT_LEN; k++) {
+        for (p=0; p < MAX_COPIES; p++) {
+          indiv->transcriptionFactorSeq[i][p][k] = clone.transcriptionFactorSeq[i][p][k];
+        }
+      }
+    }
+    initialize_new_cell_genotype(indiv, clone);
+  }
+
+  /* start number of copies of gene at current_ploidy */
+  for (p=0; p < NGENES; p++) {
+    indiv->copies[p] = current_ploidy;
+  }
+
+  calc_all_binding_sites(indiv->copies, indiv->cisRegSeq, indiv->transcriptionFactorSeq, 
+                         &(indiv->bindSiteCount), &(indiv->allBindingSites), indiv->hindrancePositions,
+                         indiv->tfsPerGene, indiv->tfsStart);
 }
 
 void mutate(Genotype *gene,
@@ -2599,6 +2658,8 @@ void recompute_kon_rates(GillespieRates *rates,
     } 
   }
   rates->salphc = kon*rates->salphc;
+  rates->maxSalphc = kon*rates->maxSalphc;
+  rates->minSalphc = kon*rates->minSalphc;
 
   /* now that it is recomputed, add salphc back to total */
   rates->total += rates->salphc;
@@ -2947,6 +3008,7 @@ void clone_cell(Genotype *genes_orig,
   }
   // FIXME: split out from NGENES loop above
   for (i=0; i < TFGENES; i++) {
+    genes_clone->hindrancePositions[i] = genes_orig->hindrancePositions[i];
     for (k=0; k < TF_ELEMENT_LEN; k++) {
       for (p=0; p < MAX_COPIES; p++) {
         genes_clone->transcriptionFactorSeq[i][p][k] = genes_orig->transcriptionFactorSeq[i][p][k];
@@ -3020,6 +3082,11 @@ void initialize_new_cell_genotype(Genotype *genes, Genotype genes_clone)
 {
   int i, p;
 
+  /* initialize hindrance for all TFGENES */
+  for (p=0; p < TFGENES; p++) {
+    genes->hindrancePositions[p] = genes_clone.hindrancePositions[p];
+  }
+
   /* initialize the non-cisregulatory parts of the genotype */
   for (i=0; i < NGENES; i++) {
     for (p=0; p < MAX_COPIES; p++) {
@@ -3034,7 +3101,7 @@ void initialize_new_cell_genotype(Genotype *genes, Genotype genes_clone)
 }
 
 void initialize_new_cell_state(CellState *state, CellState state_clone, 
-                               GillespieRates *rates, double newCellSize)
+                               GillespieRates *rates, double fraction)
 {
   int i, j;
   // reset pointers
@@ -3067,7 +3134,7 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->division_time = 999999.0;  /* reset division time for this cell */
   state->divisions = state_clone.divisions; /* copy division counter */
 
-  state->cellSize = newCellSize;   /* reset cell size */
+  state->cellSize = state_clone.cellSize*fraction;   /* reset cell size */
 
   /* TODO: check! growth rate, take instantaneous growth rate just before
      division, this will be updated after first new time step */
@@ -3314,6 +3381,8 @@ void do_cell_division(int motherID,
   /* initialize the non-cis-regulatory part of the genotype 
      of the new daughter cell based on clone of mother */
   initialize_new_cell_genotype(daughter, genes_clone);
+  // print_genotype(daughter, daughterID);
+
   /* initialize the state of the new cell */
   /* also reset size to appropriate scale of cell size */
   initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
@@ -3331,6 +3400,8 @@ void do_cell_division(int motherID,
 
   if (no_replace_mother) {
     initialize_new_cell_genotype(mother, genes_clone);
+    //print_genotype(mother, motherID);
+
     initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
     // TODO (see above)
     //initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction)*state_clone.cellSize);
@@ -3936,8 +4007,12 @@ void do_single_timestep(Genotype *genes,
                       
                       LOG_ERROR("[cell %03d] t=%g no event assigned: x=%g, recalibrate cell\n", state->cellID, *t, *x);
 
+                      log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay,
+                                   transport, *konrate, *x, *t);
                       recalibrate_cell(rates, state, genes, konStates, &koffvalues,
                                        mRNAdecay, transport, *dt); 
+                      log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay,
+                                   transport, *konrate, *x, *t);
                       
                       if (*t > 1000.0) {
                         LOG_ERROR("should probably stop cell run, has been running for > 1000 mins\n");
@@ -3983,8 +4058,6 @@ void develop(Genotype genes[POP_SIZE],
              TimeCourse *timecoursestart[POP_SIZE][NGENES],
              TimeCourse *timecourselast[POP_SIZE][NGENES],
              float temperature,   /* in Kelvin */
-             float initmRNA[NGENES],
-             float initProteinConc[NPROTEINS],
              float kdis[NUM_K_DISASSEMBLY],
              int hold_genotype_constant,
              int output_binding_sites,
@@ -3995,6 +4068,9 @@ void develop(Genotype genes[POP_SIZE],
   int i, j;
   int maxbound2, maxbound3;  
   int curr_seed;
+
+  /* initial mRNA and protein concentrations */
+  float initmRNA[NGENES], initProteinConc[NGENES];
 
   /* cached information about available binding sites for efficiency */
   KonStates konStates[POP_SIZE];
@@ -4029,10 +4105,20 @@ void develop(Genotype genes[POP_SIZE],
 
   queue = bh_alloc(POP_SIZE);
 
+  /* initialize protein concentrations to be used in all genes */
+  for (i=0; i < NGENES; i++) {
+    initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
+    initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
+  }
+
+
   for (j = 0; j < POP_SIZE; j++) {
 
     output=1;
-    initialize_genotype(&genes[j], kdis);
+    /* for all cells in this replicate initialize all parts of the
+       genotype, *except* for the cis-reg sequence using the initial
+       genes[0]  */
+    initialize_genotype(&genes[j], genes[0], kdis, j);
     /* if genotype is held constant, start varying the seed *after*
        initialize_genotype, so we can run the same genotype with
        slightly different amounts of noise  */
@@ -4275,6 +4361,18 @@ void print_time_course(TimeCourse *start,
   }
   fclose(fpout);  
 }
+
+void print_all_protein_time_courses(TimeCourse *timecoursestart[POP_SIZE][NPROTEINS],
+                                    TimeCourse *timecourselast[POP_SIZE][NPROTEINS])
+{
+  int i, j;
+  for (j = 0; j < POP_SIZE; j++) {
+    for (i=0; i < NPROTEINS; i++) {
+      if ((output)) print_time_course(timecoursestart[j][i], i, j);
+    }
+  }
+}
+
 
 void create_output_directory(char *output_directory) {
   int directory_success;

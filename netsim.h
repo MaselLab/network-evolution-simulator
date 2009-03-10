@@ -386,6 +386,8 @@ extern void initialize_growth_rate_parameters();
 
 extern void initialize_sequence(char [], int, int, int);
 
+extern void print_genotype(Genotype *, int);
+
 extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
@@ -397,7 +399,9 @@ extern void print_tf_occupancy(CellState *,
                                AllTFBindingSites *,
                                float);
 extern void initialize_genotype(Genotype *, 
-                                float []);
+                                Genotype,
+                                float [],
+                                int);
 
 
 extern void mutate(Genotype *,
@@ -691,6 +695,8 @@ extern void replicate_gene(CellState *,
                            int,
                            float);
 
+extern void initialize_new_cell_genotype(Genotype *, Genotype);
+
 extern void do_single_timestep(Genotype *, 
                                CellState *, 
                                KonStates *, 
@@ -713,8 +719,6 @@ extern void develop(Genotype [POP_SIZE],
                     TimeCourse *[POP_SIZE][NGENES],
                     TimeCourse *[POP_SIZE][NGENES], 
                     float, /* in Kelvin */
-                    float [NGENES],
-                    float [NPROTEINS],
                     float [NUM_K_DISASSEMBLY],
                     int,
                     int,
@@ -723,6 +727,9 @@ extern void develop(Genotype [POP_SIZE],
 
 extern void print_time_course(TimeCourse *,
                               int, int);
+
+extern void print_all_protein_time_courses(TimeCourse *[POP_SIZE][NPROTEINS],
+                                          TimeCourse *[POP_SIZE][NPROTEINS]);
 
 extern void create_output_directory(char *);
 

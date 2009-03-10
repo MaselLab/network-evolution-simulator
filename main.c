@@ -26,9 +26,9 @@ int main(int argc, char *argv[])
   int i, j;
   CellState state[POP_SIZE];
   Genotype indivs[POP_SIZE];
-  TimeCourse *timecoursestart[POP_SIZE][NGENES]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[POP_SIZE][NGENES];
-  float initmRNA[NGENES], initProteinConc[NGENES], kdis[NUM_K_DISASSEMBLY];
+  TimeCourse *timecoursestart[POP_SIZE][NPROTEINS]; /* array of pointers to list starts */
+  TimeCourse *timecourselast[POP_SIZE][NPROTEINS];
+  float kdis[NUM_K_DISASSEMBLY];
 
   int hold_genotype_constant = 0;
   int output_binding_sites = 0;
@@ -225,25 +225,19 @@ int main(int argc, char *argv[])
 
   initialize_growth_rate_parameters();
 
-  /* initialize protein concentrations */
-  for (i=0; i < NGENES; i++) {
-    initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
-    initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
-  }
-
   /* get the kdis.txt values */
   read_kdisassembly(kdis);
 
   /* now create and run the population of cells */
-  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, initmRNA, initProteinConc, 
+  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, 
           kdis, hold_genotype_constant, output_binding_sites, no_fixed_dev_time, max_divisions);
+
+  print_all_protein_time_courses(timecoursestart, timecourselast);
 
   for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"indiv %d\n", j);
     for (i=0; i < NGENES; i++) {
-      //if ((output) && j==POP_SIZE-1) print_time_course(timecoursestart[j][i], i, j);
-      if ((output)) print_time_course(timecoursestart[j][i], i, j);
-      if (verbose) fprintf(fperrors, "deleting gene %d\n", i);
+      LOG_VERBOSE("deleting protein %02d timecourse\n", i);
       delete_time_course(timecoursestart[j][i]);
       timecoursestart[j][i] = timecourselast[j][i] = NULL;
     }
