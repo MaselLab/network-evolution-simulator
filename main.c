@@ -2,7 +2,7 @@
 /* 
  * Yeast transcriptional network simulator
  * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
- * Copyright (c) 2007, 2008 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -210,13 +210,14 @@ int main(int argc, char *argv[])
     create_output_file("koff", output_directory, &(fp_koff[j]), j);
 #if 0 // TODO: currently disable
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
-#endif
     create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
     create_output_file("rounding", output_directory, &(fp_rounding[j]), j);
     // print header
     fprintf(fp_rounding[j], "t koff transport mRNAdecay picDisassembly salphc maxSalphc minSalphc \
           acetylationCount deacetylationCount picAssemblyCount \
           transcriptInitCount picDisassemblyCount\n");
+#endif
+
   }
   
   /* slight hack to initialize seed  */
@@ -251,8 +252,8 @@ int main(int argc, char *argv[])
     // TODO: currently disable
 #if 0
     fclose(fp_growthrate[j]);
-#endif
     fclose(fp_tfsbound[j]);
     fclose(fp_rounding[j]);
+#endif
   }
 }

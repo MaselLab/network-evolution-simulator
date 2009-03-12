@@ -1204,9 +1204,9 @@ int does_fixed_event_end(FixedEvent *mRNATranslTimeEnd,
     retval = 0;
   } else {
     // TODO: rewrite this to avoid use of magic number
-    t1 = mRNATranscrTimeEnd ? mRNATranscrTimeEnd->time : 9999.0;
-    t2 = mRNATranslTimeEnd ? mRNATranslTimeEnd->time : 9999.0;
-    t3 = replicationTimeEnd ? replicationTimeEnd->time : 9999.0;
+    t1 = mRNATranscrTimeEnd ? mRNATranscrTimeEnd->time : TIME_INFINITY;
+    t2 = mRNATranslTimeEnd ? mRNATranslTimeEnd->time : TIME_INFINITY;
+    t3 = replicationTimeEnd ? replicationTimeEnd->time : TIME_INFINITY;
 
     LOG_VERBOSE_NOCELLID("check fixed event: t1=%g, t2=%g, t3=%f [t=%g] ", t1, t2, t3, t);
 
@@ -2141,9 +2141,12 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genes
         LOG_NOFUNC("copy%d=%d ", k, state->mRNATranscrCount[i][k]);
       LOG_NOFUNC("\n");
     }
-    LOG_ERROR("cell has appeared to cease functioning, didn't reach division\n");
-    // TODO: disable
-    // return;
+    LOG_ERROR("attempting to unbind when nothing bound, recomputing koff and kon rates\n");
+    recompute_koff_rates(rates, state, genes, koffvalues, t);    
+    recompute_kon_rates(rates, state, genes, konStates, 0);
+
+    // TODO: check that this is correct
+    return;
   }
 
   while (j < state->tfBoundCount && x > 0) {
@@ -2766,7 +2769,7 @@ void recalibrate_cell(GillespieRates *rates,
   }
 
   /* recompute koffvalues for all sites */
-  recompute_koff_rates(rates, state, genes, *koffvalues, 9999.0);
+  recompute_koff_rates(rates, state, genes, *koffvalues, TIME_INFINITY);
 
   /* recompute and cache the total rate in data structure */
   rates->total += rates->transport;
@@ -3131,7 +3134,7 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->in_s_phase = 0;   /* reset S phase state to 0 */
   // TODO: check to see whether we want burn-in at the birth of each new cell ?
   state->burn_in = 0;      /* only do burn-in at beginning of runs */
-  state->division_time = 999999.0;  /* reset division time for this cell */
+  state->division_time = TIME_INFINITY;  /* reset division time for this cell */
   state->divisions = state_clone.divisions; /* copy division counter */
 
   state->cellSize = state_clone.cellSize*fraction;   /* reset cell size */
@@ -3644,7 +3647,7 @@ void log_snapshot(GillespieRates *rates,
   LOG_NOFUNC("\n");
 }
 
-void do_single_timestep(Genotype *genes, 
+int do_single_timestep(Genotype *genes, 
                         CellState *state, 
                         KonStates *konStates, 
                         GillespieRates *rates, 
@@ -3738,7 +3741,7 @@ void do_single_timestep(Genotype *genes,
   }
   
   // TODO: currently disable printing out the TF occupancy
-#if 1
+#if 0
   print_tf_occupancy(state, genes->allBindingSites, *t);
   print_rounding(state, rates, *t);
 #endif
@@ -3895,7 +3898,11 @@ void do_single_timestep(Genotype *genes,
       // TODO: probably should mark cell as "dead" in this case,
       // i.e. no TFs bound, no activity etc., and remove from queue.
       if (!(rates->total + *konrate > 0.0)) {  // if still wrong, exit
-        exit(-1);
+        // TODO: hack time to always put the event at the very back of the queue: this cell is effectively dead and should eventually
+        // be chosen by the random number to be replaced
+        *t = TIME_INFINITY;
+        LOG_ERROR("put event at the very end of queue, with t=%g, cell is effectively dead\n", *t); 
+        return -1;
       }
     }
     
@@ -4005,7 +4012,8 @@ void do_single_timestep(Genotype *genes,
                        * events should be exhaustive
                        */
                       
-                      LOG_ERROR("[cell %03d] t=%g no event assigned: x=%g, recalibrate cell\n", state->cellID, *t, *x);
+                      LOG_ERROR("[cell %03d] t=%g no event assigned: x=%g, rates->total+konrate=%g, recalibrate cell\n", 
+                                state->cellID, *t, *x, rates->total + *konrate);
 
                       log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay,
                                    transport, *konrate, *x, *t);
@@ -4013,7 +4021,6 @@ void do_single_timestep(Genotype *genes,
                                        mRNAdecay, transport, *dt); 
                       log_snapshot(rates, state, genes, konStates, &koffvalues, mRNAdecay,
                                    transport, *konrate, *x, *t);
-                      
                       if (*t > 1000.0) {
                         LOG_ERROR("should probably stop cell run, has been running for > 1000 mins\n");
                         // TODO
@@ -4047,6 +4054,7 @@ void do_single_timestep(Genotype *genes,
     /* advance to end of development (this exits the outer while loop) */
     *t = tdevelopment;
   }
+  return 0;
 }
 
 /*
@@ -4092,6 +4100,7 @@ void develop(Genotype genes[POP_SIZE],
                            necessary when running for fixed
                            development time) */
   int divisions = 0;    /* no cell divisions yet */
+  int dead_cells = 0;   /* count number of cells that are "dead" */
   int motherID;         /* mother cell at division */
   int daughterID;       /* daughter cell at division */
 
@@ -4154,7 +4163,7 @@ void develop(Genotype genes[POP_SIZE],
     calc_from_state(&genes[j], &state[j], &rates[j], &konStates[j], transport[j], mRNAdecay[j]);
 
     t[j] = 0.0;  /* time starts at zero */
-    state[j].division_time = 999999.0;  /* make artificially high */
+    state[j].division_time = TIME_INFINITY;  /* make artificially high */
 
     /* do one step for the cell */
     do_single_timestep(&(genes[j]), 
@@ -4183,18 +4192,29 @@ void develop(Genotype genes[POP_SIZE],
 
   while ((no_fixed_dev_time && divisions < max_divisions) ||    /* no fixed dev time, run until # divisions reached */
          (!no_fixed_dev_time && t_next < tdevelopment)) {       /* or, if fixed dev time, run until tdevelopment reached */
-    //while (t_next < tdevelopment && t_next < state[cell].division_time) { 
 
     /* get the next cell with the smallest t to advance next */
     //t_next = get_next(&time_queue, &time_queue_end, &cell);
-    int ops;
+    int ops, retval;
     t_next = get_next_heap(queue, &cell, &ops);
-    /* if (timesteps % 100 == 0) 
-       printf("getmin %d %d %g\n", cell, ops, t[cell]); */
 
     LOG_VERBOSE_NOCELLID("[cell=%03d] get minimum time=%g size=%g\n", cell, t_next, state[cell].cellSize);
 
-    do_single_timestep(&(genes[cell]), 
+    /* if we find a dead cell in queue, skip to next cell */
+    if (t_next == TIME_INFINITY) {
+      dead_cells++;
+      LOG_NOCELLID("[cell=%03d] is dead, total dead cells=%03d\n", cell, dead_cells);
+      if (dead_cells == POP_SIZE) {
+        LOG_NOCELLID("all %03d cells in population are dead\n", dead_cells);
+        /* if all cells in population are dead, we exit */
+        break;
+      } else {
+        /* otherwise get next event from queue */
+        continue;
+      }
+    }
+
+    retval = do_single_timestep(&(genes[cell]), 
                        &(state[cell]), 
                        &(konStates[cell]), 
                        &(rates[cell]), 
@@ -4211,6 +4231,11 @@ void develop(Genotype genes[POP_SIZE],
                        maxbound3,
                        no_fixed_dev_time);
 
+    // TODO: check print out protein time courses in case we get a bad situation
+    if (retval == -1)  {
+      print_all_protein_time_courses(timecoursestart, timecourselast);
+    }
+   
     // TODO: cleanup
     /* abort if a population of one cell, undergoing a single division
        exceeds an maximum upper limit */

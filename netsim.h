@@ -16,6 +16,7 @@
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
+#define TIME_INFINITY 9.99e10
 
 #ifndef MAX_COPIES
 #define MAX_COPIES 4       /* each gene can potentially exist as a tetraploid during replication */
@@ -695,9 +696,30 @@ extern void replicate_gene(CellState *,
                            int,
                            float);
 
+extern void recompute_kon_rates(GillespieRates *,
+                                CellState *,
+                                Genotype *,
+                                KonStates *,
+                                int);
+
+extern void recompute_koff_rates(GillespieRates *,
+                                 CellState *,
+                                 Genotype *,
+                                 float *,
+                                 float);
+
+extern void recalibrate_cell(GillespieRates *,
+                             CellState *,
+                             Genotype *,
+                             KonStates *,
+                             float **,
+                             float [NGENES],
+                             float [NGENES],
+                             float);
+
 extern void initialize_new_cell_genotype(Genotype *, Genotype);
 
-extern void do_single_timestep(Genotype *, 
+extern int do_single_timestep(Genotype *, 
                                CellState *, 
                                KonStates *, 
                                GillespieRates *, 
