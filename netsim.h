@@ -547,7 +547,8 @@ extern void calc_dt(float *,
                     float [],
                     float [],
                     int [],
-                    int []);
+                    int [],
+                    int);
 
 extern void end_transcription(float *,
                               float,

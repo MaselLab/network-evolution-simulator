@@ -1238,7 +1238,8 @@ void calc_dt(float *x,
              float mRNAdecay[],
              float mRNAdecayrates[],
              int mRNACytoCount[],
-             int mRNATranslCytoCount[])
+             int mRNATranslCytoCount[],
+             int cellID)
 {
   float tbound1, tbound2;
   int i, j;
@@ -1280,13 +1281,13 @@ void calc_dt(float *x,
 
   tbound1 = *x/(rates->total + rates->maxSalphc);
   tbound2 = *x/(rates->total + rates->minSalphc);
-  LOG_VERBOSE_NOCELLID("bounds %g %g\n", tbound1, tbound2);
+  LOG_VERBOSE_NOCELLID("[cell %03d] bounds %g %g\n", cellID, tbound1, tbound2);
 
   /* if bounds are the same, simply choose tbound1 */
   if (tbound1==tbound2){
     if (konStates->nkon!=0) {
-      LOG_ERROR_NOCELLID("nkon=%d when it should be zero x=%f rates->maxSalphc=%g rates->minSalphc=%g rates->total=%g\n",
-                         konStates->nkon, *x, rates->maxSalphc, rates->minSalphc, rates->total);
+      LOG_ERROR_NOCELLID("[cell %03d] nkon=%d when it should be zero x=%f rates->maxSalphc=%g rates->minSalphc=%g rates->total=%g\n",
+                         cellID, konStates->nkon, *x, rates->maxSalphc, rates->minSalphc, rates->total);
     }
     *dt = tbound1;
   } else {
@@ -1764,7 +1765,6 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
   LOG_VERBOSE_NOCELLID("P=%g, P_next=%g, c=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", 
                        P, P_next, c, t, t+deltat, s_mRNA);
 
-
   /* choose the appropriate piecewise linear integral */
   if (((P > Pp) && (P_next >= P)) || ((P_next > Pp) && (P >= P_next))) {          /* P > Pp throughout */
     if (verbose)
@@ -1788,8 +1788,11 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
     *integrated_growth_rate = gmax * deltatprime;
     *integrated_growth_rate += compute_integral(alpha, c, gmax, deltatrest, s_mRNA, P, Pp, ect, ect1);
   } else {
-    LOG_ERROR_NOCELLID("growth rate computation error: should not reach here.  exiting...\n");
-    exit(-1);
+    LOG_ERROR_NOCELLID("[cell %03d] P=%g, P_next=%g, c=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", 
+                       cellID, P, P_next, c, t, t+deltat, s_mRNA);
+    LOG_ERROR_NOCELLID("[cell %03d] growth rate computation error: should not reach here.  Exiting\n", 
+                       cellID);
+    exit(1);
   }
 
   /* compute instantaneous growth rate at t */
@@ -1854,7 +1857,6 @@ void update_protein_conc_cell_size(float proteinConc[],
 
   rates->maxSalphc = rates->minSalphc = 0.0;
   for (i=0; i < NPROTEINS; i++) {
-
     if (i == SELECTION_GENE)  /* if we are looking at the selection gene, record protein concentration before update */
       L = proteinConc[i];
 
@@ -2690,7 +2692,11 @@ void recompute_koff_rates(GillespieRates *rates,
     calc_koff(site, genes->allBindingSites, state, &(koffvalues[i]), t);
     temprate += koffvalues[i];
   }
+
+#if 0
   fprintf(fp_koff[state->cellID], "%g %g\n", t, rates->koff - temprate);
+#endif
+
   rates->koff = temprate;
   rates->koff_operations = 0;
 
@@ -3761,7 +3767,7 @@ int do_single_timestep(Genotype *genes,
   
   /* do first Gillespie step to chose next event */
   calc_dt(x, dt, rates, konStates, mRNAdecay, genes->mRNAdecay,
-          state->mRNACytoCount, state->mRNATranslCytoCount);
+          state->mRNACytoCount, state->mRNATranslCytoCount, state->cellID);
 
   if (*dt < 0.0) {
     LOG_ERROR("dt=%g is negative after calc_dt, t=%g\n", *dt, *t);
@@ -3858,7 +3864,7 @@ int do_single_timestep(Genotype *genes,
     
     /* re-compute a new dt */
     calc_dt(x, dt, rates, konStates, mRNAdecay, 
-            genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount);
+            genes->mRNAdecay, state->mRNACytoCount, state->mRNATranslCytoCount, state->cellID);
     
     LOG_VERBOSE("next stochastic event (2) due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
 
@@ -4110,9 +4116,10 @@ void develop(Genotype genes[POP_SIZE],
   maxbound3 = 10*maxbound;
 
   /* initialize heap */
-  bheap_t *queue;
+  bheap_t *queue, *empty_queue;
 
   queue = bh_alloc(POP_SIZE);
+  empty_queue = bh_alloc(POP_SIZE);
 
   /* initialize protein concentrations to be used in all genes */
   for (i=0; i < NGENES; i++) {
@@ -4231,9 +4238,13 @@ void develop(Genotype genes[POP_SIZE],
                        maxbound3,
                        no_fixed_dev_time);
 
-    // TODO: check print out protein time courses in case we get a bad situation
+    // TODO: check, print out protein time courses when a cell is found to be dead
     if (retval == -1)  {
       print_all_protein_time_courses(timecoursestart, timecourselast);
+      // add this cell to list of empty cell locations
+      // TODO, remove actually adding to the queue for the moment 
+      // insert_with_priority_heap(empty_queue, cell, TIME_INFINITY);
+      LOG("[cell %03d] would be added here to empty_queue (length=%03d) as a dead cell\n", daughterID, empty_queue->n);
     }
    
     // TODO: cleanup
@@ -4243,7 +4254,6 @@ void develop(Genotype genes[POP_SIZE],
       if (t_next > timemax) {
         printf("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
                cell, t_next, timemax);
-
         LOG_ERROR("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
                   cell, t_next, timemax);
         break;
@@ -4251,15 +4261,22 @@ void develop(Genotype genes[POP_SIZE],
     }
 
     if (t_next >= (state[cell]).division_time)  {  /* we have now reached cell division */
-      
+      float current_division_time = (state[cell]).division_time;  // store current division time
       divisions++;     /* increment number of divisions */
       motherID = cell; /* set mother cell as currently dividing cell */
-      daughterID = rint((POP_SIZE-1)*ran1(&seed));  /* choose one other cell randomly as new daughter */
+
+      /* to get new daughter cell slot, first check list of empty cells */
+      if (empty_queue->n > 0) {
+        get_next_heap(empty_queue, &daughterID, &ops);  /* use one of the empty cells */
+        LOG("[cell %03d] in empty_queue (length=%03d) used as daughter cell\n", daughterID, empty_queue->n);
+      } else {
+        daughterID = rint((POP_SIZE-1)*ran1(&seed));  /* otherwise choose one other cell randomly */
+      }
 
       printf("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d\n", 
-             cell, motherID, daughterID, t_next, state[cell].division_time, divisions);
+             cell, motherID, daughterID, t_next, current_division_time, divisions);
       LOG_NOCELLID("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d\n", 
-                   cell, motherID, daughterID, t_next, state[cell].division_time, divisions);
+                   cell, motherID, daughterID, t_next, current_division_time, divisions);
 
       /* removing pending event in daughter cell from queue, if different from the mother */
       if (daughterID != motherID) {
@@ -4292,6 +4309,8 @@ void develop(Genotype genes[POP_SIZE],
       }
         
       if (daughterID != motherID) {
+        t[motherID] = current_division_time;   // reset current time in mother cell to division time
+        LOG("AFTER DIVISION: time at instant of division for mother cell=%03d is t=%g\n", motherID, t[motherID]);
         /* advance time for mother */
         do_single_timestep(&(genes[motherID]), 
                            &(state[motherID]), 
@@ -4318,6 +4337,9 @@ void develop(Genotype genes[POP_SIZE],
         LOG("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
             motherID, daughterID);
       }
+
+      t[daughterID] = current_division_time;   // reset current time in mother cell to division time
+      LOG("AFTER DIVISION: time at instant of division for daughter cell=%03d is t=%g\n", daughterID, t[daughterID]);
 
       /* advance time for daughter */
       do_single_timestep(&(genes[daughterID]), 
@@ -4354,6 +4376,9 @@ void develop(Genotype genes[POP_SIZE],
   }
 
   /* cleanup data structures */
+  bh_free(queue);
+  bh_free(empty_queue);
+
   for (j = 0; j < POP_SIZE; j++) {
     free(koffvalues[j]);
     for (i=0; i < NPROTEINS; i++) {

@@ -11,7 +11,7 @@ OTHER = Makefile
 %.o: %.c %.h
 	$(CC) $(CFLAGS) -c $<
 
-netsim netsim-gs netsim-full-500: main.c $(OBJS) $(OTHER)
+netsim netsim-gs netsim-full-10 netsim-full-500: main.c $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) main.c
 
 %-check: %.c %.h $(OBJS) $(OTHER)
@@ -32,12 +32,13 @@ qtest: qtest.c $(OBJS) priority-queue.o
 rnd_test: rnd_test.c random.o
 	$(CC) $(CFLAGS) random.o -o $@ $(LIBS) rnd_test.c
 
-tfonly: tfonly.c $(OBJS) $(OTHER)
+tf: tfonly.c $(OBJS) $(OTHER) 
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) tfonly.c
 
 netsim: $(OBJS)
 netsim-gs: $(OBJS)
 netsim-full-500: $(OBJS)
+netsim-full-10: $(OBJS)
 netsim-check: $(OBJS)
 netsim-selection: $(OBJS)
 netsim-gprof: $(OBJS)
@@ -46,7 +47,7 @@ netsim-bigtf: $(OBJS)
 main-matrix-32bit: clean
 	make EXTRACFLAGS="-m32" main-matrix
 
-tfonly-clean: clean
+tf-clean: clean
 	make EXTRACFLAGS="-DTFGENES=10 -DNGENES=1 -DNPROTEINS=10" tfonly
 
 ## common command for doing regression test diff
@@ -82,17 +83,21 @@ check-sample-output:	clean
 check-multiple-pops:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4 -DUSE_RAND=1" netsim
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
-	$(subst RUN,multiple-pops,$(subst ORIG,2009-03-10-after-genotype-multiple-pops-r-4,$(DIFF_CMD)))
+	$(subst RUN,multiple-pops,$(subst ORIG,2009-03-13-division-time-multiple-pops-r-4,$(DIFF_CMD)))
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500
-	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 20 --timesphase 1.0 --timeg2phase 0.0 --random-replication --growthscaling=10.0  --kon 0.2225 --konafter 1e-4
+	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 500 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 10.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
+
+run-10-pops: clean
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=10" netsim-full-10
+	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 20 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 20.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
 
 run-gs:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-gs
 	for ((gs=10;gs>=0;gs-=1)); do  \
 	   g=$$(qalc -t "round(10^(2*$${gs}/10))"); \
-	   for ((rand=04;rand<14;rand+=1)); do  \
+	   for ((rand=04;rand<64;rand+=1)); do  \
 	     echo "random number=" $${rand} "growth rate scaling=" $${g} ; \
 	     dir=$$(printf "%03g" $${g})-$$(printf "%02d" $${rand}); \
 	     echo $${dir} ; \
@@ -104,4 +109,4 @@ run-gs:	clean
 profiling:	netsim-gprof
 
 clean:
-	rm -f netsim netsim-gs netsim-full-500 netsim-check netsim-gprof $(OBJS)
+	rm -f netsim netsim-gs netsim-full-500 netsim-check netsim-gprof netsim-selection tfonly $(OBJS)

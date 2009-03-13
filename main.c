@@ -207,8 +207,8 @@ int main(int argc, char *argv[])
   /* create output files for cell size, growth rate, TFs */
   for (j = 0; j < POP_SIZE; j++) {
     create_output_file("cellsize", output_directory, &(fp_cellsize[j]), j);
-    create_output_file("koff", output_directory, &(fp_koff[j]), j);
 #if 0 // TODO: currently disable
+    create_output_file("koff", output_directory, &(fp_koff[j]), j);
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
     create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
     create_output_file("rounding", output_directory, &(fp_rounding[j]), j);
@@ -248,9 +248,9 @@ int main(int argc, char *argv[])
   fclose(fperrors);
   for (j = 0; j < POP_SIZE; j++) {
     fclose(fp_cellsize[j]);
-    fclose(fp_koff[j]);
     // TODO: currently disable
 #if 0
+    fclose(fp_koff[j]);
     fclose(fp_growthrate[j]);
     fclose(fp_tfsbound[j]);
     fclose(fp_rounding[j]);

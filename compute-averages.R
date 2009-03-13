@@ -3,7 +3,7 @@ library(lattice)
 if (TRUE) {
 
   for (i in seq(00, 99)) {
-    cmd=sprintf("time ../netsim -r %i  -d output%02d", i, i)
+    cmd=sprintf("time ../../netsim -g -r %i  -d output%02d", i, i)
     print(cmd)
     system(cmd)
     cmd2=sprintf("mv netsimerrors.txt output%02d", i, i)
