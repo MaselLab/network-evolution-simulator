@@ -91,7 +91,7 @@ run-full-pops: clean
 
 run-10-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=10" netsim-full-10
-	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 20 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 20.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
+	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 60 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 20.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
 
 run-gs:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-gs

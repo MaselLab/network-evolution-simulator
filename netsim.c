@@ -4106,9 +4106,11 @@ void develop(Genotype genes[POP_SIZE],
                            necessary when running for fixed
                            development time) */
   int divisions = 0;    /* no cell divisions yet */
-  int dead_cells = 0;   /* count number of cells that are "dead" */
   int motherID;         /* mother cell at division */
   int daughterID;       /* daughter cell at division */
+
+  /* keep a reaper queue from which to choose 'dead cells', if there are any, as daughter cells when dividing */
+  int keep_reaper_queue = 1;  
 
   //long int timesteps = 0; 
 
@@ -4203,63 +4205,65 @@ void develop(Genotype genes[POP_SIZE],
     /* get the next cell with the smallest t to advance next */
     //t_next = get_next(&time_queue, &time_queue_end, &cell);
     int ops, retval;
+
+    LOG_VERBOSE_NOCELLID("before choosing next cell (queue len reaper=%03d, main=%03d)\n", empty_queue->n, queue->n);
+
+    if (empty_queue->n == POP_SIZE || queue->n == 0) {
+      /* if all cells in population are dead, we exit */
+      LOG_NOCELLID("all %03d cells in population are dead, main queue len=%03d\n", empty_queue->n, queue->n);
+      break;
+    } 
+    /* otherwise get next event from queue */
     t_next = get_next_heap(queue, &cell, &ops);
-
-    LOG_VERBOSE_NOCELLID("[cell=%03d] get minimum time=%g size=%g\n", cell, t_next, state[cell].cellSize);
-
-    /* if we find a dead cell in queue, skip to next cell */
-    if (t_next == TIME_INFINITY) {
-      dead_cells++;
-      LOG_NOCELLID("[cell=%03d] is dead, total dead cells=%03d\n", cell, dead_cells);
-      if (dead_cells == POP_SIZE) {
-        LOG_NOCELLID("all %03d cells in population are dead\n", dead_cells);
-        /* if all cells in population are dead, we exit */
-        break;
-      } else {
-        /* otherwise get next event from queue */
-        continue;
-      }
-    }
+    LOG_VERBOSE_NOCELLID("[cell=%03d] get minimum time=%g, size=%g (queue len reaper=%03d, main=%03d)\n", 
+                         cell, t_next, state[cell].cellSize, empty_queue->n, queue->n);
 
     retval = do_single_timestep(&(genes[cell]), 
-                       &(state[cell]), 
-                       &(konStates[cell]), 
-                       &(rates[cell]), 
-                       &(t[cell]),
-                       koffvalues[cell],
-                       transport[cell],
-                       mRNAdecay[cell],
-                       &(x[cell]),
-                       &(dt[cell]),
-                       &(konrate[cell]),
-                       timecoursestart[cell],
-                       timecourselast[cell],
-                       maxbound2,
-                       maxbound3,
-                       no_fixed_dev_time);
+                                &(state[cell]), 
+                                &(konStates[cell]), 
+                                &(rates[cell]), 
+                                &(t[cell]),
+                                koffvalues[cell],
+                                transport[cell],
+                                mRNAdecay[cell],
+                                &(x[cell]),
+                                &(dt[cell]),
+                                &(konrate[cell]),
+                                timecoursestart[cell],
+                                timecourselast[cell],
+                                maxbound2,
+                                maxbound3,
+                                no_fixed_dev_time);
 
-    // TODO: check, print out protein time courses when a cell is found to be dead
     if (retval == -1)  {
+      // TODO: check, print out protein time courses when a cell is found to be dead
       print_all_protein_time_courses(timecoursestart, timecourselast);
-      // add this cell to list of empty cell locations
-      // TODO, remove actually adding to the queue for the moment 
-      // insert_with_priority_heap(empty_queue, cell, TIME_INFINITY);
-      LOG("[cell %03d] would be added here to empty_queue (length=%03d) as a dead cell\n", daughterID, empty_queue->n);
+      /* add this cell to list of empty cell locations */
+      // TODO: make this configurable at run-time
+      if (keep_reaper_queue)
+        insert_with_priority_heap(empty_queue, cell, TIME_INFINITY);
+      LOG_NOCELLID("[cell %03d] added here to empty_queue as a dead cell, t_next=%g, t=%g (queue len reaper=%03d, main=%03d)\n", 
+                   cell, t_next, t[cell], empty_queue->n, queue->n);
+      /* this cell is dead, so don't add back to main priority queue, skip to next event */
+      continue;
     }
    
     // TODO: cleanup
     /* abort if a population of one cell, undergoing a single division
        exceeds an maximum upper limit */
     if (POP_SIZE==1 && max_divisions==1 && timemax > 0.0) {
-      if (t_next > timemax) {
+      if (t[cell] > timemax) {
         printf("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
-               cell, t_next, timemax);
+               cell, t[cell], timemax);
         LOG_ERROR("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
-                  cell, t_next, timemax);
+                  cell, t[cell], timemax);
         break;
       }
     }
 
+    // TODO: generate new regression output based on choosing the
+    // event that just happened, rather than the previous t_next event, then switch lines
+    //if (t[cell] >= (state[cell]).division_time)  {  /* we have now reached cell division */
     if (t_next >= (state[cell]).division_time)  {  /* we have now reached cell division */
       float current_division_time = (state[cell]).division_time;  // store current division time
       divisions++;     /* increment number of divisions */
@@ -4271,18 +4275,19 @@ void develop(Genotype genes[POP_SIZE],
         LOG("[cell %03d] in empty_queue (length=%03d) used as daughter cell\n", daughterID, empty_queue->n);
       } else {
         daughterID = rint((POP_SIZE-1)*ran1(&seed));  /* otherwise choose one other cell randomly */
+        /* removing pending event in daughter cell from queue, if different from the mother 
+           only remove if the daughter cell wasn't already removed from queue */
+        if (daughterID != motherID) {
+          delete_element_heap(queue, daughterID);
+          LOG_NOCELLID("removing pending event from queue (length=%3d) replaced by daughter cell=%d\n", queue->n, daughterID);
+        } 
       }
 
-      printf("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d\n", 
-             cell, motherID, daughterID, t_next, current_division_time, divisions);
-      LOG_NOCELLID("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d\n", 
-                   cell, motherID, daughterID, t_next, current_division_time, divisions);
+      printf("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
+             cell, motherID, daughterID, t[cell], current_division_time, divisions, t_next);
+      LOG_NOCELLID("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
+                   cell, motherID, daughterID, t[cell], current_division_time, divisions, t_next);
 
-      /* removing pending event in daughter cell from queue, if different from the mother */
-      if (daughterID != motherID) {
-        delete_element_heap(queue, daughterID);
-        LOG("removing pending event from queue (length=%3d) replaced by daughter cell=%d\n", queue->n, daughterID);
-      } 
 
       if (time_s_phase + time_g2_phase > 0.0) {
         do_cell_division(motherID,
@@ -4305,14 +4310,14 @@ void develop(Genotype genes[POP_SIZE],
                          x[motherID],
                          dt[motherID]);
       } else {
-        LOG("Skip division for cell=%03d S phase and G2 phase have zero length\n", motherID);
+        LOG_NOCELLID("Skip division for cell=%03d S phase and G2 phase have zero length\n", motherID);
       }
         
       if (daughterID != motherID) {
         t[motherID] = current_division_time;   // reset current time in mother cell to division time
-        LOG("AFTER DIVISION: time at instant of division for mother cell=%03d is t=%g\n", motherID, t[motherID]);
+        LOG_NOCELLID("AFTER DIVISION: time at instant of division for mother cell=%03d is t=%g\n", motherID, t[motherID]);
         /* advance time for mother */
-        do_single_timestep(&(genes[motherID]), 
+        retval = do_single_timestep(&(genes[motherID]), 
                            &(state[motherID]), 
                            &(konStates[motherID]), 
                            &(rates[motherID]), 
@@ -4329,40 +4334,56 @@ void develop(Genotype genes[POP_SIZE],
                            maxbound3,
                            no_fixed_dev_time);
 
-        LOG("AFTER DIVISION: add new timestep to queue for mother cell=%03d at t=%g\n", motherID, t[motherID]);
-        insert_with_priority_heap(queue, motherID, t[motherID]); 
+        if (retval == -1) {
+          if (keep_reaper_queue)
+            insert_with_priority_heap(empty_queue, motherID, TIME_INFINITY);
+          LOG_NOCELLID("AFTER DIVISION: mother cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
+                       motherID, t[motherID], empty_queue->n, queue->n);
+        } else {
+          LOG_NOCELLID("AFTER DIVISION: add new timestep to queue for mother cell=%03d at t=%g (queue len reaper=%03d, main=%03d)\n", 
+                       motherID, t[motherID], empty_queue->n, queue->n);
+          insert_with_priority_heap(queue, motherID, t[motherID]); 
+        }
+        
       } else {
         printf("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
                motherID, daughterID);
-        LOG("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
+        LOG_NOCELLID("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
             motherID, daughterID);
       }
 
       t[daughterID] = current_division_time;   // reset current time in mother cell to division time
-      LOG("AFTER DIVISION: time at instant of division for daughter cell=%03d is t=%g\n", daughterID, t[daughterID]);
+      LOG_NOCELLID("AFTER DIVISION: time at instant of division for daughter cell=%03d is t=%g\n", daughterID, t[daughterID]);
 
       /* advance time for daughter */
-      do_single_timestep(&(genes[daughterID]), 
-                         &(state[daughterID]), 
-                         &(konStates[daughterID]), 
-                         &(rates[daughterID]), 
-                         &(t[daughterID]),
-                         koffvalues[daughterID],
-                         transport[daughterID],
-                         mRNAdecay[daughterID],
-                         &(x[daughterID]),
-                         &(dt[daughterID]),
-                         &(konrate[daughterID]),
-                         timecoursestart[daughterID],
-                         timecourselast[daughterID],
-                         maxbound2,
-                         maxbound3,
-                         no_fixed_dev_time);
+      retval = do_single_timestep(&(genes[daughterID]), 
+                                  &(state[daughterID]), 
+                                  &(konStates[daughterID]), 
+                                  &(rates[daughterID]), 
+                                  &(t[daughterID]),
+                                  koffvalues[daughterID],
+                                  transport[daughterID],
+                                  mRNAdecay[daughterID],
+                                  &(x[daughterID]),
+                                  &(dt[daughterID]),
+                                  &(konrate[daughterID]),
+                                  timecoursestart[daughterID],
+                                  timecourselast[daughterID],
+                                  maxbound2,
+                                  maxbound3,
+                                  no_fixed_dev_time);
 
-      LOG("AFTER DIVISION: add new timestep in queue for daughter cell=%03d at t=%g\n", daughterID, t[daughterID]);
-      insert_with_priority_heap(queue, daughterID, t[daughterID]);
-    }
-    else {
+      if (retval == -1) {
+        if (keep_reaper_queue)
+          insert_with_priority_heap(empty_queue, daughterID, TIME_INFINITY);
+        LOG_NOCELLID("AFTER DIVISION: daughter cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
+                     daughterID, t[daughterID], empty_queue->n, queue->n);
+      } else {
+        LOG_NOCELLID("AFTER DIVISION: add new timestep in queue for daughter cell=%03d at t=%g (queue len reaper=%03d, main=%03d)\n", 
+                     daughterID, t[daughterID], empty_queue->n, queue->n);
+        insert_with_priority_heap(queue, daughterID, t[daughterID]);
+      }
+    } else {
       /* put the updated timestep back into the queue  */
       // ops = insert_with_priority(&(time_queue), &(time_queue_end), cell, t[cell]);
       ops = insert_with_priority_heap(queue, cell, t[cell]);
@@ -4371,9 +4392,13 @@ void develop(Genotype genes[POP_SIZE],
 
   /* output the founder information */
   for (j = 0; j < POP_SIZE; j++) {
-    printf("cell %03d derived from founder %03d had %2d divisions\n", j, state[j].founderID, state[j].divisions);
-    LOG_NOCELLID("cell %03d derived from founder %03d had %2d divisions\n", j, state[j].founderID, state[j].divisions);
+    printf("cell %03d derived from founder %03d had %2d divisions%s\n", 
+           j, state[j].founderID, state[j].divisions, t[j] == TIME_INFINITY ? " [dead]": "");
+    LOG_NOCELLID("cell %03d derived from founder %03d had %2d divisions%s\n", 
+                 j, state[j].founderID, state[j].divisions, t[j] == TIME_INFINITY ? " [dead]": "");
   }
+  // TODO: check output contents of reaper queue
+  bh_dump(empty_queue);
 
   /* cleanup data structures */
   bh_free(queue);
