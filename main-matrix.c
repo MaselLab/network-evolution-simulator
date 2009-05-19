@@ -640,7 +640,7 @@ int main(int argc, char *argv[])
   /* new API requires a Genotype clone */
   Genotype *UNUSED_clone = NULL;
   /* create sequences and binding site matrix */
-  initialize_genotype(&indiv, clone, kdis, 0);
+  initialize_genotype(&indiv, UNUSED_clone, kdis, 0);
   
   /*Sort binding sites from smallest leftEdgePosition to largest leftEdgePosition*/
   qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
