@@ -638,7 +638,7 @@ int main(int argc, char *argv[])
   //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
     
   /* new API requires a Genotype clone */
-  Genotype clone;
+  Genotype *UNUSED_clone = NULL;
   /* create sequences and binding site matrix */
   initialize_genotype(&indiv, clone, kdis, 0);
   
