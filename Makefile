@@ -52,7 +52,7 @@ main-matrix-64bit: clean
 
 
 tf-clean: clean
-	make EXTRACFLAGS="-DTFGENES=10 -DNGENES=1 -DNPROTEINS=10" tfonly
+	make EXTRACFLAGS="-DTFGENES=10 -DNGENES=1 -DNPROTEINS=10" tf
 
 ## common command for doing regression test diff
 DIFF_CMD := @diff -r --exclude=rounding*.dat --exclude=.svn --exclude=NOTES --exclude=koff*.dat  --exclude=tfsbound*.dat  --exclude=cellsize*.dat --exclude=growthrate*.dat --exclude=netsimerrors.txt RUN regression-tests/ORIG && echo -e "************\nPassed regression\n***********"

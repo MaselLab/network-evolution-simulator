@@ -312,7 +312,7 @@ void initialize_genotype_fixed(Genotype *indiv,
 }
 
 void initialize_genotype(Genotype *indiv, 
-                         Genotype clone,
+                         Genotype *clone,
                          float kdis[],
                          int genotypeID)
 {
@@ -341,7 +341,7 @@ void initialize_genotype(Genotype *indiv,
     for (i=0; i < TFGENES; i++) {
       for (k=0; k < TF_ELEMENT_LEN; k++) {
         for (p=0; p < MAX_COPIES; p++) {
-          indiv->transcriptionFactorSeq[i][p][k] = clone.transcriptionFactorSeq[i][p][k];
+          indiv->transcriptionFactorSeq[i][p][k] = clone->transcriptionFactorSeq[i][p][k];
         }
       }
     }
@@ -3087,25 +3087,25 @@ void clone_cell(Genotype *genes_orig,
               &(state_clone->mRNATranslTimeEnd), &(state_clone->mRNATranslTimeEndLast));
 }
 
-void initialize_new_cell_genotype(Genotype *genes, Genotype genes_clone)
+void initialize_new_cell_genotype(Genotype *genes, Genotype *genes_clone)
 {
   int i, p;
 
   /* initialize hindrance for all TFGENES */
   for (p=0; p < TFGENES; p++) {
-    genes->hindrancePositions[p] = genes_clone.hindrancePositions[p];
+    genes->hindrancePositions[p] = genes_clone->hindrancePositions[p];
   }
 
   /* initialize the non-cisregulatory parts of the genotype */
   for (i=0; i < NGENES; i++) {
     for (p=0; p < MAX_COPIES; p++) {
-      genes->activating[i][p]=  genes_clone.activating[i][p];
-      genes->PICdisassembly[i][p]=  genes_clone.PICdisassembly[i][p];
+      genes->activating[i][p]=  genes_clone->activating[i][p];
+      genes->PICdisassembly[i][p]=  genes_clone->PICdisassembly[i][p];
     }
-    genes->replication_time[i] =  genes_clone.replication_time[i];
-    genes->mRNAdecay[i] =  genes_clone.mRNAdecay[i];
-    genes->proteindecay[i] =  genes_clone.proteindecay[i];
-    genes->translation[i] =  genes_clone.translation[i];
+    genes->replication_time[i] =  genes_clone->replication_time[i];
+    genes->mRNAdecay[i] =  genes_clone->mRNAdecay[i];
+    genes->proteindecay[i] =  genes_clone->proteindecay[i];
+    genes->translation[i] =  genes_clone->translation[i];
   }
 }
 
@@ -3389,7 +3389,7 @@ void do_cell_division(int motherID,
 
   /* initialize the non-cis-regulatory part of the genotype 
      of the new daughter cell based on clone of mother */
-  initialize_new_cell_genotype(daughter, genes_clone);
+  initialize_new_cell_genotype(daughter, &genes_clone);
   // print_genotype(daughter, daughterID);
 
   /* initialize the state of the new cell */
@@ -3408,7 +3408,7 @@ void do_cell_division(int motherID,
                daughterID, daughter_state->founderID, daughter_state->divisions);
 
   if (no_replace_mother) {
-    initialize_new_cell_genotype(mother, genes_clone);
+    initialize_new_cell_genotype(mother, &genes_clone);
     //print_genotype(mother, motherID);
 
     initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
@@ -4138,7 +4138,7 @@ void develop(Genotype genes[POP_SIZE],
     /* for all cells in this replicate initialize all parts of the
        genotype, *except* for the cis-reg sequence using the initial
        genes[0]  */
-    initialize_genotype(&genes[j], genes[0], kdis, j);
+    initialize_genotype(&genes[j], &genes[0], kdis, j);
     /* if genotype is held constant, start varying the seed *after*
        initialize_genotype, so we can run the same genotype with
        slightly different amounts of noise  */

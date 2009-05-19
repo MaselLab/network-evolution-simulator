@@ -400,7 +400,7 @@ extern void print_tf_occupancy(CellState *,
                                AllTFBindingSites *,
                                float);
 extern void initialize_genotype(Genotype *, 
-                                Genotype,
+                                Genotype *,
                                 float [],
                                 int);
 
@@ -718,7 +718,7 @@ extern void recalibrate_cell(GillespieRates *,
                              float [NGENES],
                              float);
 
-extern void initialize_new_cell_genotype(Genotype *, Genotype);
+extern void initialize_new_cell_genotype(Genotype *, Genotype *);
 
 extern int do_single_timestep(Genotype *, 
                                CellState *, 

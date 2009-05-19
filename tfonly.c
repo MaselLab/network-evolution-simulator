@@ -32,7 +32,9 @@ int main(int argc, char *argv[])
   KonStates konStates;
   float *koffvalues;
   float konrate;
-
+  int UNUSED_genotypeID=0;    	// required by initialize_genotype.
+  Genotype *UNUSED_clone=NULL; 	// required by initialize_genotype.
+  int UNUSED_cellID=0;	      	// required by calc_dt.
   // FIXME: ultimately won't be used, declare here for moment 
   float transport[NGENES];  /* transport rates of each mRNA */
   float mRNAdecay[NGENES];  /* mRNA decay rates */
@@ -190,7 +192,7 @@ int main(int argc, char *argv[])
   current_ploidy = 1;  
 
   /* initialize genotype (1 cis-reg, 10 TFs) */
-  initialize_genotype(&genotype, kdis);
+  initialize_genotype(&genotype, UNUSED_clone, kdis, UNUSED_genotypeID);
 
   //printf("cisregseq=%s\n", (char *)genotype.cisRegSeq);
 
@@ -242,7 +244,7 @@ int main(int argc, char *argv[])
     
     /* do first Gillespie step to chose next event */
     calc_dt(&x, &dt, &rates, &konStates, mRNAdecay, genotype.mRNAdecay,
-            state.mRNACytoCount, state.mRNATranslCytoCount);
+            state.mRNACytoCount, state.mRNATranslCytoCount, UNUSED_cellID);
 
 
     printf("t=%g, dt=%g state.tfBoundCount=%d, state.tfHinderedCount=%d\n", 
@@ -267,6 +269,8 @@ int main(int argc, char *argv[])
     for (i=0; i < TFGENES; i++)
       printf("protein[%d]=%g\n", i, state.proteinConc[i]);
 
+    x = ran1(&seed)*(rates.total + konrate);
+    
     if (t+dt < tdevelopment) {
 
       /* 
