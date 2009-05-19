@@ -24,7 +24,7 @@ netsim netsim-gs netsim-full-10 netsim-full-500: main.c $(OBJS) $(OTHER)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) -pg main.c
 
 main-matrix: main-matrix.c $(OBJS) $(OTHER)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LIBS) main-matrix.c
+	$(CC) $(CFLAGS) -I/usr/local/MathSoft/extern/include/ $(OBJS) -L/usr/local/MathSoft/bin/glnxa64  -Wl,-rpath-link /usr/local/MathSoft/bin/glnxa64 -o $@ $(LIBS) -leng -lmx -lut -lmat -lexpat -lmwfl main-matrix.c
 
 qtest: qtest.c $(OBJS) priority-queue.o 
 	$(CC) $(CFLAGS) $(OBJS) priority-queue.o -o $@ $(LIBS) qtest.c
@@ -46,6 +46,10 @@ netsim-bigtf: $(OBJS)
 
 main-matrix-32bit: clean
 	make EXTRACFLAGS="-m32" main-matrix
+
+main-matrix-64bit: clean
+	make EXTRACFLAGS="-m64" main-matrix
+
 
 tf-clean: clean
 	make EXTRACFLAGS="-DTFGENES=10 -DNGENES=1 -DNPROTEINS=10" tfonly
@@ -91,7 +95,7 @@ run-full-pops: clean
 
 run-10-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=10" netsim-full-10
-	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 60 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 20.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
+	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 60 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 2.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
 
 run-gs:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-gs

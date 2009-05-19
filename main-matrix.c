@@ -5,7 +5,10 @@
  * Copyright (c) 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 
+#ifdef __WIN32__
 #include <windows.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -513,7 +516,16 @@ int main(int argc, char *argv[])
   
   //Opens Matlab engine
   Engine *ep;
-  if(!(ep= engOpen(NULL))){
+
+#ifdef __unix__
+  const char *startcmd = "/usr/local/MathSoft/bin/matlab -nojvm -nosplash -nodisplay -nodesktop";
+#else 
+#ifdef __WIN32__
+    const char *startcmd = NULL;
+#endif
+#endif
+ 
+  if(!(ep= engOpen(startcmd))){
       printf("Problem running Matlab.");
       system("PAUSE");
       exit(1);
@@ -625,9 +637,10 @@ int main(int argc, char *argv[])
   //Gibbs = (((float) allBindingSites[k].hammingDist)/3.0 - 1.0) * state->RTlnKr;
   //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
     
-
+  /* new API requires a Genotype clone */
+  Genotype clone;
   /* create sequences and binding site matrix */
-  initialize_genotype(&indiv, kdis);
+  initialize_genotype(&indiv, clone, kdis, 0);
   
   /*Sort binding sites from smallest leftEdgePosition to largest leftEdgePosition*/
   qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
@@ -792,7 +805,7 @@ int main(int argc, char *argv[])
     //print_arrayT(arrayT, array, viableStates);
     system("PAUSE");
     
-    if(!(ep= engOpen(NULL))){
+    if(!(ep= engOpen(startcmd))){
               printf("Problem running Matlab.");
               system("PAUSE");
               exit(1);

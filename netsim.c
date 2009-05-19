@@ -4109,6 +4109,8 @@ void develop(Genotype genes[POP_SIZE],
   int motherID;         /* mother cell at division */
   int daughterID;       /* daughter cell at division */
 
+  int large_cell_size = 0;  // TODO: count the number of times cellSize exceeds Y=2.0
+
   /* keep a reaper queue from which to choose 'dead cells', if there are any, as daughter cells when dividing */
   int keep_reaper_queue = 1;  
 
@@ -4269,10 +4271,19 @@ void develop(Genotype genes[POP_SIZE],
       divisions++;     /* increment number of divisions */
       motherID = cell; /* set mother cell as currently dividing cell */
 
+      if (state[cell].cellSize > 2.0) {
+        large_cell_size++;
+        printf("[cell %03d] at t=%g cell size =%g, exceeding Y=2.0, %d of %d divisions (%g fraction)\n", 
+               cell, t[cell], state[cell].cellSize, large_cell_size, divisions, (double)large_cell_size/(double)divisions);
+
+        LOG_NOCELLID("[cell %03d] at t=%g cell size =%g, exceeding Y=2.0, %d of %d divisions (%g fraction)\n", 
+                     cell, t[cell], state[cell].cellSize, large_cell_size, divisions, (double)large_cell_size/(double)divisions);
+      }
+
       /* to get new daughter cell slot, first check list of empty cells */
       if (empty_queue->n > 0) {
         get_next_heap(empty_queue, &daughterID, &ops);  /* use one of the empty cells */
-        LOG("[cell %03d] in empty_queue (length=%03d) used as daughter cell\n", daughterID, empty_queue->n);
+        LOG_NOCELLID("[cell %03d] in empty_queue (length=%03d) used as daughter cell\n", daughterID, empty_queue->n);
       } else {
         daughterID = rint((POP_SIZE-1)*ran1(&seed));  /* otherwise choose one other cell randomly */
         /* removing pending event in daughter cell from queue, if different from the mother 
@@ -4283,11 +4294,10 @@ void develop(Genotype genes[POP_SIZE],
         } 
       }
 
-      printf("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
-             cell, motherID, daughterID, t[cell], current_division_time, divisions, t_next);
-      LOG_NOCELLID("[cell %03d] dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
-                   cell, motherID, daughterID, t[cell], current_division_time, divisions, t_next);
-
+      printf("[cell %03d] (size=%g) dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
+             cell, state[cell].cellSize, motherID, daughterID, t[cell], current_division_time, divisions, t_next);
+      LOG_NOCELLID("[cell %03d] (size=%g) dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
+                   cell, state[cell].cellSize, motherID, daughterID, t[cell], current_division_time, divisions, t_next);
 
       if (time_s_phase + time_g2_phase > 0.0) {
         do_cell_division(motherID,
