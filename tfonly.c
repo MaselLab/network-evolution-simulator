@@ -236,16 +236,15 @@ int main(int argc, char *argv[])
 
   while (t < tdevelopment) {       /* run until tdevelopment reached */
 
-    /* compute total konrate (which is constant over the Gillespie step) */
-    if (konStates.nkon==0) konrate = (-rates.salphc);
-    else calc_kon_rate(dt, &konStates, &konrate); 
-
     x = expdev(&seed);        /* draw random number */
-    
+
     /* do first Gillespie step to chose next event */
     calc_dt(&x, &dt, &rates, &konStates, mRNAdecay, genotype.mRNAdecay,
             state.mRNACytoCount, state.mRNATranslCytoCount, UNUSED_cellID);
 
+    /* compute total konrate (which is constant over the Gillespie step) */
+    if (konStates.nkon==0) konrate = (-rates.salphc);
+    else calc_kon_rate(dt, &konStates, &konrate); 
 
     printf("t=%g, dt=%g state.tfBoundCount=%d, state.tfHinderedCount=%d\n", 
            t, dt, state.tfBoundCount, state.tfHinderedCount);
