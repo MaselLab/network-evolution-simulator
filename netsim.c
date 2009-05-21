@@ -771,6 +771,10 @@ void calc_time (float t,
 
   /* loop over all proteins (TFs and non-TFs) */
   for (i=0; i < NPROTEINS; i++) {
+
+    LOG_VERBOSE_NOCELLID("t=%g, konStates->nkonsum[%d]=%d, konStates->konvalues[%d][KON_DIFF_INDEX]=%g\n", 
+                         t, i, konStates->nkonsum[i], i, konStates->konvalues[i][KON_DIFF_INDEX]);
+
     /* if this particular TF is bound somewhere */
     if (konStates->nkonsum[i] > 0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] * t;
@@ -788,6 +792,8 @@ void calc_time (float t,
 
   /* compute delta-t */
   *f = x/(r + rates->total + rates->salphc) - t;
+
+  LOG_VERBOSE_NOCELLID("x=%g, r=%g, rates->total=%g, rates->salphc=%g, f=%g\n", x, r, rates->total, rates->salphc, *f);
 
   /* compute derivative of equation */
   *df = x*numer/denom - 1.0;
@@ -1060,15 +1066,15 @@ void calc_from_state(Genotype *genes,
 
   // FIXME: this updates konStates for non-TFs, even though this isn't used
   for (i=0; i < NPROTEINS; i++) {
-    /* if protein decay is otherwise going to be zero, use aging term */
-    protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
+    /* if protein decay is otherwise going to fall below cut-off, use aging term */
+    protein_decay = genes->proteindecay[i] >= protein_aging ? genes->proteindecay[i] : protein_aging;
     salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
     konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
     konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
     konStates->nkonsum[i] = 0;
     konStates->konList[i]->site_count = 0;
-    //printf("calc_from_state: prot decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
+    LOG_VERBOSE("protein decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
   }
   state->tfBoundCount=0;
 
@@ -2747,8 +2753,8 @@ void recalibrate_cell(GillespieRates *rates,
 
   /* regenerate konStates */
   for (i=0; i < NPROTEINS; i++) {
-    /* if protein decay is otherwise going to be zero, use aging term */
-    protein_decay = genes->proteindecay[i] > 0.0 ? genes->proteindecay[i] : protein_aging;
+    /* if protein decay is otherwise going to fall below cut-off, use aging term */
+    protein_decay = genes->proteindecay[i] >= protein_aging ? genes->proteindecay[i] : protein_aging;
     salphc = (float) (state->mRNACytoCount[i]) * genes->translation[i] / (protein_decay);
     konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
@@ -2820,8 +2826,8 @@ void recompute_rates(GillespieRates *rates,
     /* look at all unoccupied sites to regenerate salphc */
     for (j=0; j < konStates->konList[i]->site_count; j++) {
       //geneID = genes->allBindingSites[state->tfBoundIndexes[j]].tfID;
-      /* if protein decay is otherwise going to be zero, use aging term */
-      protein_decay = genes->proteindecay[i] > 0 ? genes->proteindecay[i] : protein_aging;
+      /* if protein decay is otherwise going to fall below cut-off, use aging term */
+      protein_decay = genes->proteindecay[i] >= protein_aging ? genes->proteindecay[i] : protein_aging;
       salphc = ((float) (state->mRNACytoCount[i]) * genes->translation[i] / protein_decay);;
       new_salphc += salphc;
       new_maxSalphc += fmaxf(state->proteinConc[i], salphc);
@@ -4126,6 +4132,8 @@ void develop(Genotype genes[POP_SIZE],
   empty_queue = bh_alloc(POP_SIZE);
 
   /* initialize protein concentrations to be used in all genes */
+  // TODO: FIXME ASAP initProteinConc should be over NPROTEINS and
+  // initmRNA should only loop over NGENES as they could be different
   for (i=0; i < NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     initmRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);

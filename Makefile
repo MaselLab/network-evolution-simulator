@@ -68,6 +68,7 @@ check-diploid:	clean
 	./netsim-check -r 4 -p 2 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2008-08-29-diploid-dilution-hind-15-r-4,$(DIFF_CMD)))
 
+## not currently tested/working with the current regression output
 check-replication:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE -DPOP_SIZE=1" netsim-check
 	./netsim-check -r 4 -p 2 -d output -c 0.55
@@ -78,6 +79,7 @@ check-selection:	clean
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0
 	$(subst RUN,selection,$(subst ORIG,2009-03-03-after-rounding-fixes-selection-r-4,$(DIFF_CMD)))
 
+## TODO: not recently tested
 check-sample-output:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0 -t 150
@@ -88,6 +90,9 @@ check-multiple-pops:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4 -DUSE_RAND=1" netsim
 	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
 	$(subst RUN,multiple-pops,$(subst ORIG,2009-03-13-division-time-multiple-pops-r-4,$(DIFF_CMD)))
+
+## all known working regression tests
+check-all: check-haploid check-diploid check-selection check-multiple-pops
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500
