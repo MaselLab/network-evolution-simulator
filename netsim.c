@@ -1,3 +1,4 @@
+
 /* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
@@ -1131,7 +1132,7 @@ void calc_from_state(Genotype *genes,
     transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
     rates->transport_operations++;
-    LOG_VERBOSE("initializing transport[%d]=%g\n", i, transport[i]);
+    LOG_VERBOSE("mRNANuclearCount=%d, initializing transport[%d]=%g\n", state->mRNANuclearCount[i], i, transport[i]);
   }
   LOG_VERBOSE("initializing rates->transport=%g\n", rates->transport);
 

@@ -170,7 +170,7 @@ static float transport[NGENES];  /* transport rates of each mRNA */
 
 static void
 model_init(){
-	int i;
+	int i, j;
 
 	// initialize mRNA concentrations  (not used) 
   for (i=0; i < NGENES; i++) {
@@ -226,13 +226,41 @@ model_init(){
 	// initialize cached data structure: allocate memory 
 
 	initialize_cell_cache(&state, genotype, &konStates, &koffvalues, maxbound2, maxbound3);  
-	rates.total = 0.0; //LOCAL HACK FIXME
 
 	printf("state.tfBoundCount=%d, state.tfHinderedCount=%d\n", state.tfBoundCount, state.tfHinderedCount);
+
+  for (i=0; i < NGENES; i++) {
+    // FIXME: here we override the initial cell state and ensure there is at least one
+    // mRNA in the cytoplasm before we initialize the cell state, otherwise there is no initial
+    // kon rates, also ensure that there are no mRNAs in the nucleus so that no transport occurs
+    state.mRNACytoCount[i] = 1;
+    state.mRNANuclearCount[i] = 0;
+    printf("mRNACytoCount[%d]=%d\n", i, state.mRNACytoCount[i]);
+    printf("mRNANuclearCount[%d]=%d\n", i, state.mRNANuclearCount[i]);
+  }
+
 
 	// initialize transcriptional state of genotype 
 	calc_from_state(&genotype, &state, &rates, &konStates, transport, mRNAdecay);
 
+  // FIXME: hack to work around the fact that calc_from_state() sets
+  // the acetylationCount to a non-zero factor, meaning it has a
+  // non-zero rate, but we don't model the acetylation process
+  // TODO: probably should copy calc_from_state here, and modify it locally
+  // and refactor back into netsim.c later
+  for (i=0; i < NGENES; i++) {
+    for (j=0; j < genotype.copies[i]; j++) {
+      rates.acetylationCount[j] = 0;
+    }
+  }
+
+  for (i=0; i < NGENES; i++) {
+    printf("after mRNACytoCount[%d]=%d\n", i, state.mRNACytoCount[i]);
+    printf("after mRNANuclearCount[%d]=%d\n", i, state.mRNANuclearCount[i]);
+  }
+
+  printf("rates->transport=%g\n", rates.transport);
+  
   // printf("rates.koff=%g, rates.salphc=%g, rates.maxSalphc=%g, rates.minSalphc=%g, rates.total=%g\n", 
   //       rates.koff, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total);
 	//printf("in model_init(): rates.koff=%g, rates.salphc=%g, rates.maxSalphc=%g, rates.minSalphc=%g, rates.total=%g\n", 
@@ -279,8 +307,18 @@ run(){
 		}
 
 		printf("t=%g, dt=%g state.tfBoundCount=%d, state.tfHinderedCount=%d\n", t, dt, state.tfBoundCount, state.tfHinderedCount);
-		//printf("in run(): rates.koff=%g, rates.salphc=%g, rates.maxSalphc=%g, rates.minSalphc=%g, rates.total=%g\n", 
-    //       rates.koff, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total);
+		printf("OFF [rates.koff=%g] ON [konrate=%g, rates.salphc=%g, (rates.maxSalphc=%g, rates.minSalphc=%g)] rates.total=%g, TOTAL [%g]\n", 
+           rates.koff, konrate, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total, rates.total+konrate);
+    printf("TRANSPORT rates.transport=%g, rates.mRNAdecay=%g, rates.picDisassembly=%g, rates.acetylationCount=%d, rates.deacetylationCount=%d, rates.transcriptInitCount=%d, rates.picAssemblyCount=%d, rates.picDisassemblyCount=%d\n", rates.transport, rates.mRNAdecay, 
+           rates.picDisassembly, rates.acetylationCount[0], rates.deacetylationCount[0], rates.transcriptInitCount[0], 
+           rates.picAssemblyCount[0], rates.picDisassemblyCount[0]);
+
+
+    float diff = (rates.total + konrate) - ((rates.koff + rates.salphc) + konrate);
+    if (abs(diff > 1e-7)) {
+      printf("\nDIFF=TOTAL(%g)- SUM(%g)=%g comprised of OFF [rates.koff=%g] and ON [konrate=%g, rates.salphc=%g]\n\n", 
+             rates.total + konrate, (rates.koff + rates.salphc) + konrate, diff, rates.koff, konrate, rates.salphc);
+    }
 
 		print_tf_occupancy(&state, genotype.allBindingSites, t);
 
@@ -296,7 +334,7 @@ run(){
 			t);
 
 
-		x = ran1(&seed)*(rates.total + konrate);
+		x = ran1(&seed)*(rates.total + konrate); // Note that rates.total = rates.salphc + rates.koff
     
 		if (t+dt < tdevelopment) {
 
