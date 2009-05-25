@@ -260,10 +260,10 @@ model_init(){
 
   printf("rates->transport=%g\n", rates.transport);
   
-  // printf("rates.koff=%g, rates.salphc=%g, rates.max_salphc=%g, rates.min_salphc=%g, rates.total=%g\n", 
-  //       rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.total);
-	//printf("in model_init(): rates.koff=%g, rates.salphc=%g, rates.max_salphc=%g, rates.min_salphc=%g, rates.total=%g\n", 
-	// rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.total);
+  // printf("rates.koff=%g, rates.salphc=%g, rates.max_salphc=%g, rates.min_salphc=%g, rates.subtotal=%g\n", 
+  //       rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.subtotal);
+	//printf("in model_init(): rates.koff=%g, rates.salphc=%g, rates.max_salphc=%g, rates.min_salphc=%g, rates.subtotal=%g\n", 
+	// rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.subtotal);
 }
 
 void 
@@ -306,17 +306,17 @@ run(){
 		}
 
 		printf("t=%g, dt=%g state.tf_bound_num=%d, state.tf_hindered_num=%d\n", t, dt, state.tf_bound_num, state.tf_hindered_num);
-		printf("OFF [rates.koff=%g] ON [konrate=%g, rates.salphc=%g, (rates.max_salphc=%g, rates.min_salphc=%g)] rates.total=%g, TOTAL [%g]\n", 
-           rates.koff, konrate, rates.salphc, rates.max_salphc, rates.min_salphc, rates.total, rates.total+konrate);
+		printf("OFF [rates.koff=%g] ON [konrate=%g, rates.salphc=%g, (rates.max_salphc=%g, rates.min_salphc=%g)] rates.subtotal=%g, TOTAL [%g]\n", 
+           rates.koff, konrate, rates.salphc, rates.max_salphc, rates.min_salphc, rates.subtotal, rates.subtotal+konrate);
     printf("TRANSPORT rates.transport=%g, rates.mRNAdecay=%g, rates.pic_disassembly=%g, rates.acetylation_num=%d, rates.deacetylation_num=%d, rates.transcript_init_num=%d, rates.pic_assembly_num=%d, rates.pic_disassembly_num=%d\n", rates.transport, rates.mRNAdecay, 
            rates.pic_disassembly, rates.acetylation_num[0], rates.deacetylation_num[0], rates.transcript_init_num[0], 
            rates.pic_assembly_num[0], rates.pic_disassembly_num[0]);
 
 
-    float diff = (rates.total + konrate) - ((rates.koff + rates.salphc) + konrate);
+    float diff = (rates.subtotal + konrate) - ((rates.koff + rates.salphc) + konrate);
     if (abs(diff > 1e-7)) {
       printf("\nDIFF=TOTAL(%g)- SUM(%g)=%g comprised of OFF [rates.koff=%g] and ON [konrate=%g, rates.salphc=%g]\n\n", 
-             rates.total + konrate, (rates.koff + rates.salphc) + konrate, diff, rates.koff, konrate, rates.salphc);
+             rates.subtotal + konrate, (rates.koff + rates.salphc) + konrate, diff, rates.koff, konrate, rates.salphc);
     }
 
 		print_tf_occupancy(&state, genotype.all_binding_sites, t);
@@ -333,7 +333,7 @@ run(){
 			t);
 
 
-		x = ran1(&seed)*(rates.total + konrate); // Note that rates.total = rates.salphc + rates.koff
+		x = ran1(&seed)*(rates.subtotal + konrate); // Note that rates.subtotal = rates.salphc + rates.koff
     
 		if (t+dt < tdevelopment) {
 

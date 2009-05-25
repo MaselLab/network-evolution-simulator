@@ -157,8 +157,8 @@ struct GillespieRates {
   int transcript_init_num[MAX_COPIES];    
   int pic_disassembly_num[MAX_COPIES];    
 
-  /* total, including above */
-  float total;
+  /* subtotal, including above, but not including konrate */
+  float subtotal;
 };
 
 /*
@@ -533,11 +533,6 @@ extern void end_transcription(float *,
                               float [NGENES],
                               GillespieRates *);
 
-extern void remove_from_array(int,
-                              int,
-                              int [],
-                              int *,
-                              int );
 
 extern void disassemble_PIC(CellState *,
                             Genotype *,
@@ -729,12 +724,6 @@ extern void print_time_course(TimeCourse *,
 
 extern void print_all_protein_time_courses(TimeCourse *[POP_SIZE][NPROTEINS],
                                           TimeCourse *[POP_SIZE][NPROTEINS]);
-
-extern void create_output_directory(char *);
-
-extern void create_output_file(char [80], char *, FILE **, int);
-
-extern void read_kdisassembly(float [NUM_K_DISASSEMBLY]);
 
 extern void log_snapshot(GillespieRates *,
                          CellState *,
