@@ -67,35 +67,35 @@ void delete_queues(CellState *state) {
 
  FixedEvent *start, *info;
 
-  start = state->mRNATranslTimeEnd;  
+  start = state->mRNA_transl_time_end;  
   while (start) {
     info = start;
     start = start->next;
     free(info);
   }
 
-  /* start = state->mRNATranslTimeEndLast;  
+  /* start = state->mRNA_transl_time_end_last;  
   while (start) {
     info = start;
     start = start->next;
     free(info);  
     } */
 
-  start = state->mRNATranscrTimeEnd;  
+  start = state->mRNA_transcr_time_end;  
   while (start) {
     info = start;
     start = start->next;
     free(info);
   }
 
-  /* start = state->mRNATranscrTimeEndLast;  
+  /* start = state->mRNA_transcr_time_end_last;  
   while (start){
     info = start;
     start = start->next;
     free(info);  
     } */
 
-  start = state->replicationTimeEnd;  
+  start = state->replication_time_end;  
   while (start) {
     info = start;
     start = start->next;
@@ -106,8 +106,8 @@ void delete_queues(CellState *state) {
 void free_mem_CellState(CellState *state)
 {
   delete_queues(state);
-  if (state->tfBoundIndexes) free(state->tfBoundIndexes);
-  if (state->tfHinderedIndexes) free(state->tfHinderedIndexes);
+  if (state->tf_bound_indexes) free(state->tf_bound_indexes);
+  if (state->tf_hindered_indexes) free(state->tf_hindered_indexes);
 }
 
 // TODO: remove, keep track of comparisons only for debugging
@@ -201,7 +201,7 @@ void display(FixedEvent *start)
 
   info = start;
   while (info){
-    fprintf(fperrors,"gene %d time %f\n",info->geneID,info->time);
+    fprintf(fperrors,"gene %d time %f\n",info->gene_id,info->time);
     info = info->next;
   }
 }

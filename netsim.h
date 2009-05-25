@@ -55,19 +55,19 @@
 #endif
 
 #ifndef LOGGING_OFF
-#define LOG(...) { fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cellID); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
+#define LOG(...) { fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cell_id); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
 #define LOG_NOCELLID(...) { fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
-#define LOG_ERROR(...) { fprintf(fperrors, "[%s: cell %03d ERROR] ", __func__, state->cellID); \
+#define LOG_ERROR(...) { fprintf(fperrors, "[%s: cell %03d ERROR] ", __func__, state->cell_id); \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #define LOG_ERROR_NOCELLID(...) { fprintf(fperrors, "[%s ERROR] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_WARNING(...) { fprintf(fperrors, "[%s: cell %03d WARNING] ", __func__, state->cellID); \
+#define LOG_WARNING(...) { fprintf(fperrors, "[%s: cell %03d WARNING] ", __func__, state->cell_id); \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #define LOG_WARNING_NOCELLID(...) { fprintf(fperrors, "[%s WARNING] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #define LOG_NOFUNC(...) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #define LOG_VERBOSE_NOFUNC(...) if (verbose) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #define LOG_VERBOSE(...) if (verbose) { \
     if (state!=NULL)                  \
-      fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cellID); \
+      fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cell_id); \
     else \
       fprintf(fperrors, "[%s] ", __func__);  \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
@@ -139,33 +139,24 @@ struct GillespieRates {
   int transport_operations;
   float mRNAdecay;         /* rates[2] */
   int mRNAdecay_operations;
-  float picDisassembly;    /* rates[3] */
-  int picDisassembly_operations;
+  float pic_disassembly;    /* rates[3] */
+  int pic_disassembly_operations;
   float salphc;            /* rates[4] */
   int salphc_operations;
 
   /* the following are cached values to avoid recomputation not
      actually part of the Gillespie rates */
-  float maxSalphc;         /* rates[5] */
-  int maxSalphc_operations;
-  float minSalphc;         /* rates[6] */
-  int minSalphc_operations;
+  float max_salphc;         /* rates[5] */
+  int max_salphc_operations;
+  float min_salphc;         /* rates[6] */
+  int min_salphc_operations;
 
   /* number of genes in the following states */
-  int acetylationCount[MAX_COPIES];       
-  int acetylationCount_operations;
-
-  int deacetylationCount[MAX_COPIES];     
-  int deacetylationCount_operations;
-
-  int picAssemblyCount[MAX_COPIES];       
-  int picAssemblyCount_operations;       
-
-  int transcriptInitCount[MAX_COPIES];    
-  int transcriptInitCount_operations;
-
-  int picDisassemblyCount[MAX_COPIES];    
-  int picDisassemblyCount_operations;
+  int acetylation_num[MAX_COPIES];       
+  int deacetylation_num[MAX_COPIES];     
+  int pic_assembly_num[MAX_COPIES];       
+  int transcript_init_num[MAX_COPIES];    
+  int pic_disassembly_num[MAX_COPIES];    
 
   /* total, including above */
   float total;
@@ -203,7 +194,7 @@ struct KonStates {
   /* list of structs: need one for each protein */
   // TODO: currently KonList has cached information for both TF proteins and non-TF
   // proteins, may want to split this out at some point
-  KonList *konList[NPROTEINS];
+  KonList *kon_list[NPROTEINS];
 
   /* konvalues are rates of binding with:
    * element 0 is (protein - salphc)/c
@@ -217,32 +208,34 @@ struct KonStates {
 
 typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
-  int cisregID;     /* cis-reg region */
-  int tfID;         /* transcription factor */
-  int strand;       /* strand 0 (forward) or 1 (backward)*/
-  int hammingDist;  /* hamming distance */
-  int geneCopy;     /* which copy of gene, 0 to MAX_COPIES-1 */
-  int leftEdgePos;  /* start position of TF on DNA, always with reference to forward strand */
-                    /* note that recognition sitePos, can be computed from: (leftEdgePos+hindPos) */
-  int hindPos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
+  int cisreg_id;     /* cis-reg region */
+  int tf_id;         /* transcription factor */
+  int strand;        /* strand 0 (forward) or 1 (backward)*/
+  int hamming_dist;  /* hamming distance */
+  int gene_copy;     /* which copy of gene, 0 to MAX_COPIES-1 */
+  int left_edge_pos; /* start position of TF on DNA, always with reference to forward strand */
+                     /* note that recognition sitePos, can be computed from: (left_edge_pos+hind_pos) */
+  int hind_pos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
 };
 
 typedef struct Genotype Genotype;
 struct Genotype {
-  char cisRegSeq[NGENES][MAX_COPIES][CISREG_LEN];
-  char transcriptionFactorSeq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
-  int hindrancePositions[TFGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
-  int bindSiteCount;
-  AllTFBindingSites *allBindingSites;
-  int tfsPerGene[NGENES];               /* cache number of TFs per gene */
-  int tfsStart[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs */
+  char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN];
+  char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
+  int hindrance_positions[TFGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
+  int binding_sites_num;                    /* total number of binding sites */
+  AllTFBindingSites *all_binding_sites;
   float mRNAdecay[NGENES];
   float proteindecay[NGENES];
   float translation[NGENES];
   int activating[NGENES][MAX_COPIES]; /* 1 is activating, 0 is repressing */
-  float PICdisassembly[NGENES][MAX_COPIES];
+  float pic_disassembly[NGENES][MAX_COPIES];
   int copies[NGENES];                 /* current per-gene ploidy */
   float replication_time[NGENES];     /* per-gene replication time */
+
+  /* cached quantities for efficiency, can be recomputed from the above genotype, not part of model */
+  int sites_per_gene[NGENES];               /* cache number of TFs per gene */
+  int site_id_pos[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs */
 };
 
 /* 
@@ -251,7 +244,7 @@ struct Genotype {
  * are easy to create pre-sorted.  */
 typedef struct FixedEvent FixedEvent;
 struct FixedEvent {
-  int geneID;
+  int gene_id;
   int copy;
   float time;
   FixedEvent *next;
@@ -259,32 +252,32 @@ struct FixedEvent {
 
 typedef struct CellState CellState;
 struct CellState {
-  int cellID;                         /* cell ID */
-  int founderID;                      /* keep track of the founder cell */
+  int cell_id;                        /* cell ID */
+  int founder_id;                     /* keep track of the founder cell */
   int burn_in;                        /* keep track of whether burn-in has finished */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
   int divisions;                      /* total number of divisions cell has undergone */
   float division_time;                /* current division time */ 
-  float cellSize;                     /* size of cell */
-  float growthRate;                   /* total growth rate in the previous deltat */
-  int mRNACytoCount[NGENES];          /* mRNAs in cytoplasm */
-  int mRNANuclearCount[NGENES];       /* mRNAs in nucleus */
-  int mRNATranslCytoCount[NGENES];    /* mRNAs are in the cytoplasm, but only recently */
-  FixedEvent *mRNATranslTimeEnd;      /* times when mRNAs become fully loaded with ribosomes and start producing protein */
-  FixedEvent *mRNATranslTimeEndLast; 
-  int mRNATranscrCount[NGENES][MAX_COPIES];       /* mRNAs which haven't finished transcription yet */
-  FixedEvent *mRNATranscrTimeEnd;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
-  FixedEvent *mRNATranscrTimeEndLast;
+  float cell_size;                    /* size of cell */
+  float growth_rate;                  /* total growth rate in the previous deltat */
+  int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
+  int mRNA_nuclear_num[NGENES];       /* mRNAs in nucleus */
+  int mRNA_transl_cyto_num[NGENES];   /* mRNAs are in the cytoplasm, but only recently */
+  FixedEvent *mRNA_transl_time_end;      /* times when mRNAs become fully loaded with ribosomes and start producing protein */
+  FixedEvent *mRNA_transl_time_end_last;
+  int mRNA_transcr_num[NGENES][MAX_COPIES];       /* mRNAs which haven't finished transcription yet */
+  FixedEvent *mRNA_transcr_time_end;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
+  FixedEvent *mRNA_transcr_time_end_last;
 
-  FixedEvent *replicationTimeEnd;     /* times when gene duplicates */
-  FixedEvent *replicationTimeEndLast;    
+  FixedEvent *replication_time_end;     /* times when gene duplicates */
+  FixedEvent *replication_time_end_last;    
 
-  float proteinConc[NPROTEINS];
-  int tfBoundCount;
-  int *tfBoundIndexes;                /* tfBoundIndexes lists just bound TFs according to binding site index in all_binding_sites */
-  int tfHinderedCount;
-  int (*tfHinderedIndexes)[2];
-  /* 1st elem tfHinderedIndexes lists binding site indices that cannot be bound due to steric hindrance
+  float protein_conc[NPROTEINS];
+  int tf_bound_num;
+  int *tf_bound_indexes;                /* tf_bound_indexes lists just bound TFs according to binding site index in all_binding_sites */
+  int tf_hindered_num;
+  int (*tf_hindered_indexes)[2];
+  /* 1st elem tf_hindered_indexes lists binding site indices that cannot be bound due to steric hindrance
    * 2nd elem gives corresponding index of inhibiting TF in all_binding_sites, so that we know when to release hindrance
    * binding sites can be hindered more than once, then multiple constraints must be lifted before TF binding
    */
@@ -295,8 +288,8 @@ struct CellState {
      5 is on but w/o TF criteria, 6 is fully on
   */
 
-  /* stores corresponding geneIDs for [de]acteylation, PIC[dis]assembly, transcriptinit */
-  int statechangeIDs[5][MAX_COPIES][NGENES]; 
+  /* stores corresponding gene_ids for [de]acteylation, PIC[dis]assembly, transcriptinit */
+  int state_change_ids[5][MAX_COPIES][NGENES]; 
   float RTlnKr;
   float temperature;
 };

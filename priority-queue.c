@@ -21,7 +21,7 @@ float get_next(FixedEvent **queue, FixedEvent **end, int *cell) {
 
   if (queue != NULL) {
     retval = (*queue)->time;
-    *cell = (*queue)->geneID;
+    *cell = (*queue)->gene_id;
     delete_fixed_event_start(queue, end);
   } else {
     printf("queue is empty!\n");

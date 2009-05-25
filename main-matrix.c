@@ -35,7 +35,7 @@ int array_size = 1000;
 FILE *sparseMatrixV1;
 FILE *statesV1;
 FILE *columnV1;
-FILE *leftEdgePositions;
+FILE *left_edge_positions;
 FILE *bVector;
 
 typedef int (*compfn)(const void*, const void*);
@@ -45,11 +45,11 @@ int intcmp(const void *a, const void *b)
     return *(int *)a - *(int *)b;
 }
 
-/*Reorders binding sites from smallest leftEdgePosition to largest leftEdgePosition */
+/*Reorders binding sites from smallest left_edge_position to largest left_edge_position */
 int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
-    if(elem1->leftEdgePos < elem2->leftEdgePos)
+    if(elem1->left_edge_pos < elem2->left_edge_pos)
         return -1;
-    else if(elem1->leftEdgePos > elem2->leftEdgePos)
+    else if(elem1->left_edge_pos > elem2->left_edge_pos)
          return 1;
     else
          return 0;
@@ -634,7 +634,7 @@ int main(int argc, char *argv[])
     printf("Koff[%d] = %f\n", jojo, Koff[jojo]);
   }
   //*koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*state->temperature));
-  //Gibbs = (((float) allBindingSites[k].hammingDist)/3.0 - 1.0) * state->RTlnKr;
+  //Gibbs = (((float) all_binding_sites[k].hamming_dist)/3.0 - 1.0) * state->RTlnKr;
   //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
     
   /* new API requires a Genotype clone */
@@ -642,26 +642,26 @@ int main(int argc, char *argv[])
   /* create sequences and binding site matrix */
   initialize_genotype(&indiv, UNUSED_clone, kdis, 0);
   
-  /*Sort binding sites from smallest leftEdgePosition to largest leftEdgePosition*/
-  qsort((void *) &(indiv.allBindingSites[0]), indiv.tfsPerGene[0],                                 
+  /*Sort binding sites from smallest left_edge_position to largest left_edge_position*/
+  qsort((void *) &(indiv.all_binding_sites[0]), indiv.sites_per_gene[0],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
          printf("\n");
   
   /*Find number of binding sites completely within sliding window*/       
   TFBS =0;
-  while(((indiv.allBindingSites[TFBS].leftEdgePos)+ (HIND_LENGTH-1)) < numBp){
+  while(((indiv.all_binding_sites[TFBS].left_edge_pos)+ (HIND_LENGTH-1)) < numBp){
      TFBS++;
   }
   printf("TFBS=%d\n", TFBS);
   system("PAUSE");
   
   /* print binding sites */
-  /* print_all_binding_sites(indiv.copies, indiv.allBindingSites, indiv.bindSiteCount, 
+  /* print_all_binding_sites(indiv.copies, indiv.all_binding_sites, indiv.bindSiteCount, 
      indiv.transcriptionFactorSeq, indiv.cisRegSeq, indiv.tfsStart); 
-			  printf("tfsPerGene = %d", indiv.tfsPerGene); */
+			  printf("sites_per_gene = %d", indiv.sites_per_gene); */
   
-  /*Create arrays to store information in indiv.allBindingSites*/
-  int *leftEdgePos, *startPos, *hammDist, *TFon; 
+  /*Create arrays to store information in indiv.all_binding_sites*/
+  int *left_edge_pos, *startPos, *hammDist, *TFon; 
   float *diag, *final, previous;
   float Kon[TFBS];//populate Kon. Kons depend on TF concentrations
   
@@ -687,7 +687,7 @@ int main(int argc, char *argv[])
 			    vector - probability vector returned by matlab*/
   
   //allocate memory for these arrays
-  leftEdgePos = malloc(indiv.tfsPerGene[0]*sizeof(int));
+  left_edge_pos = malloc(indiv.sites_per_gene[0]*sizeof(int));
   startPos=malloc(TFBS*sizeof(int));
   hammDist = malloc(TFBS *sizeof(int));
   diag = malloc(array_size*sizeof(float));
@@ -707,51 +707,51 @@ int main(int argc, char *argv[])
     previous[pi]=prev[pi];
   }*/
   
-  /*Prints all leftEdgePositions to file. Used for debugging and testing purposes*/    
-  leftEdgePositions = fopen("leftEdgePositions.txt", "w");
-  if ((leftEdgePositions = fopen("leftEdgePositions.txt", "w"))) {
+  /*Prints all left_edge_positions to file. Used for debugging and testing purposes*/    
+  left_edge_positions = fopen("left_edge_positions.txt", "w");
+  if ((left_edge_positions = fopen("left_edge_positions.txt", "w"))) {
     for( f=0; f<TFBS; f++) {
       printf("binding site %3d:  ", f);
-      printf("%d\n", indiv.allBindingSites[f].leftEdgePos);
+      printf("%d\n", indiv.all_binding_sites[f].left_edge_pos);
     }
-    printf("tfsPerGene = %d", indiv.tfsPerGene[0]);
+    printf("sites_per_gene = %d", indiv.sites_per_gene[0]);
     system("PAUSE");
 	 
-    //Stores leftEdgePositions of each site on the first gene in leftEdgePos[] array and prints to file. 
+    //Stores left_edge_positions of each site on the first gene in left_edge_pos[] array and prints to file. 
     //Commented code is to print other information
-    for (i=0; i <indiv.tfsPerGene[0] ; i++) {
-      fprintf(leftEdgePositions, "binding site %3d:  ", i);
-      leftEdgePos[i] =  indiv.allBindingSites[i].leftEdgePos;
-      /*fprintf( leftEdgePositions, "binding site %3d:  ", i);
-	fprintf(leftEdgePositions, "       cis-reg region: %3d",indiv.allBindingSites[i].cisregID);
-	fprintf(leftEdgePositions, "         cis-reg copy: %3d", indiv.allBindingSites[i].geneCopy);
-	fprintf(leftEdgePositions, " (sequence %.*s)\n", CISREG_LEN, indiv.cisRegSeq[indiv.allBindingSites[i].cisregID][indiv.allBindingSites[i].geneCopy]);
-	fprintf(leftEdgePositions, " transcription-factor: %3d", indiv.allBindingSites[i].tfID);
-	fprintf(leftEdgePositions, " (sequence: %.*s)\n", TF_ELEMENT_LEN, indiv.transcriptionFactorSeq[indiv.allBindingSites[i].tfID][indiv.allBindingSites[i].geneCopy]); 
-	fprintf(leftEdgePositions, "  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.allBindingSites[i].leftEdgePos);        
+    for (i=0; i <indiv.sites_per_gene[0] ; i++) {
+      fprintf(left_edge_positions, "binding site %3d:  ", i);
+      left_edge_pos[i] =  indiv.all_binding_sites[i].left_edge_pos;
+      /*fprintf( left_edge_positions, "binding site %3d:  ", i);
+	fprintf(left_edge_positions, "       cis-reg region: %3d",indiv.all_binding_sites[i].cisregID);
+	fprintf(left_edge_positions, "         cis-reg copy: %3d", indiv.all_binding_sites[i].geneCopy);
+	fprintf(left_edge_positions, " (sequence %.*s)\n", CISREG_LEN, indiv.cisRegSeq[indiv.all_binding_sites[i].cisregID][indiv.all_binding_sites[i].geneCopy]);
+	fprintf(left_edge_positions, " transcription-factor: %3d", indiv.all_binding_sites[i].tf_id);
+	fprintf(left_edge_positions, " (sequence: %.*s)\n", TF_ELEMENT_LEN, indiv.transcriptionFactorSeq[indiv.all_binding_sites[i].tf_id][indiv.all_binding_sites[i].geneCopy]); 
+	fprintf(left_edge_positions, "  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, indiv.all_binding_sites[i].left_edge_pos);        
         
       */
-      fprintf(leftEdgePositions, "%d\n", indiv.allBindingSites[i].leftEdgePos);
+      fprintf(left_edge_positions, "%d\n", indiv.all_binding_sites[i].left_edge_pos);
       
-      /*//fprintf(leftEdgePositions,  "%d\n", indiv.allBindingSites[i].leftEdgePos);
-	fprintf(leftEdgePositions, "  Hind offset position: %3d\n", indiv.allBindingSites[i].hindPos); 
-	fprintf(leftEdgePositions, "               strand: %3d\n", indiv.allBindingSites[i].strand);
-	fprintf(leftEdgePositions, "         Hamming dist: %3d\n\n", indiv.allBindingSites[i].hammingDist); 
+      /*//fprintf(left_edge_positions,  "%d\n", indiv.all_binding_sites[i].left_edge_pos);
+	fprintf(left_edge_positions, "  Hind offset position: %3d\n", indiv.all_binding_sites[i].hindPos); 
+	fprintf(left_edge_positions, "               strand: %3d\n", indiv.all_binding_sites[i].strand);
+	fprintf(left_edge_positions, "         Hamming dist: %3d\n\n", indiv.all_binding_sites[i].hamming_dist); 
       */}
   }
-  fclose(leftEdgePositions);
+  fclose(left_edge_positions);
   system("PAUSE");
   printf("\n");
   
   startSite=0;//start at left- most site
   
   //Main while loop for sliding window #1
-  while (startSite<indiv.tfsPerGene[0]) {
+  while (startSite<indiv.sites_per_gene[0]) {
     numStates =0;//initialize number of configurations
     
     //Find number of sites within sliding window. Changes with startSite
     TFBS = 0;
-    while(((indiv.allBindingSites[TFBS].leftEdgePos)+(HIND_LENGTH-1)) < numBp+startSite){
+    while(((indiv.all_binding_sites[TFBS].left_edge_pos)+(HIND_LENGTH-1)) < numBp+startSite){
       TFBS++;
     }
     printf("TFBS inside=%d\n", TFBS);
@@ -759,13 +759,13 @@ int main(int argc, char *argv[])
     
     //populate startpos, hammDist, TFon, Kon for specified number of binding sites 
     for (lem =0; lem<TFBS; lem++) {
-      startPos[lem] = indiv.allBindingSites[lem+startSite].leftEdgePos;
-      hammDist[lem] = indiv.allBindingSites[lem+startSite].hammingDist;
-      TFon[lem] = indiv.allBindingSites[lem+startSite].tfID;
-      bob = indiv.allBindingSites[lem+startSite].tfID;
+      startPos[lem] = indiv.all_binding_sites[lem+startSite].left_edge_pos;
+      hammDist[lem] = indiv.all_binding_sites[lem+startSite].hamming_dist;
+      TFon[lem] = indiv.all_binding_sites[lem+startSite].tf_id;
+      bob = indiv.all_binding_sites[lem+startSite].tf_id;
       Kon[lem] = initProteinConc[bob]*kon;
       
-      printf("%d", indiv.allBindingSites[lem+startSite].leftEdgePos);
+      printf("%d", indiv.all_binding_sites[lem+startSite].left_edge_pos);
       printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
       printf(" Kon[lem] = %f\n", Kon[lem]);    
     }
@@ -876,7 +876,7 @@ int main(int argc, char *argv[])
     
     //Find the next starting posittion
     printf("previous Start Site= %d\n", startSite);
-    nextS = nextStartSite(startSite, leftEdgePos);
+    nextS = nextStartSite(startSite, left_edge_pos);
     
     finalPos+=mult;
     
@@ -893,7 +893,7 @@ int main(int argc, char *argv[])
   engClose(ep);
   
   /* free dynamically allocated all binding sites list */
-  free(indiv.allBindingSites);
+  free(indiv.all_binding_sites);
   int d;
   for (d=0; d<numStates; d++) {
     free(arrayT[d].row);

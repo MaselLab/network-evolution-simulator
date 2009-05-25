@@ -197,7 +197,7 @@ model_init(){
 	// initialize cell state 
 	initialize_cell(&state, 0, genotype.copies, genotype.mRNAdecay, initmRNA, initProteinConc, burn_in);
 
-  //printf("cisregseq=%s\n", (char *)genotype.cisRegSeq);
+  //printf("cisregseq=%s\n", (char *)genotype.cisreg_seq);
 
 
 	// FIXME: hack
@@ -207,8 +207,8 @@ model_init(){
 	}
 
 	if (output_binding_sites){  // if command-line option was passed in 
-		print_all_binding_sites(genotype.copies, genotype.allBindingSites, genotype.bindSiteCount, 
-				    genotype.transcriptionFactorSeq, genotype.cisRegSeq, genotype.tfsStart); 
+		print_all_binding_sites(genotype.copies, genotype.all_binding_sites, genotype.binding_sites_num, 
+				    genotype.tf_seq, genotype.cisreg_seq, genotype.site_id_pos); 
 	}
 
 	/* set cell temperature and value of RTlnKr constant */
@@ -221,22 +221,22 @@ model_init(){
 		timecourselast[i] = NULL;
 	} 
 
-	add_time_points((float) 0.0, state.proteinConc,  timecoursestart,  timecourselast);
+	add_time_points((float) 0.0, state.protein_conc,  timecoursestart,  timecourselast);
 
 	// initialize cached data structure: allocate memory 
 
 	initialize_cell_cache(&state, genotype, &konStates, &koffvalues, maxbound2, maxbound3);  
 
-	printf("state.tfBoundCount=%d, state.tfHinderedCount=%d\n", state.tfBoundCount, state.tfHinderedCount);
+	printf("state.tf_bound_num=%d, state.tf_hindered_num=%d\n", state.tf_bound_num, state.tf_hindered_num);
 
   for (i=0; i < NGENES; i++) {
     // FIXME: here we override the initial cell state and ensure there is at least one
     // mRNA in the cytoplasm before we initialize the cell state, otherwise there is no initial
     // kon rates, also ensure that there are no mRNAs in the nucleus so that no transport occurs
-    state.mRNACytoCount[i] = 1;
-    state.mRNANuclearCount[i] = 0;
-    printf("mRNACytoCount[%d]=%d\n", i, state.mRNACytoCount[i]);
-    printf("mRNANuclearCount[%d]=%d\n", i, state.mRNANuclearCount[i]);
+    state.mRNA_cyto_num[i] = 1;
+    state.mRNA_nuclear_num[i] = 0;
+    printf("mRNA_cyto_num[%d]=%d\n", i, state.mRNA_cyto_num[i]);
+    printf("mRNA_nuclear_num[%d]=%d\n", i, state.mRNA_nuclear_num[i]);
   }
 
 
@@ -250,21 +250,21 @@ model_init(){
   // and refactor back into netsim.c later
   for (i=0; i < NGENES; i++) {
     for (j=0; j < genotype.copies[i]; j++) {
-      rates.acetylationCount[j] = 0;
+      rates.acetylation_num[j] = 0;
     }
   }
 
   for (i=0; i < NGENES; i++) {
-    printf("after mRNACytoCount[%d]=%d\n", i, state.mRNACytoCount[i]);
-    printf("after mRNANuclearCount[%d]=%d\n", i, state.mRNANuclearCount[i]);
+    printf("after mRNA_cyto_num[%d]=%d\n", i, state.mRNA_cyto_num[i]);
+    printf("after mRNA_nuclear_num[%d]=%d\n", i, state.mRNA_nuclear_num[i]);
   }
 
   printf("rates->transport=%g\n", rates.transport);
   
-  // printf("rates.koff=%g, rates.salphc=%g, rates.maxSalphc=%g, rates.minSalphc=%g, rates.total=%g\n", 
-  //       rates.koff, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total);
-	//printf("in model_init(): rates.koff=%g, rates.salphc=%g, rates.maxSalphc=%g, rates.minSalphc=%g, rates.total=%g\n", 
-	// rates.koff, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total);
+  // printf("rates.koff=%g, rates.salphc=%g, rates.max_salphc=%g, rates.min_salphc=%g, rates.total=%g\n", 
+  //       rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.total);
+	//printf("in model_init(): rates.koff=%g, rates.salphc=%g, rates.max_salphc=%g, rates.min_salphc=%g, rates.total=%g\n", 
+	// rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.total);
 }
 
 void 
@@ -297,7 +297,7 @@ run(){
 
 		// do first Gillespie step to chose next event 
 		calc_dt(&x, &dt, &rates, &konStates, mRNAdecay, genotype.mRNAdecay,
-			state.mRNACytoCount, state.mRNATranslCytoCount, UNUSED_cellID);
+			state.mRNA_cyto_num, state.mRNA_transl_cyto_num, UNUSED_cellID);
 
 		// compute total konrate (which is constant over the Gillespie step) 
 		if (konStates.nkon==0){
@@ -306,12 +306,12 @@ run(){
 			calc_kon_rate(dt, &konStates, &konrate); 
 		}
 
-		printf("t=%g, dt=%g state.tfBoundCount=%d, state.tfHinderedCount=%d\n", t, dt, state.tfBoundCount, state.tfHinderedCount);
-		printf("OFF [rates.koff=%g] ON [konrate=%g, rates.salphc=%g, (rates.maxSalphc=%g, rates.minSalphc=%g)] rates.total=%g, TOTAL [%g]\n", 
-           rates.koff, konrate, rates.salphc, rates.maxSalphc, rates.minSalphc, rates.total, rates.total+konrate);
-    printf("TRANSPORT rates.transport=%g, rates.mRNAdecay=%g, rates.picDisassembly=%g, rates.acetylationCount=%d, rates.deacetylationCount=%d, rates.transcriptInitCount=%d, rates.picAssemblyCount=%d, rates.picDisassemblyCount=%d\n", rates.transport, rates.mRNAdecay, 
-           rates.picDisassembly, rates.acetylationCount[0], rates.deacetylationCount[0], rates.transcriptInitCount[0], 
-           rates.picAssemblyCount[0], rates.picDisassemblyCount[0]);
+		printf("t=%g, dt=%g state.tf_bound_num=%d, state.tf_hindered_num=%d\n", t, dt, state.tf_bound_num, state.tf_hindered_num);
+		printf("OFF [rates.koff=%g] ON [konrate=%g, rates.salphc=%g, (rates.max_salphc=%g, rates.min_salphc=%g)] rates.total=%g, TOTAL [%g]\n", 
+           rates.koff, konrate, rates.salphc, rates.max_salphc, rates.min_salphc, rates.total, rates.total+konrate);
+    printf("TRANSPORT rates.transport=%g, rates.mRNAdecay=%g, rates.pic_disassembly=%g, rates.acetylation_num=%d, rates.deacetylation_num=%d, rates.transcript_init_num=%d, rates.pic_assembly_num=%d, rates.pic_disassembly_num=%d\n", rates.transport, rates.mRNAdecay, 
+           rates.pic_disassembly, rates.acetylation_num[0], rates.deacetylation_num[0], rates.transcript_init_num[0], 
+           rates.pic_assembly_num[0], rates.pic_disassembly_num[0]);
 
 
     float diff = (rates.total + konrate) - ((rates.koff + rates.salphc) + konrate);
@@ -320,7 +320,7 @@ run(){
              rates.total + konrate, (rates.koff + rates.salphc) + konrate, diff, rates.koff, konrate, rates.salphc);
     }
 
-		print_tf_occupancy(&state, genotype.allBindingSites, t);
+		print_tf_occupancy(&state, genotype.all_binding_sites, t);
 
 		log_snapshot(&rates,
 			&state,
@@ -388,7 +388,7 @@ run(){
 	}
 
 	free_mem_CellState(&state);
-	free(genotype.allBindingSites);
+	free(genotype.all_binding_sites);
 
 	fclose(fperrors);
 	fclose(fp_koff[0]);

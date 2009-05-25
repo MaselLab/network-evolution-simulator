@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
       timecoursestart[j][i] = timecourselast[j][i] = NULL;
     }
     free_mem_CellState(&state[j]);
-    free(indivs[j].allBindingSites);
+    free(indivs[j].all_binding_sites);
   }
   fclose(fperrors);
   for (j = 0; j < POP_SIZE; j++) {
