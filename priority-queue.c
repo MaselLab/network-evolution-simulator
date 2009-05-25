@@ -53,20 +53,14 @@ int insert_with_priority_heap(bheap_t *queue, int cell, float time) {
 
 /* remove the element from the queue that has the highest priority,
    and return it (also known as "PopElement(Off)", or "GetMinimum") */
-float get_next_heap(bheap_t *queue, int *cell, int *pos) {
-
+float get_next_heap(bheap_t *queue, int *cell) {
   float time;
-
-  *pos = queue->key_comps;
   /* get minimum element in queue */
   *cell = bh_min(queue);
   /* get time */
   time = queue->a[1].key;
-
   /* now remove this head from queue */
   bh_delete(queue, *cell);
-  *pos = queue->key_comps - *pos;
-  
   return time;
 }
 

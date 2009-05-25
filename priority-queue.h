@@ -49,7 +49,7 @@ extern int insert_with_priority_heap(bheap_t *, int, float);
 
 /* remove the element from the queue that has the highest priority,
    and return it (also known as "PopElement(Off)", or "GetMinimum") */
-extern float get_next_heap(bheap_t *, int *, int *);
+extern float get_next_heap(bheap_t *, int *);
 
 extern void delete_element_heap(bheap_t *, int);
 

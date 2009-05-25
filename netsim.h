@@ -319,9 +319,9 @@ const float PICassembly;
 const float startnucleus;
 const float Kr;    /* don't put this less than 1, weird things happen to koff calculation */
 const float GasConstant;
-const float cooperativity;/* dGibbs, relative to 1 additional specific nt */
+const float cooperativity;         /* dGibbs, relative to 1 additional specific nt */
 const float cooperative_distance;  /* distance co-operativity operates, changed from 20 */ 
-const float NumSitesInGenome ; /* updated from 1.8e+6 */
+const float NumSitesInGenome ;     /* updated from 1.8e+6 */
 const float selection ;
 
 const float mN ;
@@ -335,19 +335,19 @@ int burn_in;
 
 float tdevelopment;  /* default development time: can be changed at runtime */
 float timemax;       /* set an upper limit to development time */
-int current_ploidy;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
+int current_ploidy;  /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output;
-long seed ;         /* something is wrong here: changing seed changes nothing */
-int dummyrun;       /* used to change seed */
-int recompute_koff; /* toggle whether to recompute certain features at each time to avoid
-                       compounding rounding error */
+long seed ;          /* something is wrong here: changing seed changes nothing */
+int dummyrun;        /* used to change seed */
+int recompute_koff;  /* toggle whether to recompute certain features at each time to avoid
+                        compounding rounding error */
 int recompute_kon;
 float critical_size ; /* critical size at which cell divides, 
                          set to negative to prevent division  */
 float growth_rate_scaling; /* set growth rate scaling factor */
 
-float time_s_phase;  /* length of S phase (default: 30 mins) */
-float time_g2_phase; /* length of G2/mitosis phase (default: 30 mins) */
+float time_s_phase;          /* length of S phase (default: 30 mins) */
+float time_g2_phase;         /* length of G2/mitosis phase (default: 30 mins) */
 int random_replication_time; /* toggle replication times in S phase being random */
 
 /* file output parameters */
