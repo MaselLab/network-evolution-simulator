@@ -621,19 +621,19 @@ int main(int argc, char *argv[])
   float RTlnKr;
   float koffCheck;
   float temperature = 293.0;
-  RTlnKr = GasConstant * temperature * log(Kr);
+  RTlnKr = GASCONSTANT * temperature * log(KR);
   
   int jo, jojo;
   for( jo=0; jo<3; jo++){
     Gibbs = (((float) jo)/3.0 - 1.0) * RTlnKr;
-    koffCheck = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*temperature));
+    koffCheck = NUMSITESINGENOME*kon*0.25/exp(-Gibbs/(GASCONSTANT*temperature));
     Koff[jo] = koffCheck;
   }
   
   for(jojo=0; jojo<3; jojo++){
     printf("Koff[%d] = %f\n", jojo, Koff[jojo]);
   }
-  //*koff = NumSitesInGenome*kon*0.25/exp(-Gibbs/(GasConstant*state->temperature));
+  //*koff = NUMSITESINGENOME*kon*0.25/exp(-Gibbs/(GASCONSTANT*state->temperature));
   //Gibbs = (((float) all_binding_sites[k].hamming_dist)/3.0 - 1.0) * state->RTlnKr;
   //Koff = [0 mismatch, 1 mismatch, 2 mismatch, coop on 1 side, coop on 2 sides]
     

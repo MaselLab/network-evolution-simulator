@@ -166,7 +166,6 @@ static int UNUSED_genotypeID=0;    	// required by initialize_genotype.
 static Genotype *UNUSED_clone=NULL; 	// required by initialize_genotype.
 static int UNUSED_cellID=0;	      	// required by calc_dt.
 static float transport[NGENES];  /* transport rates of each mRNA */
-//static long int dummy1[4096];
 
 static void
 model_init(){
@@ -185,8 +184,8 @@ model_init(){
 	// get the kdis.txt values 
 	read_kdisassembly(kdis);
 
-	maxbound2 = maxbound;
-	maxbound3 = 10*maxbound;
+	maxbound2 = MAXBOUND;
+	maxbound3 = 10*MAXBOUND;
 
 	// set to be haploid (global)
 	current_ploidy = 1;  
@@ -213,7 +212,7 @@ model_init(){
 
 	/* set cell temperature and value of RTlnKr constant */
 	state.temperature = 293.0;
-	state.RTlnKr = GasConstant * state.temperature * log(Kr);
+	state.RTlnKr = GASCONSTANT * state.temperature * log(KR);
 
 	// initialize time courses 
 	for (i=0; i < NPROTEINS; i++) {

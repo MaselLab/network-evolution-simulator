@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 1
+#define POP_SIZE 1         /* default to a single cell if not otherwise defined */
 #endif
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -46,8 +46,8 @@
 #define SELECTION_GENE (NGENES-1)   /* index of selection gene: always the last gene */
 #endif
 
-#define CISREG_LEN 150     /* length of cis-regulatory region in base-pairs */
-#define TF_ELEMENT_LEN 6   /* length of binding element on TF */
+#define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
+#define TF_ELEMENT_LEN 6      /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
 
 #ifndef HIND_LENGTH
@@ -104,18 +104,17 @@ enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
        ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
 
 /*
- * enum for stateChangeIDs
+ * enum for state_change_ids
  */
-enum { ACETYLATION = 0, 
-       DEACETYLATION = 1, 
-       PICASSEMBLY = 2,
-       TRANSCRIPTINIT = 3, 
-       PICDISASSEMBLY = 4,
+enum { ACETYLATION_STATE = 0, 
+       DEACETYLATION_STATE = 1, 
+       PICASSEMBLY_STATE = 2,
+       TRANSCRIPTINIT_STATE = 3, 
+       PICDISASSEMBLY_STATE = 4,
 };
 
 /*
- * New data structure for keeping track of rates for Gillespie
- * algorithm 
+ * Rates for Gillespie algorithm
  *
  * Events with exponentially-distributed waiting times are:
  * - TF association and dissociation, 
@@ -163,11 +162,6 @@ struct GillespieRates {
 };
 
 /*
- * enum for konIDs
- */
-enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
-
-/*
  * KonList: stores information about available binding sites for a
  * particular TF
  */
@@ -179,6 +173,7 @@ struct KonList {
                              non-TFs for which this should always be
                              zero */
 };
+
 /*
  * KonStates : new composite data structure to cache information about
  * available binding sites to avoid re-computation.  This groups the
@@ -241,7 +236,8 @@ struct Genotype {
 /* 
  * transcription/translation delays are sorted linked lists.  Deleting
  * the head each time, and tack new stuff on the end.  Linked lists
- * are easy to create pre-sorted.  */
+ * are easy to create pre-sorted.
+ */
 typedef struct FixedEvent FixedEvent;
 struct FixedEvent {
   int gene_id;
@@ -250,6 +246,9 @@ struct FixedEvent {
   FixedEvent *next;
 };
 
+/*
+ * cell state
+ */
 typedef struct CellState CellState;
 struct CellState {
   int cell_id;                        /* cell ID */
@@ -263,13 +262,12 @@ struct CellState {
   int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
   int mRNA_nuclear_num[NGENES];       /* mRNAs in nucleus */
   int mRNA_transl_cyto_num[NGENES];   /* mRNAs are in the cytoplasm, but only recently */
-  FixedEvent *mRNA_transl_time_end;      /* times when mRNAs become fully loaded with ribosomes and start producing protein */
+  FixedEvent *mRNA_transl_time_end;   /* times when mRNAs become fully loaded with ribosomes and start producing protein */
   FixedEvent *mRNA_transl_time_end_last;
-  int mRNA_transcr_num[NGENES][MAX_COPIES];       /* mRNAs which haven't finished transcription yet */
-  FixedEvent *mRNA_transcr_time_end;     /* times when transcription is complete and an mRNA is available to move to cytoplasm*/
+  int mRNA_transcr_num[NGENES][MAX_COPIES];  /* mRNAs which haven't finished transcription yet */
+  FixedEvent *mRNA_transcr_time_end;  /* times when transcription is complete and an mRNA is available to move to cytoplasm */
   FixedEvent *mRNA_transcr_time_end_last;
-
-  FixedEvent *replication_time_end;     /* times when gene duplicates */
+  FixedEvent *replication_time_end;   /* times when gene duplicates */
   FixedEvent *replication_time_end_last;    
 
   float protein_conc[NPROTEINS];
@@ -283,12 +281,14 @@ struct CellState {
    */
   int active[NGENES][MAX_COPIES];
   /* gives the state of each of the genes, according to figure
-     1 is fully off, 2 meets TF criteria
-     3 is off but w/o nucleosome, 4 is on but w/o PIC
-     5 is on but w/o TF criteria, 6 is fully on
-  */
+   *  1 is fully off, 2 meets TF criteria
+   *  3 is off but w/o nucleosome, 4 is on but w/o PIC
+   *  5 is on but w/o TF criteria, 6 is fully on
+   * see the enum definition above
+   */
 
-  /* stores corresponding gene_ids for [de]acteylation, PIC[dis]assembly, transcriptinit */
+  /* stores corresponding gene_ids for [de]acteylation,
+     PIC[dis]assembly, transcriptinit, see enum above*/
   int state_change_ids[5][MAX_COPIES][NGENES]; 
   float RTlnKr;
   float temperature;
@@ -303,52 +303,48 @@ struct TimeCourse
   TimeCourse *next;
 };     
 
-extern const int maxelements; 
-/* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
-const int maxbound;
-const int PopSize;
-const int nmin;
-const float kRNA;
-const float ttranslation;
-const float ttranscription;
-const float pact;
-const float transcriptinit; /* replace betaon and betaoff */
-const float deacetylate;
-const float acetylate;
-const float PICassembly;
-const float startnucleus;
-const float Kr;    /* don't put this less than 1, weird things happen to koff calculation */
-const float GasConstant;
-const float cooperativity;         /* dGibbs, relative to 1 additional specific nt */
-const float cooperative_distance;  /* distance co-operativity operates, changed from 20 */ 
-const float NumSitesInGenome ;     /* updated from 1.8e+6 */
-const float selection ;
+/* see netsim.c for documentation for these global constant variables */
+extern const int MAXELEMENTS; 
+const int MAXBOUND;
+const int NMIN;
+const float KRNA;
+const float TTRANSLATION;
+const float TTRANSCRIPTION;
+const float PROB_ACTIVATING;
+const float TRANSCRIPTINIT; 
+const float DEACETYLATE;
+const float ACETYLATE;
+const float PICASSEMBLY;
+const float STARTNUCLEUS;
+const float KR;    
+const float GASCONSTANT;
+const float COOPERATIVITY;
+const float COOPERATIVE_DISTANCE; 
+const float NUMSITESINGENOME ;
 
-const float mN ;
-const int Generations;
+const float mN ;        // TODO: integrate
 
-float kon; /* lower value is so things run faster */
-/* kon=0.2225 is based on 1 molecule taking 240seconds=4 minutes
-   and 89% of the proteins being in the nucleus*/
+/* see netsim.c for documentation for these global variables */
+float kon; 
 float kon_after_burnin; 
 int burn_in;
-
-float tdevelopment;  /* default development time: can be changed at runtime */
-float timemax;       /* set an upper limit to development time */
-int current_ploidy;  /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
+float tdevelopment;  
+float timemax;       
+int current_ploidy;  
 int output;
-long seed ;          /* something is wrong here: changing seed changes nothing */
-int dummyrun;        /* used to change seed */
-int recompute_koff;  /* toggle whether to recompute certain features at each time to avoid
-                        compounding rounding error */
+long seed ;          
+int dummyrun;        
+int recompute_koff;  
 int recompute_kon;
-float critical_size ; /* critical size at which cell divides, 
-                         set to negative to prevent division  */
-float growth_rate_scaling; /* set growth rate scaling factor */
-
-float time_s_phase;          /* length of S phase (default: 30 mins) */
-float time_g2_phase;         /* length of G2/mitosis phase (default: 30 mins) */
-int random_replication_time; /* toggle replication times in S phase being random */
+float critical_size;
+float growth_rate_scaling; 
+float Pp;         
+float h;
+float gmax;
+float time_s_phase;          
+float time_g2_phase;         
+int random_replication_time; 
+float protein_aging;
 
 /* file output parameters */
 char *output_directory ;
@@ -360,15 +356,7 @@ FILE *fp_growthrate[POP_SIZE];
 FILE *fp_tfsbound[POP_SIZE];
 FILE *fp_rounding[POP_SIZE];
 
-/* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
-   Belle et al. (2006) and small with respect to most growth rates  */
-float protein_aging;
-
-/* growth rate parameters globally used during simulation */
-float Pp;         
-float h;
-float gmax;
-
+/* function prototypes */
 
 extern void initialize_parameters();
 
@@ -636,7 +624,6 @@ extern void transport_event(GillespieRates *,
                             float [NGENES],
                             TimeCourse **, 
                             TimeCourse **, 
-                            float,
                             float,
                             float,
                             float);
