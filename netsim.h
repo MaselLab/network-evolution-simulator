@@ -177,16 +177,19 @@ struct GillespieRates {
 enum { SITEID_INDEX = 0, TFID_INDEX = 1 };
 
 /*
- * enum for KonList
+ * KonList: stores information about available binding sites for a
+ * particular TF
  */
-/* enum { SITEID_INDEX = 0, TOTAL_AVAILABLE = 1 }; */
 typedef struct KonList KonList;
 struct KonList {
-  int *available_sites;
-  int site_count;
+  int *available_sites;   /* list of available sites for this TF */
+  int site_count;         /* number of available binding sites for a
+                             given TF, TODO: currently includes
+                             non-TFs for which this should always be
+                             zero */
 };
 /*
- * konStates : new composite data structure to cache information about
+ * KonStates : new composite data structure to cache information about
  * available binding sites to avoid re-computation.  This groups the
  * previous data structures:
  *
@@ -194,20 +197,13 @@ struct KonList {
  */
 typedef struct KonStates KonStates;
 struct KonStates {
-  /* number of currently *available* binding sites */
+  /* total number of currently *available* binding sites */
   int nkon;
 
   /* list of structs: need one for each protein */
   // TODO: currently KonList has cached information for both TF proteins and non-TF
   // proteins, may want to split this out at some point
   KonList *konList[NPROTEINS];
-
-  // check
-  // TODO: may remove, could be redundant with konList above
-  //
-  /* number of available binding sites for a given TF, TODO: currently
-     includes non-TFs for which this should always be zero */
-  int nkonsum[NPROTEINS];
 
   /* konvalues are rates of binding with:
    * element 0 is (protein - salphc)/c

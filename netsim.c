@@ -791,16 +791,16 @@ void calc_time (float t,
   /* loop over all proteins (TFs and non-TFs) */
   for (i=0; i < NPROTEINS; i++) {
 
-    LOG_VERBOSE_NOCELLID("t=%g, konStates->nkonsum[%d]=%d, konStates->konvalues[%d][KON_DIFF_INDEX]=%g\n", 
-                         t, i, konStates->nkonsum[i], i, konStates->konvalues[i][KON_DIFF_INDEX]);
+    LOG_VERBOSE_NOCELLID("t=%g, konStates->konList[%d]->site_count=%d, konStates->konvalues[%d][KON_DIFF_INDEX]=%g\n", 
+                         t, i, konStates->konList[i]->site_count, i, konStates->konvalues[i][KON_DIFF_INDEX]);
 
     /* if this particular TF is bound somewhere */
-    if (konStates->nkonsum[i] > 0) {
+    if (konStates->konList[i]->site_count > 0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] * t;
       if (fabs(ct)<EPSILON) ect=ct;
       else ect = 1-exp(-ct);
-      r += ((float) konStates->nkonsum[i]) * konStates->konvalues[i][KON_DIFF_INDEX] * ect;
-      numer += ((float) konStates->nkonsum[i]) * konStates->konvalues[i][KON_DIFF_INDEX] * (ect-ct*exp(-ct));
+      r += ((float) konStates->konList[i]->site_count) * konStates->konvalues[i][KON_DIFF_INDEX] * ect;
+      numer += ((float) konStates->konList[i]->site_count) * konStates->konvalues[i][KON_DIFF_INDEX] * (ect-ct*exp(-ct));
     }
   }
   numer *= kon;
@@ -830,11 +830,11 @@ void calc_kon_rate(float t,
   r = 0.0;
   /* loop through all TFs */
   for (i=0; i < TFGENES; i++) {  
-    if (konStates->nkonsum[i] > 0) {
+    if (konStates->konList[i]->site_count > 0) {
       ct = konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]*t;
       if (fabs(ct)<EPSILON) ect=ct;
       else ect = 1-exp(-ct);
-      r += ((float) konStates->nkonsum[i])*konStates->konvalues[i][KON_DIFF_INDEX]*ect;
+      r += ((float) konStates->konList[i]->site_count)*konStates->konvalues[i][KON_DIFF_INDEX]*ect;
     }
   }
   *konrate = kon*r/t;
@@ -859,12 +859,12 @@ void change_mRNA_cytoplasm(int i,
   LOG_VERBOSE("change_mRNA_cytoplasm[%d]: mRNA=%d, transl rate=%g, protein decay=%g, salphc=%g\n", 
               i, state->mRNACytoCount[i], genes->translation[i], konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX], salphc);
   
-  rates->salphc += konStates->nkonsum[i]*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
+  rates->salphc += konStates->konList[i]->site_count*kon*(salphc - konStates->konvalues[i][KON_SALPHC_INDEX]);
   rates->salphc_operations++;
 
-  rates->maxSalphc += konStates->nkonsum[i]*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
+  rates->maxSalphc += konStates->konList[i]->site_count*kon*(fmaxf(state->proteinConc[i], salphc) - fmaxf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));
   rates->maxSalphc_operations++;
-  rates->minSalphc += konStates->nkonsum[i]*kon*(fminf(state->proteinConc[i], salphc) - fminf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));    
+  rates->minSalphc += konStates->konList[i]->site_count*kon*(fminf(state->proteinConc[i], salphc) - fminf(state->proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]));    
   rates->minSalphc_operations++;
 
   konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
@@ -998,8 +998,6 @@ void remove_kon(int siteID,
     (konStates->nkon)--;
 
     /* also per gene */
-    (konStates->nkonsum[TFID])--;
-
     (konStates->konList[TFID]->site_count)--;
 
     /* move the last element end of array into space vacated by site k */
@@ -1037,7 +1035,6 @@ void add_kon(float proteinConcTFID,
 
   /* one more site available */
   (konStates->konList[TFID]->site_count)++;
-  (konStates->nkonsum[TFID])++;
   (konStates->nkon)++;
 }
 
@@ -1111,7 +1108,6 @@ void calc_from_state(Genotype *genes,
     konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
     konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
-    konStates->nkonsum[i] = 0;
     konStates->konList[i]->site_count = 0;
     LOG_VERBOSE("protein decay[%d]=%g\n", i, konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
   }
@@ -1155,7 +1151,6 @@ void calc_from_state(Genotype *genes,
     /* update the list of sites that bind for a particular TF, i */
     konStates->konList[i]->available_sites[konStates->konList[i]->site_count] = k;
     (konStates->konList[i]->site_count)++;
-    (konStates->nkonsum[i])++;
   }
 
   /* initialize konStates->nkon as the total number of binding sites */
@@ -1164,8 +1159,8 @@ void calc_from_state(Genotype *genes,
   for (i=0; i < NGENES; i++) {
 
     // FIXME: this updates konStates for non-TFs, even though this isn't used
-    LOG("after initializing konStates for gene=%d, nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
-        i, konStates->nkonsum[i], konStates->konList[i]->site_count, genes->tfsPerGene[i], konStates->nkon);
+    LOG("after initializing konStates for gene=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
+        i, konStates->konList[i]->site_count, genes->tfsPerGene[i], konStates->nkon);
 
     transport[i] = kRNA * (float) (state->mRNANuclearCount[i]);
     rates->transport += transport[i];
@@ -1936,8 +1931,8 @@ void update_protein_conc_cell_size(float proteinConc[],
     proteinConc[i] = konStates->konvalues[i][KON_SALPHC_INDEX]*ect1 + ect*proteinConc[i];
 
     konStates->konvalues[i][KON_DIFF_INDEX] = (proteinConc[i] - konStates->konvalues[i][KON_SALPHC_INDEX]) / konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX];
-    rates->maxSalphc += ((float) konStates->nkonsum[i]) * fmaxf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
-    rates->minSalphc += ((float) konStates->nkonsum[i]) * fminf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
+    rates->maxSalphc += ((float) konStates->konList[i]->site_count) * fmaxf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
+    rates->minSalphc += ((float) konStates->konList[i]->site_count) * fminf(proteinConc[i], konStates->konvalues[i][KON_SALPHC_INDEX]);
     
     if (i == SELECTION_GENE) {  /* now find out the protein concentration at end of dt interval and compute growth rate */
       L_next = proteinConc[i];
@@ -2516,8 +2511,8 @@ void replicate_gene(CellState *state,
   /* double the number of copies of gene being replicating */
   genes->copies[geneID] = 2*current_ploidy;
 
-  LOG("[gene %2d] before removing all TFs: nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
-      geneID, konStates->nkonsum[geneID], konStates->konList[geneID]->site_count, genes->tfsPerGene[geneID],
+  LOG("[gene %2d] before removing all TFs: site_count=%d, tfsPerGene=%d, nkon=%d\n", 
+      geneID, konStates->konList[geneID]->site_count, genes->tfsPerGene[geneID],
       konStates->nkon);
   LOG("[gene %2d] before removing all TFs: tfBoundCount=%d, tfHinderedCount=%d\n", geneID, state->tfBoundCount, state->tfHinderedCount);
   
@@ -2566,8 +2561,8 @@ void replicate_gene(CellState *state,
   LOG("[gene %2d] has %d TFBS before replication [run from %d to %d]\n", 
       geneID, number_tfbs_pre_replication, start_tfbs_pos, end_tfbs_pos);
 
-  LOG("[gene %2d] after removing all TFs: nkonsum=%d, site_count=%d, tfsPerGene=%d, nkon=%d\n", 
-      geneID, konStates->nkonsum[geneID], konStates->konList[geneID]->site_count, genes->tfsPerGene[geneID],
+  LOG("[gene %2d] after removing all TFs: site_count=%d, tfsPerGene=%d, nkon=%d\n", 
+      geneID, konStates->konList[geneID]->site_count, genes->tfsPerGene[geneID],
       konStates->nkon);
 
   LOG("[gene %2d] after removing all TFs: tfBoundCount=%d, tfHinderedCount=%d\n", geneID, state->tfBoundCount, state->tfHinderedCount);  
@@ -2716,7 +2711,6 @@ void recompute_kon_rates(GillespieRates *rates,
         // update the list of sites that bind for a particular TF, i
         konStates->konList[tfID]->available_sites[konStates->konList[tfID]->site_count] = k;
         (konStates->konList[tfID]->site_count)++;
-        (konStates->nkonsum[tfID])++;
         konStates->nkon++;
       }
     } 
@@ -2818,7 +2812,6 @@ void recalibrate_cell(GillespieRates *rates,
     konStates->konvalues[i][KON_DIFF_INDEX] = (state->proteinConc[i] - salphc) / (protein_decay);
     konStates->konvalues[i][KON_PROTEIN_DECAY_INDEX] = (protein_decay);
     konStates->konvalues[i][KON_SALPHC_INDEX] = salphc;
-    konStates->nkonsum[i] = 0;  
     konStates->konList[i]->site_count = 0;
   }
   konStates->nkon = 0;   /* initialize to zero */
