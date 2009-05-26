@@ -745,7 +745,7 @@ void initialize_cell_cache(CellState *state,
 {
   int i;
   /* number of possible binding sites */
-  // TODO: currently create for all proteins, not just TFs, as we need info for protein decay
+  /* currently create for all proteins, not just TFs, as we need info for protein decay */
   for (i=0; i < NPROTEINS; i++){
     kon_states->kon_list[i] = malloc(sizeof(KonList));
     kon_states->kon_list[i]->available_sites = malloc(genes.binding_sites_num*sizeof(int));
@@ -775,9 +775,8 @@ void calc_time (float t,
   
   r = numer = 0.0;
 
-  /* loop over all proteins (TFs and non-TFs) */
-  // TODO: check
-  for (i=0; i < NPROTEINS; i++) {
+  /* loop over all only TFs that bind */
+  for (i=0; i < TFGENES; i++) {
 
     LOG_VERBOSE_NOCELLID("t=%g, kon_states->kon_list[%d]->site_count=%d, kon_states->konvalues[%d][KON_DIFF_INDEX]=%g\n", 
                          t, i, kon_states->kon_list[i]->site_count, i, kon_states->konvalues[i][KON_DIFF_INDEX]);
@@ -1082,7 +1081,6 @@ void calc_from_state(Genotype *genotype,
   float salphc, protein_conc_for_tfid; 
   float protein_decay;
 
-  // TODO FIXME: this updates kon_states for non-TFs, even though this isn't used
   for (i=0; i < NPROTEINS; i++) {
     /* if protein decay is otherwise going to fall below cut-off, use aging term */
     protein_decay = genotype->proteindecay[i] >= protein_aging ? genotype->proteindecay[i] : protein_aging;
@@ -2783,9 +2781,11 @@ void recalibrate_cell(GillespieRates *rates,
     rates->mRNAdecay_operations++;
 
   }
-
-  /* recompute koffvalues for all sites */
-  recompute_koff_rates(rates, state, genotype, *koffvalues, TIME_INFINITY);
+  /* recompute koffvalues for all sites: note that a time is required
+     by the function only for diagnostic purposes, it isn't used by
+     the function, and since we don't have available a current time in
+     this function, we simply feed it a dummy time of 0.0  */
+  recompute_koff_rates(rates, state, genotype, *koffvalues, 0.0);
 
   /* recompute and cache the total rate in data structure */
   rates->subtotal += rates->transport;
@@ -3665,13 +3665,13 @@ int do_single_timestep(Genotype *genotype,
   float fixed_time;
 
   /* if enabled, check for rounding error and recompute rates */
-  /* check drift from koff every 1e6 operations or if they go negative */
-  if (recompute_koff && (rates->koff_operations >= 1e6 || rates->koff < 0.0)) {
+  /* check drift from koff every RATE_OPERATIONS operations or if they go negative */
+  if (recompute_koff && (rates->koff_operations >= RATE_OPERATIONS || rates->koff < 0.0)) {
     LOG_WARNING("(t=%g) after %d operations recompute koff rates\n", *t, rates->koff_operations);
     recompute_koff_rates(rates, state, genotype, koffvalues, *t);
   }
-  /* check drift from various kon rates every 1e6 operations or if they go negative */
-  if (recompute_kon && (rates->salphc_operations >= 1e6 || rates->salphc < 0.0)) {
+  /* check drift from various kon rates every RATE_OPERATIONS operations or if they go negative */
+  if (recompute_kon && (rates->salphc_operations >= RATE_OPERATIONS || rates->salphc < 0.0)) {
     LOG_WARNING("(t=%g) after %d operations recompute kon rates\n", *t, rates->salphc_operations);
     recompute_kon_rates(rates, state, genotype, kon_states, 0);
   } 
@@ -3684,16 +3684,8 @@ int do_single_timestep(Genotype *genotype,
   if (*t > 0.00005 && state->burn_in) {
     printf("recalibrating cell %3d after burn-in!\n", state->cell_id);
     LOG("recalibrating cell %3d after burn-in!\n", state->cell_id);
-    log_snapshot(rates,
-                 state,
-                 genotype,
-                 kon_states,
-                 &koffvalues,
-                 mRNAdecay,
-                 transport, 
-                 *konrate,
-                 *x,
-                 *t);
+    log_snapshot(rates, state, genotype, kon_states, &koffvalues,
+                 mRNAdecay, transport, *konrate, *x, *t);
 
     kon = kon_after_burnin;     /* reset kon to the post-burn-in value */
     recalibrate_cell(rates,
@@ -3705,25 +3697,8 @@ int do_single_timestep(Genotype *genotype,
                      transport,
                      *dt); 
 
-    // TODO: check!
-    /* compute konrate (which is constant over the Gillespie step) */
-    if (kon_states->nkon==0) {
-      *konrate = (-rates->salphc);    /* all binding sites are occupied, total rate of binding is zero */
-      LOG_WARNING("kon_states->nkon=%d, konrate=%g\n", kon_states->nkon, *konrate);
-    } else  {
-      calc_kon_rate(*dt, kon_states, konrate);           /* otherwise compute konrate */
-    }
-
-    log_snapshot(rates,
-                 state,
-                 genotype,
-                 kon_states,
-                 &koffvalues,
-                 mRNAdecay,
-                 transport,
-                 *konrate,
-                 *x,
-                 *t);
+    log_snapshot(rates, state, genotype, kon_states, &koffvalues,
+                 mRNAdecay, transport, *konrate, *x, *t);
     state->burn_in = 0;    /* now disable burn-in */
   } 
 
@@ -3854,13 +3829,12 @@ int do_single_timestep(Genotype *genotype,
      this  */
   if (*t+*dt < tdevelopment || no_fixed_dev_time) {
     
-    // TODO: check this logic!
-    /* compute konrate (which is constant over the Gillespie step) */
+    /* compute konrate */
     if (kon_states->nkon==0) {
       *konrate = (-rates->salphc);    /* all binding sites are occupied, total rate of binding is zero */
-      LOG_ERROR("kon_states->nkon=%d, konrate=%g\n", kon_states->nkon, *konrate);
+      LOG_WARNING("kon_states->nkon=%d, konrate=%g\n", kon_states->nkon, *konrate);
     } else  {
-      calc_kon_rate(*dt, kon_states, konrate);           /* otherwise compute konrate */
+      calc_kon_rate(*dt, kon_states, konrate);  /* otherwise compute konrate */
     }
 
     /* if the total rates falls below zero, we do an emergency recalibration of cell */
@@ -3868,7 +3842,6 @@ int do_single_timestep(Genotype *genotype,
       log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
       LOG_ERROR("x should always be >0 t=%g (x=%g) rates->subtotal=%g, konrate=%g, recalibrate cell!\n", *t, *x, rates->subtotal, *konrate); 
       recalibrate_cell(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *dt); 
-      calc_kon_rate(*dt, kon_states, konrate);           /* also recompute konrate */
       log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
 
       /* if this still results in either zero or negative total rates,
@@ -3876,7 +3849,6 @@ int do_single_timestep(Genotype *genotype,
          activity etc.  We mark cell as "dead" in this case, and
          remove from queue. */
       if (!(rates->subtotal + *konrate > 0.0)) {  
-        //*t = TIME_INFINITY;  TODO: should remove, not needed
         LOG_ERROR("cell is effectively dead\n"); 
         return -1;        /* return cell status as "dead" */
       }
@@ -3941,7 +3913,7 @@ int do_single_timestep(Genotype *genotype,
             /* 
              * STOCHASTIC EVENT: TF binding event
              */
-            if (*x < rates->salphc + (*konrate)) {   /* add variable (salphc) and constant (konrate) */
+            if (*x < rates->salphc + (*konrate)) {   /* get total on rate = sum of (salphc) and (konrate) */
               tf_binding_event(rates, state, genotype, kon_states, koffvalues,
                                timecoursestart, timecourselast, (*konrate), *dt, *t, 
                                maxbound2, maxbound3, 1);
@@ -4072,7 +4044,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
   int divisions = 0;    /* no cell divisions yet */
   int mother_id;         /* mother cell at division */
   int daughter_id;       /* daughter cell at division */
-  int large_cell_size = 0;  /* TODO: count the number of times cell_size exceeds Y=2.0 */
+  int large_cell_size = 0;  /* count the number of times cell_size exceeds Y=2.0 */
 
   /* keep a reaper queue from which to choose 'dead cells', if there
      are any, as daughter cells when dividing */
@@ -4199,19 +4171,6 @@ void init_run_pop(Genotype genotype[POP_SIZE],
       continue;
     }
    
-    // TODO: cleanup
-    /* abort if a population of one cell, undergoing a single division
-       exceeds an maximum upper limit */
-    if (POP_SIZE==1 && max_divisions==1 && timemax > 0.0) {
-      if (t[cell] > timemax) {
-        printf("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
-               cell, t[cell], timemax);
-        LOG_ERROR("[cell %03d] at t=%g exceeds the maximum time of t=%g\n", 
-                  cell, t[cell], timemax);
-        break;
-      }
-    }
-
     if (t[cell] >= (state[cell]).division_time)  {  /* we have now reached cell division */
       int keep_mother, keep_daughter;
       float current_division_time = (state[cell]).division_time;  // store current division time
@@ -4225,6 +4184,12 @@ void init_run_pop(Genotype genotype[POP_SIZE],
 
         LOG_NOCELLID("[cell %03d] at t=%g cell size =%g, exceeding Y=2.0, %d of %d divisions (%g fraction)\n", 
                      cell, t[cell], state[cell].cell_size, large_cell_size, divisions, (double)large_cell_size/(double)divisions);
+        // TODO: currently this just keeps track of the fraction of divisions that the cell exceeds 2.0
+        // to implement:
+        //  1. a check that a threshold has been reached
+        //  2. choose a new, lower growth_rate_scaling
+        //  3. re-run initialize_growth_rate_parameters() to recompute gpeak etc.
+        //  4. for each cell in the population, run recalibrate_cell() to compute new rates etc.
       }
 
       /* to get new daughter cell slot, first check list of empty cells */

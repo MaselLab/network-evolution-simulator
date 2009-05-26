@@ -25,14 +25,14 @@
  * both function value and first deriv.x  
  */
 float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *, float *), 
-             float x, GillespieRates *rates, KonStates *konStates, float x1, float x2, float xacc)
+             float x, GillespieRates *rates, KonStates *kon_states, float x1, float x2, float xacc)
 {
   int j,done;
   float df,dx,dxold,f,fh,fl;
   float temp,xh,xl,rts;
   
-  (*funcd)(x1, x, rates, konStates, &fl, &df);
-  (*funcd)(x2, x, rates, konStates, &fh, &df); /* note df isn't used here */
+  (*funcd)(x1, x, rates, kon_states, &fl, &df);
+  (*funcd)(x2, x, rates, kon_states, &fh, &df); /* note df isn't used here */
   if (fabs(fl) < 1e-9) return x1;
   if (fabs(fh) < 1e-9) return x2;
   if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0)){
@@ -49,7 +49,7 @@ float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *,
   rts=0.5*(x1+x2);
   dxold=fabs(x2-x1);
   dx=dxold;
-  (*funcd)(rts, x, rates, konStates, &f, &df);
+  (*funcd)(rts, x, rates, kon_states, &f, &df);
   done = 0;
   for (j=1;j<=MAXIT;j++){
     if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0) || (fabs(2.0*f) > fabs(dxold*df))) {
@@ -71,7 +71,7 @@ float rtsafe(void (*funcd)(float, float, GillespieRates *, KonStates *, float *,
       else rts = fminf(2.0*x2,(xl+xh)/2.0);
       fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
     }
-    if (j>1 || done==0) (*funcd)(rts, x, rates, konStates, &f, &df);
+    if (j>1 || done==0) (*funcd)(rts, x, rates, kon_states, &f, &df);
     if (f < 0.0) xl=rts;
     else xh=rts;   
   }

@@ -17,6 +17,7 @@
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
 #define TIME_INFINITY 9.99e10
+#define RATE_OPERATIONS 1e6   /* number of operations on a rate before recomputing that rate */
 
 #ifndef MAX_COPIES
 #define MAX_COPIES 4       /* each gene can exists with four copies during replication */

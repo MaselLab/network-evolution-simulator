@@ -59,12 +59,12 @@ DIFF_CMD := @diff -r --exclude=rounding*.dat --exclude=.svn --exclude=NOTES --ex
 
 ## check specific directory
 check-haploid:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DNO_SEPARATE_GENE -DPOP_SIZE=1 -DUSE_RAND=1" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DNO_SEPARATE_GENE -DPOP_SIZE=1" netsim-check
 	./netsim-check -r 4 -p 1 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2009-05-26-haploid-with-ran1-r-4,$(DIFF_CMD)))
 
 check-diploid:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE -DPOP_SIZE=1 -DUSE_RAND=1" netsim-check
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15  -DNO_SEPARATE_GENE -DPOP_SIZE=1" netsim-check
 	./netsim-check -r 4 -p 2 -d output -c -1.0
 	$(subst RUN,output,$(subst ORIG,2009-05-26-diploid-with-ran1-r-4,$(DIFF_CMD)))
 
@@ -77,6 +77,12 @@ check-selection:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection
 	./netsim-selection -r 4 -p 2 -d selection -c -1.0
 	$(subst RUN,selection,$(subst ORIG,2009-05-26-selection-with-ran1-r-4,$(DIFF_CMD)))
+
+check-burn-in:	clean
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-selection
+	./netsim-selection -r 4 -p 2 -d selection -c -1.0 --kon 0.225 --konafter 1e-4
+	$(subst RUN,selection,$(subst ORIG,2009-05-26-burn-in-diploid-r-4,$(DIFF_CMD)))
+
 
 ## TODO: not recently tested
 check-sample-output:	clean
@@ -91,7 +97,7 @@ check-multiple-pops:	clean
 	$(subst RUN,multiple-pops,$(subst ORIG,2009-05-26-division-time-multiple-pops-r-5,$(DIFF_CMD)))
 
 ## all known working regression tests
-check-all: check-haploid check-diploid check-replication check-selection check-multiple-pops
+check-all: check-haploid check-diploid check-replication check-burn-in check-multiple-pops check-selection 
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500

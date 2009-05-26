@@ -346,8 +346,10 @@ run(){
 				x -= (rates.salphc + (konrate));        
 				// STOCHASTIC EVENT: a TF unbinds (koff) 
 				if (x < rates.koff) {  
+          // gets set to true (1) if unbinding failed
+          int unbinding_failed = 0;
 					tf_unbinding_event(&rates, &state, &genotype, &konStates, koffvalues,
-						timecoursestart,  timecourselast, (konrate), dt, t, x, 0);
+                             timecoursestart,  timecourselast, (konrate), dt, t, x, 0, &unbinding_failed);
 				} else {
 					//x -= rates.koff;  
 					//

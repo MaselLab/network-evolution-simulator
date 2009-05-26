@@ -86,3 +86,15 @@ CellState->state_change_ids  ACTEYLATION_STATE = 0,
                              PICASSEMBLY_STATE = 2,
                              TRANSCRIPTINIT_STATE = 3, 
                              PICDISASSEMBLY_STATE = 4
+
+
+TODO list
+========
+
+Other potential minor cleanups that aren't urgent but could be done at
+some later point:
+
+- rename remove_kon and add_kon to something else, e.g. free_binding_site
+- refactor calc_from_state() to use parts of recalibrate_cell()
+- move some helper print_ functions etc. to a new output.c file?
+- make length of burn-in a command-line parameter
