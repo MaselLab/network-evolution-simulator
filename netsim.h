@@ -24,28 +24,27 @@
 #endif
 
 #ifdef  NO_SEPARATE_GENE    /* set to true if selection gene is also a TF */
-#ifndef TFGENES
-#define TFGENES 10          /* number of genes encoding TFs */
-#endif
-#ifndef NGENES
-#define NGENES TFGENES      /* total number of cisreg genes */
-#endif
-#ifndef NPROTEINS
-#define NPROTEINS TFGENES   /* total number of types of proteins */
-#endif
-#define SELECTION_GENE (NGENES-1)    /* index of selection gene */
-
+  #ifndef TFGENES
+  #define TFGENES 10          /* number of genes encoding TFs */
+  #endif
+  #ifndef NGENES
+  #define NGENES TFGENES      /* total number of cisreg genes */
+  #endif
+  #ifndef NPROTEINS
+  #define NPROTEINS TFGENES   /* total number of types of proteins, may be >#GENES if extracellular signals */
+  #endif
+  #define SELECTION_GENE (NGENES-1)    /* index of selection gene */
 #else                       /* otherwise, by default assuming selection gene is not a TF */
-#ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 10
-#endif
-#ifndef NGENES
-#define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
-#endif
-#ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
-#define NPROTEINS (TFGENES+1)
-#endif
-#define SELECTION_GENE (NGENES-1)   /* index of selection gene: always the last gene */
+  #ifndef TFGENES             /* number of genes encoding TFs */
+  #define TFGENES 10
+  #endif
+  #ifndef NGENES
+  #define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
+  #endif
+  #ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
+  #define NPROTEINS (TFGENES+1)
+  #endif
+  #define SELECTION_GENE (NGENES-1)   /* index of selection gene: always the last gene */
 #endif
 
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
@@ -60,30 +59,30 @@
  * define macros for logging output and warning/errors 
  */
 #ifndef LOGGING_OFF
-#define LOG(...) { fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cell_id); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
-#define LOG_NOCELLID(...) { fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
-#define LOG_ERROR(...) { fprintf(fperrors, "[%s: cell %03d ERROR] ", __func__, state->cell_id); \
+  #define LOG(...) { fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cell_id); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
+  #define LOG_NOCELLID(...) { fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
+  #define LOG_ERROR(...) { fprintf(fperrors, "[%s: cell %03d ERROR] ", __func__, state->cell_id); \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_ERROR_NOCELLID(...) { fprintf(fperrors, "[%s ERROR] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_WARNING(...) { fprintf(fperrors, "[%s: cell %03d WARNING] ", __func__, state->cell_id); \
+  #define LOG_ERROR_NOCELLID(...) { fprintf(fperrors, "[%s ERROR] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+  #define LOG_WARNING(...) { fprintf(fperrors, "[%s: cell %03d WARNING] ", __func__, state->cell_id); \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_WARNING_NOCELLID(...) { fprintf(fperrors, "[%s WARNING] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_NOFUNC(...) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_VERBOSE_NOFUNC(...) if (verbose) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_VERBOSE(...) if (verbose) { \
+  #define LOG_WARNING_NOCELLID(...) { fprintf(fperrors, "[%s WARNING] ", __func__); fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+  #define LOG_NOFUNC(...) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+  #define LOG_VERBOSE_NOFUNC(...) if (verbose) { fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
+  #define LOG_VERBOSE(...) if (verbose) { \
     if (state!=NULL)                  \
       fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cell_id); \
     else \
       fprintf(fperrors, "[%s] ", __func__);  \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
-#define LOG_VERBOSE_NOCELLID(...) if (verbose) { \
+  #define LOG_VERBOSE_NOCELLID(...) if (verbose) { \
     fprintf(fperrors, "[%s] ", __func__);                 \
     fprintf (fperrors, __VA_ARGS__); fflush(fperrors); }
 #else
-#define LOG
-#define LOG_ERROR
-#define LOG_NOFUNC
-#define LOG_VERBOSE
+  #define LOG
+  #define LOG_ERROR
+  #define LOG_NOFUNC
+  #define LOG_VERBOSE
 #endif
 
 /*
@@ -91,7 +90,7 @@
  */
 
 /* 
- * enum for 'konvalues' indices
+ * enumeration for 'konvalues' indices
  * are rates of binding with:
  * element KON_DIFF          is (proteinConc - salphc)/proteindecay
  * element KON_PROTEIN_DECAY is proteindecay
@@ -129,17 +128,11 @@ enum { ACETYLATION_STATE = 0,
  * - acetylation and deacetylation, 
  * - and PIC assembly and disassembly.
  *
- * was formerly float rates[8];  and int rates2[5] 
- * rates: total rates for 0-koff,1-transport,2-mRNAdecay,3-PIC disassembly,
- *  4-salphc,5-max(L,salphc),6-min(L,salphc) c>0 and 7-total incl. rates2
- *  3-PIC disassembly used to be 3-transcriptinit
- * rates2: #genes for 0-acetylation 1-deacetylation, 2-PIC assembly, 
- *  3-transcriptinit, 4=PIC disassembly
  */
 typedef struct GillespieRates GillespieRates;
 struct GillespieRates {
   float koff;              /* rates[0] */
-  int koff_operations;
+  int koff_operations;     /* keeps track of when rounding errors should be recalc*/
   float transport;         /* rates[1] */
   int transport_operations;
   float mRNAdecay;         /* rates[2] */
@@ -156,7 +149,7 @@ struct GillespieRates {
   float min_salphc;         /* rates[6] */
   int min_salphc_operations;
 
-  /* number of genes in the following states, the rates of the
+  /* number of genes subject ot the following transitions, the rates of the
      relevant process are computed from these numbers */
   int acetylation_num[MAX_COPIES];       
   int deacetylation_num[MAX_COPIES];     
@@ -176,15 +169,13 @@ typedef struct KonList KonList;
 struct KonList {
   int *available_sites;   /* list of available sites for this TF */
   int site_count;         /* number of available binding sites for a
-                             given TF, TODO: currently includes
-                             non-TFs for which this should always be
-                             zero */
+                             given TF. Zero if protein is not a TF. */
 };
 
 /*
- * KonStates : new composite data structure to cache information about
- * available binding sites to avoid re-computation.  This groups the
- * previous data structures:
+ * KonStates : composite data structure to cache information about
+ * available binding sites to avoid re-computation.  This groups 
+ * info for all TFs:
  *
  * konIDs, konvalues, nkonsum
  */
@@ -227,17 +218,17 @@ struct Genotype {
   int hindrance_positions[TFGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
   int binding_sites_num;                    /* total number of binding sites */
   AllTFBindingSites *all_binding_sites;
-  float mRNAdecay[NGENES];
+  float mRNAdecay[NGENES];            /* kinetic rates*/
   float proteindecay[NGENES];
   float translation[NGENES];
   int activating[NGENES][MAX_COPIES]; /* 1 is activating, 0 is repressing */
   float pic_disassembly[NGENES][MAX_COPIES];
   int copies[NGENES];                 /* current per-gene ploidy */
-  float replication_time[NGENES];     /* per-gene replication time */
+  float replication_time[NGENES];     /* per-gene replication time within S phase*/
 
   /* cached quantities for efficiency, can be recomputed from the above genotype, not part of model */
-  int sites_per_gene[NGENES];               /* cache number of TFs per gene */
-  int site_id_pos[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs */
+  int sites_per_gene[NGENES];               /* cache number of TFBSs per gene */
+  int site_id_pos[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs for each cis-reg sequence for use during replication and division*/
 };
 
 /* 
@@ -253,17 +244,14 @@ struct FixedEvent {
   FixedEvent *next;
 };
 
-/*
- * cell state
- */
 typedef struct CellState CellState;
 struct CellState {
   int cell_id;                        /* cell ID */
   int founder_id;                     /* keep track of the founder cell */
   int burn_in;                        /* keep track of whether burn-in has finished */
   int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
-  int divisions;                      /* total number of divisions cell has undergone */
-  float division_time;                /* current division time */ 
+  int divisions;                      /* total number of divisions cell has undergone as mother, reset as daughter */
+  float division_time;                /* in global time, TIME_INFINITY until start of S phase*/ 
   float cell_size;                    /* size of cell */
   float growth_rate;                  /* total growth rate in the previous deltat */
   int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
@@ -274,12 +262,12 @@ struct CellState {
   int mRNA_transcr_num[NGENES][MAX_COPIES];  /* mRNAs which haven't finished transcription yet */
   FixedEvent *mRNA_transcr_time_end;  /* times when transcription is complete and an mRNA is available to move to cytoplasm */
   FixedEvent *mRNA_transcr_time_end_last;
-  FixedEvent *replication_time_end;   /* times when gene duplicates */
+  FixedEvent *replication_time_end;   /* times when genes (start and) finish replicating */
   FixedEvent *replication_time_end_last;    
 
   float protein_conc[NPROTEINS];
   int tf_bound_num;
-  int *tf_bound_indexes;                /* tf_bound_indexes lists just bound TFs according to binding site index in all_binding_sites */
+  int *tf_bound_indexes;                /* indices in all_binding_sites that are currently bound*/
   int tf_hindered_num;
   int (*tf_hindered_indexes)[2];
   /* 1st elem tf_hindered_indexes lists binding site indices that cannot be bound due to steric hindrance
@@ -294,7 +282,7 @@ struct CellState {
    * see the enum definition above
    */
 
-  /* stores corresponding gene_ids for [de]acteylation,
+  /* stores corresponding gene_ids ready for [de]acteylation,
      PIC[dis]assembly, transcriptinit, see enum above*/
   int state_change_ids[5][MAX_COPIES][NGENES]; 
   float RTlnKr;
@@ -333,7 +321,7 @@ const float COOPERATIVITY;
 const float COOPERATIVE_DISTANCE; 
 const float NUMSITESINGENOME ;
 
-const float mN ;        // TODO: integrate
+const float mN ;     
 
 /* see netsim.c for documentation for these global variables */
 float kon; 
@@ -362,10 +350,12 @@ char *output_directory ;
 int verbose ;
 FILE *fperrors;
 FILE *fp_cellsize[POP_SIZE];
+#if 0 
 FILE *fp_koff[POP_SIZE];
 FILE *fp_growthrate[POP_SIZE];
 FILE *fp_tfsbound[POP_SIZE];
 FILE *fp_rounding[POP_SIZE];
+#endif
 
 /* function prototypes */
 

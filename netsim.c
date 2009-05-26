@@ -42,6 +42,8 @@ const float NUMSITESINGENOME = 1.3e+6; /* updated from 1.8e+6 */
 
 const float mN = 3.3e-10 * 5e6;    /* Lynch et al. (2008), Tsai et al. (2008)  */
 
+/* below are default options, can be changed on command line*/
+
 float kon=1e-4;              /* lower value is so things run faster */
                              /* actual value should be kon=0.2225 is
                                 based on 1 molecule taking
@@ -66,6 +68,8 @@ float growth_rate_scaling = 2.0; /* set default growth rate scaling factor */
 float time_s_phase = 30.0;  /* length of S phase (default: 30 mins) */
 float time_g2_phase = 30.0; /* length of G2/mitosis phase (default: 30 mins) */
 int random_replication_time = 1; /* replication times in S phase are random by default */
+
+/* end default options */
 
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */
@@ -207,6 +211,7 @@ void print_all_binding_sites(int copies[NGENES],
   }
 }
 
+#if 0
 void print_tf_occupancy(CellState *state,
                         AllTFBindingSites *all_binding_sites,
                         float t)
@@ -224,13 +229,13 @@ void print_tf_occupancy(CellState *state,
     gene_copy = all_binding_sites[state->tf_bound_indexes[j]].gene_copy;
     bound_count[gene_id][gene_copy]++;
   }
-
   fprintf(fp_tfsbound[state->cell_id], "%g %d ", t, state->tf_bound_num);
   for (i = 0; i < NGENES; i++) 
     for (j = 0; j < MAX_COPIES; j++) 
       fprintf(fp_tfsbound[state->cell_id], "%d ", bound_count[i][j]);
 
   fprintf(fp_tfsbound[state->cell_id], "\n");
+
 }
 
 void print_rounding(CellState *state, GillespieRates *rates, float t)
@@ -239,6 +244,7 @@ void print_rounding(CellState *state, GillespieRates *rates, float t)
           t, rates->koff_operations, rates->transport_operations, rates->mRNAdecay_operations, 
           rates->pic_disassembly_operations, rates->salphc_operations, rates->max_salphc_operations, rates->min_salphc_operations);
 }
+#endif
 
 void initialize_genotype_fixed(Genotype *genotype, 
                                float kdis[],
@@ -4004,7 +4010,7 @@ int do_single_timestep(Genotype *genotype,
 }
 
 /*
- * develop: initialize the population of cells, then run for a given
+ * initialize the population of cells, then run for a given
  * number of divisions or run cell(s) for a specific length of time
  */
 void init_run_pop(Genotype genotype[POP_SIZE],
@@ -4028,7 +4034,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
   KonStates kon_states[POP_SIZE];
   GillespieRates rates[POP_SIZE];
 
-  float t[POP_SIZE];
+  float t[POP_SIZE];             /* time of last event */
   float *koffvalues[POP_SIZE];   /* rates of unbinding */
   float transport[POP_SIZE][NGENES];  /* transport rates of each mRNA */
   float mRNAdecay[POP_SIZE][NGENES];  /* mRNA decay rates */
@@ -4037,18 +4043,13 @@ void init_run_pop(Genotype genotype[POP_SIZE],
   float konrate[POP_SIZE];
 
   /* priority queue and time step initialization */
-  bheap_t *priority_queue, *reaper_queue;
-  float t_next = 0.0;   /* initialize to zero */
-  int cell = 0;         /* initialize cell number (use 0 when running
-                           for fixed development time) */
+  bheap_t *priority_queue, *reaper_queue; /*living cells and empty slots*/
+  float t_next = 0.0;  
+  int cell = 0;         /* next cell to have an event */
   int divisions = 0;    /* no cell divisions yet */
   int mother_id;         /* mother cell at division */
   int daughter_id;       /* daughter cell at division */
-  int large_cell_size = 0;  /* count the number of times cell_size exceeds Y=2.0 */
-
-  /* keep a reaper queue from which to choose 'dead cells', if there
-     are any, as daughter cells when dividing */
-  int keep_reaper_queue = 1;  
+  int large_cell_size = 0;  /* count the number of times cell_size exceeds Y=2.0*/
 
   maxbound2 = MAXBOUND;
   maxbound3 = 10*MAXBOUND;
@@ -4095,7 +4096,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
     /* initialize KonStates data structures */
     initialize_cell_cache(&(state[j]), genotype[j], &(kon_states[j]), &(koffvalues[j]), maxbound2, maxbound3);
 
-    /* initialize transcriptional state of genes */
+    /* initialize transcriptional state of genes and computes initial rates */
     calc_from_state(&genotype[j], &state[j], &rates[j], &kon_states[j], transport[j], mRNAdecay[j]);
 
     t[j] = 0.0;  /* time starts at zero */
@@ -4126,12 +4127,11 @@ void init_run_pop(Genotype genotype[POP_SIZE],
 
   while ((no_fixed_dev_time && divisions < max_divisions) ||    /* no fixed dev time, run until # divisions reached */
          (!no_fixed_dev_time && t_next < tdevelopment)) {       /* or, if fixed dev time, run until tdevelopment reached */
-
-    /* get the next cell with the smallest t to advance next */
+                                                                /* TODO: when evolutionary goal is achieved! */
     int cell_status; 
-
+    
     LOG_VERBOSE_NOCELLID("before choosing next cell (queue len reaper=%03d, main=%03d)\n", reaper_queue->n, priority_queue->n);
-
+    /* get the next cell with the smallest t to advance next */
     if (reaper_queue->n == POP_SIZE || priority_queue->n == 0) {
       /* if all cells in population are dead, we exit */
       LOG_NOCELLID("all %03d cells in population are dead, main queue len=%03d\n", reaper_queue->n, priority_queue->n);
@@ -4163,8 +4163,8 @@ void init_run_pop(Genotype genotype[POP_SIZE],
     if (cell_status == -1)  {   /* if cell is dead */
       /* for debugging purposes, print out protein time courses when a cell is found to be dead */
       print_all_protein_time_courses(timecoursestart, timecourselast);
-      if (keep_reaper_queue)        /* add this cell to list of empty cell locations */
-        insert_with_priority_heap(reaper_queue, cell, TIME_INFINITY);
+      /* add this cell to list of empty cell locations */
+      insert_with_priority_heap(reaper_queue, cell, TIME_INFINITY);
       LOG_NOCELLID("[cell %03d] added here to reaper_queue as a dead cell, t_next=%g, t=%g (queue len reaper=%03d, main=%03d)\n", 
                    cell, t_next, t[cell], reaper_queue->n, priority_queue->n);
       /* this cell is dead, so don't add back to main priority queue, skip to next event */
@@ -4184,12 +4184,14 @@ void init_run_pop(Genotype genotype[POP_SIZE],
 
         LOG_NOCELLID("[cell %03d] at t=%g cell size =%g, exceeding Y=2.0, %d of %d divisions (%g fraction)\n", 
                      cell, t[cell], state[cell].cell_size, large_cell_size, divisions, (double)large_cell_size/(double)divisions);
-        // TODO: currently this just keeps track of the fraction of divisions that the cell exceeds 2.0
+        // TODO: currently this just keeps track of the number of divisions that the cell exceeds 2.0
         // to implement:
+        //  0. let this number go down after a fat cell divides
         //  1. a check that a threshold has been reached
         //  2. choose a new, lower growth_rate_scaling
         //  3. re-run initialize_growth_rate_parameters() to recompute gpeak etc.
         //  4. for each cell in the population, run recalibrate_cell() to compute new rates etc.
+        //  5. now have machinery for simulated annealing, get evolution to work.
       }
 
       /* to get new daughter cell slot, first check list of empty cells */
@@ -4200,7 +4202,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
         LOG_NOCELLID("[cell %03d] in reaper_queue (length=%03d) used as daughter cell\n", daughter_id, reaper_queue->n);
       } else {
         /* otherwise choose one of the now POP_SIZE + 1 (since the mother has reproduced) other cell randomly to die */
-        daughter_id = rint(POP_SIZE*ran1(&seed));  
+        daughter_id = trunc((POP_SIZE+1)*ran1(&seed));  /*for Alex: regression change here*/
 
         if (daughter_id == mother_id) {          /* daughter replaces mother */
           LOG_NOCELLID("daughter=%03d replaces mother=%03d\n", daughter_id, mother_id);
@@ -4227,8 +4229,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
       LOG_NOCELLID("[cell %03d] (size=%g) dividing into mother=%03d and daughter=%03d at t=%g, division=%g, total divisions=%d (t_next=%g)\n", 
                    cell, state[cell].cell_size, mother_id, daughter_id, t[cell], current_division_time, divisions, t_next);
 
-      if (time_s_phase + time_g2_phase > 0.0) {
-        do_cell_division(mother_id, daughter_id,
+      do_cell_division(mother_id, daughter_id,
                          keep_mother, keep_daughter,
                          &(genotype[mother_id]),
                          &(state[mother_id]),
@@ -4247,10 +4248,6 @@ void init_run_pop(Genotype genotype[POP_SIZE],
                          0.44,
                          x[mother_id],
                          dt[mother_id]);
-      } else {
-        LOG_NOCELLID("Skip division for cell=%03d S phase and G2 phase have zero length\n", mother_id);
-      }
-
       if (keep_mother) {
         t[mother_id] = current_division_time;   /* reset current time in mother cell to division time */
         LOG_NOCELLID("AFTER DIVISION: time at instant of division for mother cell=%03d is t=%g\n", mother_id, t[mother_id]);
@@ -4273,8 +4270,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
                                          no_fixed_dev_time);
 
         if (cell_status == -1) {  /* if cell dies, add it to the reaper queue */
-          if (keep_reaper_queue)
-            insert_with_priority_heap(reaper_queue, mother_id, TIME_INFINITY);
+          insert_with_priority_heap(reaper_queue, mother_id, TIME_INFINITY);
           LOG_NOCELLID("AFTER DIVISION: mother cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
                        mother_id, t[mother_id], reaper_queue->n, priority_queue->n);
         } else {                  /* otherwise we add the new mother timestep back to the priority queue */
@@ -4311,8 +4307,7 @@ void init_run_pop(Genotype genotype[POP_SIZE],
                                          no_fixed_dev_time);
 
         if (cell_status == -1) {   /* if cell dies, add to reaper queue */
-          if (keep_reaper_queue)
-            insert_with_priority_heap(reaper_queue, daughter_id, TIME_INFINITY);
+          insert_with_priority_heap(reaper_queue, daughter_id, TIME_INFINITY);
           LOG_NOCELLID("AFTER DIVISION: daughter cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
                        daughter_id, t[daughter_id], reaper_queue->n, priority_queue->n);
         } else {                   /* otherwise we add the new daughter timestep back to the priority queue */

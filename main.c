@@ -30,12 +30,12 @@ int main(int argc, char *argv[])
   TimeCourse *timecourselast[POP_SIZE][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
 
-  int output_binding_sites = 0;
-  int no_fixed_dev_time = 0; /* switch on/off fixed development time  */
-  int max_divisions = 0;
-  int curr_seed;
+  int output_binding_sites = 0; /*verbose flag*/
+  int no_fixed_dev_time = 0; /* on = fixed development time, off = divides when ready  */
+  int max_divisions = 0; /* per population */
+  int curr_seed; /*still needs to be fixed by Barry*/
 
-  int c;  /* for getopt_long() */
+  int c;  /* argv index */
 
   burn_in = 0;  /* don't do burn-in of kon by default */
   verbose = 0;  /* no verbose out by default */
