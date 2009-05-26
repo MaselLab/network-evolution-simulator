@@ -1,9 +1,12 @@
 library(lattice)
 ##runtimeall=read.table("/tmp/new-runtime/runtime-all.txt", head=T)
-##runtimeall=read.table("/tmp/new-runtime/runtime-profile-double-gentime.txt", head=T)
-runtimeall=read.table("/tmp/new-runtime/runtime-profile-small-burnin-new.txt", head=T)
+runtimeall=read.table("/tmp/new-runtime/runtime-profile-double-gentime.txt", head=T)
+##runtimeall=read.table("/tmp/new-runtime/runtime-profile-small-burnin-new.txt", head=T)
 outall=aggregate(runtimeall, by=list(runtimeall$kon), mean)
+## do monthly quota
 outall=transform(subset(outall, kon>1e-10), gen=77040000/(500*real*33))
+## do daily quota
+##outall=transform(subset(outall, kon>1e-10), gen=((24100*60*60)/30)/(500*real*33))
 
 ##png("generations-vs-kon.png")
 ##postscript("generations-vs-kon.ps")
