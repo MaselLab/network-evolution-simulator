@@ -19,10 +19,10 @@
 #define TIME_INFINITY 9.99e10
 
 #ifndef MAX_COPIES
-#define MAX_COPIES 4       /* each gene can potentially exist as a tetraploid during replication */
+#define MAX_COPIES 4       /* each gene can exists with four copies during replication */
 #endif
 
-#ifdef  NO_SEPARATE_GENE
+#ifdef  NO_SEPARATE_GENE    /* set to true if selection gene is also a TF */
 #ifndef TFGENES
 #define TFGENES 10          /* number of genes encoding TFs */
 #endif
@@ -33,14 +33,15 @@
 #define NPROTEINS TFGENES   /* total number of types of proteins */
 #endif
 #define SELECTION_GENE (NGENES-1)    /* index of selection gene */
-#else
-#ifndef TFGENES               /* number of genes encoding TFs */
+
+#else                       /* otherwise, by default assuming selection gene is not a TF */
+#ifndef TFGENES             /* number of genes encoding TFs */
 #define TFGENES 10
 #endif
 #ifndef NGENES
-#define NGENES (TFGENES+1)    /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
+#define NGENES (TFGENES+1)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
 #endif
-#ifndef NPROTEINS             /* number of proteins: TODO: must be equal to the number of genes currently */
+#ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
 #define NPROTEINS (TFGENES+1)
 #endif
 #define SELECTION_GENE (NGENES-1)   /* index of selection gene: always the last gene */
@@ -54,6 +55,9 @@
 #define HIND_LENGTH 15         /* default length of hindrance (original was 6) */
 #endif
 
+/* 
+ * define macros for logging output and warning/errors 
+ */
 #ifndef LOGGING_OFF
 #define LOG(...) { fprintf(fperrors, "[%s: cell %03d] ", __func__, state->cell_id); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
 #define LOG_NOCELLID(...) { fprintf(fperrors, "[%s] ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); }
@@ -81,8 +85,9 @@
 #define LOG_VERBOSE
 #endif
 
-extern int verbose;
-extern FILE *fperrors;
+/*
+ * primary data structures for model
+ */
 
 /* 
  * enum for 'konvalues' indices
@@ -150,7 +155,8 @@ struct GillespieRates {
   float min_salphc;         /* rates[6] */
   int min_salphc_operations;
 
-  /* number of genes in the following states */
+  /* number of genes in the following states, the rates of the
+     relevant process are computed from these numbers */
   int acetylation_num[MAX_COPIES];       
   int deacetylation_num[MAX_COPIES];     
   int pic_assembly_num[MAX_COPIES];       
@@ -302,6 +308,10 @@ struct TimeCourse
   float time;
   TimeCourse *next;
 };     
+
+/*
+ * global variables
+ */
 
 /* see netsim.c for documentation for these global constant variables */
 extern const int MAXELEMENTS; 
@@ -629,7 +639,7 @@ extern void tf_binding_event(GillespieRates *, CellState *, Genotype *,
 
 extern void tf_unbinding_event(GillespieRates *, CellState *, Genotype *, 
                                KonStates *, float *, TimeCourse **, TimeCourse **,
-                               float, float, float, float, int);
+                               float, float, float, float, int, int *);
 
 extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, 
                              KonStates *, float *, TimeCourse **, TimeCourse **,
@@ -708,16 +718,15 @@ extern int do_single_timestep(Genotype *,
                                int,
                                int) ;
   
-extern void develop(Genotype [POP_SIZE],
-                    CellState [POP_SIZE],
-                    TimeCourse *[POP_SIZE][NGENES],
-                    TimeCourse *[POP_SIZE][NGENES], 
-                    float, /* in Kelvin */
-                    float [NUM_K_DISASSEMBLY],
-                    int,
-                    int,
-                    int,
-                    int); 
+extern void init_run_pop(Genotype [POP_SIZE],
+                         CellState [POP_SIZE],
+                         TimeCourse *[POP_SIZE][NGENES],
+                         TimeCourse *[POP_SIZE][NGENES], 
+                         float, /* in Kelvin */
+                         float [NUM_K_DISASSEMBLY],
+                         int,
+                         int,
+                         int); 
 
 extern void print_time_course(TimeCourse *,
                               int, int);

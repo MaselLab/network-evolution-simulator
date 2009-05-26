@@ -34,10 +34,10 @@ const float DEACETYLATE=0.462;
 const float ACETYLATE=0.1155;
 const float PICASSEMBLY=0.0277;
 const float STARTNUCLEUS=0.1;
-const float KR=10.0;    /* don't put this less than 1, weird things happen to koff calculation */
+const float KR=10.0;                  /* don't put this less than 1, weird things happen to koff calculation */
 const float GASCONSTANT=8.31447;
-const float COOPERATIVITY=1.0;/* dGibbs, relative to 1 additional specific nt */
-const float COOPERATIVE_DISTANCE=11;  /* distance co-operativity operates, changed from 20 */ 
+const float COOPERATIVITY=1.0;        /* dGibbs, relative to 1 additional specific nt */
+const float COOPERATIVE_DISTANCE=11;  /* distance co-operativity operates (changed from 20) */ 
 const float NUMSITESINGENOME = 1.3e+6; /* updated from 1.8e+6 */
 
 const float mN = 3.3e-10 * 5e6;    /* Lynch et al. (2008), Tsai et al. (2008)  */
@@ -57,23 +57,23 @@ int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 
 int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
 int dummyrun = 4;          /* used to change seed */
-int recompute_koff = 0;    /* toggle whether to recompute certain features at each time to avoid
+int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
-int recompute_kon = 0;     /* likewise for kon */
+int recompute_kon = 1;     /* likewise for kon */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
 float growth_rate_scaling = 2.0; /* set default growth rate scaling factor */
 float time_s_phase = 30.0;  /* length of S phase (default: 30 mins) */
 float time_g2_phase = 30.0; /* length of G2/mitosis phase (default: 30 mins) */
-int random_replication_time = 0; /* toggle replication times in S phase being random */
+int random_replication_time = 1; /* replication times in S phase are random by default */
 
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */
 float protein_aging = 1e-4;
 
 /* file output parameters */
-char *output_directory = "output";
-int verbose = 0;
+char *output_directory = "output";   /* default output directory */
+int verbose = 0;                     /* don't log verbosely by default */ 
 
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
@@ -225,7 +225,6 @@ void print_tf_occupancy(CellState *state,
     bound_count[gene_id][gene_copy]++;
   }
 
-  // TODO: currently comment-out generation of TF bound information
   fprintf(fp_tfsbound[state->cell_id], "%g %d ", t, state->tf_bound_num);
   for (i = 0; i < NGENES; i++) 
     for (j = 0; j < MAX_COPIES; j++) 
@@ -254,13 +253,7 @@ void initialize_genotype_fixed(Genotype *genotype,
     if (HIND_LENGTH == TF_ELEMENT_LEN) {
       genotype->hindrance_positions[p]=0;
     } else  {
-      // TODO: only keep until new regression output is generated
-#ifdef USE_RAND
-      genotype->hindrance_positions[p]=rand()%10;
-#else
       genotype->hindrance_positions[p]=rint(ran1(&seed)*(HIND_LENGTH - TF_ELEMENT_LEN));
-#endif
-
     }
   } 
   
@@ -1262,7 +1255,7 @@ void calc_dt(float *x,
   rates->subtotal=0.0;
   /* reset mRNA decay rate */
   rates->mRNAdecay=0.0;
-  /* hence reset the number of rounding operations (TODO: check!) */
+  /* hence reset the number of rounding operations for this particular rate */
   rates->mRNAdecay_operations=0;
 
   /* update mRNAdecay rate based on the total number of mRNAs in both
@@ -1844,8 +1837,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
   if (instantaneous_growth_rate < 0.0)
     instantaneous_growth_rate = 0.0;
   
-  // TODO: current disable printing out growth rate information
-#if 0
+#if 0 /* currently disable printing out growth rate information */
   fprintf(fp_growthrate[cell_id], "%g %g %g %g %g %g\n", t, instantaneous_growth_rate, *integrated_growth_rate, P, s_mRNA, c);
 #endif
 
@@ -2157,15 +2149,16 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genotyp
 }
 
 void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                        KonStates *kon_states, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
-                        float konrate, float dt, float t, float x, int update_protein_flag)
+                       KonStates *kon_states, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                       float konrate, float dt, float t, float x, int update_protein_flag, int *ignore_event)
 {
   int i, j = -1;
   int site;
-
+  
+  *ignore_event = 0;
+  
   /* if an attempt is made to do an unbinding event when there is
-     nothing bound, then we ignore this event and recompute kon and
-     koff */
+     nothing bound then we recompute kon and koff */
   if (state->tf_bound_num <= 0) {
     LOG_ERROR("tf_bound_num=%d, t=%g, dt=%g, x=%g, rates->koff=%g\n", state->tf_bound_num, t, dt, x, rates->koff);
 
@@ -2180,8 +2173,8 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genot
     LOG_ERROR("attempting to unbind when nothing bound, recomputing koff and kon rates\n");
     recompute_koff_rates(rates, state, genotype, koffvalues, t);    
     recompute_kon_rates(rates, state, genotype, kon_states, 0);
-
-    return;  // TODO: should we throw out this dt? (check)
+    *ignore_event = 1; /* ignore this event, don't advance t */
+    return;
   }
 
   while (j < state->tf_bound_num && x > 0) {
@@ -2238,9 +2231,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
                                 rates, kon_states, 
                                 t, timecoursestart, timecourselast,
                                 state->protein_conc);
-  /* 
-   * decay mRNA in cytoplasm 
-   */
+  /* decay mRNA in cytoplasm */
   if (x < (float)state->mRNA_cyto_num[i]) {
     LOG_VERBOSE("mRNA decay event gene %d from %d copies in cytoplasm not %d copies translating\n",
                 i, state->mRNA_cyto_num[i], state->mRNA_transl_cyto_num[i]);
@@ -2250,16 +2241,13 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
     change_mRNA_cytoplasm(i, genotype, state, rates, kon_states); 
     
   } else {
-    /* 
-     * decay mRNA in process of translating
-     */
+    /* decay mRNA in process of translating */
     x = ran1(&seed)*((float) state->mRNA_transl_cyto_num[i]);
     LOG_VERBOSE("mRNA decay event gene %d not from %d copies in cytoplasm but %f from %d copies translating\n",
                 i, state->mRNA_cyto_num[i], trunc(x), state->mRNA_transl_cyto_num[i]);
     
     /* delete this fixed event: this mRNA will never be translated */
     LOG_VERBOSE("delete fixed TRANSLATION EVENT at time =%d for gene=%d\n", (int) trunc(x), i);
-    //delete_fixed_event(i, (int) trunc(x), &(state->mRNA_transl_time_end), &(state->mRNA_transl_time_end_last));
     delete_fixed_event(i, -1, (int) trunc(x), &(state->mRNA_transl_time_end), &(state->mRNA_transl_time_end_last));
     
     /* remove the mRNA from the count */
@@ -2739,10 +2727,9 @@ void recalibrate_cell(GillespieRates *rates,
                       float transport[NGENES],
                       float dt) 
 {
-  int i, j; //, k;
+  int i, j; 
   float protein_decay;
   float salphc = 0.0;
-  //int site_id, tf_id;
 
   /* reset the total rate for current step */
   rates->subtotal=0.0;
@@ -2878,8 +2865,6 @@ int move_gene_copy(int from_copy,
   LOG_VERBOSE_NOCELLID("gene=%d [copy=%d] start=%d, end=%d, lastpos=%d\n", gene, from_copy, start, end, lastpos);
   return lastpos;
 }
-
-// TODO: move to helper lib.c?
 
 /*
  * clone a queue of pending events by adding them to the new
@@ -3677,7 +3662,7 @@ int do_single_timestep(Genotype *genotype,
   int i;
   int event;     /* boolean to keep track of whether FixedEvent has ended */
   int total;     /* total possible translation events */
-  float temp_rate, fixed_time;
+  float fixed_time;
 
   /* if enabled, check for rounding error and recompute rates */
   /* check drift from koff every 1e6 operations or if they go negative */
@@ -3692,7 +3677,7 @@ int do_single_timestep(Genotype *genotype,
   } 
   
   /* if burn-in is set and we have completed the 0.003 sec (= 0.00005
-     min) burn in, then recompute the rates for the new burn-in.  the
+     min) burn in, then recompute the rates for the new burn-in.  The
      0.003 sec length was found by multiple runs of the model with
      kon=0.225 and finding the length of time it took for the number
      of bound TFs to equilibrate  */
@@ -3750,26 +3735,14 @@ int do_single_timestep(Genotype *genotype,
     LOG("at t=%g add division time=%g, cell_size=%g\n", *t, state->division_time, state->cell_size);
   }
   
-  // TODO: currently disable printing out the TF occupancy
-#if 0
+#if 0 /* currently disable printing out the TF occupancy and amount of rounding */
   print_tf_occupancy(state, genotype->all_binding_sites, *t);
   print_rounding(state, rates, *t);
 #endif
   
   *x = expdev(&seed);        /* draw random number */
 
-  /* check for rounding error */
-  // TODO 2009-03-03: will remove very soon after more testing
-  if (rates->koff < 0.0){
-    temp_rate = 0.0;
-    for (i=0; i < state->tf_bound_num; i++) temp_rate += koffvalues[i];
-    if ((verbose) || temp_rate>0.0) {
-      LOG_WARNING("koffvalues add up to %g rates->koff=%g < 0\n", temp_rate, rates->koff);
-    }
-    rates->koff = temp_rate;
-  } 
-  
-  /* do first Gillespie step to chose next event */
+  /* compute the initial dt for the next event */
   calc_dt(x, dt, rates, kon_states, mRNAdecay, genotype->mRNAdecay,
           state->mRNA_cyto_num, state->mRNA_transl_cyto_num, state->cell_id);
 
@@ -3854,8 +3827,7 @@ int do_single_timestep(Genotype *genotype,
       break;
     }
     
-    /* advance time by the dt */
-    *t += *dt;
+    *t += *dt;                  /* advance time by the dt */
     *x -= (*dt)*(*konrate);
 
     LOG_VERBOSE("dt=%g t=%g fixed event old x=%g new x=%g\n", *dt, *t, (*x)+(*dt)*(*konrate), *x);
@@ -3891,32 +3863,29 @@ int do_single_timestep(Genotype *genotype,
       calc_kon_rate(*dt, kon_states, konrate);           /* otherwise compute konrate */
     }
 
-    // TODO: FIXME 
-    // do sanity check on total rates first
+    /* if the total rates falls below zero, we do an emergency recalibration of cell */
     if (!(rates->subtotal + *konrate > 0.0)) {
       log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
       LOG_ERROR("x should always be >0 t=%g (x=%g) rates->subtotal=%g, konrate=%g, recalibrate cell!\n", *t, *x, rates->subtotal, *konrate); 
-      //recompute_kon_rates(rates, state, genotype, kon_states, 0);
-      //recompute_koff_rates(rates, state, koffvalues, *t);
       recalibrate_cell(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *dt); 
       calc_kon_rate(*dt, kon_states, konrate);           /* also recompute konrate */
       log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
 
-      // TODO: probably should mark cell as "dead" in this case,
-      // i.e. no TFs bound, no activity etc., and remove from queue.
-      if (!(rates->subtotal + *konrate > 0.0)) {  // if still wrong, exit
-        // TODO: hack time to always put the event at the very back of the queue: this cell is effectively dead and should eventually
-        // be chosen by the random number to be replaced
-        *t = TIME_INFINITY;
-        LOG_ERROR("put event at the very end of queue, with t=%g, cell is effectively dead\n", *t); 
-        return -1;
+      /* if this still results in either zero or negative total rates,
+         this most likely due the cell being "dead" no TFs bound, no
+         activity etc.  We mark cell as "dead" in this case, and
+         remove from queue. */
+      if (!(rates->subtotal + *konrate > 0.0)) {  
+        //*t = TIME_INFINITY;  TODO: should remove, not needed
+        LOG_ERROR("cell is effectively dead\n"); 
+        return -1;        /* return cell status as "dead" */
       }
     }
     
     /* 
-     * choose a new uniform random number weighted by the
-     * probability of all Gillespie events, note that konrate is
-     * *not* included in rates->subtotal, so it needs to be added here
+     * choose a new uniform random number weighted by the rate of all
+     * Gillespie events, note that konrate is *not* included in
+     * rates->subtotal, so it needs to be added here
      */
     *x = ran1(&seed)*(rates->subtotal + *konrate);  
     
@@ -3932,16 +3901,16 @@ int do_single_timestep(Genotype *genotype,
                    *x,
                    *t);
     }
-    /* JM: kon generally could be handled better, with more direct
-     * references to kon_states->nkonsum, probably a bit vulnerable to rounding
-     * error */
-    
     /* 
      * STOCHASTIC EVENT: a TF unbinds (koff) 
      */
     if (*x < rates->koff) {  
+      int ignore_event;
       tf_unbinding_event(rates, state, genotype, kon_states, koffvalues,
-                         timecoursestart, timecourselast, (*konrate), *dt, *t, *x, 1);
+                         timecoursestart, timecourselast, (*konrate), *dt, *t, *x, 1, &ignore_event);
+      if (ignore_event) { /* if the TF unbinding event failed, we return without updating *t  */
+        return 0;
+      }
     } else {
       *x -= rates->koff;  
       /* 
@@ -4063,25 +4032,22 @@ int do_single_timestep(Genotype *genotype,
 }
 
 /*
- * develop: run the population of cells for a given number of
- * divisions or run cell(s) for a specific length of time
+ * develop: initialize the population of cells, then run for a given
+ * number of divisions or run cell(s) for a specific length of time
  */
-//TODO: rename run_pop()?
-void develop(Genotype genotype[POP_SIZE],
-             CellState state[POP_SIZE],
-             TimeCourse *timecoursestart[POP_SIZE][NGENES],
-             TimeCourse *timecourselast[POP_SIZE][NGENES],
-             float temperature,   /* in Kelvin */
-             float kdis[NUM_K_DISASSEMBLY],
-             int hold_genotype_constant,
-             int output_binding_sites,
-             int no_fixed_dev_time,
-             int max_divisions)
+void init_run_pop(Genotype genotype[POP_SIZE],
+                  CellState state[POP_SIZE],
+                  TimeCourse *timecoursestart[POP_SIZE][NGENES],
+                  TimeCourse *timecourselast[POP_SIZE][NGENES],
+                  float temperature,   /* in Kelvin */
+                  float kdis[NUM_K_DISASSEMBLY],
+                  int output_binding_sites,
+                  int no_fixed_dev_time,
+                  int max_divisions)
 {
   /* local variables that don't require per-cell tracking */
   int i, j;
   int maxbound2, maxbound3;  
-  int curr_seed;
 
   /* initial mRNA and protein concentrations */
   float init_mRNA[NGENES], init_protein_conc[NGENES];
@@ -4101,16 +4067,15 @@ void develop(Genotype genotype[POP_SIZE],
   /* priority queue and time step initialization */
   bheap_t *priority_queue, *reaper_queue;
   float t_next = 0.0;   /* initialize to zero */
-  int cell = 0;         /* initialize cell number (TODO: this is only
-                           necessary when running for fixed
-                           development time) */
+  int cell = 0;         /* initialize cell number (use 0 when running
+                           for fixed development time) */
   int divisions = 0;    /* no cell divisions yet */
   int mother_id;         /* mother cell at division */
   int daughter_id;       /* daughter cell at division */
+  int large_cell_size = 0;  /* TODO: count the number of times cell_size exceeds Y=2.0 */
 
-  int large_cell_size = 0;  // TODO: count the number of times cell_size exceeds Y=2.0
-
-  /* keep a reaper queue from which to choose 'dead cells', if there are any, as daughter cells when dividing */
+  /* keep a reaper queue from which to choose 'dead cells', if there
+     are any, as daughter cells when dividing */
   int keep_reaper_queue = 1;  
 
   maxbound2 = MAXBOUND;
@@ -4135,14 +4100,6 @@ void develop(Genotype genotype[POP_SIZE],
        genotype, *except* for the cis-reg sequence using the initial
        genes[0]  */
     initialize_genotype(&genotype[j], &genotype[0], kdis, j);
-    /* if genotype is held constant, start varying the seed *after*
-       initialize_genotype, so we can run the same genotype with
-       slightly different amounts of noise  */
-    // TODO: maybe remove this?  needs to be put back at some point in more systematic way
-    if (hold_genotype_constant)
-      for (curr_seed=0; curr_seed<dummyrun; curr_seed++) 
-        ran1(&seed);
-   
     initialize_cell(&state[j], j, genotype[j].copies, genotype[j].mRNAdecay, init_mRNA, init_protein_conc, burn_in);
 
     /* print binding sites */
@@ -4234,7 +4191,6 @@ void develop(Genotype genotype[POP_SIZE],
     if (cell_status == -1)  {   /* if cell is dead */
       /* for debugging purposes, print out protein time courses when a cell is found to be dead */
       print_all_protein_time_courses(timecoursestart, timecourselast);
-      // TODO: make this configurable at run-time
       if (keep_reaper_queue)        /* add this cell to list of empty cell locations */
         insert_with_priority_heap(reaper_queue, cell, TIME_INFINITY);
       LOG_NOCELLID("[cell %03d] added here to reaper_queue as a dead cell, t_next=%g, t=%g (queue len reaper=%03d, main=%03d)\n", 
@@ -4428,10 +4384,6 @@ void develop(Genotype genotype[POP_SIZE],
       free(kon_states[j].kon_list[i]->available_sites);
       free(kon_states[j].kon_list[i]);
     }
-
-    // TODO: remove?
-    /* free(&kon_states[j]);
-       free(&rates[j]); */
   }
 }
 

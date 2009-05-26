@@ -1,7 +1,7 @@
 /* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
+ * Authors: Joanna Masel, Alex Lancaster
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
@@ -30,7 +30,6 @@ int main(int argc, char *argv[])
   TimeCourse *timecourselast[POP_SIZE][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
 
-  int hold_genotype_constant = 0;
   int output_binding_sites = 0;
   int no_fixed_dev_time = 0; /* switch on/off fixed development time  */
   int max_divisions = 0;
@@ -55,10 +54,9 @@ int main(int argc, char *argv[])
         {"timemax",  required_argument, 0, 0},
         {"criticalsize",  required_argument, 0, 'c'},
         {"divisions",  required_argument, 0, 's'},
-        {"genotypeconst",  no_argument, 0, 'g'},
         {"random-replication",  no_argument, 0, 0},
-        {"recompute-koff",  no_argument, 0, 0},
-        {"recompute-kon",  no_argument, 0, 0},
+        {"no-recompute-koff",  no_argument, 0, 0},
+        {"no-recompute-kon",  no_argument, 0, 0},
         {"nofixedtime",  no_argument, 0, 'n'},
         {"burnin",  no_argument, 0, 'b'},
         {"kon",  required_argument, 0, 0},
@@ -76,7 +74,7 @@ int main(int argc, char *argv[])
     int option_index = 0;
     char *endptr;
     
-    c = getopt_long (argc, argv, "d:r:p:t:c:s:gvhonb",
+    c = getopt_long (argc, argv, "d:r:p:t:c:s:vhonb",
                      long_options, &option_index);
     
     /* Detect the end of the options. */
@@ -107,15 +105,15 @@ int main(int argc, char *argv[])
       } else if (strcmp("timemax", long_options[option_index].name) == 0) {
         timemax  = strtof(optarg, &endptr);
         printf("setting timemax=%g\n", timemax);
-      } else if (strcmp("random-replication", long_options[option_index].name) == 0) {
-        printf("making replication times random in S phase\n");
-        random_replication_time = 1;
-      } else if (strcmp("recompute-koff", long_options[option_index].name) == 0) {
-        printf("recompute rates->koff\n");
-        recompute_koff = 1;
-      } else if (strcmp("recompute-kon", long_options[option_index].name) == 0) {
-        printf("recompute rates->kon\n");
-        recompute_kon = 1;
+      } else if (strcmp("no-random-replication", long_options[option_index].name) == 0) {
+        printf("don't make replication times random in S phase\n");
+        random_replication_time = 0;
+      } else if (strcmp("no-recompute-koff", long_options[option_index].name) == 0) {
+        printf("don't recompute rates->koff\n");
+        recompute_koff = 0;
+      } else if (strcmp("no-recompute-kon", long_options[option_index].name) == 0) {
+        printf("don't recompute rates->kon\n");
+        recompute_kon = 0;
       } else { 
         printf ("option %s", long_options[option_index].name);
         if (optarg)
@@ -144,9 +142,6 @@ int main(int argc, char *argv[])
     case 'c':
       critical_size = atof(optarg);
       break;
-    case 'g':
-      hold_genotype_constant = 1;
-      break;
     case 'b':
       burn_in = 1;
       break;
@@ -156,7 +151,6 @@ int main(int argc, char *argv[])
     case 'h':
       fprintf(stderr, "Usage: %s [OPTION]\n\
 \n\
- -g,  --genotypeconst       hold genotype constant\n\
  -o,  --outputbindingsites  print out binding sites\n\
  -d,  --directory=DIRECTORY directory to store output\n\
  -r,  --randomseed=SEED     random seed\n\
@@ -170,13 +164,13 @@ int main(int argc, char *argv[])
  -b,  --burnin              whether to do burn-in (off by default)\n\
       --kon=KON             initial kon value\n\
       --konafter=KON        kon value post-burnin\n\
-      --random-replication  make replication times in S phase random\n\
+      --no-random-replication  don't make replication times in S phase random\n\
       --timesphase=TIME     length of S-phase (30 mins by default)\n\
       --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
       --growthscaling=GS    amount to accelerate the growth rate\n\
                               (2.0 by default)\n\
-      --recompute-koff      recompute koff rates after a fixed number of operations\n\
-      --recompute-kon       recompute kon rates after a fixed number of operations\n\
+      --no-recompute-koff   don't recompute koff rates after a fixed number of operations\n\
+      --no-recompute-kon    don't recompute kon rates after a fixed number of operations\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);
@@ -207,12 +201,12 @@ int main(int argc, char *argv[])
   /* create output files for cell size, growth rate, TFs */
   for (j = 0; j < POP_SIZE; j++) {
     create_output_file("cellsize", output_directory, &(fp_cellsize[j]), j);
-#if 0 // TODO: currently disable
+#if 0 /* currently disable these file outputs */
     create_output_file("koff", output_directory, &(fp_koff[j]), j);
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
     create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
     create_output_file("rounding", output_directory, &(fp_rounding[j]), j);
-    // print header
+    /* print header */
     fprintf(fp_rounding[j], "t koff transport mRNAdecay picDisassembly salphc maxSalphc minSalphc \
           acetylationCount deacetylationCount picAssemblyCount \
           transcriptInitCount picDisassemblyCount\n");
@@ -221,8 +215,7 @@ int main(int argc, char *argv[])
   }
   
   /* slight hack to initialize seed  */
-  if (!hold_genotype_constant)
-    for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+  for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
 
   initialize_growth_rate_parameters();
 
@@ -230,13 +223,14 @@ int main(int argc, char *argv[])
   read_kdisassembly(kdis);
 
   /* now create and run the population of cells */
-  develop(indivs, state, timecoursestart, timecourselast, (float) 293.0, 
-          kdis, hold_genotype_constant, output_binding_sites, no_fixed_dev_time, max_divisions);
+  init_run_pop(indivs, state, timecoursestart, timecourselast, (float) 293.0, 
+               kdis, output_binding_sites, no_fixed_dev_time, max_divisions);
 
   print_all_protein_time_courses(timecoursestart, timecourselast);
 
+  /* cleanup memory */
   for (j = 0; j < POP_SIZE; j++) {
-    fprintf(fperrors,"indiv %d\n", j);
+    fprintf(fperrors,"cleanup cell %03d\n", j);
     for (i=0; i < NGENES; i++) {
       LOG_VERBOSE("deleting protein %02d timecourse\n", i);
       delete_time_course(timecoursestart[j][i]);
@@ -245,11 +239,13 @@ int main(int argc, char *argv[])
     free_mem_CellState(&state[j]);
     free(indivs[j].all_binding_sites);
   }
+
+  /* close file descriptors */
   fclose(fperrors);
   for (j = 0; j < POP_SIZE; j++) {
     fclose(fp_cellsize[j]);
-    // TODO: currently disable
-#if 0
+    
+#if 0  /* currently disable */
     fclose(fp_koff[j]);
     fclose(fp_growthrate[j]);
     fclose(fp_tfsbound[j]);
