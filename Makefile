@@ -95,11 +95,11 @@ check-all: check-haploid check-diploid check-replication check-selection check-m
 
 run-full-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=500" netsim-full-500
-	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 500 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 10.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
+	./netsim-full-500 -r 8 -p 2 -d multiple-pops-500 -c 1.0 -n -s 500 --timesphase 30.0 --timeg2phase 30.0 --growthscaling 10.0  --kon 0.2225 --konafter 1e-4
 
 run-10-pops: clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=10" netsim-full-10
-	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 60 --timesphase 30.0 --timeg2phase 30.0 --random-replication --growthscaling 2.0  --kon 0.2225 --konafter 1e-4 --recompute-koff --recompute-kon
+	./netsim-full-10 -r 3 -p 2 -d multiple-pops-10 -c 1.0 -n -s 60 --timesphase 30.0 --timeg2phase 30.0 --growthscaling 2.0  --kon 0.2225 --konafter 1e-4
 
 run-gs:	clean
 	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=1" netsim-gs
@@ -109,7 +109,7 @@ run-gs:	clean
 	     echo "random number=" $${rand} "growth rate scaling=" $${g} ; \
 	     dir=$$(printf "%03g" $${g})-$$(printf "%02d" $${rand}); \
 	     echo $${dir} ; \
-	     time ./netsim-gs -r $${rand} -p 2 -d growthscaling/$${dir} -c 1.0 -n -s 1 --timemax=1000.0 --timesphase 0.0 --timeg2phase 0.0 --growth $${g} --kon 0.2225 --konafter 1e-4 --random-replication --recompute-koff ; \
+	     time ./netsim-gs -r $${rand} -p 2 -d growthscaling/$${dir} -c 1.0 -n -s 1 --timemax=1000.0 --timesphase 0.0 --timeg2phase 0.0 --growth $${g} --kon 0.2225 --konafter 1e-4 ; \
 	   done \
 	done	
 
