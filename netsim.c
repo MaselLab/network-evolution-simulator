@@ -40,7 +40,7 @@ const float COOPERATIVITY=1.0;/* dGibbs, relative to 1 additional specific nt */
 const float COOPERATIVE_DISTANCE=11;  /* distance co-operativity operates, changed from 20 */ 
 const float NUMSITESINGENOME = 1.3e+6; /* updated from 1.8e+6 */
 
-const float mN = 0.1;  // TODO: mN: integrate with mutation rate
+const float mN = 3.3e-10 * 5e6;    /* Lynch et al. (2008), Tsai et al. (2008)  */
 
 float kon=1e-4;              /* lower value is so things run faster */
                              /* actual value should be kon=0.2225 is
@@ -1258,12 +1258,10 @@ void calc_dt(float *x,
   float tbound1, tbound2;
   int i, j;
 
-  /* reset the total rate for current step */
+  /* reset the subtotal rate (excludes konrate) for current step */
   rates->subtotal=0.0;
-  
   /* reset mRNA decay rate */
   rates->mRNAdecay=0.0;
-
   /* hence reset the number of rounding operations (TODO: check!) */
   rates->mRNAdecay_operations=0;
 
@@ -2518,10 +2516,9 @@ void replicate_gene(CellState *state,
   LOG_VERBOSE("[gene %2d] number of binding sites before adding new sites=%d at t=%g\n", 
               gene_id, genotype->binding_sites_num, t);
   
-  /* do mutation */
-  // TODO: make mutation rate a parameter 
+  /* do mutation: mutation rate is the mN product divided by population size */
   for (p=0; p<2*current_ploidy; p++)
-    mutate(genotype, gene_id, p, 0.01);  
+    mutate(genotype, gene_id, p, mN / POP_SIZE);  
 
   /* record number of TFBS pre-replication */
   number_tfbs_pre_replication = genotype->sites_per_gene[gene_id];
@@ -2882,7 +2879,7 @@ int move_gene_copy(int from_copy,
   return lastpos;
 }
 
-// TODO: move to helper lib?
+// TODO: move to helper lib.c?
 
 /*
  * clone a queue of pending events by adding them to the new
@@ -3124,16 +3121,13 @@ void initialize_new_cell_state(CellState *state, CellState state_clone,
   state->tf_hindered_num = 0;
 
   state->in_s_phase = 0;   /* reset S phase state to 0 */
-  // TODO: check to see whether we want burn-in at the birth of each new cell ?
   state->burn_in = 0;      /* only do burn-in at beginning of runs */
   state->division_time = TIME_INFINITY;  /* reset division time for this cell */
   state->divisions = state_clone.divisions; /* copy division counter */
-
   state->cell_size = state_clone.cell_size*fraction;   /* reset cell size */
 
-  /* TODO: check! growth rate, take instantaneous growth rate just before
+  /* growth rate, take instantaneous growth rate of mother just before
      division, this will be updated after first new time step */
-  // TODO, check that this is always inherited always from mother cell
   state->growth_rate = state_clone.growth_rate;
 
   /* keep thermodynamic state the same */ 
@@ -3243,7 +3237,6 @@ void initialize_new_cell_gene(Genotype *genotype, Genotype genotype_clone,
   initialize_new_cell_state_change_ids(state, *state_clone, ACETYLATION_STATE,
                                      rates->acetylation_num, rates_clone->acetylation_num,
                                      copy1, copy2, gene_id);
-
   /* DEACETYLATION_STATE */
   initialize_new_cell_state_change_ids(state, *state_clone, DEACETYLATION_STATE,
                                      rates->deacetylation_num, rates_clone->deacetylation_num,
@@ -3341,6 +3334,8 @@ void realloc_cell_memory(CellState *state, float **koffvalues)
  */
 void do_cell_division(int mother_id,
                       int daughter_id,
+                      int keep_mother, 
+                      int keep_daughter,
                       Genotype *mother,
                       CellState *mother_state,
                       GillespieRates *mother_rates,
@@ -3375,48 +3370,36 @@ void do_cell_division(int mother_id,
   int lastpos_daughter = 0;
   int lastpos_mother = 0;
   int original_bind_count = mother->binding_sites_num;
-  int no_replace_mother = (mother_id != daughter_id) ? 1: 0;  /* set if daughter cell replaces mother 
-                                                               in that case, we discard all updating of 
-                                                               the mother cell */
-  /* clone mother cell */
+
+  /* create a "read-only" clone of the mother cell */
   clone_cell(mother, mother_state, mother_rates,
              &genotype_clone, &state_clone, &rates_clone);
   
   /* free the existing memory for the time queue */
-  delete_queues(daughter_state);
-  if (no_replace_mother)
-    delete_queues(mother_state);
+  if (keep_daughter) delete_queues(daughter_state);
+  if (keep_mother) delete_queues(mother_state);
 
-  /* initialize the non-cis-regulatory part of the genotype 
-     of the new daughter cell based on clone of mother */
-  initialize_new_cell_genotype(daughter, &genotype_clone);
-  // print_genotype(daughter, daughter_id);
-
-  /* initialize the state of the new cell */
-  /* also reset size to appropriate scale of cell size */
-  initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
-  // TODO: fix to use scale according to the current size as per below
-  //initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction*state_clone.cell_size);
-
-  /* set the founder_id of the daughter cell from the mother cell */
-  daughter_state->founder_id = state_clone.founder_id;
-  daughter_state->divisions = 0;    /* daughter cell resets divisions */ 
-
-  printf("daughter cell %03d is founded by cell %03d with %2d divisions\n", 
-         daughter_id, daughter_state->founder_id, daughter_state->divisions);
-  LOG_NOCELLID("daughter cell %03d is founded by cell %03d with %2d divisions\n", 
-               daughter_id, daughter_state->founder_id, daughter_state->divisions);
-
-  if (no_replace_mother) {
+  if (keep_daughter) {
+    /* initialize the non-cis-regulatory part of the genotype 
+       of the new daughter cell based on clone of mother */
+    initialize_new_cell_genotype(daughter, &genotype_clone);
+    /* initialize the state of the new cell, including size */
+    initialize_new_cell_state(daughter_state, state_clone, daughter_rates, fraction);
+    /* set the founder_id of the daughter cell from the mother cell */
+    daughter_state->founder_id = state_clone.founder_id;
+    daughter_state->divisions = 0;    /* daughter cell resets divisions */ 
+    printf("daughter cell %03d is founded by cell %03d with %2d divisions\n", 
+           daughter_id, daughter_state->founder_id, daughter_state->divisions);
+    LOG_NOCELLID("daughter cell %03d is founded by cell %03d with %2d divisions\n", 
+                 daughter_id, daughter_state->founder_id, daughter_state->divisions);
+  }
+    
+  if (keep_mother) {
     initialize_new_cell_genotype(mother, &genotype_clone);
-    //print_genotype(mother, mother_id);
-
-    initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction));
-    // TODO (see above)
-    //initialize_new_cell_state(mother_state, state_clone, mother_rates, (1-fraction)*state_clone.cell_size);
+    initialize_new_cell_state(mother_state, state_clone, mother_rates, (1.0-fraction));
     mother_state->divisions++;      /* update divisions in mother */
     printf("mother   cell %03d is founded by cell %03d with %2d divisions\n", 
-         mother_id, mother_state->founder_id, mother_state->divisions);
+           mother_id, mother_state->founder_id, mother_state->divisions);
     LOG_NOCELLID("mother   cell %03d is founded by cell %03d with %2d divisions\n", 
                  mother_id, mother_state->founder_id, mother_state->divisions);
   }
@@ -3438,16 +3421,16 @@ void do_cell_division(int mother_id,
   }
 
   /* now split up the genes into one or other of the new cells */
+  /* this assumes division of a diploid cell */
   for (i=0; i < NGENES; i++) {
 
     /* reset the number of copies of gene in mother and daughter after
        division to original ploidy */
-    daughter->copies[i] = current_ploidy;
-    if (no_replace_mother)
+    if (keep_daughter)
+      daughter->copies[i] = current_ploidy;
+    if (keep_mother)
       mother->copies[i] = current_ploidy;
 
-    // TODO: assume diploid for the moment, generalize for haploid
-    
     r = ran1(&seed);  /* random number for independent assortment of
                          each gene */
     if (r<0.25) {
@@ -3480,13 +3463,15 @@ void do_cell_division(int mother_id,
       mother_copy2 = 2;
     }
 
-    LOG_NOCELLID("initialize daughter=%2d, gene_id=%2d\n", daughter_id, i);
-    initialize_new_cell_gene(daughter, genotype_clone, 
-                             daughter_state, &state_clone,
-                             daughter_rates, &rates_clone,
-                             i, daughter_copy1, daughter_copy2, &lastpos_daughter);
+    if (keep_daughter) {
+      LOG_NOCELLID("initialize daughter=%2d, gene_id=%2d\n", daughter_id, i);
+      initialize_new_cell_gene(daughter, genotype_clone, 
+                               daughter_state, &state_clone,
+                               daughter_rates, &rates_clone,
+                               i, daughter_copy1, daughter_copy2, &lastpos_daughter);
+    }
 
-    if (no_replace_mother) {
+    if (keep_mother) {
       LOG_NOCELLID("initialize mother  =%2d, gene_id=%2d\n", mother_id, i);
       initialize_new_cell_gene(mother, genotype_clone, 
                                mother_state, &state_clone,
@@ -3495,7 +3480,7 @@ void do_cell_division(int mother_id,
     }
   }
 
-  if (verbose) {
+  if (verbose) {    /* debugging output only */
     total = 0;
     for (j=0; j < MAX_COPIES; j++)  {
       LOG_NOCELLID(" after daughter acetylation_num[%2d]=%2d\n", j, daughter_rates->acetylation_num[j]);
@@ -3505,7 +3490,7 @@ void do_cell_division(int mother_id,
     }
     LOG_NOCELLID(" after total acetylation=%d\n", total);
 
-    // check that we have emptied the list of transcribing mRNAs
+    /* check that we have emptied the list of transcribing mRNAs */
     total = 0;
     for (i=0; i < NGENES; i++) 
       for (j=0; j < MAX_COPIES; j++) 
@@ -3514,23 +3499,26 @@ void do_cell_division(int mother_id,
     LOG_NOCELLID("mRNA_transcr_num=%2d left in state_clone after moving to mother+daughter\n", total);
   }
 
-  realloc_cell_memory(daughter_state, daughter_koffvalues);
-  if (no_replace_mother) {
+  if (keep_daughter) {
+    realloc_cell_memory(daughter_state, daughter_koffvalues);
+  }
+  if (keep_mother) {
     realloc_cell_memory(mother_state, mother_koffvalues);
   }
 
-  /* recompute *all* binding sites in daughter, then relabel sites */
-  calc_all_binding_sites(daughter->copies, 
-                         daughter->cisreg_seq, 
-                         daughter->tf_seq, 
-                         &(daughter->binding_sites_num),
-                         &(daughter->all_binding_sites),
-                         //daughter->hindrance_positions,
-                         mother->hindrance_positions,
-                         daughter->sites_per_gene,
-                         daughter->site_id_pos); 
-
-  if (no_replace_mother) {
+  if (keep_daughter) {
+    /* recompute *all* binding sites in daughter, then relabel sites */
+    calc_all_binding_sites(daughter->copies, 
+                           daughter->cisreg_seq, 
+                           daughter->tf_seq, 
+                           &(daughter->binding_sites_num),
+                           &(daughter->all_binding_sites),
+                           daughter->hindrance_positions,
+                           daughter->sites_per_gene,
+                           daughter->site_id_pos);
+  }
+    
+  if (keep_mother) {
     /* recompute *all* binding sites in mother, then relabel sites */
     calc_all_binding_sites(mother->copies, 
                            mother->cisreg_seq, 
@@ -3542,10 +3530,8 @@ void do_cell_division(int mother_id,
                            mother->site_id_pos); 
   }
 
-  //print_all_binding_sites(mother->copies, mother->all_binding_sites, mother->binding_sites_num, 
-  //                        mother->tf_seq, mother->cisreg_seq, mother->site_id_pos); 
-
-  if (no_replace_mother) {
+  if (keep_daughter && keep_mother) {
+    /* check that number of binding sites in mother before division equals sum when of mother and daughter after */
     LOG_NOCELLID("original number of binding sites=%d should = (mother=%d + daughter=%d) = %d\n", 
                  original_bind_count, mother->binding_sites_num, daughter->binding_sites_num, mother->binding_sites_num + daughter->binding_sites_num);
     if (original_bind_count != mother->binding_sites_num + daughter->binding_sites_num) {
@@ -3558,8 +3544,10 @@ void do_cell_division(int mother_id,
   /* split up the volume of the cell */
   /* do protein first */
   for (i=0; i < NPROTEINS; i++) {
-    daughter_state->protein_conc[i] = fraction * state_clone.protein_conc[i];
-    if (no_replace_mother) {
+    if (keep_daughter) {
+      daughter_state->protein_conc[i] = fraction * state_clone.protein_conc[i];
+    }
+    if (keep_mother) {
       mother_state->protein_conc[i] = (1-fraction) * state_clone.protein_conc[i];
       LOG_VERBOSE_NOCELLID("daughter=%g (%g), mother=%g (%g) = total protein=%g\n", 
                    daughter_state->protein_conc[i], fraction, mother_state->protein_conc[i], (1-fraction), state_clone.protein_conc[i]);
@@ -3569,21 +3557,30 @@ void do_cell_division(int mother_id,
   /* now loop over all transcribing genes */
   for (i=0; i < NGENES; i++) {
     /* mRNAs in cytoplasm (not translating) */
-    daughter_state->mRNA_cyto_num[i] = rint(fraction * state_clone.mRNA_cyto_num[i]);
-    if (no_replace_mother) {
-      mother_state->mRNA_cyto_num[i] =  state_clone.mRNA_cyto_num[i] - daughter_state->mRNA_cyto_num[i];
-      LOG_VERBOSE_NOCELLID("daughter=%d, mother=%d of total mRNA_cyto_num=%d\n", 
-                   daughter_state->mRNA_cyto_num[i], mother_state->mRNA_cyto_num[i], state_clone.mRNA_cyto_num[i]);
+    int mRNA_cyto_to_daughter = rint(fraction * state_clone.mRNA_cyto_num[i]);
+    if (keep_daughter) {
+      daughter_state->mRNA_cyto_num[i] = mRNA_cyto_to_daughter;
+      LOG_VERBOSE_NOCELLID("daughter=%d ", daughter_state->mRNA_cyto_num[i]);
     }
+    if (keep_mother) {
+      mother_state->mRNA_cyto_num[i] =  state_clone.mRNA_cyto_num[i] - mRNA_cyto_to_daughter;
+      LOG_VERBOSE_NOCELLID("mother=%d ", mother_state->mRNA_cyto_num[i]);
+    }
+    LOG_VERBOSE_NOCELLID("total mRNA_cyto_num=%d\n", state_clone.mRNA_cyto_num[i]);
 
     /* mRNAs in nucleus */
-    daughter_state->mRNA_nuclear_num[i] = rint(fraction * mother_state->mRNA_nuclear_num[i]);
-    if (no_replace_mother) {
-      mother_state->mRNA_nuclear_num[i] =  state_clone.mRNA_nuclear_num[i] - daughter_state->mRNA_nuclear_num[i];
-      LOG_VERBOSE_NOCELLID("daughter=%d, mother=%d of total mRNA_nuclear_num=%d\n", 
-                   daughter_state->mRNA_nuclear_num[i], mother_state->mRNA_nuclear_num[i], state_clone.mRNA_nuclear_num[i]);
+    int mRNA_nuclear_to_daughter = rint(fraction * mother_state->mRNA_nuclear_num[i]);
+    if (keep_daughter) {
+      daughter_state->mRNA_nuclear_num[i] = mRNA_nuclear_to_daughter;
+      LOG_VERBOSE_NOCELLID("daughter=%d ", daughter_state->mRNA_nuclear_num[i]);
     }
+    if (keep_mother) {
+      mother_state->mRNA_nuclear_num[i] =  state_clone.mRNA_nuclear_num[i] - mRNA_nuclear_to_daughter;
+      LOG_VERBOSE_NOCELLID("mother=%d ", mother_state->mRNA_nuclear_num[i]);
+    }
+    LOG_VERBOSE_NOCELLID("of total mRNA_nuclear_num=%d\n", state_clone.mRNA_nuclear_num[i]);
 
+    // TODO: fix to take into account mother replacing daughter or vice versa
     /* split up currently translating mRNAs (mRNA_transl_cyto_num) along with associated FixedTime events */
     split_mRNA(&(state_clone.mRNA_transl_time_end), &(state_clone.mRNA_transl_time_end_last), state_clone.mRNA_transl_cyto_num,
                &(daughter_state->mRNA_transl_time_end), &(daughter_state->mRNA_transl_time_end_last), daughter_state->mRNA_transl_cyto_num,
@@ -3592,20 +3589,22 @@ void do_cell_division(int mother_id,
   }  
   fflush(stdout);
 
-  /* recompute rates in daughter */
-  recalibrate_cell(daughter_rates, daughter_state, daughter,
-                   daughter_kon_states, daughter_koffvalues,
-                   daughter_mRNAdecay, daughter_transport, dt);
+  if (keep_daughter) {
+    /* recompute rates in daughter */
+    recalibrate_cell(daughter_rates, daughter_state, daughter,
+                     daughter_kon_states, daughter_koffvalues,
+                     daughter_mRNAdecay, daughter_transport, dt);
+    LOG_VERBOSE_NOCELLID("tf_bound_num=%d (daughter_id=%d)\n", daughter_state->tf_bound_num, daughter_id);
+    LOG_VERBOSE_NOCELLID("tf_hindered_num=%d (daughter_id=%d)\n", daughter_state->tf_hindered_num, daughter_id);
+  }
 
-  if (no_replace_mother) {
+  if (keep_mother) {
     /* recompute rates in mother */
     recalibrate_cell(mother_rates, mother_state, mother,
                      mother_kon_states, mother_koffvalues,
                      mother_mRNAdecay, mother_transport, dt);
-    LOG_VERBOSE_NOCELLID("tf_bound_num=%d (mother_id=%d), tf_bound_num=%d (daughter_id=%d)\n", 
-                         mother_state->tf_bound_num, mother_id, daughter_state->tf_bound_num, daughter_id);
-    LOG_VERBOSE_NOCELLID("tf_hindered_num=%d (mother_id=%d), tf_hindered_num=%d (daughter_id=%d)\n", 
-                         mother_state->tf_hindered_num, mother_id, daughter_state->tf_hindered_num, daughter_id);
+    LOG_VERBOSE_NOCELLID("tf_bound_num=%d (mother_id=%d)\n", mother_state->tf_bound_num, mother_id);
+    LOG_VERBOSE_NOCELLID("tf_hindered_num=%d (mother_id=%d)\n", mother_state->tf_hindered_num, mother_id);
   }
 
   /* free the memory associated with temporary copy of mother */
@@ -3768,7 +3767,7 @@ int do_single_timestep(Genotype *genotype,
       LOG_WARNING("koffvalues add up to %g rates->koff=%g < 0\n", temp_rate, rates->koff);
     }
     rates->koff = temp_rate;
-  }
+  } 
   
   /* do first Gillespie step to chose next event */
   calc_dt(x, dt, rates, kon_states, mRNAdecay, genotype->mRNAdecay,
@@ -4030,11 +4029,8 @@ int do_single_timestep(Genotype *genotype,
                       if (*t > 1000.0) {
                         LOG_ERROR("cell has been running for %g which is > 1000 mins\n", *t);
                       }
-                      // TODO:  2009-05-24 should probably break out of "if" statement
-                      //  as we should actually ignore this timestep completely 
-                      // and through out the dt we used, and not advance time until we have
-                      // a successfull event
-                      // break;
+                      /* ignore this timestep, we throw out the dt by returning without updating t */
+                      return 0;
                     }
                   }
                 }
@@ -4131,6 +4127,7 @@ void develop(Genotype genotype[POP_SIZE],
     init_mRNA[i] = exp(0.91966*gasdev(&seed)-0.465902);
   }
 
+  /* initialize the population of cells */
   for (j = 0; j < POP_SIZE; j++) {
 
     output=1;
@@ -4216,6 +4213,7 @@ void develop(Genotype genotype[POP_SIZE],
     LOG_VERBOSE_NOCELLID("[cell=%03d] get minimum time=%g, size=%g (queue len reaper=%03d, main=%03d)\n", 
                          cell, t_next, state[cell].cell_size, reaper_queue->n, priority_queue->n);
 
+    /* update a single timestep on this cell, returns new timestep in t[cell] */
     cell_status = do_single_timestep(&(genotype[cell]), 
                                      &(state[cell]), 
                                      &(kon_states[cell]), 
@@ -4233,12 +4231,11 @@ void develop(Genotype genotype[POP_SIZE],
                                      maxbound3,
                                      no_fixed_dev_time);
 
-    if (cell_status == -1)  {
-      // TODO: check, print out protein time courses when a cell is found to be dead
+    if (cell_status == -1)  {   /* if cell is dead */
+      /* for debugging purposes, print out protein time courses when a cell is found to be dead */
       print_all_protein_time_courses(timecoursestart, timecourselast);
-      /* add this cell to list of empty cell locations */
       // TODO: make this configurable at run-time
-      if (keep_reaper_queue)
+      if (keep_reaper_queue)        /* add this cell to list of empty cell locations */
         insert_with_priority_heap(reaper_queue, cell, TIME_INFINITY);
       LOG_NOCELLID("[cell %03d] added here to reaper_queue as a dead cell, t_next=%g, t=%g (queue len reaper=%03d, main=%03d)\n", 
                    cell, t_next, t[cell], reaper_queue->n, priority_queue->n);
@@ -4259,10 +4256,8 @@ void develop(Genotype genotype[POP_SIZE],
       }
     }
 
-    // TODO: generate new regression output based on choosing the
-    // event that just happened, rather than the previous t_next event, then switch lines
-    //if (t[cell] >= (state[cell]).division_time)  {  /* we have now reached cell division */
-    if (t_next >= (state[cell]).division_time)  {  /* we have now reached cell division */
+    if (t[cell] >= (state[cell]).division_time)  {  /* we have now reached cell division */
+      int keep_mother, keep_daughter;
       float current_division_time = (state[cell]).division_time;  // store current division time
       divisions++;     /* increment number of divisions */
       mother_id = cell; /* set mother cell as currently dividing cell */
@@ -4279,12 +4274,28 @@ void develop(Genotype genotype[POP_SIZE],
       /* to get new daughter cell slot, first check list of empty cells */
       if (reaper_queue->n > 0) {
         get_next_heap(reaper_queue, &daughter_id);  /* use one of the empty cells */
+        keep_mother = 1;                            /* keep both */
+        keep_daughter = 1;                   
         LOG_NOCELLID("[cell %03d] in reaper_queue (length=%03d) used as daughter cell\n", daughter_id, reaper_queue->n);
       } else {
-        daughter_id = rint((POP_SIZE-1)*ran1(&seed));  /* otherwise choose one other cell randomly */
-        /* removing pending event in daughter cell from queue, if different from the mother 
-           only remove if the daughter cell wasn't already removed from queue */
-        if (daughter_id != mother_id) {
+        /* otherwise choose one of the now POP_SIZE + 1 (since the mother has reproduced) other cell randomly to die */
+        daughter_id = rint(POP_SIZE*ran1(&seed));  
+
+        if (daughter_id == mother_id) {          /* daughter replaces mother */
+          LOG_NOCELLID("daughter=%03d replaces mother=%03d\n", daughter_id, mother_id);
+          keep_mother = 0;                     /* discard mother */
+          keep_daughter = 1;                   /* keep daughter */
+
+        } else if (daughter_id == POP_SIZE) {    /* arbitrarily define POP_SIZE as being mother replaces daughter */
+          LOG_NOCELLID("mother=%03d replaces daughter=%03d\n", mother_id, daughter_id);
+          keep_mother = 1;                     /* keep mother */
+          keep_daughter = 0;                   /* discard daughter */
+
+        } else {  /* removing pending event in original daughter cell
+                     from queue, since we are replacing it only remove
+                     if the daughter cell wasn't already removed from queue */
+          keep_mother = 1;                     /* keep both mother and daughter */
+          keep_daughter = 1;                   
           delete_element_heap(priority_queue, daughter_id);
           LOG_NOCELLID("removing pending event from queue (length=%3d) replaced by daughter cell=%d\n", priority_queue->n, daughter_id);
         } 
@@ -4296,8 +4307,8 @@ void develop(Genotype genotype[POP_SIZE],
                    cell, state[cell].cell_size, mother_id, daughter_id, t[cell], current_division_time, divisions, t_next);
 
       if (time_s_phase + time_g2_phase > 0.0) {
-        do_cell_division(mother_id,
-                         daughter_id,
+        do_cell_division(mother_id, daughter_id,
+                         keep_mother, keep_daughter,
                          &(genotype[mother_id]),
                          &(state[mother_id]),
                          &(rates[mother_id]),
@@ -4318,9 +4329,9 @@ void develop(Genotype genotype[POP_SIZE],
       } else {
         LOG_NOCELLID("Skip division for cell=%03d S phase and G2 phase have zero length\n", mother_id);
       }
-        
-      if (daughter_id != mother_id) {
-        t[mother_id] = current_division_time;   // reset current time in mother cell to division time
+
+      if (keep_mother) {
+        t[mother_id] = current_division_time;   /* reset current time in mother cell to division time */
         LOG_NOCELLID("AFTER DIVISION: time at instant of division for mother cell=%03d is t=%g\n", mother_id, t[mother_id]);
         /* advance time for mother */
         cell_status = do_single_timestep(&(genotype[mother_id]), 
@@ -4340,56 +4351,60 @@ void develop(Genotype genotype[POP_SIZE],
                                          maxbound3,
                                          no_fixed_dev_time);
 
-        if (cell_status == -1) {
+        if (cell_status == -1) {  /* if cell dies, add it to the reaper queue */
           if (keep_reaper_queue)
             insert_with_priority_heap(reaper_queue, mother_id, TIME_INFINITY);
           LOG_NOCELLID("AFTER DIVISION: mother cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
                        mother_id, t[mother_id], reaper_queue->n, priority_queue->n);
-        } else {
+        } else {                  /* otherwise we add the new mother timestep back to the priority queue */
           LOG_NOCELLID("AFTER DIVISION: add new timestep to queue for mother cell=%03d at t=%g (queue len reaper=%03d, main=%03d)\n", 
                        mother_id, t[mother_id], reaper_queue->n, priority_queue->n);
           insert_with_priority_heap(priority_queue, mother_id, t[mother_id]); 
         }
         
       } else {
-        printf("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
-               mother_id, daughter_id);
-        LOG_NOCELLID("mother (%3d) and daughter (%3d) are the same: don't update mother it is replaced by daughter\n",
-                     mother_id, daughter_id);
+        printf("don't update mother [%03d] it replaced by daughter [%03d]\n", mother_id, daughter_id);
+        LOG_NOCELLID("don't update mother [%03d] it replaced by daughter [%03d]\n", mother_id, daughter_id);
       }
 
-      t[daughter_id] = current_division_time;   // reset current time in mother cell to division time
-      LOG_NOCELLID("AFTER DIVISION: time at instant of division for daughter cell=%03d is t=%g\n", daughter_id, t[daughter_id]);
+      if (keep_daughter) {   /* only update if daughter cell isn't replaced by mother */
+        t[daughter_id] = current_division_time;   /* reset current time in daughter cell to division time */
+        LOG_NOCELLID("AFTER DIVISION: time at instant of division for daughter cell=%03d is t=%g\n", daughter_id, t[daughter_id]);
 
-      /* advance time for daughter */
-      cell_status = do_single_timestep(&(genotype[daughter_id]), 
-                                  &(state[daughter_id]), 
-                                  &(kon_states[daughter_id]), 
-                                  &(rates[daughter_id]), 
-                                  &(t[daughter_id]),
-                                  koffvalues[daughter_id],
-                                  transport[daughter_id],
-                                  mRNAdecay[daughter_id],
-                                  &(x[daughter_id]),
-                                  &(dt[daughter_id]),
-                                  &(konrate[daughter_id]),
-                                  timecoursestart[daughter_id],
-                                  timecourselast[daughter_id],
-                                  maxbound2,
-                                  maxbound3,
-                                  no_fixed_dev_time);
+        /* advance time for daughter */
+        cell_status = do_single_timestep(&(genotype[daughter_id]), 
+                                         &(state[daughter_id]), 
+                                         &(kon_states[daughter_id]), 
+                                         &(rates[daughter_id]), 
+                                         &(t[daughter_id]),
+                                         koffvalues[daughter_id],
+                                         transport[daughter_id],
+                                         mRNAdecay[daughter_id],
+                                         &(x[daughter_id]),
+                                         &(dt[daughter_id]),
+                                         &(konrate[daughter_id]),
+                                         timecoursestart[daughter_id],
+                                         timecourselast[daughter_id],
+                                         maxbound2,
+                                         maxbound3,
+                                         no_fixed_dev_time);
 
-      if (cell_status == -1) {
-        if (keep_reaper_queue)
-          insert_with_priority_heap(reaper_queue, daughter_id, TIME_INFINITY);
-        LOG_NOCELLID("AFTER DIVISION: daughter cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
-                     daughter_id, t[daughter_id], reaper_queue->n, priority_queue->n);
+        if (cell_status == -1) {   /* if cell dies, add to reaper queue */
+          if (keep_reaper_queue)
+            insert_with_priority_heap(reaper_queue, daughter_id, TIME_INFINITY);
+          LOG_NOCELLID("AFTER DIVISION: daughter cell %03d is dead at t=%g (queue len reaper=%03d, main=%03d)\n", 
+                       daughter_id, t[daughter_id], reaper_queue->n, priority_queue->n);
+        } else {                   /* otherwise we add the new daughter timestep back to the priority queue */
+          LOG_NOCELLID("AFTER DIVISION: add new timestep in queue for daughter cell=%03d at t=%g (queue len reaper=%03d, main=%03d)\n", 
+                       daughter_id, t[daughter_id], reaper_queue->n, priority_queue->n);
+          insert_with_priority_heap(priority_queue, daughter_id, t[daughter_id]);
+        }
       } else {
-        LOG_NOCELLID("AFTER DIVISION: add new timestep in queue for daughter cell=%03d at t=%g (queue len reaper=%03d, main=%03d)\n", 
-                     daughter_id, t[daughter_id], reaper_queue->n, priority_queue->n);
-        insert_with_priority_heap(priority_queue, daughter_id, t[daughter_id]);
+        printf("don't update daughter [%03d] it is replaced by mother [%03d]\n", daughter_id, mother_id);
+        LOG_NOCELLID("don't update daughter [%03d] it is replaced by mother [%03d]\n", daughter_id, mother_id);
       }
-    } else {
+
+    } else {   /* no division happens at all */
       /* put the updated timestep back into the priority_queue  */
       insert_with_priority_heap(priority_queue, cell, t[cell]);
     }
@@ -4402,8 +4417,6 @@ void develop(Genotype genotype[POP_SIZE],
     LOG_NOCELLID("cell %03d derived from founder %03d had %2d divisions%s\n", 
                  j, state[j].founder_id, state[j].divisions, t[j] == TIME_INFINITY ? " [dead]": "");
   }
-  // TODO: check output contents of reaper queue
-  bh_dump(reaper_queue);
 
   /* cleanup data structures */
   bh_free(priority_queue);

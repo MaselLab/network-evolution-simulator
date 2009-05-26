@@ -87,9 +87,9 @@ check-sample-output:	clean
 
 ## run for 4 divisions with reduced S and G2 phases
 check-multiple-pops:	clean
-	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4 -DUSE_RAND=1" netsim
-	./netsim -r 4 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0
-	$(subst RUN,multiple-pops,$(subst ORIG,2009-03-13-division-time-multiple-pops-r-4,$(DIFF_CMD)))
+	make EXTRACFLAGS="-m32 -DHIND_LENGTH=15 -DPOP_SIZE=4" netsim
+	./netsim -r 5 -p 2 -d multiple-pops -c 0.505 -n -s 4 --timesphase 1.0 --timeg2phase 0.0 --recompute-kon --recompute-kof
+	$(subst RUN,multiple-pops,$(subst ORIG,2009-05-25-division-time-multiple-pops-r-5,$(DIFF_CMD)))
 
 ## all known working regression tests
 check-all: check-haploid check-diploid check-selection check-multiple-pops

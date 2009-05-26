@@ -3,26 +3,26 @@ Variable definitions:
 
 Symbol  Old name          New name                                   Meaning
 ------  ---------         ---------                                  ---------
-        Genotype->y       Genotype->bindSiteCount                    total number of binding sites
-G       Genotype->G       Genotype->allBindingSites                  list of all TF binding sites with cached information about each site
-C       Genotype->C       Genotype->cisRegSeq
-O       Genotype->O       Genotype->transcriptionFactorSeq
+        Genotype->y       Genotype->bind_site_count                  total number of binding sites
+G       Genotype->G       Genotype->all_binding_sites                list of all TF binding sites with cached information about each site
+C       Genotype->C       Genotype->cisreg_seq
+O       Genotype->O       Genotype->tf_seq
         
-        CellState->y2     CellState->tfBoundCount                    current number of TFs bound
-        CellState->B2     CellState->tfBoundIndexes                  array of indices of bound TFs
-        CellState->y3     CellState->tfHinderedCount                 number of binding sites that have steric hindrances
-        CellState->B3     CellState->tfHinderedIndexes               array of binding sites that can't be bound due steric hindrance
-L_i(t)  CellState->L      CellState->proteinConc                     protein concentrations
-s_i(t)  CellState->Scyto  CellState->mRNACytoCount                   number of mRNA in cytoplasm
-s'_i(t) CellState->Snuclear          CellState->mRNANuclearCount
-        CellState->Stranslating      CellState->mRNATranslCytoCount
-        CellState->tStranslating     CellState->mRNATranslTimeEnd
-        CellState->lasttStranslating CellState->mRNATranslTimeEndLast
-        CellState->Stranscribing      CellState->mRNATranscrCount
-        CellState->tStranscribing     CellState->mRNATranscrTimeEnd
-        CellState->lasttStranscribing CellState->mRNATranscrTimeEndLast
+        CellState->y2     CellState->tf_bound_num                    current number of TFs bound
+        CellState->B2     CellState->tf_bound_indexes                array of indices of bound TFs
+        CellState->y3     CellState->tf_hindered_num                 number of binding sites that have steric hindrances
+        CellState->B3     CellState->tf_hindered_indexes             array of binding sites that can't be bound due steric hindrance
+L_i(t)  CellState->L      CellState->protein_conc                    protein concentrations
+s_i(t)  CellState->Scyto  CellState->mRNA_cyto_num                   number of mRNA in cytoplasm
+s'_i(t) CellState->Snuclear          CellState->mRNA_nuclear_num
+        CellState->Stranslating      CellState->mRNA_transl_cyto_num
+        CellState->tStranslating     CellState->mRNA_transl_time_end
+        CellState->lasttStranslating CellState->mRNA_transl_time_end_last
+        CellState->Stranscribing      CellState->mRNA_transcr_num
+        CellState->tStranscribing     CellState->mRNA_transcr_time_end
+        CellState->lasttStranscribing CellState->mRNA_transcr_time_end_last
         
-        statechangeIDs                CellState->statechangeIDs      now part of CellState structure: 
+        statechangeIDs                CellState->state_change_ids    now part of CellState structure: 
                                                                      keeps track of list of genes in each state
         
         rates, rates2                 merged into new GillespieRates struct:
@@ -78,17 +78,11 @@ CellState->active   OFF_FULL = 1,           /* repr>activ, still nuclesome, and 
 konIDs              SITEID_INDEX = 0, 
 		    TFID_INDEX = 1 
 
-CellState->statechangeIDs  ACTEYLATION = 0, 
-                           DEACTEYLATION = 1, 
-                           PICASSEMBLY = 2,
-                           TRANSCRIPTINIT = 3, 
-                           PICDISASSEMBLY = 4
+KonStates
+nkon       total number of *available* binding sites across all genes
 
-To check
---------
-nkon       total number of *available* binding sites
-nkonsum    total number of available binding sites on cis-reg sequence for a given TF
-
-
-
-
+CellState->state_change_ids  ACTEYLATION_STATE = 0, 
+                             DEACTEYLATION_STATE = 1, 
+                             PICASSEMBLY_STATE = 2,
+                             TRANSCRIPTINIT_STATE = 3, 
+                             PICDISASSEMBLY_STATE = 4
