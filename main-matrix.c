@@ -714,7 +714,7 @@ int main(int argc, char *argv[])
       printf("binding site %3d:  ", f);
       printf("%d\n", indiv.all_binding_sites[f].left_edge_pos);
     }
-    printf("sites_per_gene = %d", indiv.sites_per_gene[0]);
+    printf("sites_per_gene = %d\n", indiv.sites_per_gene[0]);
     system("PAUSE");
 	 
     //Stores left_edge_positions of each site on the first gene in left_edge_pos[] array and prints to file. 
