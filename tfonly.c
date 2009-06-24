@@ -4,6 +4,10 @@
  * Authors: Alex Lancaster, Barry Rountree
  * Copyright (c) 2009 Arizona Board of Regents (University of Arizona)
  */
+#ifdef __WIN32__
+#include <windows.h>
+#endif
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -40,8 +44,7 @@ static struct option long_options[] =
 	{0, 0, 0, 0}
 };
 
-static void
-print_help(char *arg){
+static void print_help(char *arg){
 	fprintf(stderr, "Usage: %s [OPTION]\n\
 	\n\
 	-g,  --genotypeconst       hold genotype constant\n\
@@ -59,8 +62,7 @@ print_help(char *arg){
 }
 static int hold_genotype_constant = 0;
 static int output_binding_sites = 0;
-static void
-parse_options(int argc, char **argv){
+static void parse_options(int argc, char **argv){
 	int c;  
 	int option_index = 0;
 	char *endptr;
@@ -130,13 +132,12 @@ parse_options(int argc, char **argv){
   	}
 } 
 
-static void
-system_init(){
+static void system_init(){
 	int curr_seed;  // This doesn't do what you think it does.
 	create_output_directory(output_directory);
 	create_output_file("netsimerrors.txt", output_directory, &(fperrors), -1);
-	create_output_file("koff", output_directory, &(fp_koff[0]), 0);
-	create_output_file("tfsbound", output_directory, &(fp_tfsbound[0]), 0);
+	//create_output_file("koff", output_directory, &(fp_koff[0]), 0);
+	//create_output_file("tfsbound", output_directory, &(fp_tfsbound[0]), 0);
 
 	if (!hold_genotype_constant){
 		// For now, the random number generator is initialized to
@@ -167,8 +168,7 @@ static Genotype *UNUSED_clone=NULL; 	// required by initialize_genotype.
 static int UNUSED_cellID=0;	      	// required by calc_dt.
 static float transport[NGENES];  /* transport rates of each mRNA */
 
-static void
-model_init(){
+static void model_init(){
 	int i, j;
 
 	// initialize mRNA concentrations  (not used) 
@@ -266,8 +266,7 @@ model_init(){
 	// rates.koff, rates.salphc, rates.max_salphc, rates.min_salphc, rates.subtotal);
 }
 
-void 
-run(){
+void run(){
 	int i;
 	float x, t, dt;
 	float konrate = 0.0;
@@ -308,9 +307,9 @@ run(){
 		printf("t=%g, dt=%g state.tf_bound_num=%d, state.tf_hindered_num=%d\n", t, dt, state.tf_bound_num, state.tf_hindered_num);
 		printf("OFF [rates.koff=%g] ON [konrate=%g, rates.salphc=%g, (rates.max_salphc=%g, rates.min_salphc=%g)] rates.subtotal=%g, TOTAL [%g]\n", 
            rates.koff, konrate, rates.salphc, rates.max_salphc, rates.min_salphc, rates.subtotal, rates.subtotal+konrate);
-    printf("TRANSPORT rates.transport=%g, rates.mRNAdecay=%g, rates.pic_disassembly=%g, rates.acetylation_num=%d, rates.deacetylation_num=%d, rates.transcript_init_num=%d, rates.pic_assembly_num=%d, rates.pic_disassembly_num=%d\n", rates.transport, rates.mRNAdecay, 
-           rates.pic_disassembly, rates.acetylation_num[0], rates.deacetylation_num[0], rates.transcript_init_num[0], 
-           rates.pic_assembly_num[0], rates.pic_disassembly_num[0]);
+    printf("TRANSPORT rates.transport=%g, rates.mRNAdecay=%g, rates.pic_disassembly=%g, rates.acetylation_num=%d, rates.deacetylation_num=%d, rates.transcript_init_num=%d, rates.pic_assembly_num=%d, rates.pic_disassembly_num=%d\n",
+               rates.transport, rates.mRNAdecay, rates.pic_disassembly, rates.acetylation_num[0], rates.deacetylation_num[0], rates.transcript_init_num[0], 
+               rates.pic_assembly_num[0], rates.pic_disassembly_num[0]);
 
 
     float diff = (rates.subtotal + konrate) - ((rates.koff + rates.salphc) + konrate);
@@ -318,8 +317,8 @@ run(){
       printf("\nDIFF=TOTAL(%g)- SUM(%g)=%g comprised of OFF [rates.koff=%g] and ON [konrate=%g, rates.salphc=%g]\n\n", 
              rates.subtotal + konrate, (rates.koff + rates.salphc) + konrate, diff, rates.koff, konrate, rates.salphc);
     }
-
-		print_tf_occupancy(&state, genotype.all_binding_sites, t);
+    system("PAUSE");
+		//print_tf_occupancy(&state, genotype.all_binding_sites, t);
 
 		log_snapshot(&rates,
 			&state,
@@ -392,12 +391,11 @@ run(){
 	free(genotype.all_binding_sites);
 
 	fclose(fperrors);
-	fclose(fp_koff[0]);
-	fclose(fp_tfsbound[0]);
+	//fclose(fp_koff[0]);
+	//fclose(fp_tfsbound[0]);
 }
 
-int 
-main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
 	parse_options(argc, argv);
 	system_init();
