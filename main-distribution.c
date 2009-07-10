@@ -29,6 +29,21 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
+#define NITER 100
+
+struct Dtype{
+       int active;
+       int repress;
+       float ratio;
+       int count;
+};
+struct Wtype{
+       int startPos;
+       int hammDist;
+       int tfIDon;
+       float conc;
+       float weight;
+};    
 
 typedef int (*compfn)(const void*, const void*);
 //typedef float (*compfnf)(const void*, const void*);
@@ -36,11 +51,6 @@ typedef int (*compfn)(const void*, const void*);
 int intcmp(const void *a, const void *b)
 {
     return *(int *)a - *(int *)b;
-}
-
-float fltcmp(const void *a, const void *b)
-{
-      return *(float *)a - *(float *)b;
 }
 
 /*Reorders binding sites from smallest left_edge_position to largest left_edge_position */
@@ -53,15 +63,15 @@ int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
          return 0;
 }
 
-float compareWeights(float *elem1, float *elem2){
-      if(elem1 < elem2)
+int compareWeights(struct Wtype *elem1, struct Wtype *elem2){
+      if(elem1->weight < elem2->weight)
           return -1;
-      else if(elem1 > elem2)
+      else if(elem1->weight > elem2->weight)
           return 1;
       else 
           return 0;
 }
-      
+
 
 int main(int argc, char *argv[])
 {
@@ -173,8 +183,10 @@ int main(int argc, char *argv[])
   /*Sort binding sites from smallest left_edge_position to largest left_edge_position*/
   qsort((void *) &(indiv.all_binding_sites[0]), indiv.sites_per_gene[0],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
-            
-  
+ /*each struct holds # activators, # repressors, ratio A/R, and how many times ratio has occurred */          
+ struct DType *arrayD;
+ arrayD = malloc(NITER*sizeof(struct Dtype));
+  struct Wtype *arrayWT;
           
   float Koff[5];
   float Gibbs;
@@ -218,28 +230,87 @@ int main(int argc, char *argv[])
   }
             
   startSite = 0;
-  
+  arrayWT = malloc((TFBS) *sizeof(struct Wtype));
   system("PAUSE");
   
   for (lem =0; lem<TFBS; lem++) {
+      
+      arrayWT[lem].startPos = indiv.all_binding_sites[lem+startSite].left_edge_pos;
+      arrayWT[lem].hammDist = indiv.all_binding_sites[lem+startSite].hamming_dist;
+      arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+startSite].tf_id;
+      bob = indiv.all_binding_sites[lem+startSite].tf_id;
+      arrayWT[lem].conc = initProteinConc[bob];
+      arrayWT[lem].weight = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+startSite].hamming_dist)]);
+ 
       startPos[lem] = indiv.all_binding_sites[lem+startSite].left_edge_pos;
       hammDist[lem] = indiv.all_binding_sites[lem+startSite].hamming_dist;
       TFon[lem] = indiv.all_binding_sites[lem+startSite].tf_id;
-      bob = indiv.all_binding_sites[lem+startSite].tf_id;
       Kon[lem] = initProteinConc[bob];
-      weight[lem] = initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+startSite].hamming_dist)];
+      weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+startSite].hamming_dist)]);
       
-      printf("%d", indiv.all_binding_sites[lem+startSite].left_edge_pos);
-      printf(" Hd = %d   tf = %d", hammDist[lem], TFon[lem]);
-      printf(" Kon = %f", Kon[lem]);
-      printf(" weight = %.2f\n", weight[lem]);    
+      printf("%d  Hd = %d   tf = %d Kon = %f weight = %.2f\n", indiv.all_binding_sites[lem+startSite].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
+      printf("%d  Hd = %d   tf = %d Kon = %f weight = %.2f\n", arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
     }
     system("PAUSE");
     printf("\n");
-    qsort((void *) &(weight[0]), TFBS, sizeof(float*), (compfn)compareWeights);
-    for(lem=0; lem<TFBS; lem++){
-        printf(" weight = %.2f\n", weight[lem]);    
+    qsort((void *) &(arrayWT[0]), TFBS, sizeof(struct Wtype), (compfn)compareWeights);
+
+    float weightSum = 0.;
+    for(lem=0; lem<(TFBS); lem++){
+               printf(" weight = %.2f\n", arrayWT[lem].weight);  
+               weightSum = weightSum +  arrayWT[lem].weight;
+               printf("       weightSum = %f\n", weightSum);
+               
+               /*FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!
+               
+               
+               if(lem==0) {weightSum += 2 * arrayWT[lem].weight;}
+               else  {weightSum += arrayWT[lem].weight;}*/
+          
     }
+    weightSum += arrayWT[0].weight;
+    printf("weightSum = %.2f\n", weightSum);
+    
+    float *prob;
+    prob = malloc((TFBS+1)*sizeof(float));
+    
+    for(lem =0; lem<TFBS+1; lem++){
+            if(lem == TFBS) { prob[lem] = (arrayWT[0].weight) / weightSum;}
+            else {prob[lem] = (arrayWT[lem].weight) / weightSum;}
+            printf("prob[%d] = %f\n", lem, prob[lem]);
+    }
+    srand((unsigned)time(NULL));  
+    int n = rand()%100;
+    printf("n=%d\n",n);
+    float check =0.;
+    check = n/1.;
+    printf("\ncheck = %f\n", check);
+    float *partition;
+    partition = malloc((TFBS+1)*sizeof(float));
+    for(lem=0; lem<TFBS+1; lem++){
+               if(lem==0){partition[lem] = prob[lem];}
+               else if(lem!=TFBS){ partition[lem] = (partition[(lem-1)]+prob[lem]);}
+               else {partition[lem] = 1;}
+               printf("partition[%d] = %f\n", lem, partition[lem]);
+    }
+    int b = 0;
+    lem =0;
+   float checkP =0.;
+   checkP = check /100.;
+    printf("checkP=%f\n", checkP);
+    if(0<checkP && checkP<=partition[0]){b=0;}
+    else if(partition[0]<checkP && checkP<=partition[1]){b=1;}
+    else if(partition[1]<checkP && checkP<=partition[2]){b=2;}
+    else if(partition[2]<checkP && checkP<=partition[3]){b=3;}
+    else if(partition[3]<checkP && checkP<=partition[4]){b=4;}
+    else if(partition[4]<checkP && checkP<=partition[5]){b=5;}
+    else if(partition[5]<checkP && checkP<=partition[6]){b=6;}
+    else {b=7;}
+ 
+ printf("b=%d\n", b);
+ printf("TF = %d\n", arrayWT[b].tfIDon);
+ 
+ 
      /* TO DO: Sort possible TFs according to weight. Decide on suitable 'unbound weight.' 
                Sum all weights and find prob of each TF. Pick random num to decide.*/          
     
