@@ -38,6 +38,7 @@ struct Dtype{
        int count;
 };
 struct Wtype{
+       int tfbsNum;
        int startPos;
        int hammDist;
        int tfIDon;
@@ -72,6 +73,21 @@ int compareWeights(struct Wtype *elem1, struct Wtype *elem2){
           return 0;
 }
 
+//given current bound position get next avaliable position
+int nextPos( int leftEdge, int *leftPos){
+ 
+    int right;
+   // if(leftEdge < CISREG_LEN - HIND_LENGTH){
+    right = leftEdge + HIND_LENGTH;
+    int num;
+    num =0;
+    while( leftPos[num] < right){
+           num++;
+           }
+   printf("num = %d, leftEdge = %d \n\n", num, leftPos[num]);
+   return num;
+  //}else{ return 0;}
+}
 
 int main(int argc, char *argv[])
 {
@@ -202,8 +218,8 @@ int main(int argc, char *argv[])
   startNum = indiv.all_binding_sites[0].left_edge_pos;
   printf("startNum = %d\n", startNum);
   
-  TFBS =0;
-  while(indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
+ 
+  while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
      TFBS++;
   }
   printf("TFBS=%d\n", TFBS);
@@ -217,6 +233,15 @@ int main(int argc, char *argv[])
   hammDist = malloc(TFBS *sizeof(int));
   TFon = malloc(TFBS*sizeof(int));
   weight = malloc(TFBS*sizeof(float));
+   int posNext;
+   posNext=0;
+  int count;
+  for( count =0; count<indiv.sites_per_gene[0]; count++){
+       left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
+       printf("%d\n", left_edge_pos[count]);
+       }
+  printf("\n\n posNum(0,leftEdge) = %d\n\n", nextPos( 4, left_edge_pos));
+  
   
   int jo, jojo;
   for( jo=0; jo<3; jo++){
@@ -228,28 +253,55 @@ int main(int argc, char *argv[])
   for(jojo=0; jojo<3; jojo++){
     printf("Koff[%d] = %f\n", jojo, Koff[jojo]);
   }
-            
+   int tfCount;
+  int siteCount = TFBS;
+  printf("siteCount= %d\n", siteCount);
+   int A;
+   int R;
+   A=R=0;        
   startSite = 0;
+  
+  
+  
+  
+  
+  
+  
+  while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){
+  
+   tfCount = posNext;
+  TFBS =0;
+  printf("startNum = %d\n", tfCount);
+  while(indiv.all_binding_sites[tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH){
+                                                      
+     // if(startNum <= indiv.all_binding_sites[tfCount].left_edge_pos && indiv.all_binding_sites[tfCount].left_edge_pos < startNum + HIND_LENGTH){
+         //printf("startNum = %d,  tfCount = %d,  left_edge_pos =%d \n", startNum, tfCount,indiv.all_binding_sites[tfCount].left_edge_pos);
+         TFBS++;
+      //}
+      tfCount++;
+  }
+  printf("TFBS=%d\n", TFBS);
+  
   arrayWT = malloc((TFBS) *sizeof(struct Wtype));
   system("PAUSE");
-  
+   
   for (lem =0; lem<TFBS; lem++) {
-      
-      arrayWT[lem].startPos = indiv.all_binding_sites[lem+startSite].left_edge_pos;
-      arrayWT[lem].hammDist = indiv.all_binding_sites[lem+startSite].hamming_dist;
-      arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+startSite].tf_id;
-      bob = indiv.all_binding_sites[lem+startSite].tf_id;
+      arrayWT[lem].tfbsNum = lem;
+      arrayWT[lem].startPos = indiv.all_binding_sites[lem+posNext].left_edge_pos;
+      arrayWT[lem].hammDist = indiv.all_binding_sites[lem+posNext].hamming_dist;
+      arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+posNext].tf_id;
+      bob = indiv.all_binding_sites[lem+posNext].tf_id;
       arrayWT[lem].conc = initProteinConc[bob];
-      arrayWT[lem].weight = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+startSite].hamming_dist)]);
+      arrayWT[lem].weight = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
  
-      startPos[lem] = indiv.all_binding_sites[lem+startSite].left_edge_pos;
-      hammDist[lem] = indiv.all_binding_sites[lem+startSite].hamming_dist;
-      TFon[lem] = indiv.all_binding_sites[lem+startSite].tf_id;
+      startPos[lem] = indiv.all_binding_sites[lem+posNext].left_edge_pos;
+      hammDist[lem] = indiv.all_binding_sites[lem+posNext].hamming_dist;
+      TFon[lem] = indiv.all_binding_sites[lem+posNext].tf_id;
       Kon[lem] = initProteinConc[bob];
-      weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+startSite].hamming_dist)]);
+      weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
       
-      printf("%d  Hd = %d   tf = %d Kon = %f weight = %.2f\n", indiv.all_binding_sites[lem+startSite].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
-      printf("%d  Hd = %d   tf = %d Kon = %f weight = %.2f\n", arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
+      printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",lem, indiv.all_binding_sites[lem+posNext].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
+      printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
     }
     system("PAUSE");
     printf("\n");
@@ -308,11 +360,27 @@ int main(int argc, char *argv[])
     else {b=7;}
  
  printf("b=%d\n", b);
- printf("TF = %d\n", arrayWT[b].tfIDon);
+ printf("TF = %d, \n", arrayWT[b].tfIDon);
+ printf("lem = %d\n", arrayWT[b].tfbsNum);
+ printf("activating[][] = %d\n", indiv.activating[arrayWT[b].tfIDon][0]);
+ if(indiv.activating[arrayWT[b].tfIDon][0] ==1){A++;}
+ else{R++;}
+ printf("A = %d   R = %d\n", A, R);
  
+ startSite++;
+ printf("startSite = %d\n", startSite);
+ printf("ARGH!! = %d\n", arrayWT[b].startPos);
+ startNum = arrayWT[b].startPos + HIND_LENGTH;
+ printf("startNum = %d\n", startNum);
  
-     /* TO DO: Sort possible TFs according to weight. Decide on suitable 'unbound weight.' 
-               Sum all weights and find prob of each TF. Pick random num to decide.*/          
+
+ posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
+ printf("posNext = %d\n\n", posNext);
+}
+ 
+     /* TO DO: Fix sliding window. ie. revamp algorithm look in notebook. make sure window doesnt go off
+     end of gene. make sure AR ratio resonable. look at activating[][]--not sure what it does. test.
+     get all this done tomorrow!!*/         
     
   printf("Here\n");
   
