@@ -29,14 +29,15 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 100
+#define NITER 5
 
 struct Dtype{
-       int active;
-       int repress;
+       float active;
+       float repress;
        float ratio;
        int count;
 };
+
 struct Wtype{
        int tfbsNum;
        int startPos;
@@ -88,6 +89,38 @@ int nextPos( int leftEdge, int *leftPos){
    return num;
   //}else{ return 0;}
 }
+
+int addRatio(struct Dtype *arrayD, float active, float repress, int size){
+     int count;
+     int S=0;
+     if((size) ==0){
+              arrayD[(size)].active = active;
+              arrayD[(size)].repress = repress;
+              arrayD[(size)].ratio = active/repress;
+              arrayD[(size)].count = 1;
+              size++;
+     }
+     else{           
+     for(count =0; count< (size); count++){
+        if(arrayD[count].active == active && arrayD[count].repress == repress){
+            arrayD[count].count = (arrayD[count].count) + 1;
+        }else{
+              //size++;
+              arrayD[size].active = active;
+              arrayD[size].repress = repress;
+              arrayD[size].ratio = active/repress;
+              arrayD[size].count = 1;
+              size++;
+        }
+     }
+     }
+     printf("size = %d\n", size);
+     S=size;
+     return S;
+     
+     
+}
+     
 
 int main(int argc, char *argv[])
 {
@@ -200,9 +233,11 @@ int main(int argc, char *argv[])
   qsort((void *) &(indiv.all_binding_sites[0]), indiv.sites_per_gene[0],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
  /*each struct holds # activators, # repressors, ratio A/R, and how many times ratio has occurred */          
- struct DType *arrayD;
+ struct Dtype *arrayD;
  arrayD = malloc(NITER*sizeof(struct Dtype));
   struct Wtype *arrayWT;
+  int A;
+   int R;
           
   float Koff[5];
   float Gibbs;
@@ -233,6 +268,8 @@ int main(int argc, char *argv[])
   hammDist = malloc(TFBS *sizeof(int));
   TFon = malloc(TFBS*sizeof(int));
   weight = malloc(TFBS*sizeof(float));
+
+   
    int posNext;
    posNext=0;
   int count;
@@ -256,24 +293,33 @@ int main(int argc, char *argv[])
    int tfCount;
   int siteCount = TFBS;
   printf("siteCount= %d\n", siteCount);
-   int A;
-   int R;
-   A=R=0;        
+   
+   A=R=0.;        
   startSite = 0;
   
   
   
+  int size;
+size =0;
   
-  
-  
-  
+  int val; 
+  val =0;
+  while(val < NITER){
+            startNum = indiv.all_binding_sites[0].left_edge_pos;
+            while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
+     TFBS++;
+  }
+  posNext=0;
+  A=R=0.;        
+  startSite = 0;
   while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){
   
    tfCount = posNext;
   TFBS =0;
   printf("startNum = %d\n", tfCount);
-  while(indiv.all_binding_sites[tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH){
-                                                      
+  printf("LEP+HIND_LENGTH = %d\n", (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH);
+  while(indiv.all_binding_sites[tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){
+         printf("tfcount = %d\n", tfCount);                                             
      // if(startNum <= indiv.all_binding_sites[tfCount].left_edge_pos && indiv.all_binding_sites[tfCount].left_edge_pos < startNum + HIND_LENGTH){
          //printf("startNum = %d,  tfCount = %d,  left_edge_pos =%d \n", startNum, tfCount,indiv.all_binding_sites[tfCount].left_edge_pos);
          TFBS++;
@@ -283,7 +329,7 @@ int main(int argc, char *argv[])
   printf("TFBS=%d\n", TFBS);
   
   arrayWT = malloc((TFBS) *sizeof(struct Wtype));
-  system("PAUSE");
+ // system("PAUSE");
    
   for (lem =0; lem<TFBS; lem++) {
       arrayWT[lem].tfbsNum = lem;
@@ -303,7 +349,7 @@ int main(int argc, char *argv[])
       printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",lem, indiv.all_binding_sites[lem+posNext].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
       printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
     }
-    system("PAUSE");
+    //system("PAUSE");
     printf("\n");
     qsort((void *) &(arrayWT[0]), TFBS, sizeof(struct Wtype), (compfn)compareWeights);
 
@@ -363,7 +409,7 @@ int main(int argc, char *argv[])
  printf("TF = %d, \n", arrayWT[b].tfIDon);
  printf("lem = %d\n", arrayWT[b].tfbsNum);
  printf("activating[][] = %d\n", indiv.activating[arrayWT[b].tfIDon][0]);
- if(indiv.activating[arrayWT[b].tfIDon][0] ==1){A++;}
+ if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){A++;}
  else{R++;}
  printf("A = %d   R = %d\n", A, R);
  
@@ -377,14 +423,79 @@ int main(int argc, char *argv[])
  posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
  printf("posNext = %d\n\n", posNext);
 }
- 
+
+printf("\n\nEND OF GENE!!!!!!!!\n\n");
+printf("A = %d   R = %d\n", A, R);
+
+
+
+
+
+
+
+     if(size ==0){
+              arrayD[(size)].active = A;
+              arrayD[(size)].repress = R;
+              arrayD[(size)].ratio = A/R;
+              arrayD[(size)].count = 1;
+               printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", size, arrayD[size].count, arrayD[size].active, arrayD[size].repress, arrayD[size].ratio);
+              size++;
+     }
+     else{           
+       for(count =0; count< (size); count++){
+         if(arrayD[count].active == A && arrayD[count].repress == R){
+            arrayD[count].count = (arrayD[count].count) + 1;
+            break;
+        }else{
+              //size++;
+              arrayD[size].active = A;
+              arrayD[size].repress = R;
+              arrayD[size].ratio = arrayD[size].active/arrayD[size].repress;
+              arrayD[size].count = 1;
+              size++;
+              break;
+        }
+         printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", count, arrayD[count].count, arrayD[count].active, arrayD[count].repress, arrayD[count].ratio);
+       }
+     }
+    
+ /*TO DO: get arrayD to work. if A-R ration present in the array add to counter. else add element to array
+ with the new A-R ratio. this is not working! figure it out! clean up code!*/
+
+
+
+
+
+// size = addRatio(arrayD, A, R, size);
+ //size++;
+  /*arrayD[val].active = A;
+  arrayD[val].repress = R;
+  arrayD[val].ratio = arrayD[val].active/arrayD[val].repress;
+  arrayD[val].count = 1;*/
+printf("size = %d\n", size);
+//printf("%d  active = %f, repress = %f, ratio = %f\n", arrayD[0].count, arrayD[0].active, arrayD[0].repress, arrayD[0].ratio);
+val++;
+system("PAUSE");
+} 
+int chek =0;
+for(chek=0; chek<size; chek++){
+            printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", chek, arrayD[chek].count, arrayD[chek].active, arrayD[chek].repress, arrayD[chek].ratio);
+}
+//ddRatio(arrayD, 5, 1, &chek);
      /* TO DO: Fix sliding window. ie. revamp algorithm look in notebook. make sure window doesnt go off
      end of gene. make sure AR ratio resonable. look at activating[][]--not sure what it does. test.
      get all this done tomorrow!!*/         
     
   printf("Here\n");
   
-  
   system("PAUSE");	
-  return 0;
+    
+  free(left_edge_pos);
+  free(startPos);
+  free(hammDist);
+  free(TFon);
+  free(weight);
+  free(arrayD);
+  free(arrayWT);
+  
 }
