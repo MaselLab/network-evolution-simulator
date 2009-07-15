@@ -29,7 +29,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 5
+#define NITER 10
 
 struct Dtype{
        float active;
@@ -274,9 +274,9 @@ int main(int argc, char *argv[])
    posNext=0;
   int count;
   for( count =0; count<indiv.sites_per_gene[0]; count++){
-       left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
-       printf("%d\n", left_edge_pos[count]);
-       }
+     left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
+     printf("%d\n", left_edge_pos[count]);
+  }
   printf("\n\n posNum(0,leftEdge) = %d\n\n", nextPos( 4, left_edge_pos));
   
   
@@ -294,200 +294,210 @@ int main(int argc, char *argv[])
   int siteCount = TFBS;
   printf("siteCount= %d\n", siteCount);
    
-   A=R=0.;        
+  A=R=0.;        
   startSite = 0;
-  
-  
-  
   int size;
-size =0;
+  size =0;
   
   int val; 
   val =0;
   while(val < NITER){
-            startNum = indiv.all_binding_sites[0].left_edge_pos;
-            while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
-     TFBS++;
-  }
-  posNext=0;
-  A=R=0.;        
-  startSite = 0;
-  while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){
+    startNum = indiv.all_binding_sites[0].left_edge_pos;
+    while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){TFBS++;}
+    posNext=0;
+    A=R=0.;        
+    startSite = 0;
+    while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){
   
-   tfCount = posNext;
-  TFBS =0;
-  printf("startNum = %d\n", tfCount);
-  printf("LEP+HIND_LENGTH = %d\n", (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH);
-  while(indiv.all_binding_sites[tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){
+      tfCount = posNext;
+      TFBS =0;
+      printf("startNum = %d\n", tfCount);
+      printf("LEP+HIND_LENGTH = %d\n", (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH);
+      while(indiv.all_binding_sites[tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){
          printf("tfcount = %d\n", tfCount);                                             
-     // if(startNum <= indiv.all_binding_sites[tfCount].left_edge_pos && indiv.all_binding_sites[tfCount].left_edge_pos < startNum + HIND_LENGTH){
+         // if(startNum <= indiv.all_binding_sites[tfCount].left_edge_pos && indiv.all_binding_sites[tfCount].left_edge_pos < startNum + HIND_LENGTH){
          //printf("startNum = %d,  tfCount = %d,  left_edge_pos =%d \n", startNum, tfCount,indiv.all_binding_sites[tfCount].left_edge_pos);
          TFBS++;
-      //}
-      tfCount++;
-  }
-  printf("TFBS=%d\n", TFBS);
+          //}
+         tfCount++;
+      }
+      printf("TFBS=%d\n", TFBS);
   
-  arrayWT = malloc((TFBS) *sizeof(struct Wtype));
- // system("PAUSE");
+      arrayWT = malloc((TFBS+1) *sizeof(struct Wtype));
+      // system("PAUSE");
    
-  for (lem =0; lem<TFBS; lem++) {
-      arrayWT[lem].tfbsNum = lem;
-      arrayWT[lem].startPos = indiv.all_binding_sites[lem+posNext].left_edge_pos;
-      arrayWT[lem].hammDist = indiv.all_binding_sites[lem+posNext].hamming_dist;
-      arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+posNext].tf_id;
-      bob = indiv.all_binding_sites[lem+posNext].tf_id;
-      arrayWT[lem].conc = initProteinConc[bob];
-      arrayWT[lem].weight = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
+      for (lem =0; lem<TFBS; lem++) {
+         arrayWT[lem].tfbsNum = lem;
+         arrayWT[lem].startPos = indiv.all_binding_sites[lem+posNext].left_edge_pos;
+         arrayWT[lem].hammDist = indiv.all_binding_sites[lem+posNext].hamming_dist;
+         arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+posNext].tf_id;
+         bob = indiv.all_binding_sites[lem+posNext].tf_id;
+         arrayWT[lem].conc = initProteinConc[bob];
+         arrayWT[lem].weight = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
  
-      startPos[lem] = indiv.all_binding_sites[lem+posNext].left_edge_pos;
-      hammDist[lem] = indiv.all_binding_sites[lem+posNext].hamming_dist;
-      TFon[lem] = indiv.all_binding_sites[lem+posNext].tf_id;
-      Kon[lem] = initProteinConc[bob];
-      weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
+         startPos[lem] = indiv.all_binding_sites[lem+posNext].left_edge_pos;
+         hammDist[lem] = indiv.all_binding_sites[lem+posNext].hamming_dist;
+         TFon[lem] = indiv.all_binding_sites[lem+posNext].tf_id;
+         Kon[lem] = initProteinConc[bob];
+         weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
       
-      printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",lem, indiv.all_binding_sites[lem+posNext].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
-      printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
-    }
-    //system("PAUSE");
-    printf("\n");
-    qsort((void *) &(arrayWT[0]), TFBS, sizeof(struct Wtype), (compfn)compareWeights);
-
-    float weightSum = 0.;
-    for(lem=0; lem<(TFBS); lem++){
-               printf(" weight = %.2f\n", arrayWT[lem].weight);  
-               weightSum = weightSum +  arrayWT[lem].weight;
-               printf("       weightSum = %f\n", weightSum);
-               
+         //printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",lem, indiv.all_binding_sites[lem+posNext].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
+         printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
+      }
+      
+      //system("PAUSE");
+      printf("\n");
+      qsort((void *) &(arrayWT[0]), TFBS, sizeof(struct Wtype), (compfn)compareWeights);
+      
+      system("PAUSE");
+      printf("last entry\n");
+      arrayWT[TFBS].conc = 0;
+      arrayWT[TFBS].hammDist = 0;
+      arrayWT[TFBS].startPos = 0;
+      arrayWT[TFBS].tfbsNum = 111;
+      arrayWT[TFBS].tfIDon = 11;
+      arrayWT[TFBS].weight = arrayWT[0].weight;
+      printf("%d  LEP = %d  Hd = %d   tf = %d conc = %f weight = %.2f\n",arrayWT[TFBS].tfbsNum, arrayWT[TFBS].startPos, arrayWT[TFBS].hammDist, arrayWT[TFBS].tfIDon, arrayWT[TFBS].conc, arrayWT[TFBS].weight);
+      printf("END last entry\n");
+      
+      
+      float weightSum = 0.;
+      for(lem=0; lem<(TFBS); lem++){
+         printf(" weight = %.2f\n", arrayWT[lem].weight);  
+         weightSum = weightSum +  arrayWT[lem].weight;
+         printf("       weightSum = %f\n", weightSum);
                /*FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!
-               
-               
-               if(lem==0) {weightSum += 2 * arrayWT[lem].weight;}
-               else  {weightSum += arrayWT[lem].weight;}*/
-          
-    }
-    weightSum += arrayWT[0].weight;
-    printf("weightSum = %.2f\n", weightSum);
+         if(lem==0) {weightSum += 2 * arrayWT[lem].weight;}
+         else  {weightSum += arrayWT[lem].weight;}*/
+      }
+      weightSum += arrayWT[0].weight;
+      printf("weightSum = %.2f\n", weightSum);
     
-    float *prob;
-    prob = malloc((TFBS+1)*sizeof(float));
+      float *prob;
+      prob = malloc((TFBS+1)*sizeof(float));
     
-    for(lem =0; lem<TFBS+1; lem++){
-            if(lem == TFBS) { prob[lem] = (arrayWT[0].weight) / weightSum;}
-            else {prob[lem] = (arrayWT[lem].weight) / weightSum;}
-            printf("prob[%d] = %f\n", lem, prob[lem]);
-    }
-    srand((unsigned)time(NULL));  
-    int n = rand()%100;
-    printf("n=%d\n",n);
-    float check =0.;
-    check = n/1.;
-    printf("\ncheck = %f\n", check);
-    float *partition;
-    partition = malloc((TFBS+1)*sizeof(float));
-    for(lem=0; lem<TFBS+1; lem++){
-               if(lem==0){partition[lem] = prob[lem];}
-               else if(lem!=TFBS){ partition[lem] = (partition[(lem-1)]+prob[lem]);}
-               else {partition[lem] = 1;}
-               printf("partition[%d] = %f\n", lem, partition[lem]);
-    }
-    int b = 0;
-    lem =0;
-   float checkP =0.;
-   checkP = check /100.;
-    printf("checkP=%f\n", checkP);
-    if(0<checkP && checkP<=partition[0]){b=0;}
-    else if(partition[0]<checkP && checkP<=partition[1]){b=1;}
-    else if(partition[1]<checkP && checkP<=partition[2]){b=2;}
-    else if(partition[2]<checkP && checkP<=partition[3]){b=3;}
-    else if(partition[3]<checkP && checkP<=partition[4]){b=4;}
-    else if(partition[4]<checkP && checkP<=partition[5]){b=5;}
-    else if(partition[5]<checkP && checkP<=partition[6]){b=6;}
-    else {b=7;}
+      for(lem =0; lem<TFBS+1; lem++){
+         if(lem == TFBS) { prob[lem] = (arrayWT[0].weight) / weightSum;}
+         else {prob[lem] = (arrayWT[lem].weight) / weightSum;}
+         printf("prob[%d] = %f\n", lem, prob[lem]);
+      }
+      system("PAUSE");
+      srand((unsigned)time(NULL));  
+      int n = rand()%100;
+      printf("n=%d\n",n);
+      float check =0.;
+      check = n/1.;
+      printf("\ncheck = %f\n", check);
+      float *partition;
+      partition = malloc((TFBS+1)*sizeof(float));
+      for(lem=0; lem<TFBS+1; lem++){
+         if(lem==0){partition[lem] = prob[lem];}
+         else if(lem!=TFBS){ partition[lem] = (partition[(lem-1)]+prob[lem]);}
+         else {partition[lem] = 1;}
+         printf("partition[%d] = %f\n", lem, partition[lem]);
+      }
+      int b = 0;
+      lem =0;
+      float checkP =0.;
+      checkP = check /100.;
+      printf("checkP=%f\n", checkP);
+     
+     /* if(0<=checkP && checkP<=partition[0]){b=0;}
+      else if(partition[0]<checkP && checkP<=partition[1]){b=1;}
+      else if(partition[1]<checkP && checkP<=partition[2]){b=2;}
+      else if(partition[2]<checkP && checkP<=partition[3]){b=3;}
+      else if(partition[3]<checkP && checkP<=partition[4]){b=4;}
+      else if(partition[4]<checkP && checkP<=partition[5]){b=5;}
+      else if(partition[5]<checkP && checkP<=partition[6]){b=6;}
+      else {b=7;}*/
+      system("PAUSE");
+      int k, kTF;
+      kTF =0;
+      if(0<=checkP && checkP<=partition[0]){b=0;}
+      else{ for(k=0; k<TFBS; k++){
+              printf("part[k] = %.2f, part[k+1] = %.2f\n", partition[k],partition[k+1]);
+              if(partition[k]<checkP && checkP<=partition[k+1]){
+                 b=k+1;
+                 kTF=1;
+              }/*else{
+                 b=TFBS;
+              }*/
+            }
+            if(kTF ==0){b=TFBS;}
+            //else{b=TFBS;}
+      }     
+      
+      
+      /*else if(partition[0]<checkP && checkP<=partition[1]){b=1;}
+      else if(partition[1]<checkP && checkP<=partition[2]){b=2;}
+      else if(partition[2]<checkP && checkP<=partition[3]){b=3;}
+      else if(partition[3]<checkP && checkP<=partition[4]){b=4;}
+      else if(partition[4]<checkP && checkP<=partition[5]){b=5;}
+      else if(partition[5]<checkP && checkP<=partition[6]){b=6;}
+      else {b=7;}*/
+      
  
- printf("b=%d\n", b);
- printf("TF = %d, \n", arrayWT[b].tfIDon);
- printf("lem = %d\n", arrayWT[b].tfbsNum);
- printf("activating[][] = %d\n", indiv.activating[arrayWT[b].tfIDon][0]);
- if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){A++;}
- else{R++;}
- printf("A = %d   R = %d\n", A, R);
+      printf("b=%d\n", b);
+      printf("TF = %d, \n", arrayWT[b].tfIDon);
+      printf("lem = %d\n", arrayWT[b].tfbsNum);
+      printf("activating[][] = %d\n", indiv.activating[arrayWT[b].tfIDon][0]);
+      if(arrayWT[b].tfIDon == 11){/*do nothing, there is nothing bound */}
+      else{
+        if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){A++;}
+        else{R++;}
+      }
+      printf("A = %d   R = %d\n", A, R);
  
- startSite++;
- printf("startSite = %d\n", startSite);
- printf("ARGH!! = %d\n", arrayWT[b].startPos);
- startNum = arrayWT[b].startPos + HIND_LENGTH;
- printf("startNum = %d\n", startNum);
- 
+      startSite++;
+      printf("startSite = %d\n", startSite);
+      printf("ARGH!! = %d\n", arrayWT[b].startPos);
+      startNum = arrayWT[b].startPos + HIND_LENGTH;
+      printf("startNum = %d\n", startNum);
 
- posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
- printf("posNext = %d\n\n", posNext);
-}
+      posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
+      printf("posNext = %d\n\n", posNext);
+    }
+    printf("\n\nEND OF GENE!!!!!!!!\n\n");
+    printf("A = %d   R = %d\n", A, R);
 
-printf("\n\nEND OF GENE!!!!!!!!\n\n");
-printf("A = %d   R = %d\n", A, R);
+    int add;
+    if(val!=0){
+      int i;
+      i=0;
+      add =1;
+      while(i<val){
+         if(A == arrayD[i].active){ 
+            printf("ACITVE MATCH ");
+            if(R == arrayD[i].repress){
+               printf("REPRESS MATCH");
+               arrayD[i].count = arrayD[i].count +1;
+               printf("count = %d\n", arrayD[i].count);
+               printf("\n");
+               add =0;
+               break;
+            }
+         }
+         printf("\n");
+         i++;
+      }
+    }
+    if(val ==0 || add ==1){ 
+       arrayD[size].active = A;
+       arrayD[size].repress = R;
+       if(R==0) {arrayD[size].ratio = A*10.;}
+       else{arrayD[size].ratio = arrayD[size].active/arrayD[size].repress;}
+       arrayD[size].count = 1;
+       size++;
+    }
 
-
-
-
-
-
-
-     if(size ==0){
-              arrayD[(size)].active = A;
-              arrayD[(size)].repress = R;
-              arrayD[(size)].ratio = A/R;
-              arrayD[(size)].count = 1;
-               printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", size, arrayD[size].count, arrayD[size].active, arrayD[size].repress, arrayD[size].ratio);
-              size++;
-     }
-     else{           
-       for(count =0; count< (size); count++){
-         if(arrayD[count].active == A && arrayD[count].repress == R){
-            arrayD[count].count = (arrayD[count].count) + 1;
-            break;
-        }else{
-              //size++;
-              arrayD[size].active = A;
-              arrayD[size].repress = R;
-              arrayD[size].ratio = arrayD[size].active/arrayD[size].repress;
-              arrayD[size].count = 1;
-              size++;
-              break;
-        }
-         printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", count, arrayD[count].count, arrayD[count].active, arrayD[count].repress, arrayD[count].ratio);
-       }
-     }
-    
- /*TO DO: get arrayD to work. if A-R ration present in the array add to counter. else add element to array
- with the new A-R ratio. this is not working! figure it out! clean up code!*/
-
-
-
-
-
-// size = addRatio(arrayD, A, R, size);
- //size++;
-  /*arrayD[val].active = A;
-  arrayD[val].repress = R;
-  arrayD[val].ratio = arrayD[val].active/arrayD[val].repress;
-  arrayD[val].count = 1;*/
-printf("size = %d\n", size);
-//printf("%d  active = %f, repress = %f, ratio = %f\n", arrayD[0].count, arrayD[0].active, arrayD[0].repress, arrayD[0].ratio);
-val++;
-system("PAUSE");
-} 
-int chek =0;
-for(chek=0; chek<size; chek++){
-            printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", chek, arrayD[chek].count, arrayD[chek].active, arrayD[chek].repress, arrayD[chek].ratio);
-}
-//ddRatio(arrayD, 5, 1, &chek);
-     /* TO DO: Fix sliding window. ie. revamp algorithm look in notebook. make sure window doesnt go off
-     end of gene. make sure AR ratio resonable. look at activating[][]--not sure what it does. test.
-     get all this done tomorrow!!*/         
-    
-  printf("Here\n");
-  
+    val++;
+    system("PAUSE");
+  } 
+  int chek =0;
+  for(chek=0; chek<size; chek++){
+     printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", chek, arrayD[chek].count, arrayD[chek].active, arrayD[chek].repress, arrayD[chek].ratio);
+  }
+  printf("Here\n");  
   system("PAUSE");	
     
   free(left_edge_pos);
@@ -496,6 +506,5 @@ for(chek=0; chek<size; chek++){
   free(TFon);
   free(weight);
   free(arrayD);
-  free(arrayWT);
-  
+  free(arrayWT); 
 }
