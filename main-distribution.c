@@ -260,14 +260,14 @@ int main(int argc, char *argv[])
   printf("TFBS=%d\n", TFBS);
   
   
-  float Kon[TFBS];
+  //float Kon[TFBS];
   float *weight;
   
   left_edge_pos = malloc(indiv.sites_per_gene[0]*sizeof(int));
-  startPos=malloc(TFBS*sizeof(int));
+ /* startPos=malloc(TFBS*sizeof(int));
   hammDist = malloc(TFBS *sizeof(int));
   TFon = malloc(TFBS*sizeof(int));
-  weight = malloc(TFBS*sizeof(float));
+  weight = malloc(TFBS*sizeof(float));*/
 
    
    int posNext;
@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
      left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
      printf("%d\n", left_edge_pos[count]);
   }
-  printf("\n\n posNum(0,leftEdge) = %d\n\n", nextPos( 4, left_edge_pos));
+  //printf("\n\n posNum(0,leftEdge) = %d\n\n", nextPos( 4, left_edge_pos));
   
   
   int jo, jojo;
@@ -333,13 +333,13 @@ int main(int argc, char *argv[])
          arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+posNext].tf_id;
          bob = indiv.all_binding_sites[lem+posNext].tf_id;
          arrayWT[lem].conc = initProteinConc[bob];
-         arrayWT[lem].weight = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
+         arrayWT[lem].weight = (float)(initProteinConc[bob] * (float)Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
  
-         startPos[lem] = indiv.all_binding_sites[lem+posNext].left_edge_pos;
+         /*startPos[lem] = indiv.all_binding_sites[lem+posNext].left_edge_pos;
          hammDist[lem] = indiv.all_binding_sites[lem+posNext].hamming_dist;
          TFon[lem] = indiv.all_binding_sites[lem+posNext].tf_id;
          Kon[lem] = initProteinConc[bob];
-         weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
+         weight[lem] = (float)(initProteinConc[bob] * Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);*/
       
          //printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",lem, indiv.all_binding_sites[lem+posNext].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
          printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
       printf("\n");
       qsort((void *) &(arrayWT[0]), TFBS, sizeof(struct Wtype), (compfn)compareWeights);
       
-      system("PAUSE");
+      //system("PAUSE");
       printf("last entry\n");
       arrayWT[TFBS].conc = 0;
       arrayWT[TFBS].hammDist = 0;
@@ -381,7 +381,7 @@ int main(int argc, char *argv[])
          else {prob[lem] = (arrayWT[lem].weight) / weightSum;}
          printf("prob[%d] = %f\n", lem, prob[lem]);
       }
-      system("PAUSE");
+      //system("PAUSE");
       srand((unsigned)time(NULL));  
       int n = rand()%100;
       printf("n=%d\n",n);
@@ -410,7 +410,7 @@ int main(int argc, char *argv[])
       else if(partition[4]<checkP && checkP<=partition[5]){b=5;}
       else if(partition[5]<checkP && checkP<=partition[6]){b=6;}
       else {b=7;}*/
-      system("PAUSE");
+      //system("PAUSE");
       int k, kTF;
       kTF =0;
       if(0<=checkP && checkP<=partition[0]){b=0;}
@@ -426,15 +426,6 @@ int main(int argc, char *argv[])
             if(kTF ==0){b=TFBS;}
             //else{b=TFBS;}
       }     
-      
-      
-      /*else if(partition[0]<checkP && checkP<=partition[1]){b=1;}
-      else if(partition[1]<checkP && checkP<=partition[2]){b=2;}
-      else if(partition[2]<checkP && checkP<=partition[3]){b=3;}
-      else if(partition[3]<checkP && checkP<=partition[4]){b=4;}
-      else if(partition[4]<checkP && checkP<=partition[5]){b=5;}
-      else if(partition[5]<checkP && checkP<=partition[6]){b=6;}
-      else {b=7;}*/
       
  
       printf("b=%d\n", b);
