@@ -29,7 +29,9 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 20
+#define NITER 30
+
+FILE *recordFile;
 
 struct Dtype{
        float active;
@@ -192,6 +194,11 @@ int main(int argc, char *argv[])
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     printf("%f\n", initProteinConc[i]);
   }
+  for (i=0; i<NGENES; i++) {
+    initProteinConc[i] = 1000;
+    printf("%f\n", initProteinConc[i]);
+  }
+  //system("PAUSE");
   printf("\n");
   
   /* new API requires a Genotype clone */
@@ -222,6 +229,9 @@ int main(int argc, char *argv[])
   int *left_edge_pos, *startPos, *hammDist, *TFon; 
   float *weight, *partition;
   float check, checkP;
+  
+  int unboundCount;
+  unboundCount=0;
  
   left_edge_pos = malloc(indiv.sites_per_gene[0]*sizeof(int));
   
@@ -255,7 +265,9 @@ int main(int argc, char *argv[])
   startSite = 0;
   size =0;
   val =0;
-  
+  n= time(NULL);
+   recordFile = fopen("recodeFile.txt", "w");
+  if ((recordFile = fopen("recordFile.txt", "w"))) {
   while(val < NITER){
     A=R=0.;
     startNum = indiv.all_binding_sites[0].left_edge_pos;
@@ -264,7 +276,8 @@ int main(int argc, char *argv[])
     A=R=0.;        
     startSite = 0;
     while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){
-  
+      fprintf(recordFile, "left_edge_pos = %d\n", left_edge_pos[posNext]);
+      
       tfCount = posNext;
       TFBS =0;
       //printf("startNum = %d\n", tfCount);
@@ -296,6 +309,7 @@ int main(int argc, char *argv[])
       
          //printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",lem, indiv.all_binding_sites[lem+posNext].left_edge_pos, hammDist[lem], TFon[lem], Kon[lem], weight[lem]);
          printf("%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
+         fprintf(recordFile, "%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
       }
       
       //system("PAUSE");
@@ -306,18 +320,19 @@ int main(int argc, char *argv[])
       //printf("last entry\n");
       arrayWT[TFBS].conc = 0;
       arrayWT[TFBS].hammDist = 0;
-      arrayWT[TFBS].startPos = 0;
+      arrayWT[TFBS].startPos = 299;
       arrayWT[TFBS].tfbsNum = 111;
       arrayWT[TFBS].tfIDon = 11;
       arrayWT[TFBS].weight = arrayWT[0].weight;
       printf("%d  LEP = %d  Hd = %d   tf = %d conc = %f weight = %.2f\n",arrayWT[TFBS].tfbsNum, arrayWT[TFBS].startPos, arrayWT[TFBS].hammDist, arrayWT[TFBS].tfIDon, arrayWT[TFBS].conc, arrayWT[TFBS].weight);
+      fprintf(recordFile, "%d  LEP = %d  Hd = %d   tf = %d conc = %f weight = %.2f\n",arrayWT[TFBS].tfbsNum, arrayWT[TFBS].startPos, arrayWT[TFBS].hammDist, arrayWT[TFBS].tfIDon, arrayWT[TFBS].conc, arrayWT[TFBS].weight);
       //printf("END last entry\n");
       
       
       float weightSum = 0.;
       for(lem=0; lem<(TFBS); lem++){
          printf(" weight = %.2f\n", arrayWT[lem].weight);  
-         weightSum = weightSum +  arrayWT[lem].weight;
+         weightSum = (float)weightSum +  (float)arrayWT[lem].weight;
          printf("       weightSum = %f\n", weightSum);
                /*FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!
          if(lem==0) {weightSum += 2 * arrayWT[lem].weight;}
@@ -325,6 +340,7 @@ int main(int argc, char *argv[])
       }
       weightSum += arrayWT[0].weight;
       printf("weightSum = %.2f\n", weightSum);
+      fprintf(recordFile, "weightSum = %.2f\n", weightSum);
     
       float *prob;
       prob = malloc((TFBS+1)*sizeof(float));
@@ -335,24 +351,27 @@ int main(int argc, char *argv[])
          //printf("prob[%d] = %f\n", lem, prob[lem]);
       }
       //system("PAUSE");
-      srand((unsigned)time(NULL));  
+      srand(n);  
       n = rand()%100;
       printf("n=%d\n",n);
       check =0.;
       check = n/1.;
       printf("\ncheck = %f\n", check);
+      fprintf(recordFile, "\ncheck = %f\n", check);
       partition = malloc((TFBS+1)*sizeof(float));
       for(lem=0; lem<TFBS+1; lem++){
          if(lem==0){partition[lem] = prob[lem];}
          else if(lem!=TFBS){ partition[lem] = (partition[(lem-1)]+prob[lem]);}
          else {partition[lem] = 1;}
          printf("partition[%d] = %f\n", lem, partition[lem]);
+         fprintf(recordFile, "partition[%d] = %f\n", lem, partition[lem]);
       }
       b = 0;
       lem =0;
       checkP =0.;
       checkP = check /100.;
       printf("checkP=%f\n", checkP);
+      fprintf(recordFile, "checkP=%f\n", checkP);
      
      /* if(0<=checkP && checkP<=partition[0]){b=0;}
       else if(partition[0]<checkP && checkP<=partition[1]){b=1;}
@@ -367,7 +386,8 @@ int main(int argc, char *argv[])
       kTF =0;
       if(0<=checkP && checkP<=partition[0]){b=0;}
       else{ for(k=0; k<TFBS; k++){
-              printf("part[k] = %.2f, part[k+1] = %.2f\n", partition[k],partition[k+1]);
+              printf("part[%d] = %.2f, part[%d] = %.2f\n",k,  partition[k],k+1,partition[k+1]);
+              fprintf(recordFile, "part[%d] = %.2f, part[%d] = %.2f\n",k,  partition[k],k+1,partition[k+1]);
               if(partition[k]<checkP && checkP<=partition[k+1]){
                  b=k+1;
                  kTF=1;
@@ -384,14 +404,23 @@ int main(int argc, char *argv[])
       printf("TF = %d \n", arrayWT[b].tfIDon);
       printf("lem = %d\n", arrayWT[b].tfbsNum);
       printf("activating[][] = %d\n", indiv.activating[arrayWT[b].tfIDon][0]);
-      if(arrayWT[b].tfIDon == 11){/*do nothing, there is nothing bound */}
+      
+      fprintf(recordFile, "b=%d\n", b);
+      fprintf(recordFile, "TF = %d \n", arrayWT[b].tfIDon);
+      fprintf(recordFile, "lem = %d\n", arrayWT[b].tfbsNum);
+      fprintf(recordFile, "activating[][] = %d\n", indiv.activating[arrayWT[b].tfIDon][0]);
+      
+      if(arrayWT[b].tfIDon == 11){/*do nothing, there is nothing bound */
+         unboundCount++;}
       else{
         if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){A++;}
         else{R++;}
       }
       printf("A = %d   R = %d\n", A, R);
+      fprintf(recordFile, "A = %d   R = %d\n", A, R);
       if(A+R > 9){
              printf("PROBLEM!!!!!!!");
+             fprintf(recordFile, "PROBLEM!!!!!!!");
              system("PAUSE");
              //TO DO: fix this problem!! Too many things get bound, not sure what is wrong!
       }
@@ -399,15 +428,30 @@ int main(int argc, char *argv[])
       startSite++;
       printf("startSite = %d\n", startSite);
       printf("ARGH!! = %d\n", arrayWT[b].startPos);
-      startNum = arrayWT[b].startPos + HIND_LENGTH;
-      printf("startNum = %d\n", startNum);
+      
+      fprintf(recordFile, "startSite = %d\n", startSite);
+      fprintf(recordFile, "ARGH!! = %d\n", arrayWT[b].startPos);
+      
+      if(arrayWT[b].startPos != 299){
+        startNum = arrayWT[b].startPos + HIND_LENGTH;
+        printf("startNum = %d\n", startNum);
+        
+         fprintf(recordFile, "startNum = %d\n", startNum);
 
-      posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
+        posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
+      }else{
+            posNext++;
+      }
       printf("posNext = %d\n\n", posNext);
+      fprintf(recordFile, "posNext = %d\n\n", posNext);
+      //system("PAUSE");
     }
     printf("\n\nEND OF GENE!!!!!!!!\n\n");
     printf("A = %d   R = %d\n", A, R);
-
+    
+    fprintf(recordFile, "\n\nEND OF GENE!!!!!!!!\n\n");
+    fprintf(recordFile, "A = %d   R = %d\n", A, R);
+    //system("PAUSE");
     
     if(val!=0){
       p=0;
@@ -443,7 +487,11 @@ int main(int argc, char *argv[])
   chek =0;
   for(chek=0; chek<size; chek++){
      printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", chek, arrayD[chek].count, arrayD[chek].active, arrayD[chek].repress, arrayD[chek].ratio);
+     fprintf(recordFile, "%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", chek, arrayD[chek].count, arrayD[chek].active, arrayD[chek].repress, arrayD[chek].ratio);
   }
+  fprintf(recordFile, "unboundCount = %d\n", unboundCount);
+  }//file for-loop
+  fclose(recordFile);
   printf("Here\n");  
   system("PAUSE");	
     
