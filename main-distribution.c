@@ -29,7 +29,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 30
+#define NITER 50
 
 FILE *recordFile;
 
@@ -194,10 +194,10 @@ int main(int argc, char *argv[])
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     printf("%f\n", initProteinConc[i]);
   }
-  for (i=0; i<NGENES; i++) {
+  /*for (i=0; i<NGENES; i++) {
     initProteinConc[i] = 1000;
     printf("%f\n", initProteinConc[i]);
-  }
+  }*/
   //system("PAUSE");
   printf("\n");
   
@@ -475,8 +475,9 @@ int main(int argc, char *argv[])
     if(val ==0 || add ==1){ 
        arrayD[size].active = A;
        arrayD[size].repress = R;
-       if(R==0) {arrayD[size].ratio = A*10.;}
-       else{arrayD[size].ratio = arrayD[size].active/arrayD[size].repress;}
+       arrayD[size].ratio = arrayD[size].active * .33442 + .31303;
+       /*if(R==0) {arrayD[size].ratio = A*10.;}
+       else{arrayD[size].ratio = arrayD[size].active * .33442 + .31303;}*/
        arrayD[size].count = 1;
        size++;
     }
