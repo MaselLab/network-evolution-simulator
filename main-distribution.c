@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+
 #include "engine.h"
 
 #include "random.h"
@@ -351,15 +352,19 @@ int main(int argc, char *argv[])
          //printf("prob[%d] = %f\n", lem, prob[lem]);
       }
       //system("PAUSE");
+     
       fprintf(recordFile, "BEFORE n=%d\n",n);
       
-      srand(n);  
+      //srand(n);  
       //NOT RANDOM!! FIX THIS!!
-      
-      n = rand()%100;
-      //printf("n=%d\n",n);
+      fprintf(recordFile, "gasdev(&seed) = %f\n", gasdev(&seed));
+      //fprintf(recordFile,"rand = %d\n", rand());
+      n = rand()%1000;
+      fprintf(recordFile, "n1=%d\n",n);
+      //n=n/1000;
+      fprintf(recordFile, "n2=%d\n",n);
       check =0.;
-      check = n/1.;
+      check = n/1000.;
       //printf("\ncheck = %f\n", check);
       fprintf(recordFile, "\ncheck = %f\n", check);
       partition = malloc((TFBS+1)*sizeof(float));
@@ -372,8 +377,8 @@ int main(int argc, char *argv[])
       }
       b = 0;
       lem =0;
-      checkP =0.;
-      checkP = check /100.;
+     checkP =check;
+      //checkP = check /100.;
       //printf("checkP=%f\n", checkP);
       fprintf(recordFile, "checkP=%f\n", checkP);
      
