@@ -30,7 +30,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 200
+#define NITER 800
 
 FILE *recordFile;
 
@@ -195,8 +195,9 @@ int main(int argc, char *argv[])
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     printf("%f\n", initProteinConc[i]);
   }
-  /*for (i=0; i<NGENES; i++) {
-    initProteinConc[i] = 1000;
+  /*printf("\n");
+  for (i=0; i<NGENES; i++) {
+    initProteinConc[i] = initProteinConc[i]* (rand()%1000)/1000;
     printf("%f\n", initProteinConc[i]);
   }*/
   //system("PAUSE");
@@ -266,7 +267,8 @@ int main(int argc, char *argv[])
   startSite = 0;
   size =0;
   val =0;
-  n= time(NULL);
+  //n= time(NULL);
+  srand(time(NULL));
    recordFile = fopen("recodeFile.txt", "w");
   if ((recordFile = fopen("recordFile.txt", "w"))) {
   while(val < NITER){
@@ -484,7 +486,7 @@ int main(int argc, char *argv[])
     if(val ==0 || add ==1){ 
        arrayD[size].active = A;
        arrayD[size].repress = R;
-       arrayD[size].ratio = arrayD[size].active * .33442 + .31303;
+       arrayD[size].ratio = arrayD[size].active * .33 + .31;
        /*if(R==0) {arrayD[size].ratio = A*10.;}
        else{arrayD[size].ratio = arrayD[size].active * .33442 + .31303;}*/
        arrayD[size].count = 1;
