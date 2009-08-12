@@ -336,7 +336,7 @@ int main(int argc, char *argv[])
    verbose = 0;
 
   /* change to get a different genotype */
-  dummyrun = 4;
+  dummyrun = 8;
   current_ploidy = 1;
 
   /* parse command-line options */
@@ -351,13 +351,7 @@ int main(int argc, char *argv[])
         break;
       case 'p':
         current_ploidy = atoi(optarg);
-        break;
-     /* case 'w':
-        numBp = atoi(optarg);
-        break;
-      case 'a':
-        array_size = atoi(optarg);
-        break;  */      
+        break; 
      case 'v':
         verbose = 1;
         break;
