@@ -418,6 +418,9 @@ int main(int argc, char *argv[])
   qsort((void *) &(indiv.all_binding_sites[0]), indiv.sites_per_gene[0],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
  
+ active_to_repress(indiv, initProteinConc);
+ system("PAUSE");
+ 
  /*each struct holds # activators, # repressors, ratio A/R, and how many times ratio has occurred */          
  struct Dtype *arrayD;
  arrayD = malloc(NITER*sizeof(struct Dtype));
