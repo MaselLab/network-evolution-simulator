@@ -23,8 +23,6 @@
 #include <errno.h>
 
 
-#include "engine.h"
-
 #include "random.h"
 #include "lib.h"
 #include "netsim.h"
@@ -336,7 +334,7 @@ int main(int argc, char *argv[])
    verbose = 0;
 
   /* change to get a different genotype */
-  dummyrun = 8;
+  dummyrun = 4;
   current_ploidy = 1;
 
   /* parse command-line options */
