@@ -112,7 +112,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   percent = 0.000;
   active_prob = malloc(TFGENES*sizeof(float));
   int gene_num;
-  
+  int number =0;
   
   //gene_num =1;
   recordFile = fopen("recodeFile.txt", "w");
@@ -122,29 +122,34 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   unboundCount=0;
   activeCount = 0;
   percent = 0.000;
-  left_edge_pos = malloc(indiv.sites_per_gene[0]*sizeof(int));
+  left_edge_pos = malloc(indiv.sites_per_gene[gene_num]*sizeof(int));
   
   //TO DO: all_binding_sites holds ALL BS. need to divide up into genes. where gene[0] ends, gene[1] begins.
   //need to loop through all genes and store probabilities for each gene.
+   if(gene_num == 0){number =0;}
+   else{ number += indiv.sites_per_gene[gene_num-1];}
+  printf("number = %d\n", number);
+  int otherNum = indiv.all_binding_sites[number].left_edge_pos;
+  printf("otherNum = %d\n", otherNum);
   
-  startNum = indiv.all_binding_sites[0].left_edge_pos;
+  startNum = indiv.all_binding_sites[number].left_edge_pos;
   printf("startNum = %d\n", startNum);
   TFBS=0;
   //printf("TFBS = %d\n", TFBS);
-  while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
+  while( indiv.all_binding_sites[number+TFBS].left_edge_pos < startNum + HIND_LENGTH){
      TFBS++;
   }
   printf("TFBS = %d\n", TFBS);
   posNext=0;
   for( count =0; count<indiv.sites_per_gene[gene_num]; count++){
-     left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
+     left_edge_pos[count] = indiv.all_binding_sites[number+count].left_edge_pos;
   }
   printf("count = %d\n", count);
   for( lem=0; lem<3; lem++){
     Gibbs = (((float) lem)/3.0 - 1.0) * RTlnKr;
     Koff[lem] = -Gibbs;
   }
-  
+ system("PAUSE"); 
   siteCount = TFBS;
    
   A=R=0.;        
@@ -159,7 +164,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   printf("val=%d, NITER = %d\n", val, NITER);
   while(val < NITER){
     A=R=0.;
-    startNum = indiv.all_binding_sites[0].left_edge_pos;
+    startNum = indiv.all_binding_sites[number].left_edge_pos;
     while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){TFBS++;}
     posNext=0;
     A=R=0.;        
