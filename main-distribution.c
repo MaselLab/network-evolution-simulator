@@ -28,7 +28,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 10000
+#define NITER 1000
 
 FILE *recordFile;
 
@@ -103,27 +103,43 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   int startSite, TFBS, startNum, lem, bob, posNext, count, activeCount;
   int tfCount, siteCount, size, val, n, b, k, kTF, add, p;
   int *left_edge_pos; 
-  float *partition;
+  float *partition, *active_prob;
   float check, checkP, percent;
   
   int unboundCount;
   unboundCount=0;
   activeCount = 0;
   percent = 0.000;
- 
+  active_prob = malloc(TFGENES*sizeof(float));
+  int gene_num;
+  
+  
+  //gene_num =1;
+  recordFile = fopen("recodeFile.txt", "w");
+  if ((recordFile = fopen("recordFile.txt", "w"))) {
+  for(gene_num = 0; gene_num < TFGENES; gene_num++){
+  percent = 0.000;
+  unboundCount=0;
+  activeCount = 0;
+  percent = 0.000;
   left_edge_pos = malloc(indiv.sites_per_gene[0]*sizeof(int));
   
+  //TO DO: all_binding_sites holds ALL BS. need to divide up into genes. where gene[0] ends, gene[1] begins.
+  //need to loop through all genes and store probabilities for each gene.
+  
   startNum = indiv.all_binding_sites[0].left_edge_pos;
- 
+  printf("startNum = %d\n", startNum);
+  TFBS=0;
+  //printf("TFBS = %d\n", TFBS);
   while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
      TFBS++;
   }
-  
+  printf("TFBS = %d\n", TFBS);
   posNext=0;
-  for( count =0; count<indiv.sites_per_gene[0]; count++){
+  for( count =0; count<indiv.sites_per_gene[gene_num]; count++){
      left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
   }
-
+  printf("count = %d\n", count);
   for( lem=0; lem<3; lem++){
     Gibbs = (((float) lem)/3.0 - 1.0) * RTlnKr;
     Koff[lem] = -Gibbs;
@@ -138,8 +154,9 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
  
  
   srand(time(NULL));
-   recordFile = fopen("recodeFile.txt", "w");
-  if ((recordFile = fopen("recordFile.txt", "w"))) {
+   //recordFile = fopen("recodeFile.txt", "w");
+  //if ((recordFile = fopen("recordFile.txt", "w"))) {
+  printf("val=%d, NITER = %d\n", val, NITER);
   while(val < NITER){
     A=R=0.;
     startNum = indiv.all_binding_sites[0].left_edge_pos;
@@ -292,6 +309,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
     }
     val++;
   } 
+  activeCount=0;
   for(lem=0; lem<size; lem++){
      printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", lem, arrayD[lem].count, arrayD[lem].active, arrayD[lem].repress, arrayD[lem].ratio);
      fprintf(recordFile, "%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", lem, arrayD[lem].count, arrayD[lem].active, arrayD[lem].repress, arrayD[lem].ratio);
@@ -302,7 +320,14 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   fprintf(recordFile, "unboundCount = %d\n", unboundCount);
   fprintf(recordFile, "activeCount = %d\n", activeCount);
   fprintf(recordFile, "percent = %f\n", percent);
+  active_prob[gene_num] = percent;
+  }
+    for(lem =0; lem<TFGENES; lem ++){
+          printf("%.4f ", active_prob[lem]);
+          fprintf(recordFile, "%.4f ", active_prob[lem]);
+    }
   }//file for-loop
+  
   fclose(recordFile);
   
   free(left_edge_pos); 
