@@ -113,10 +113,10 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   active_prob = malloc(TFGENES*sizeof(float));
  // int bsNum;
   
-  //int gene_num;
+  int gene_num;
   //int number =0;
   
-  //gene_num =1;
+  gene_num =0;
   recordFile = fopen("recodeFile.txt", "w");
   if ((recordFile = fopen("recordFile.txt", "w"))) {
   /*for(bsNum = 0; bsNum < indiv.binding_sites_num; bsNum++){
@@ -133,19 +133,20 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   int *gene_start_pos;
   gene_start_pos = malloc(TFGENES*sizeof(int));
   int position =0;
-  
+  gene_start_pos[0] = 0;
   for(lem=0; lem < TFGENES; lem++){
-             printf("%d  %d  \n", lem, indiv.sites_per_gene[lem]);
+             //printf("%d  %d  \n", lem, indiv.sites_per_gene[lem]);
+            // position = indiv.sites_per_gene[lem];
              if(lem==0){ gene_start_pos[lem] = 0;
                          position = indiv.sites_per_gene[lem];}
              else{
              gene_start_pos[lem] = position;
-             //printf("%d  %d  ", lem, indiv.sites_per_gene[lem]);
+            // printf("%d  %d  ", lem, indiv.sites_per_gene[lem]);
              position+=indiv.sites_per_gene[lem];
              
              
              }
-            // printf("%d\n", gene_start_pos[lem]);
+             printf("%d %d\n",lem, gene_start_pos[lem]);
   }
   printf("sites_per_gene[] = %d\n TFGENES = %d\n", indiv.sites_per_gene[TFGENES], TFGENES);
   system("PAUSE");
@@ -153,21 +154,24 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   //need to loop through all genes and store probabilities for each gene.
   /* if(gene_num == 0){number =0;}
    else{ number += indiv.sites_per_gene[gene_num-1];}
+   
   printf("number = %d\n", number);
   int otherNum = indiv.all_binding_sites[number].left_edge_pos;
   printf("otherNum = %d\n", otherNum);*/
-  
-  startNum = indiv.all_binding_sites[0].left_edge_pos;
+  for(gene_num =0; gene_num < TFGENES; gene_num++){
+  int start_pos = gene_start_pos[gene_num];
+  startNum = indiv.all_binding_sites[start_pos].left_edge_pos;
   printf("startNum = %d\n", startNum);
   TFBS=0;
   printf("TFBS = %d\n", TFBS);
-  while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){
+  while( indiv.all_binding_sites[TFBS+start_pos].left_edge_pos < startNum + HIND_LENGTH){
      TFBS++;
   }
   printf("TFBS = %d\n", TFBS);
+  system("PAUSE");
   posNext=0;
-  for( count =0; count<indiv.sites_per_gene[0]; count++){
-     left_edge_pos[count] = indiv.all_binding_sites[count].left_edge_pos;
+  for( count =0; count<indiv.sites_per_gene[gene_num]; count++){
+     left_edge_pos[count] = indiv.all_binding_sites[count+start_pos].left_edge_pos;
   }
   printf("count = %d\n", count);
   for( lem=0; lem<3; lem++){
@@ -189,11 +193,11 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   printf("val=%d, NITER = %d\n", val, NITER);
   while(val < NITER){
     A=R=0.;
-    startNum = indiv.all_binding_sites[0].left_edge_pos;
+    startNum = indiv.all_binding_sites[start_pos].left_edge_pos;
     //printf("TFBS!!! = %d\n", TFBS);
     //system("PAUSE");
     //TFBS=0;
-    while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){TFBS++;}
+    //while( indiv.all_binding_sites[TFBS].left_edge_pos < startNum + HIND_LENGTH){TFBS++;}
     posNext=0;
     A=R=0.;        
     startSite = 0;
@@ -202,7 +206,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
       
       tfCount = posNext;
       TFBS =0;
-      while(indiv.all_binding_sites[tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){                                         
+      while(indiv.all_binding_sites[start_pos + tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){                                         
          TFBS++;
          tfCount++;
       }
@@ -359,6 +363,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
           printf("%.4f ", active_prob[lem]);
           fprintf(recordFile, "%.4f ", active_prob[lem]);
     }*/
+}
   }//file for-loop
   
   fclose(recordFile);
