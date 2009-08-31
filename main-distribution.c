@@ -111,17 +111,17 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   activeCount = 0;
   percent = 0.000;
   active_prob = malloc(TFGENES*sizeof(float));
-  int bsNum;
+ // int bsNum;
   
-  int gene_num;
+  //int gene_num;
   //int number =0;
   
   //gene_num =1;
   recordFile = fopen("recodeFile.txt", "w");
   if ((recordFile = fopen("recordFile.txt", "w"))) {
-  for(bsNum = 0; bsNum < indiv.binding_sites_num; bsNum++){
+  /*for(bsNum = 0; bsNum < indiv.binding_sites_num; bsNum++){
     for(gene_num =0; gene_num<TFGENES; gene_num++){
-       int bsBegin = indiv.sites_per
+       int bsBegin = indiv.sites_per*/
   percent = 0.000;
   unboundCount=0;
   activeCount = 0;
@@ -130,6 +130,25 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   
   printf("NUM BS = %d\n", indiv.binding_sites_num);
   
+  int *gene_start_pos;
+  gene_start_pos = malloc(TFGENES*sizeof(int));
+  int position =0;
+  
+  for(lem=0; lem < TFGENES; lem++){
+             printf("%d  %d  \n", lem, indiv.sites_per_gene[lem]);
+             if(lem==0){ gene_start_pos[lem] = 0;
+                         position = indiv.sites_per_gene[lem];}
+             else{
+             gene_start_pos[lem] = position;
+             //printf("%d  %d  ", lem, indiv.sites_per_gene[lem]);
+             position+=indiv.sites_per_gene[lem];
+             
+             
+             }
+            // printf("%d\n", gene_start_pos[lem]);
+  }
+  printf("sites_per_gene[] = %d\n TFGENES = %d\n", indiv.sites_per_gene[TFGENES], TFGENES);
+  system("PAUSE");
   //TO DO: all_binding_sites holds ALL BS. need to divide up into genes. where gene[0] ends, gene[1] begins.
   //need to loop through all genes and store probabilities for each gene.
   /* if(gene_num == 0){number =0;}
