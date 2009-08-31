@@ -158,7 +158,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   printf("number = %d\n", number);
   int otherNum = indiv.all_binding_sites[number].left_edge_pos;
   printf("otherNum = %d\n", otherNum);*/
-  for(gene_num =0; gene_num < TFGENES; gene_num++){
+  for(gene_num =0; gene_num < NGENES; gene_num++){
   int start_pos = gene_start_pos[gene_num];
   startNum = indiv.all_binding_sites[start_pos].left_edge_pos;
   printf("startNum = %d\n", startNum);
@@ -190,10 +190,12 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
   srand(time(NULL));
    //recordFile = fopen("recodeFile.txt", "w");
   //if ((recordFile = fopen("recordFile.txt", "w"))) {
+  startNum = indiv.all_binding_sites[start_pos].left_edge_pos;
   printf("val=%d, NITER = %d\n", val, NITER);
   while(val < NITER){
     A=R=0.;
-    startNum = indiv.all_binding_sites[start_pos].left_edge_pos;
+    
+    fprintf(recordFile, "startNum = %d\n", startNum);
     //printf("TFBS!!! = %d\n", TFBS);
     //system("PAUSE");
     //TFBS=0;
@@ -202,6 +204,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
     A=R=0.;        
     startSite = 0;
     while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){
+       fprintf(recordFile,  "left_edge_pos[posNext] = %d\n", left_edge_pos[posNext]);
      // fprintf(recordFile, "left_edge_pos = %d\n", left_edge_pos[posNext]);
       
       tfCount = posNext;
@@ -214,13 +217,13 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
       arrayWT = malloc((TFBS+1) *sizeof(struct Wtype));
    
       for (lem =0; lem<TFBS; lem++) {
-         arrayWT[lem].tfbsNum = lem;
-         arrayWT[lem].startPos = indiv.all_binding_sites[lem+posNext].left_edge_pos;
-         arrayWT[lem].hammDist = indiv.all_binding_sites[lem+posNext].hamming_dist;
-         arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+posNext].tf_id;
-         bob = indiv.all_binding_sites[lem+posNext].tf_id;
+         arrayWT[lem].tfbsNum = lem+start_pos;
+         arrayWT[lem].startPos = indiv.all_binding_sites[start_pos+lem+posNext].left_edge_pos;
+         arrayWT[lem].hammDist = indiv.all_binding_sites[start_pos+lem+posNext].hamming_dist;
+         arrayWT[lem].tfIDon = indiv.all_binding_sites[start_pos+lem+posNext].tf_id;
+         bob = indiv.all_binding_sites[start_pos+lem+posNext].tf_id;
          arrayWT[lem].conc = initProteinConc[bob];
-         arrayWT[lem].weight = (float)(initProteinConc[bob] * (float)Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
+         arrayWT[lem].weight = (float)(initProteinConc[bob] * (float)Koff[(indiv.all_binding_sites[start_pos+lem+posNext].hamming_dist)]);
  
          //fprintf(recordFile, "%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
       }
@@ -311,9 +314,10 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
       if(arrayWT[b].startPos != 299){
         startNum = arrayWT[b].startPos + HIND_LENGTH;
         
-        // fprintf(recordFile, "startNum = %d\n", startNum);
+         fprintf(recordFile, "startNum = %d\n", startNum);
 
         posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
+        fprintf("%d\n", posNext);
       }else{
             posNext++;
       }
@@ -363,6 +367,7 @@ void active_to_repress(Genotype indiv, float initProteinConc[NGENES]){
           printf("%.4f ", active_prob[lem]);
           fprintf(recordFile, "%.4f ", active_prob[lem]);
     }*/
+    printf("here");
 }
   }//file for-loop
   
