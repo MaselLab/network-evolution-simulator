@@ -123,6 +123,7 @@ int nextPos( int leftEdge, int *leftPos){
   float *partition, *active_prob;
   float check, checkP, percent;
   float weightSum;
+  int structStart;
   
   int unboundCount;
   unboundCount=0;
@@ -137,7 +138,8 @@ int nextPos( int leftEdge, int *leftPos){
   }
   
   startNum = indiv.all_binding_sites[start].left_edge_pos;
-  printf("startNum = %d\n", startNum);
+  int endNum =indiv.sites_per_gene[gene]+start;
+  printf("startNum = %d EndNum = %d\n", startNum, endNum);
   //count num BS in window
   TFBS=0;
   while( indiv.all_binding_sites[start+TFBS].left_edge_pos < startNum + HIND_LENGTH){
@@ -147,7 +149,8 @@ int nextPos( int leftEdge, int *leftPos){
   srand(time(NULL));  
   system("PAUSE");
     
-    posNext=start;
+    posNext=0;
+    structStart = start;
     A=R=0.; 
     val =0;  
     size=0;
@@ -155,22 +158,26 @@ int nextPos( int leftEdge, int *leftPos){
       weightSum = 0.;
       A=R=0.;
       while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){//loop through all sites in window
-          
+          printf("LEP = %d\n", left_edge_pos[posNext]);
+          structStart = start + posNext;
+          printf("dtructStart= %d LEP[SS] = %d\n", structStart, indiv.all_binding_sites[structStart].left_edge_pos);
          //while(indiv.all_binding_sites[start_pos + tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){                                         
-         while( indiv.all_binding_sites[posNext+TFBS].left_edge_pos < startNum + HIND_LENGTH){
+         TFBS=0;
+         while( indiv.all_binding_sites[structStart+TFBS].left_edge_pos < indiv.all_binding_sites[structStart].left_edge_pos + HIND_LENGTH && structStart+TFBS < endNum-HIND_LENGTH){
             TFBS++;
             //tfCount++;
          }
+         fprintf(recordFile, "TFBS=%d\n", TFBS);
         arrayWT = malloc((TFBS+1) *sizeof(struct Wtype));
    
          for (lem =0; lem<TFBS; lem++) {
-           arrayWT[lem].tfbsNum = lem+posNext;
-           arrayWT[lem].startPos = indiv.all_binding_sites[lem+posNext].left_edge_pos;
-           arrayWT[lem].hammDist = indiv.all_binding_sites[lem+posNext].hamming_dist;
-           arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+posNext].tf_id;
-           bob = indiv.all_binding_sites[lem+posNext].tf_id;
+           arrayWT[lem].tfbsNum = lem+structStart;
+           arrayWT[lem].startPos = indiv.all_binding_sites[lem+structStart].left_edge_pos;
+           arrayWT[lem].hammDist = indiv.all_binding_sites[lem+structStart].hamming_dist;
+           arrayWT[lem].tfIDon = indiv.all_binding_sites[lem+structStart].tf_id;
+           bob = indiv.all_binding_sites[lem+structStart].tf_id;
            arrayWT[lem].conc = initProteinConc[bob];
-           arrayWT[lem].weight = (float)(initProteinConc[bob] * (float)Koff[(indiv.all_binding_sites[lem+posNext].hamming_dist)]);
+           arrayWT[lem].weight = (float)(initProteinConc[bob] * (float)Koff[(indiv.all_binding_sites[lem+structStart].hamming_dist)]);
  
          fprintf(recordFile, "%d  LEP = %d  Hd = %d   tf = %d Kon = %f weight = %.2f\n",arrayWT[lem].tfbsNum, arrayWT[lem].startPos, arrayWT[lem].hammDist, arrayWT[lem].tfIDon, arrayWT[lem].conc, arrayWT[lem].weight);
       }//closes array for-loop
@@ -185,7 +192,7 @@ int nextPos( int leftEdge, int *leftPos){
       arrayWT[TFBS].weight = arrayWT[0].weight;
       
       fprintf(recordFile, "%d  LEP = %d  Hd = %d   tf = %d conc = %f weight = %.2f\n",arrayWT[TFBS].tfbsNum, arrayWT[TFBS].startPos, arrayWT[TFBS].hammDist, arrayWT[TFBS].tfIDon, arrayWT[TFBS].conc, arrayWT[TFBS].weight);
-      
+      weightSum =0;
       for(n=0; n<(TFBS); n++){
          weightSum = (float)weightSum +  (float)arrayWT[n].weight;
         // printf("       weightSum = %f\n", weightSum);
@@ -253,8 +260,9 @@ int nextPos( int leftEdge, int *leftPos){
       }else{
             posNext++;
       }
-      //fprintf(recordFile, "posNext = %d\n\n", posNext);
-      
+      printf("posNext = %d\n\n", posNext);
+      fprintf(recordFile, "posNext = %d\n\n", posNext);
+      system("PAUSE");
       }//closes while(left_edge_pos)
      
       if(val!=0){
