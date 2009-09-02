@@ -28,7 +28,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 100
+#define NITER 500
 
 FILE *recordFile;
 
@@ -85,8 +85,17 @@ int nextPos( int leftEdge, int *leftPos){
     while(leftPos[num] < right) {num++;}
    return num;
 }
- void active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start, int gene){
+float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start, int gene){
        int n;
+       
+       int startSite, TFBS, startNum, lem, bob, posNext, count, activeCount;
+  int tfCount, siteCount, size, val, m, b, k, kTF, add, p;
+  int *left_edge_pos; 
+  float *partition, *active_prob;
+  float check, checkP, percent;
+  float weightSum;
+  int structStart;
+       
        qsort((void *) &(indiv.all_binding_sites[start]), indiv.sites_per_gene[gene],                                 
             sizeof(struct AllTFBindingSites),(compfn)compare );
        
@@ -117,13 +126,7 @@ int nextPos( int leftEdge, int *leftPos){
     Koff[n] = -Gibbs;
   }
   
-  int startSite, TFBS, startNum, lem, bob, posNext, count, activeCount;
-  int tfCount, siteCount, size, val, m, b, k, kTF, add, p;
-  int *left_edge_pos; 
-  float *partition, *active_prob;
-  float check, checkP, percent;
-  float weightSum;
-  int structStart;
+  
   
   int unboundCount;
   unboundCount=0;
@@ -309,7 +312,7 @@ int nextPos( int leftEdge, int *leftPos){
       }//closes recordFile loop
       fclose(recordFile);
       //printf("here");
-      
+      return percent;
  }
 
      
@@ -417,12 +420,30 @@ int main(int argc, char *argv[])
   initialize_genotype(&indiv, UNUSED_clone, kdis, 0);
   
   /*Sort binding sites from smallest left_edge_position to largest left_edge_position*/
-  for(i=0; i<NGENES; i++){
-           printf("%d\n", indiv.sites_per_gene[i]);
+  int geneSum = 0;
+  float *gene_active;
+  gene_active = malloc(NGENES*sizeof(float));
+  printf("OUTSIDE WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, 0, 0));
+  for(i=0; i<NGENES-1; i++){
+           
+           /*FIX THIS!!!!!!!!!!!!!*/
+           printf("geneSum = %d,  i=%d\n", geneSum, i);
+           geneSum += indiv.sites_per_gene[i];
+           printf("WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, geneSum, i));
+           gene_active[i] = active_to_repress(indiv, initProteinConc, geneSum, i);
+           printf("%d    %.2f\n", indiv.sites_per_gene[i], gene_active[i]);
+           system("PAUSE"); 
   }
   system("PAUSE");
-  active_to_repress(indiv, initProteinConc, 86, 3);
- 
+  //float test = active_to_repress(indiv, initProteinConc, 0, 0);
+ // float test2 = active_to_repress(indiv, initProteinConc, 85, 1);
+  //float test3 = active_to_repress(indiv, initProteinConc, 190, 2);
+  //float test4 = active_to_repress(indiv, initProteinConc,1036,10);
+  //printf("test = %.2f\n", test);
+  //printf("test = %.2f\n", test2);
+ //printf("test = %.2f\n", test3);
+  //printf("test = %.2f\n", test4);
+  
   //printf("Here\n");  
   system("PAUSE");	
 
