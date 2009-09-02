@@ -28,7 +28,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 10
+#define NITER 100
 
 FILE *recordFile;
 
@@ -139,15 +139,15 @@ int nextPos( int leftEdge, int *leftPos){
   
   startNum = indiv.all_binding_sites[start].left_edge_pos;
   int endNum =indiv.sites_per_gene[gene]+start;
-  printf("startNum = %d EndNum = %d\n", startNum, endNum);
+  //printf("startNum = %d EndNum = %d\n", startNum, endNum);
   //count num BS in window
   TFBS=0;
   while( indiv.all_binding_sites[start+TFBS].left_edge_pos < startNum + HIND_LENGTH){
      TFBS++;
   }
-  printf("TFBS = %d\n", TFBS);
+  //printf("TFBS = %d\n", TFBS);
   srand(time(NULL));  
-  system("PAUSE");
+  //system("PAUSE");
     
     posNext=0;
     structStart = start;
@@ -162,9 +162,9 @@ int nextPos( int leftEdge, int *leftPos){
       structStart = start;
       fprintf(recordFile, "\n\n -----ITER = %d ----- \n\n", val);
       while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){//loop through all sites in window
-          printf("LEP = %d\n", left_edge_pos[posNext]);
+          //printf("LEP = %d\n", left_edge_pos[posNext]);
           structStart = start + posNext;
-          printf("dtructStart= %d LEP[SS] = %d\n", structStart, indiv.all_binding_sites[structStart].left_edge_pos);
+          //printf("dtructStart= %d LEP[SS] = %d\n", structStart, indiv.all_binding_sites[structStart].left_edge_pos);
          //while(indiv.all_binding_sites[start_pos + tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){                                         
          TFBS=0;
         // fprintf(recordFile, "endNum = %d, HIND_LENGTH = %d\n", endNum, HIND_LENGTH);
@@ -265,9 +265,9 @@ int nextPos( int leftEdge, int *leftPos){
       }else{
             posNext++;
       }
-      printf("posNext = %d\n\n", posNext);
+      //printf("posNext = %d\n\n", posNext);
       fprintf(recordFile, "posNext = %d\n\n", posNext);
-      system("PAUSE");
+     // system("PAUSE");
       }//closes while(left_edge_pos)
      
       if(val!=0){
@@ -308,7 +308,7 @@ int nextPos( int leftEdge, int *leftPos){
       
       }//closes recordFile loop
       fclose(recordFile);
-      printf("here");
+      //printf("here");
       
  }
 
@@ -417,10 +417,13 @@ int main(int argc, char *argv[])
   initialize_genotype(&indiv, UNUSED_clone, kdis, 0);
   
   /*Sort binding sites from smallest left_edge_position to largest left_edge_position*/
-  
-  active_to_repress(indiv, initProteinConc, 85, 1);
+  for(i=0; i<NGENES; i++){
+           printf("%d\n", indiv.sites_per_gene[i]);
+  }
+  system("PAUSE");
+  active_to_repress(indiv, initProteinConc, 86, 3);
  
-  printf("Here\n");  
+  //printf("Here\n");  
   system("PAUSE");	
 
 }
