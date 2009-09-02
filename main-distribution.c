@@ -154,16 +154,23 @@ int nextPos( int leftEdge, int *leftPos){
     A=R=0.; 
     val =0;  
     size=0;
-    while(val < NITER){ 
+    while(val < NITER){
+              //fprintf("\n\n ----- ITER = %d -----\n", val);
       weightSum = 0.;
       A=R=0.;
+      posNext=0;
+      structStart = start;
+      fprintf(recordFile, "\n\n -----ITER = %d ----- \n\n", val);
       while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){//loop through all sites in window
           printf("LEP = %d\n", left_edge_pos[posNext]);
           structStart = start + posNext;
           printf("dtructStart= %d LEP[SS] = %d\n", structStart, indiv.all_binding_sites[structStart].left_edge_pos);
          //while(indiv.all_binding_sites[start_pos + tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){                                         
          TFBS=0;
-         while( indiv.all_binding_sites[structStart+TFBS].left_edge_pos < indiv.all_binding_sites[structStart].left_edge_pos + HIND_LENGTH && structStart+TFBS < endNum-HIND_LENGTH){
+        // fprintf(recordFile, "endNum = %d, HIND_LENGTH = %d\n", endNum, HIND_LENGTH);
+        fprintf(recordFile, "structStart = %d\n", structStart);
+         while( indiv.all_binding_sites[structStart+TFBS].left_edge_pos < indiv.all_binding_sites[structStart].left_edge_pos + HIND_LENGTH && 
+                       structStart+TFBS < endNum){
             TFBS++;
             //tfCount++;
          }
@@ -253,8 +260,6 @@ int nextPos( int leftEdge, int *leftPos){
         startNum = arrayWT[b].startPos + HIND_LENGTH;
         
          fprintf(recordFile, "startNum = %d\n", startNum);
- /*THIS NEEDS TO BE FIXED!!!!!!!!!!!!! 
-  NOT STARTING WITH THE CORRECT POSITION!!!*/
         posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
         fprintf(recordFile, "%d\n", posNext);
       }else{
@@ -289,7 +294,7 @@ int nextPos( int leftEdge, int *leftPos){
     val++;
       }//closes while(val-NITER)
       
-      /*activeCount=0;
+      activeCount=0;
       for(lem=0; lem<size; lem++){
       printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", lem, arrayD[lem].count, arrayD[lem].active, arrayD[lem].repress, arrayD[lem].ratio);
       fprintf(recordFile, "%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", lem, arrayD[lem].count, arrayD[lem].active, arrayD[lem].repress, arrayD[lem].ratio);
@@ -299,7 +304,7 @@ int nextPos( int leftEdge, int *leftPos){
       percent = activeCount/(float)NITER;
       fprintf(recordFile, "unboundCount = %d\n", unboundCount);
       fprintf(recordFile, "activeCount = %d\n", activeCount);
-      fprintf(recordFile, "percent = %f\n", percent);*/
+      fprintf(recordFile, "percent = %f\n", percent);
       
       }//closes recordFile loop
       fclose(recordFile);
