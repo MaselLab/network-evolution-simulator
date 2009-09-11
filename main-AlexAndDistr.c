@@ -22,7 +22,7 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 10000
+#define NITER 3000
 
 FILE *recordFile;
 

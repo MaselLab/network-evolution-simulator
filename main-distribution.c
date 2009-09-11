@@ -23,9 +23,9 @@
 #include <errno.h>
 
 
-#include "random.h"
-#include "lib.h"
-#include "netsim.h"
+#include "randomJ.h"
+#include "libJ.h"
+#include "netsimJ.h"
 
 #define BUFSIZE 250
 #define NITER 3000
@@ -127,8 +127,6 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
     Koff[n] = -Gibbs;
   }
   
-  
-  
   int unboundCount;
   unboundCount=0;
   activeCount = 0;
@@ -138,20 +136,17 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
   //populate left_edge_pos
   for(n=0; n<indiv.sites_per_gene[gene]; n++){
            left_edge_pos[n] = indiv.all_binding_sites[start+n].left_edge_pos;
-          // fprintf(recordFile, "  %d\n", left_edge_pos[n]);
   }
   
   startNum = indiv.all_binding_sites[start].left_edge_pos;
   int endNum =indiv.sites_per_gene[gene]+start;
-  //printf("startNum = %d EndNum = %d\n", startNum, endNum);
+ 
   //count num BS in window
   TFBS=0;
   while( indiv.all_binding_sites[start+TFBS].left_edge_pos < startNum + HIND_LENGTH){
      TFBS++;
   }
-  //printf("TFBS = %d\n", TFBS);
   srand(time(NULL));  
-  //system("PAUSE");
     
     posNext=0;
     structStart = start;
@@ -159,24 +154,19 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
     val =0;  
     size=0;
     while(val < NITER){
-              //fprintf("\n\n ----- ITER = %d -----\n", val);
       weightSum = 0.;
       A=R=0.;
       posNext=0;
       structStart = start;
-      fprintf(recordFile, "\n\n -----ITER = %d ----- \n\n", val);
+      //fprintf(recordFile, "\n\n -----ITER = %d ----- \n\n", val);
       while(left_edge_pos[posNext]<= (CISREG_LEN - HIND_LENGTH)){//loop through all sites in window
-          //printf("LEP = %d\n", left_edge_pos[posNext]);
-          structStart = start + posNext;
-          //printf("dtructStart= %d LEP[SS] = %d\n", structStart, indiv.all_binding_sites[structStart].left_edge_pos);
-         //while(indiv.all_binding_sites[start_pos + tfCount].left_edge_pos < (indiv.all_binding_sites[posNext].left_edge_pos) + HIND_LENGTH && tfCount < indiv.sites_per_gene[0]){                                         
+          structStart = start + posNext;              
          TFBS=0;
-        // fprintf(recordFile, "endNum = %d, HIND_LENGTH = %d\n", endNum, HIND_LENGTH);
-        //fprintf(recordFile, "structStart = %d\n", structStart);
+       
          while( indiv.all_binding_sites[structStart+TFBS].left_edge_pos < indiv.all_binding_sites[structStart].left_edge_pos + HIND_LENGTH && 
                        structStart+TFBS < endNum){
             TFBS++;
-            //tfCount++;
+           
          }
          //fprintf(recordFile, "TFBS=%d\n", TFBS);
         arrayWT = malloc((TFBS+1) *sizeof(struct Wtype));
@@ -202,7 +192,6 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       arrayWT[TFBS].tfIDon = 11;
       arrayWT[TFBS].weight = arrayWT[0].weight;
       
-     // fprintf(recordFile, "%d  LEP = %d  Hd = %d   tf = %d conc = %f weight = %.2f\n",arrayWT[TFBS].tfbsNum, arrayWT[TFBS].startPos, arrayWT[TFBS].hammDist, arrayWT[TFBS].tfIDon, arrayWT[TFBS].conc, arrayWT[TFBS].weight);
       weightSum =0;
       for(n=0; n<(TFBS); n++){
          weightSum = (float)weightSum +  (float)arrayWT[n].weight;
@@ -210,7 +199,6 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
                /*FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!*/    
       }
       weightSum += arrayWT[0].weight;
-     // fprintf(recordFile, "weightSum = %.4f\n", weightSum);
       
       float *prob;
       prob = malloc((TFBS+1)*sizeof(float));
@@ -218,7 +206,6 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       for(n =0; n<TFBS+1; n++){
          if(n == TFBS) { prob[n] = (arrayWT[0].weight) / weightSum;}
          else {prob[n] = (arrayWT[n].weight) / weightSum;}
-         //fprintf(recordFile, "%f\n", prob[n]);
       }
       m = rand()%1000;
       check =0.;
@@ -228,17 +215,14 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
          if(n==0){partition[n] = prob[n];}
          else if(n!=TFBS){ partition[n] = (partition[(n-1)]+prob[n]);}
          else {partition[n] = 1;}
-        // fprintf(recordFile, "partition[%d] = %f\n", lem, partition[lem]);
       }
       b = 0;
       n =0;
      checkP =check;
-      //fprintf(recordFile, "checkP=%f\n", checkP);
       
       kTF =0;
       if(0<=checkP && checkP<=partition[0]){b=0;}
       else{ for(k=0; k<TFBS; k++){
-              //fprintf(recordFile, "part[%d] = %f, part[%d] = %f\n",k,  partition[k],k+1,partition[k+1]);
               if(partition[k]<checkP && checkP<=partition[k+1]){
                  b=k+1;
                  kTF=1;
@@ -258,20 +242,15 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
              //TO DO: fix this problem!! Too many things get bound, not sure what is wrong!
       }
       fprintf(recordFile, "A=%d, R=%d\n", A, R);  
-      //fprintf(recordFile, "arrayWT[b].startPos = %d\n", arrayWT[b].startPos);
       
       if(arrayWT[b].startPos != 299){
         startNum = arrayWT[b].startPos + HIND_LENGTH;
         
-         //fprintf(recordFile, "startNum = %d\n", startNum);
         posNext = nextPos(arrayWT[b].startPos, left_edge_pos);
-       // fprintf(recordFile, "%d\n", posNext);
+       
       }else{
             posNext++;
       }
-      //printf("posNext = %d\n\n", posNext);
-      //fprintf(recordFile, "posNext = %d\n\n", posNext);
-     // system("PAUSE");
       }//closes while(left_edge_pos)
      
       if(val!=0){
@@ -300,8 +279,6 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       
       activeCount=0;
       for(lem=0; lem<size; lem++){
-      //printf("%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", lem, arrayD[lem].count, arrayD[lem].active, arrayD[lem].repress, arrayD[lem].ratio);
-     // fprintf(recordFile, "%d  count = %d  active = %.2f, repress = %.2f, ratio = %.3f\n", lem, arrayD[lem].count, arrayD[lem].active, arrayD[lem].repress, arrayD[lem].ratio);
       if(arrayD[lem].repress < arrayD[lem].ratio){
          activeCount += arrayD[lem].count;} 
       }
@@ -312,7 +289,6 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       
       }//closes recordFile loop
       fclose(recordFile);
-      //printf("here");
       return percent;
  }
 
@@ -429,28 +405,14 @@ int main(int argc, char *argv[])
   printf("OUTSIDE WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, 0, 0));
   for(i=0; i<NGENES; i++){
            
-           /*FIX THIS!!!!!!!!!!!!!*/
            printf("geneSum = %d,  i=%d\n", geneSum, i);
            fprintf(outputFile, "geneSum = %d, i = %d, WHAT = %f\n\n", geneSum, i, active_to_repress(indiv, initProteinConc, geneSum, i));
-           //fprintf(recordFile, "geneSum = %d, i = %d, WHAT = %.2f\n\n", geneSum, i, active_to_repress(indiv, initProteinConc, geneSum, i));
            geneSum += indiv.sites_per_gene[i];
-          // gene_active[i] = active_to_repress(indiv, initProteinConc, geneSum, i);
-           //printf("%d    %.2f\n", indiv.sites_per_gene[i], gene_active[i]);
-           //system("PAUSE"); 
+        
   }
- }//close outputFile
+ }//closes file loop
   fclose(outputFile);
-  //system("PAUSE");
-  //float test = active_to_repress(indiv, initProteinConc, 0, 0);
- // float test2 = active_to_repress(indiv, initProteinConc, 85, 1);
-  //float test3 = active_to_repress(indiv, initProteinConc, 190, 2);
-  //float test4 = active_to_repress(indiv, initProteinConc,1036,10);
-  //printf("test = %.2f\n", test);
-  //printf("test = %.2f\n", test2);
- //printf("test = %.2f\n", test3);
-  //printf("test = %.2f\n", test4);
-  
-  //printf("Here\n");  
+
   system("PAUSE");	
 
 }
