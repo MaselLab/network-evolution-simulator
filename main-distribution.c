@@ -28,9 +28,10 @@
 #include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 500
+#define NITER 2000
 
 FILE *recordFile;
+FILE *outputFile;
 
 struct Dtype{
        float active;
@@ -88,10 +89,10 @@ int nextPos( int leftEdge, int *leftPos){
 float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start, int gene){
        int n;
        
-       int startSite, TFBS, startNum, lem, bob, posNext, count, activeCount;
-  int tfCount, siteCount, size, val, m, b, k, kTF, add, p;
+       int  TFBS, startNum, lem, bob, posNext, activeCount;
+  int  size, val, m, b, k, kTF, add, p;
   int *left_edge_pos; 
-  float *partition, *active_prob;
+  float *partition;
   float check, checkP, percent;
   float weightSum;
   int structStart;
@@ -397,6 +398,8 @@ int main(int argc, char *argv[])
 
   /* change random number */
   for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+  outputFile = fopen("outputFile.txt", "w");
+      if ((outputFile = fopen("outputFile.txt", "w"))) {
 
 
   /**********************************************************************
@@ -424,17 +427,20 @@ int main(int argc, char *argv[])
   float *gene_active;
   gene_active = malloc(NGENES*sizeof(float));
   printf("OUTSIDE WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, 0, 0));
-  for(i=0; i<NGENES-1; i++){
+  for(i=0; i<NGENES; i++){
            
            /*FIX THIS!!!!!!!!!!!!!*/
            printf("geneSum = %d,  i=%d\n", geneSum, i);
+           fprintf(outputFile, "geneSum = %d, i = %d, WHAT = %.2f\n\n", geneSum, i, active_to_repress(indiv, initProteinConc, geneSum, i));
+           //fprintf(recordFile, "geneSum = %d, i = %d, WHAT = %.2f\n\n", geneSum, i, active_to_repress(indiv, initProteinConc, geneSum, i));
            geneSum += indiv.sites_per_gene[i];
-           printf("WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, geneSum, i));
-           gene_active[i] = active_to_repress(indiv, initProteinConc, geneSum, i);
-           printf("%d    %.2f\n", indiv.sites_per_gene[i], gene_active[i]);
-           system("PAUSE"); 
+          // gene_active[i] = active_to_repress(indiv, initProteinConc, geneSum, i);
+           //printf("%d    %.2f\n", indiv.sites_per_gene[i], gene_active[i]);
+           //system("PAUSE"); 
   }
-  system("PAUSE");
+ }//close outputFile
+  fclose(outputFile);
+  //system("PAUSE");
   //float test = active_to_repress(indiv, initProteinConc, 0, 0);
  // float test2 = active_to_repress(indiv, initProteinConc, 85, 1);
   //float test3 = active_to_repress(indiv, initProteinConc, 190, 2);
