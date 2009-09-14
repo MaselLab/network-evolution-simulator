@@ -86,6 +86,7 @@ int nextPos( int leftEdge, int *leftPos){
     while(leftPos[num] < right) {num++;}
    return num;
 }
+
 float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start, int gene){
        int n;
        
@@ -291,7 +292,18 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       fclose(recordFile);
       return percent;
  }
-
+ 
+ void active_vect(Genotype indiv, float initProteinConc[NGENES], float *gene_active){
+       int geneSum = 0;
+       int i;
+       for(i=0; i<NGENES; i++){ 
+           printf("geneSum = %d,  i=%d\n", geneSum, i);
+           gene_active[i] = active_to_repress(indiv, initProteinConc, geneSum, i);
+           fprintf(outputFile, "geneSum = %d, i = %d, WHAT = %f\n\n", geneSum, i, gene_active[i] );
+           geneSum += indiv.sites_per_gene[i];
+        
+  }
+ }
      
 
 int main(int argc, char *argv[])
@@ -399,15 +411,17 @@ int main(int argc, char *argv[])
   initialize_genotype(&indiv, UNUSED_clone, kdis, 0);
   
   /*Sort binding sites from smallest left_edge_position to largest left_edge_position*/
-  int geneSum = 0;
+  
   float *gene_active;
   gene_active = malloc(NGENES*sizeof(float));
   printf("OUTSIDE WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, 0, 0));
+  active_vect(indiv, initProteinConc, gene_active);
   for(i=0; i<NGENES; i++){
-           
-           printf("geneSum = %d,  i=%d\n", geneSum, i);
-           fprintf(outputFile, "geneSum = %d, i = %d, WHAT = %f\n\n", geneSum, i, active_to_repress(indiv, initProteinConc, geneSum, i));
-           geneSum += indiv.sites_per_gene[i];
+           fprintf(outputFile, " WHAT = %f\n", gene_active[i] );
+          /* printf("geneSum = %d,  i=%d\n", geneSum, i);
+           gene_active[i] = active_to_repress(indiv, initProteinConc, geneSum, i);
+           fprintf(outputFile, "geneSum = %d, i = %d, WHAT = %f\n\n", geneSum, i, gene_active[i] );
+           geneSum += indiv.sites_per_gene[i];*/
         
   }
  }//closes file loop
