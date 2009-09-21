@@ -77,7 +77,7 @@ float protein_aging = 1e-4;
 
 /* file output parameters */
 char *output_directory = "output";   /* default output directory */
-int verbose = 0;                     /* don't log verbosely by default */ 
+int verbose = 1;                     /* don't log verbosely by default */ 
 
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
@@ -778,7 +778,7 @@ void calc_time (float t,
 {
   float r, denom, numer, ct, ect;
   int i;
-  
+  printf("x=%g, t=%g\n", x, t);
   r = numer = 0.0;
 
   /* loop over all only TFs that bind */
@@ -811,6 +811,8 @@ void calc_time (float t,
   *df = x*numer/denom - 1.0;
 
   LOG_VERBOSE_NOCELLID("t=%g f=%g df=%g\n", t, *f, *df);
+  printf("x=%g, t=%g f=%g df=%g\n",x,  t, *f, *df);
+  system("PAUSE");
 }
 
 void calc_kon_rate(float t,
