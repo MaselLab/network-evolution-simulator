@@ -515,7 +515,7 @@ int main(int argc, char *argv[])
       delete_time_course(timecoursestart[j][i]);
       timecoursestart[j][i] = timecourselast[j][i] = NULL;
     }
-    free_mem_CellState(&state[j]);
+    //free_mem_CellState(&state[j]);
     free(indivs[j].all_binding_sites);
   }
   system("PAUSE");
