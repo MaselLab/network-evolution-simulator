@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
                kdis, output_binding_sites, no_fixed_dev_time, max_divisions);
 
   print_all_protein_time_courses(timecoursestart, timecourselast);
-
+  //system("PAUSE");
   /* cleanup memory */
   for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"cleanup cell %03d\n", j);
