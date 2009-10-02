@@ -21,36 +21,15 @@
 #include "libJ.h"
 #include "netsimJ.h"
 
-#define BUFSIZE 250
-#define NITER 3000
 
-FILE *recordFile;
+//#define NITER 3000
 
-struct Dtype{
-       float active;
-       float repress;
-       float ratio;
-       int count;
-};
+//FILE *recordFile;
 
-struct Wtype{
-       int tfbsNum;
-       int startPos;
-       int hammDist;
-       int tfIDon;
-       float conc;
-       float weight;
-};    
 
-typedef int (*compfn)(const void*, const void*);
-//typedef float (*compfnf)(const void*, const void*);
 
-int intcmp(const void *a, const void *b)
-{
-    return *(int *)a - *(int *)b;
-}
 
-/*Reorders binding sites from smallest left_edge_position to largest left_edge_position */
+/*Reorders binding sites from smallest left_edge_position to largest left_edge_position 
 int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
     if(elem1->left_edge_pos < elem2->left_edge_pos)
         return -1;
@@ -106,7 +85,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       struct Dtype *arrayD;
  arrayD = malloc(NITER*sizeof(struct Dtype));
  
- /*each struct holds ID, BS numer, start positon, hamming distance, concentration and weight*/
+ //each struct holds ID, BS numer, start positon, hamming distance, concentration and weight
  struct Wtype *arrayWT;
   int A, R;
           
@@ -190,7 +169,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       for(n=0; n<(TFBS); n++){
          weightSum = (float)weightSum +  (float)arrayWT[n].weight;
         // printf("       weightSum = %f\n", weightSum);
-               /*FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!*/    
+               //FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!    
       }
       weightSum += arrayWT[0].weight;
       
@@ -224,7 +203,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
             }
             if(kTF ==0){b=TFBS;}
       } 
-      if(arrayWT[b].tfIDon == 11){/*do nothing, there is nothing bound */
+      if(arrayWT[b].tfIDon == 11){//do nothing, there is nothing bound 
          unboundCount++;}
       else{
         if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){A++;}
@@ -297,7 +276,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
            geneSum += indiv.sites_per_gene[i];
         
   }
- }  
+ }  */
 
 
 int main(int argc, char *argv[])
@@ -481,9 +460,9 @@ int main(int argc, char *argv[])
   for (j = 0; j < POP_SIZE; j++) {
     create_output_file("cellsize", output_directory, &(fp_cellsize[j]), j);
 #if 0 /* currently disable these file outputs */
-    create_output_file("koff", output_directory, &(fp_koff[j]), j);
+    //create_output_file("koff", output_directory, &(fp_koff[j]), j);
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
-    create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
+    //create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
     create_output_file("rounding", output_directory, &(fp_rounding[j]), j);
     /* print header */
     fprintf(fp_rounding[j], "t koff transport mRNAdecay picDisassembly salphc maxSalphc minSalphc \
@@ -525,9 +504,9 @@ int main(int argc, char *argv[])
     fclose(fp_cellsize[j]);
     
 #if 0  /* currently disable */
-    fclose(fp_koff[j]);
+   // fclose(fp_koff[j]);
     fclose(fp_growthrate[j]);
-    fclose(fp_tfsbound[j]);
+    //fclose(fp_tfsbound[j]);
     fclose(fp_rounding[j]);
 #endif
   }
