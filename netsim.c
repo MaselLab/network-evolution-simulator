@@ -1884,7 +1884,7 @@ void update_protein_conc_cell_size(float protein_conc[],
 
     /* update protein decay rates due to dilution caused by growth */
     adjusted_decay = genotype->proteindecay[i] + state->growth_rate;
-
+ 
     /* if this results in a very small or zero decay rate, use protein aging term */
     if (adjusted_decay > protein_aging)
       kon_states->konvalues[i][KON_PROTEIN_DECAY_INDEX] = adjusted_decay;
