@@ -23,12 +23,12 @@
 #include <errno.h>
 
 
-#include "randomJ.h"
-#include "libJ.h"
-#include "netsimJ.h"
+#include "random.h"
+#include "lib.h"
+#include "netsim.h"
 
 #define BUFSIZE 250
-#define NITER 3000
+#define NITER 1000
 
 FILE *recordFile;
 FILE *outputFile;
@@ -105,6 +105,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       if ((recordFile = fopen("recordFile.txt", "w"))) {
      
       fprintf(recordFile, "BS num  = %d\n", indiv.binding_sites_num);
+       fprintf(recordFile, "BS num gene 0 = %d\n", indiv.sites_per_gene[0]);
       for(n=0; n<indiv.sites_per_gene[gene]; n++){
                fprintf(recordFile, "%d   %d\n",n,  indiv.all_binding_sites[start+n].left_edge_pos);
       }
@@ -279,10 +280,14 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       }//closes while(val-NITER)
       
       activeCount=0;
+      printf("%f\n", arrayD[0].active);
+      
       for(lem=0; lem<size; lem++){
+                
       if(arrayD[lem].repress < arrayD[lem].ratio){
          activeCount += arrayD[lem].count;} 
       }
+       printf("active= %d, repress= %f, ratio=%f, count = %d\n", arrayD[0].active, arrayD[0].repress, arrayD[0].ratio, arrayD[0].count);
       percent = activeCount/(float)NITER;
       fprintf(recordFile, "unboundCount = %d\n", unboundCount);
       fprintf(recordFile, "activeCount = %d\n", activeCount);
@@ -401,6 +406,7 @@ int main(int argc, char *argv[])
   for (i=0; i<NGENES; i++) {
     initProteinConc[i] = exp(1.25759*gasdev(&seed)+7.25669);
     printf("%f\n", initProteinConc[i]);
+    fprintf(outputFile, "%f\n", initProteinConc[i]);
   }
   printf("\n");
   
