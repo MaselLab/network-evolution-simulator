@@ -486,6 +486,7 @@ int main(int argc, char *argv[])
 
   print_all_protein_time_courses(timecoursestart, timecourselast);
 
+  system("PAUSE");
   /* cleanup memory */
   for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"cleanup cell %03d\n", j);
@@ -497,7 +498,7 @@ int main(int argc, char *argv[])
     //free_mem_CellState(&state[j]);
     free(indivs[j].all_binding_sites);
   }
-  system("PAUSE");
+  //system("PAUSE");
   /* close file descriptors */
   fclose(fperrors);
   for (j = 0; j < POP_SIZE; j++) {

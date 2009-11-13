@@ -3744,7 +3744,7 @@ int do_single_timestep(Genotype *genotype,
                                state->mRNA_transcr_time_end,
                                state->replication_time_end,
                                fixed_time);
-  
+  printf("rates transport = %f\n", rates->transport);
   /* while there are either transcription or translation events
      occuring in current t->dt window */
   while (event > 0) {
@@ -3868,7 +3868,8 @@ int do_single_timestep(Genotype *genotype,
      * rates->subtotal, so it needs to be added here
      */
     *x = ran1(&seed)*(rates->subtotal + *konrate);  
-    
+    printf("*x = %f\n", *x);
+    system("PAUSE");
     if (verbose) {
       log_snapshot(rates,
                    state,
@@ -3884,6 +3885,7 @@ int do_single_timestep(Genotype *genotype,
     /* 
      * STOCHASTIC EVENT: a TF unbinds (koff) 
      */
+     printf("*x = %f, rates transport= %f, rates koff= %f\n", *x, rates->transport, rates->koff);
     if (*x < rates->koff) {  
       int ignore_event;
       tf_unbinding_event(rates, state, genotype, kon_states, koffvalues,
@@ -3893,6 +3895,7 @@ int do_single_timestep(Genotype *genotype,
       }
     } else {
       *x -= rates->koff;  
+      printf("*x = %f\n", *x);
       /* 
        * STOCHASTIC EVENT: a transport event
        */

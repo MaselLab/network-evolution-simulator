@@ -25,7 +25,7 @@
 
 #include "random.h"
 #include "lib.h"
-#include "netsim.h"
+#include "netsimJ.h"
 
 #define BUFSIZE 250
 #define NITER 1000
@@ -33,7 +33,7 @@
 FILE *recordFile;
 FILE *outputFile;
 
-struct Dtype{
+/*struct Dtype{
        float active;
        float repress;
        float ratio;
@@ -57,7 +57,7 @@ int intcmp(const void *a, const void *b)
     return *(int *)a - *(int *)b;
 }
 
-/*Reorders binding sites from smallest left_edge_position to largest left_edge_position */
+//Reorders binding sites from smallest left_edge_position to largest left_edge_position 
 int compare(struct AllTFBindingSites  *elem1, struct AllTFBindingSites *elem2){
     if(elem1->left_edge_pos < elem2->left_edge_pos)
         return -1;
@@ -114,7 +114,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       struct Dtype *arrayD;
  arrayD = malloc(NITER*sizeof(struct Dtype));
  
- /*each struct holds ID, BS numer, start positon, hamming distance, concentration and weight*/
+ //each struct holds ID, BS numer, start positon, hamming distance, concentration and weight
  struct Wtype *arrayWT;
   int A, R;
           
@@ -198,7 +198,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       for(n=0; n<(TFBS); n++){
          weightSum = (float)weightSum +  (float)arrayWT[n].weight;
         // printf("       weightSum = %f\n", weightSum);
-               /*FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!*/    
+               //FIX THIS! SUM IS NOT CORRECT! ROUNDING ERRORS!    
       }
       weightSum += arrayWT[0].weight;
       
@@ -232,7 +232,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
             }
             if(kTF ==0){b=TFBS;}
       } 
-      if(arrayWT[b].tfIDon == 11){/*do nothing, there is nothing bound */
+      if(arrayWT[b].tfIDon == 11){//do nothing, there is nothing bound 
          unboundCount++;}
       else{
         if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){A++;}
@@ -287,7 +287,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       if(arrayD[lem].repress < arrayD[lem].ratio){
          activeCount += arrayD[lem].count;} 
       }
-       printf("active= %d, repress= %f, ratio=%f, count = %d\n", arrayD[0].active, arrayD[0].repress, arrayD[0].ratio, arrayD[0].count);
+       printf("active= %f, repress= %f, ratio=%f, count = %d\n", arrayD[0].active, arrayD[0].repress, arrayD[0].ratio, arrayD[0].count);
       percent = activeCount/(float)NITER;
       fprintf(recordFile, "unboundCount = %d\n", unboundCount);
       fprintf(recordFile, "activeCount = %d\n", activeCount);
@@ -309,7 +309,7 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
         
   }
  }
-     
+*/     
 
 int main(int argc, char *argv[])
 {
@@ -420,7 +420,7 @@ int main(int argc, char *argv[])
   
   float *gene_active;
   gene_active = malloc(NGENES*sizeof(float));
-  printf("OUTSIDE WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, 0, 0));
+ // printf("OUTSIDE WHAT = %.2f\n\n", active_to_repress(indiv, initProteinConc, 0, 0));
   active_vect(indiv, initProteinConc, gene_active);
   for(i=0; i<NGENES; i++){
            fprintf(outputFile, " WHAT = %f\n", gene_active[i] );
