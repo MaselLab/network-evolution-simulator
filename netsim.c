@@ -53,9 +53,9 @@ float kon_after_burnin=1e-4; /* lower value value after burn is so things run fa
 
 int burn_in = 0;             /* disable burn-in by default */
 
-float tdevelopment = 120.0;/* default  development time: can be changed at runtime */
+float tdevelopment = 7.0;/* default  development time: can be changed at runtime */
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
-int current_ploidy = 2;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
+int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
 int dummyrun = 4;          /* used to change seed */
@@ -77,7 +77,7 @@ float protein_aging = 1e-4;
 
 /* file output parameters */
 char *output_directory = "output";   /* default output directory */
-int verbose = 1;                     /* don't log verbosely by default */ 
+int verbose = 0;                     /* don't log verbosely by default */ 
 
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
@@ -798,6 +798,7 @@ void calc_time (float t,
   }
   numer *= kon;
   r *= kon;
+  LOG_VERBOSE_NOCELLID("r=%g \n", r);
   denom = r + t*(rates->subtotal + rates->salphc);
   denom = denom * denom;
   r /= t;
@@ -1279,7 +1280,8 @@ void calc_dt(float *x,
   rates->subtotal += rates->mRNAdecay;
   rates->subtotal += rates->pic_disassembly;
   rates->subtotal += rates->salphc;
-
+  LOG_ERROR_NOCELLID("rates subtotal = %f, salphc = %f\n", rates->subtotal, rates->salphc);
+  //printf("rates subtotal = %f\n rates koff = %f\n rates transport = %f\n rates mrna = %f\n rates pic = %f\n rates salphc = %f \n",rates->subtotal, rates->koff, rates->transport, rates->mRNAdecay, rates->pic_disassembly, rates->salphc);
   /* 
    * convert the counts back into rates using the constants 
    */
@@ -1289,7 +1291,8 @@ void calc_dt(float *x,
     rates->subtotal += (float) rates->pic_assembly_num[j] * PICASSEMBLY;
     rates->subtotal += (float) rates->transcript_init_num[j] * TRANSCRIPTINIT;    
   } 
-
+  //printf("rates subtotal = %f\n",rates->subtotal);
+  //system("PAUSE");
   tbound1 = *x/(rates->subtotal + rates->max_salphc);
   tbound2 = *x/(rates->subtotal + rates->min_salphc);
   LOG_VERBOSE_NOCELLID("[cell %03d] bounds %g %g\n", cell_id, tbound1, tbound2);
@@ -1405,7 +1408,10 @@ void revise_activity_state(int gene_id,
 
   /* get last state of transcription initiation */
   oldstate = state->active[gene_id][gene_copy];
-
+  //printf("gene id = %d\n", gene_id);
+  //if(gene_id == 0){
+            // system("PAUSE");
+  //}
   /*
    * first set of rules:
    * ACTIVATING TFs exceed REPRESSING TFs 
@@ -1413,12 +1419,14 @@ void revise_activity_state(int gene_id,
 
   /* OFF_FULL -> ON_WITH_NUCLEOSOME */
   if ((transcriptrule) && oldstate==OFF_FULL){
+                       //printf("A\n");
     state->active[gene_id][gene_copy] = ON_WITH_NUCLEOSOME;
     state->state_change_ids[ACETYLATION_STATE][gene_copy][rates->acetylation_num[gene_copy]] = gene_id;
     (rates->acetylation_num[gene_copy])++;
   }
   /* OFF_NO_PIC -> ON_NO_PIC */
   if ((transcriptrule) && oldstate==OFF_NO_PIC) {
+                       //printf("B\n");
     state->active[gene_id][gene_copy] = ON_NO_PIC;
     remove_from_array(gene_id, DEACETYLATION_STATE,  state->state_change_ids[DEACETYLATION_STATE][gene_copy], 
                       &(rates->deacetylation_num[gene_copy]), (int) 1);
@@ -1429,6 +1437,7 @@ void revise_activity_state(int gene_id,
   }
   /* OFF_PIC -> ON_FULL */
   if ((transcriptrule) && oldstate==OFF_PIC) {
+                      // printf("C\n");
     state->active[gene_id][gene_copy] = ON_FULL;
   }
 
@@ -1439,6 +1448,7 @@ void revise_activity_state(int gene_id,
 
   /* ON_WITH_NUCLEOSOME -> OFF_FULL */
   if (!(transcriptrule) && oldstate==ON_WITH_NUCLEOSOME) {
+                       // printf("D\n");
     state->active[gene_id][gene_copy] = OFF_FULL;
     LOG_VERBOSE("removing gene=%d, copy=%d from state_change_ids[ACETYLATION_STATE][%d]\n", gene_id, gene_copy, gene_copy);
     remove_from_array(gene_id, ACETYLATION_STATE, state->state_change_ids[ACETYLATION_STATE][gene_copy], 
@@ -1446,7 +1456,8 @@ void revise_activity_state(int gene_id,
   }
   
   /* ON_NO_PIC -> OFF_NO_PIC */
-  if (!(transcriptrule) && oldstate==ON_NO_PIC){          
+  if (!(transcriptrule) && oldstate==ON_NO_PIC){    
+                       // printf("E\n");      
     state->active[gene_id][gene_copy] = OFF_NO_PIC;
     remove_from_array(gene_id, PICASSEMBLY_STATE, state->state_change_ids[PICASSEMBLY_STATE][gene_copy], 
                       &(rates->pic_assembly_num[gene_copy]), (int) 0);
@@ -1455,9 +1466,10 @@ void revise_activity_state(int gene_id,
   }
   /* ON_FULL -> OFF_PIC  */
   if (!(transcriptrule) && oldstate==ON_FULL) {
+                       // printf("F\n");
     state->active[gene_id][gene_copy] = OFF_PIC;
   }
-
+//system("PAUSE");
   /* do remaining transitions:
    * OFF_PIC -> OFF_NO_PIC
    * ON_FULL -> ON_NO_PIC 
@@ -3744,7 +3756,7 @@ int do_single_timestep(Genotype *genotype,
                                state->mRNA_transcr_time_end,
                                state->replication_time_end,
                                fixed_time);
-  printf("rates transport = %f\n", rates->transport);
+  //printf("rates transport = %f\n", rates->transport);
   /* while there are either transcription or translation events
      occuring in current t->dt window */
   while (event > 0) {
@@ -3812,7 +3824,7 @@ int do_single_timestep(Genotype *genotype,
     
     *t += *dt;                  /* advance time by the dt */
     *x -= (*dt)*(*konrate);
-
+    
     LOG_VERBOSE("dt=%g t=%g fixed event old x=%g new x=%g\n", *dt, *t, (*x)+(*dt)*(*konrate), *x);
     
     /* re-compute a new dt */
@@ -3868,8 +3880,11 @@ int do_single_timestep(Genotype *genotype,
      * rates->subtotal, so it needs to be added here
      */
     *x = ran1(&seed)*(rates->subtotal + *konrate);  
-    printf("*x = %f\n", *x);
-    system("PAUSE");
+    LOG_ERROR("*x = %f, rates + kon  = %f \n", *x, (rates->subtotal+ *konrate ));
+    LOG_ERROR("rates koff = %f\n", rates->koff);
+    LOG_ERROR("rates pic = %f\n sum rate ACE = %f\n sum rate DEACE = %f\n sum rate PIC = %f\n sum rate trans = %f\n", rates->pic_disassembly, sum_rate_counts(rates->acetylation_num) * ACETYLATE, sum_rate_counts(rates->deacetylation_num) * DEACETYLATE, sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY, sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT);
+    //printf("*x = %f\n", *x);
+    //system("PAUSE");
     if (verbose) {
       log_snapshot(rates,
                    state,
@@ -3885,7 +3900,8 @@ int do_single_timestep(Genotype *genotype,
     /* 
      * STOCHASTIC EVENT: a TF unbinds (koff) 
      */
-     printf("*x = %f, rates transport= %f, rates koff= %f\n", *x, rates->transport, rates->koff);
+     //printf("*x = %f, rates transport= %f, rates koff= %f\n", *x, rates->transport, rates->koff);
+     //LOG_ERROR("*x = %f\n", *x);
     if (*x < rates->koff) {  
       int ignore_event;
       tf_unbinding_event(rates, state, genotype, kon_states, koffvalues,
@@ -3895,7 +3911,7 @@ int do_single_timestep(Genotype *genotype,
       }
     } else {
       *x -= rates->koff;  
-      printf("*x = %f\n", *x);
+      //printf("*x = %f\n", *x);
       /* 
        * STOCHASTIC EVENT: a transport event
        */
