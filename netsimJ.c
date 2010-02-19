@@ -1297,79 +1297,7 @@ int does_fixed_event_end(FixedEvent *mRNA_transl_time_end,
  * calculate the length of the next (Gillespie) timestep, dt
  */
  //DESTROY??
-void calc_dt(float *x,
-             float *dt,
-             GillespieRates *rates,
-             //KonStates *kon_states,
-             float mRNAdecay[],
-             float mRNAdecayrates[],
-             int mRNA_cyto_num[],
-             int mRNA_transl_cyto_num[],
-             int cell_id)
-{
-  //float tbound1, tbound2;
-  int i, j;
 
-  /* reset the subtotal rate (excludes konrate) for current step */
-  rates->subtotal=0.0;
-  /* reset mRNA decay rate */
-  rates->mRNAdecay=0.0;
-  /* hence reset the number of rounding operations for this particular rate */
-  rates->mRNAdecay_operations=0;
-
-  /* update mRNAdecay rate based on the total number of mRNAs in both
-     cytoplasm (mRNA_cyto_num) and ones that have only just recently arrived
-     (mRNA_transl_cyto_num) */
-  for (i=0; i < NGENES; i++) {
-    mRNAdecay[i] = mRNAdecayrates[i] * ((float) mRNA_cyto_num[i] + (float) mRNA_transl_cyto_num[i]);
-    rates->mRNAdecay += mRNAdecay[i];
-    rates->mRNAdecay_operations++;
-}
-
-  /* recompute and cache the total rate in data structure */
- // rates->subtotal += rates->koff;
-  rates->subtotal += rates->transport;
-  rates->subtotal += rates->mRNAdecay;
-  rates->subtotal += rates->pic_disassembly;
-  //printf("rates subtotal = %f, rates salphc = %f\n",rates->subtotal, rates->salphc);
-  rates->subtotal += rates->salphc;
-
-  /* 
-   * convert the counts back into rates using the constants 
-   */
-   //float test = (mRNA_cyto_num[0]) * 63;//genotype->translation[0];
-   //printf("test = %f\n", test);
-    //system("PAUSE");
-   // LOG_ERROR_NOCELLID("ratesONE = %d\n", rates->acetylation_num[2]);
-  for (j=0; j < MAX_COPIES; j++) {
-    rates->subtotal += (float) rates->acetylation_num[j] * ACETYLATE;
-    rates->subtotal += (float) rates->deacetylation_num[j] * DEACETYLATE;
-    rates->subtotal += (float) rates->pic_assembly_num[j] * PICASSEMBLY;
-    rates->subtotal += (float) rates->transcript_init_num[j] * TRANSCRIPTINIT;    
-  } 
-    //printf("rates subtotal = %f\n",rates->subtotal);
-
-  //tbound1 = 1.01536e-007;
-  //tbound2 = 2.02787e-007;
-  //tbound1 = *x/(rates->subtotal + rates->max_salphc);
-  //tbound2 = *x/(rates->subtotal + rates->min_salphc);
-  //LOG_VERBOSE_NOCELLID("[cell %03d] bounds %g %g\n", cell_id, tbound1, tbound2);
-
-  /* if bounds are the same, simply choose tbound1 */
-  //if (tbound1==tbound2){
-    //if (kon_states->nkon!=0) {
-     // LOG_ERROR_NOCELLID("[cell %03d] nkon=%d when it should be zero x=%f rates->max_salphc=%g rates->min_salphc=%g rates->subtotal=%g\n",
-                      //   cell_id, kon_states->nkon, *x, rates->max_salphc, rates->min_salphc, rates->subtotal);
-   // }
-    //*dt = tbound1;
- // } else {
-    /* otherwise get delta t by solving the equation using Newton-Raphson method */
-    //FIXXX!!
-    *dt = (*x);
-    //*dt = rtsafe(&calc_time, *x, rates,  tbound1, tbound2, (float) RT_SAFE_EPSILON); //kon_states,
-    //*dt = 1.0e-004;
-  //}
-}
 
 /*
  * end transcription: update the mRNAs in the nucleus, cytoplasm
@@ -1517,10 +1445,10 @@ void revise_activity_state(int gene_id,
     state->active[gene_id][gene_copy] = ON_NO_PIC;
     remove_from_array(gene_id, DEACETYLATION_STATE,  state->state_change_ids[DEACETYLATION_STATE][gene_copy], 
                       &(rates->deacetylation_num[gene_copy]), (int) 1);
-    /*if (numactive){ FIGURE OUT WHAT THIS IS/DOES!!
+    if (transcriptrule){// FIGURE OUT WHAT THIS IS/DOES!!
       state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
       (rates->pic_assembly_num[gene_copy])++;
-    }*/
+    }
   }
   /* OFF_PIC -> ON_FULL */
   if ((transcriptrule) && oldstate==OFF_PIC) {
@@ -4210,11 +4138,11 @@ int do_single_timestep(Genotype *genotype,
   *x = expdev(&seed);        /* draw random number */
   
     
-
-  /* compute the initial dt for the next event */
+  *dt = (*x);
+  /* compute the initial dt for the next event 
   calc_dt(x, dt, rates, //kon_states,
    mRNAdecay, genotype->mRNAdecay,
-          state->mRNA_cyto_num, state->mRNA_transl_cyto_num, state->cell_id);
+          state->mRNA_cyto_num, state->mRNA_transl_cyto_num, state->cell_id);*/
 
   
 
@@ -4342,10 +4270,11 @@ int do_single_timestep(Genotype *genotype,
 
     //LOG_VERBOSE("dt=%g t=%g fixed event old x=%g new x=%g\n", *dt, *t, (*x)+(*dt)*(*konrate), *x);
     
+    *dt = expdev(&seed);
     /* re-compute a new dt */
-    calc_dt(x, dt, rates, //kon_states,
+    /*calc_dt(x, dt, rates, //kon_states,
      mRNAdecay, 
-            genotype->mRNAdecay, state->mRNA_cyto_num, state->mRNA_transl_cyto_num, state->cell_id);
+            genotype->mRNAdecay, state->mRNA_cyto_num, state->mRNA_transl_cyto_num, state->cell_id);*/
     
     LOG_VERBOSE("next stochastic event (2) due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
 
@@ -4374,11 +4303,12 @@ int do_single_timestep(Genotype *genotype,
     }*/
 
     /* if the total rates falls below zero, we do an emergency recalibration of cell */
-   // if (!(rates->subtotal > 0.0)) {//+ *konrate 
-     /* log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
-      LOG_ERROR("x should always be >0 t=%g (x=%g) rates->subtotal=%g, konrate=%g, recalibrate cell!\n", *t, *x, rates->subtotal, *konrate); 
-      recalibrate_cell(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *dt); 
-      log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);*/
+    if (!(rates->subtotal > 0.0)) {//+ *konrate 
+     //log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
+      LOG_ERROR("x should always be >0 t=%g (x=%g) rates->subtotal=%g, recalibrate cell!\n", *t, *x, rates->subtotal); 
+      recalibrate_cell(rates, state, genotype, mRNAdecay, transport, *dt); // kon_states,&koffvalues
+     // log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);*/
+     }
 
       /* if this still results in either zero or negative total rates,
          this most likely due the cell being "dead" no TFs bound, no
@@ -4545,6 +4475,7 @@ int do_single_timestep(Genotype *genotype,
                */
               // *x-= (*x)*(.999);
                //LOG_ERROR("rates salphc = %f\n", rates->salphc);
+               LOG_ERROR("transcript init num = %d, pic assemb = %d\n", sum_rate_counts(rates->transcript_init_num), sum_rate_counts(rates->pic_assembly_num));
                LOG_ERROR("CHECK! x = %f, sum_rate_counts = %d, acetylate = %f\n", *x, sum_rate_counts(rates->acetylation_num), ACETYLATE );
               if (*x < (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE) {
                 LOG_ERROR("hist act event\n");
@@ -4580,6 +4511,7 @@ int do_single_timestep(Genotype *genotype,
                     /* 
                      * STOCHASTIC EVENT: transcription initiation
                      */
+                     LOG_ERROR("transcript init num = %d\n", sum_rate_counts(rates->transcript_init_num));
                     if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
                        LOG_ERROR("transcript init event\n");
                       transcription_init_event(rates, state, genotype, //kon_states, 
@@ -4596,7 +4528,7 @@ int do_single_timestep(Genotype *genotype,
 
                       log_snapshot(rates, state, genotype, 
                       mRNAdecay,transport,  *x, *t);//kon_states, &koffvalues, *konrate,
-                      //recalibrate_cell(rates, state, genotype, mRNAdecay, transport, *dt); //kon_states, &koffvalues,
+                      recalibrate_cell(rates, state, genotype, mRNAdecay, transport, *dt); //kon_states, &koffvalues,
                       log_snapshot(rates, state, genotype, 
                       mRNAdecay, transport, *x, *t);//kon_states, &koffvalues, *konrate, 
                       if (*t > 1000.0) {
