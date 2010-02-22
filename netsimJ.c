@@ -1446,6 +1446,7 @@ void revise_activity_state(int gene_id,
     remove_from_array(gene_id, DEACETYLATION_STATE,  state->state_change_ids[DEACETYLATION_STATE][gene_copy], 
                       &(rates->deacetylation_num[gene_copy]), (int) 1);
     if (transcriptrule){// FIGURE OUT WHAT THIS IS/DOES!!
+    LOG_ERROR("Increase PIC assembly num\n");
       state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
       (rates->pic_assembly_num[gene_copy])++;
     }
@@ -2361,6 +2362,8 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   /* set state: eject nucleosome, but there is no PIC yet */
   state->active[gene_id][gene_copy] = ON_NO_PIC;
   remove_from_array(gene_id, ACETYLATION_STATE, state->state_change_ids[ACETYLATION_STATE][gene_copy], &(rates->acetylation_num[gene_copy]), (int) 1);
+  state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id; 
+    (rates->pic_assembly_num[gene_copy])++;
   /*if (is_one_activator(gene_id, gene_copy, //state->tf_bound_indexes, state->tf_bound_num, 
                        genotype->all_binding_sites, genotype->activating)) {
     state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id; 
@@ -2404,7 +2407,8 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genot
 
   int gene_copy; 
   int gene_loc; 
-
+ 
+ LOG_ERROR("PIC assembly\n");
   /* choose a particular gene and copy to change state */
   get_gene(rates->pic_assembly_num, (int)trunc(x), &gene_loc, &gene_copy);
   int gene_id = state->state_change_ids[PICASSEMBLY_STATE][gene_copy][gene_loc];
@@ -4286,6 +4290,8 @@ int do_single_timestep(Genotype *genotype,
                                  state->replication_time_end,
                                  fixed_time);
   } 
+  recalibrate_cell(rates, state, genotype, mRNAdecay, transport, *dt);
+  LOG_ERROR("RATES SUBTOTAL = %f\n", rates->subtotal);
   // printf("no more events");
   /* no remaining fixed events to do in dt, now do stochastic events */
   
@@ -4343,6 +4349,7 @@ int do_single_timestep(Genotype *genotype,
              i,rates->acetylation_num[i],i,rates->deacetylation_num[i],i, rates->pic_assembly_num[i],i, rates->transcript_init_num[i],i, rates->pic_disassembly_num[i]);
     }
     *x = ran1(&seed)*rates->subtotal;//*(876.76);//*(rates->subtotal);  // + *konrate
+    LOG_ERROR("NEW x = %f\n", *x);
     float test2, *testProb, *deaceProb;
     testProb = malloc(NGENES*sizeof(float));
     deaceProb = malloc(NGENES*sizeof(float));
@@ -4430,6 +4437,7 @@ int do_single_timestep(Genotype *genotype,
       test = active_to_repress( *genotype, state->protein_conc, 0,  0);
 
      LOG_ERROR("a to r = %f, ace = %f\n", genesActive[0], (float)sum_rate_counts(rates->acetylation_num)*ACETYLATE);
+     //*x = ran
      LOG_ERROR("x = %f\n", *x);
       if (*x < rates->transport) {  
              LOG_ERROR("transport event\n");  
