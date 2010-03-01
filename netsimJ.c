@@ -56,12 +56,12 @@ float kon_after_burnin=1e-4; /* lower value value after burn is so things run fa
 
 int burn_in = 0;             /* disable burn-in by default */
 
-float tdevelopment = 7.0;/* default  development time: can be changed at runtime */
+float tdevelopment = 30.0;/* default  development time: can be changed at runtime */
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121; //94571       /* something is wrong here: changing seed changes nothing */
-int dummyrun = 4;          /* used to change seed */
+int dummyrun = 7;          /* used to change seed */
 int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
 int recompute_kon = 1;     /* likewise for kon */
@@ -1015,10 +1015,10 @@ void revise_activity_state(int gene_id,
                                        genotype->activating,
                                        &numactive);*/
    //srand(time(NULL));
-   //transcriptrule = ready_to_transcribeJU(gene_id, gene_active, state);
-   float test = ran1(&seed);
+   transcriptrule = ready_to_transcribeJU(gene_id, gene_active, state);
+   /*float test = ran1(&seed);
    if(test <= .5) transcriptrule = 1;
-   else transcriptrule =0;
+   else transcriptrule =0;*/
    LOG_VERBOSE("transcript rule = %d\n", transcriptrule);
   /* get last state of transcription initiation */
   oldstate = state->active[gene_id][gene_copy];
@@ -1032,12 +1032,12 @@ void revise_activity_state(int gene_id,
    * ACTIVATING TFs exceed REPRESSING TFs 
    */
 
-  /* OFF_FULL -> ON_WITH_NUCLEOSOME */
+  /* OFF_FULL -> ON_WITH_NUCLEOSOME  P(A) * P(AC)*/
   LOG_ERROR("transcript rule = %d, oldstate = %d,  OFF_FULL = %d\n", transcriptrule, oldstate, OFF_FULL);
   if ((transcriptrule) && oldstate==OFF_FULL){
                        // printf("A\n");
                        //LOG_ERROR("A\n");
-                        //LOG_ERROR("UP ACE NUM!\n");
+                        LOG_ERROR("UP ACE NUM!\n");
     state->active[gene_id][gene_copy] = ON_WITH_NUCLEOSOME;
     state->state_change_ids[ACETYLATION_STATE][gene_copy][rates->acetylation_num[gene_copy]] = gene_id;
     //LOG_ERROR("ace num = %d, gene copy = %d\n", rates->acetylation_num[gene_copy], gene_copy);
@@ -1046,20 +1046,23 @@ void revise_activity_state(int gene_id,
   }
   //LOG_ERROR("after first if\n");
  // LOG_ERROR("transcript rule = %d, oldstate = %d, OFF_NO_PIC = %d\n", transcriptrule, oldstate, OFF_NO_PIC);
-  /* OFF_NO_PIC -> ON_NO_PIC */
+  /* OFF_NO_PIC -> ON_NO_PIC  P(A)*P(DEAC)*/
   if ((transcriptrule) && oldstate==OFF_NO_PIC) {
                        // printf("B\n");
                        LOG_ERROR("OFF to ON\n");
     state->active[gene_id][gene_copy] = ON_NO_PIC;
     remove_from_array(gene_id, DEACETYLATION_STATE,  state->state_change_ids[DEACETYLATION_STATE][gene_copy], 
                       &(rates->deacetylation_num[gene_copy]), (int) 1);
+    //P(A)
     if (transcriptrule){// FIGURE OUT WHAT THIS IS/DOES!!
     LOG_ERROR("Increase PIC assembly num\n");
+    LOG_ERROR(" Before state change num = %d\n", rates->pic_assembly_num[gene_copy]);
       state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
       (rates->pic_assembly_num[gene_copy])++;
+      LOG_ERROR(" num = %d\n", rates->pic_assembly_num[gene_copy]); 
     }
   }
-  /* OFF_PIC -> ON_FULL */
+  /* OFF_PIC -> ON_FULL P(A)*/
   if ((transcriptrule) && oldstate==OFF_PIC) {
                        // printf("C\n");
                        LOG_ERROR("C\n");
@@ -1071,7 +1074,7 @@ void revise_activity_state(int gene_id,
    * REPRESSING TFs exceed ACTIVATING TFs 
    */
 
-  /* ON_WITH_NUCLEOSOME -> OFF_FULL */
+  /* ON_WITH_NUCLEOSOME -> OFF_FULL P(R)*P(A) */
   if (!(transcriptrule) && oldstate==ON_WITH_NUCLEOSOME) {
                        //  printf("D\n");
                        LOG_ERROR("D\n");
@@ -1081,7 +1084,7 @@ void revise_activity_state(int gene_id,
                       &(rates->acetylation_num[gene_copy]), (int) 1);
   }
   
-  /* ON_NO_PIC -> OFF_NO_PIC */
+  /* ON_NO_PIC -> OFF_NO_PIC P(R)*P(DEAC) */
   if (!(transcriptrule) && oldstate==ON_NO_PIC){
                         // printf("E\n");   
                        LOG_ERROR("E\n");       
@@ -1092,7 +1095,7 @@ void revise_activity_state(int gene_id,
     (rates->deacetylation_num[gene_copy])++;
     LOG_ERROR("deace num = %d\n", rates->deacetylation_num[gene_copy]);
   }
-  /* ON_FULL -> OFF_PIC  */
+  /* ON_FULL -> OFF_PIC P(R)*/
   if (!(transcriptrule) && oldstate==ON_FULL) {
                         // printf("F\n");
                         LOG_ERROR("F\n");
@@ -1577,13 +1580,13 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   /* set state: eject nucleosome, but there is no PIC yet */
   state->active[gene_id][gene_copy] = ON_NO_PIC;
   remove_from_array(gene_id, ACETYLATION_STATE, state->state_change_ids[ACETYLATION_STATE][gene_copy], &(rates->acetylation_num[gene_copy]), (int) 1);
-  state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id; 
-    (rates->pic_assembly_num[gene_copy])++;
-  /*if (is_one_activator(gene_id, gene_copy, //state->tf_bound_indexes, state->tf_bound_num, 
-                       genotype->all_binding_sites, genotype->activating)) {
+ // state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id; 
+    //(rates->pic_assembly_num[gene_copy])++;
+  //if (is_one_activator(gene_id, gene_copy, //state->tf_bound_indexes, state->tf_bound_num, 
+                      // genotype->all_binding_sites, genotype->activating)) {
     state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id; 
     (rates->pic_assembly_num[gene_copy])++;
-  }*/
+  //}
 }
 
 void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
@@ -2836,6 +2839,8 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
       m = rand()%1000;
       check =0.;
       check = m/1000.;
+      
+      //LOG_ERROR_NOCELLID("m = %f\n", m);
       //printf("check=%f\n", check);
       partition = malloc((TFBS+1)*sizeof(float));
       for(n=0; n<TFBS+1; n++){
@@ -2863,10 +2868,10 @@ float active_to_repress(Genotype indiv, float initProteinConc[NGENES], int start
          unboundCount++;}
       else{
            if(ran1(&seed)<PROB_ACTIVATING){A++;}
-        /*if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){
-             LOG_ERROR_NOCELLID("ACTIVATING!!!\n");
-             A++;
-        }*/
+       // if(indiv.activating[arrayWT[b].tfIDon][indiv.all_binding_sites[(arrayWT[b].tfbsNum)].gene_copy] ==1){
+            // LOG_ERROR_NOCELLID("ACTIVATING!!!\n");
+            // A++;
+       // }
         else{R++;}
       }
       if(A+R > 9){
@@ -3070,7 +3075,7 @@ int do_single_timestep(Genotype *genotype,
   *x = expdev(&seed);        /* draw random number */
   
     
-  *dt = (*x);
+  *dt = .03 * (*x);
   /* compute the initial dt for the next event 
   calc_dt(x, dt, rates, //kon_states,
    mRNAdecay, genotype->mRNAdecay,
@@ -3276,6 +3281,8 @@ int do_single_timestep(Genotype *genotype,
              LOG_ERROR("ace_num[%d] = %d, deace_num[%d] = %d, pic[%d] = %d, trans_num[%d] = %d, pic_dis[%d] = %d\n",
              i,rates->acetylation_num[i],i,rates->deacetylation_num[i],i, rates->pic_assembly_num[i],i, rates->transcript_init_num[i],i, rates->pic_disassembly_num[i]);
     }
+ 
+ 
     *x = ran1(&seed)*rates->subtotal;//*(876.76);//*(rates->subtotal);  // + *konrate
     LOG_ERROR("NEW x = %f\n", *x);
     float test2, *testProb, *deaceProb;
@@ -3285,14 +3292,14 @@ int do_single_timestep(Genotype *genotype,
     LOG_ERROR("test2 = %f\n", test2);
     for(i=0;i<NGENES; i++){
        testProb[i] = genesActive[i]*ACETYLATE*(float)sum_rate_counts(rates->acetylation_num)*10;
-       deaceProb[i] = (1-genesActive[i])*DEACETYLATE*(float)sum_rate_counts(rates->deacetylation_num);
+       //deaceProb[i] = (1-genesActive[i])*DEACETYLATE*(float)sum_rate_counts(rates->deacetylation_num);
        LOG_ERROR("testProb[%d] = %f\n",i, testProb[i]);
     }
     for(i=0;i<NGENES; i++){
          LOG_ERROR("deaceProb[%d] = %f\n",i, testProb[i]);  
     }
     for(i=0; i<NGENES; i++){    
-    if(test2 > testProb[i]){
+    if(test2 < testProb[i]){
              revise_activity_state(i,genotype->all_binding_sites->gene_copy, genotype, state,rates, genesActive);
     }
     }
@@ -3367,7 +3374,7 @@ int do_single_timestep(Genotype *genotype,
             *x -= rates->pic_disassembly;
             
                //LOG_ERROR("rates salphc = %f\n", rates->salphc);
-               LOG_ERROR("transcript init num = %d, pic assemb = %d\n", sum_rate_counts(rates->transcript_init_num), sum_rate_counts(rates->pic_assembly_num));
+               LOG_ERROR("transcript init num = %d, pic assemb = %d, pic assem *PIC = %f\n", sum_rate_counts(rates->transcript_init_num), sum_rate_counts(rates->pic_assembly_num), sum_rate_counts(rates->pic_assembly_num)*PICASSEMBLY);
                LOG_ERROR("CHECK! x = %f, sum_rate_counts = %d, acetylate = %f\n", *x, sum_rate_counts(rates->acetylation_num), ACETYLATE );
               if (*x < (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE) {
                 LOG_ERROR("hist act event\n");
