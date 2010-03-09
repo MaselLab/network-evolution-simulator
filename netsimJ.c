@@ -1057,9 +1057,11 @@ void revise_activity_state(int gene_id,
     if (transcriptrule){// FIGURE OUT WHAT THIS IS/DOES!!
     LOG_ERROR("Increase PIC assembly num\n");
     LOG_ERROR(" Before state change num = %d\n", rates->pic_assembly_num[gene_copy]);
+      //if(numactive?){
       state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
       (rates->pic_assembly_num[gene_copy])++;
       LOG_ERROR(" num = %d\n", rates->pic_assembly_num[gene_copy]); 
+     // }
     }
   }
   /* OFF_PIC -> ON_FULL P(A)*/
@@ -1684,6 +1686,7 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
                               TimeCourse **timecoursestart, TimeCourse **timecourselast,
                               float dt, float t, float x)
 {
+ 
   int gene_id;
   int gene_copy; 
   int gene_loc; 
@@ -1698,6 +1701,8 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
   if (state->active[gene_id][gene_copy] != ON_FULL && state->active[gene_id][gene_copy] != OFF_PIC) {
     LOG_ERROR("transcription event attempted from state %d\n", state->active[gene_id][gene_copy]);
   }
+  
+   LOG_ERROR("gene = %d\n", gene_id);
 
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt,
                                 rates, 
@@ -3009,20 +3014,6 @@ int do_single_timestep(Genotype *genotype,
        LOG_ERROR("rates->deacetylation_num[%d]=%d\n", j, rates->deacetylation_num[j]);
     }
   //LOG_ERROR("ratesTWO = %d\n", rates->acetylation_num[2]);
-  /* if enabled, check for rounding error and recompute rates */
-  /* check drift from koff every RATE_OPERATIONS operations or if they go negative */
-  
-  //CHANGE JU
-  /*if (recompute_koff && (rates->koff_operations >= RATE_OPERATIONS || rates->koff < 0.0)) {
-    LOG_WARNING("(t=%g) after %d operations recompute koff rates\n", *t, rates->koff_operations);
-    recompute_koff_rates(rates, state, genotype, koffvalues, *t);
-  }*/
-  //CHANGE JU
-  /* check drift from various kon rates every RATE_OPERATIONS operations or if they go negative */
-  /*if (recompute_kon && (rates->salphc_operations >= RATE_OPERATIONS || rates->salphc < 0.0)) {
-    LOG_WARNING("(t=%g) after %d operations recompute kon rates\n", *t, rates->salphc_operations);
-    recompute_kon_rates(rates, state, genotype, kon_states, 0);
-  } */
   
   /* if burn-in is set and we have completed the 0.003 sec (= 0.00005
      min) burn in, then recompute the rates for the new burn-in.  The
@@ -3412,7 +3403,7 @@ int do_single_timestep(Genotype *genotype,
                      */
                      LOG_ERROR("transcript init num = %d\n", sum_rate_counts(rates->transcript_init_num));
                     if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
-                       LOG_ERROR("transcript init event\n");
+                       LOG_ERROR("transcript init event time = %f\n", *t);
                       transcription_init_event(rates, state, genotype, //kon_states, 
                                                timecoursestart, timecourselast, *dt, *t, *x);
                       //active_vect(genotype[0], state->protein_conc, genesActive);

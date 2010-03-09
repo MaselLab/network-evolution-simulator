@@ -53,12 +53,12 @@ float kon_after_burnin=1e-4; /* lower value value after burn is so things run fa
 
 int burn_in = 0;             /* disable burn-in by default */
 
-float tdevelopment = 7.0;/* default  development time: can be changed at runtime */
+float tdevelopment = 120.0;/* default  development time: can be changed at runtime */
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
-int dummyrun = 4;          /* used to change seed */
+int dummyrun = 7;          /* used to change seed */
 int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
 int recompute_kon = 1;     /* likewise for kon */
@@ -1186,9 +1186,10 @@ void calc_from_state(Genotype *genotype,
     }
   }
 
-  if (verbose) 
+  if (1) 
     for (j=0; j < MAX_COPIES; j++) {
       LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+      LOG_ERROR("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
     }
 }
 
@@ -1280,7 +1281,7 @@ void calc_dt(float *x,
   rates->subtotal += rates->mRNAdecay;
   rates->subtotal += rates->pic_disassembly;
   rates->subtotal += rates->salphc;
-  LOG_ERROR_NOCELLID("rates subtotal = %f, salphc = %f\n", rates->subtotal, rates->salphc);
+  //LOG_ERROR_NOCELLID("rates subtotal = %f, salphc = %f\n", rates->subtotal, rates->salphc);
   //printf("rates subtotal = %f\n rates koff = %f\n rates transport = %f\n rates mrna = %f\n rates pic = %f\n rates salphc = %f \n",rates->subtotal, rates->koff, rates->transport, rates->mRNAdecay, rates->pic_disassembly, rates->salphc);
   /* 
    * convert the counts back into rates using the constants 
@@ -1416,9 +1417,10 @@ void revise_activity_state(int gene_id,
    * first set of rules:
    * ACTIVATING TFs exceed REPRESSING TFs 
    */
-
+   LOG_ERROR("transcript rule = %d, oldstate = %d, transcriptrule & oldstate = %d, OFF_FULL = %d\n", transcriptrule, oldstate, (transcriptrule) && oldstate, OFF_FULL);
   /* OFF_FULL -> ON_WITH_NUCLEOSOME */
   if ((transcriptrule) && oldstate==OFF_FULL){
+                       LOG_ERROR("UP ACE NUM!\n");
                        //printf("A\n");
     state->active[gene_id][gene_copy] = ON_WITH_NUCLEOSOME;
     state->state_change_ids[ACETYLATION_STATE][gene_copy][rates->acetylation_num[gene_copy]] = gene_id;
@@ -1433,6 +1435,7 @@ void revise_activity_state(int gene_id,
     if (numactive){
       state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
       (rates->pic_assembly_num[gene_copy])++;
+      LOG_ERROR("PIC NUM = %d\n", rates->pic_assembly_num[gene_copy]);
     }
   }
   /* OFF_PIC -> ON_FULL */
@@ -2405,11 +2408,12 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
   int gene_loc; 
 
   x /= TRANSCRIPTINIT;
-
+LOG_ERROR("TRANSCRIPT INIT\n");
   /* choose the gene and copy that gets transcribed */
   get_gene(rates->transcript_init_num, (int)trunc(x), &gene_loc, &gene_copy);
   gene_id = state->state_change_ids[TRANSCRIPTINIT_STATE][gene_copy][gene_loc];
   LOG_VERBOSE("transcription event gene %d, copy %d\n", gene_id, gene_copy);
+  LOG_ERROR("Gene id = %d\n", gene_id);
 
   if (state->active[gene_id][gene_copy] != ON_FULL && state->active[gene_id][gene_copy] != OFF_PIC) {
     LOG_ERROR("transcription event attempted from state %d\n", state->active[gene_id][gene_copy]);
@@ -3679,10 +3683,22 @@ int do_single_timestep(Genotype *genotype,
                        int maxbound3,
                        int no_fixed_dev_time) 
 {
-  int i;
+  int i,j;
   int event;     /* boolean to keep track of whether FixedEvent has ended */
   int total;     /* total possible translation events */
   float fixed_time;
+  
+  if (1) //VERBOSE JU CHANGE
+    for (j=0; j < MAX_COPIES; j++) {
+      //LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+      LOG_ERROR("FDSTS rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+    }
+    
+    for (j=0; j < MAX_COPIES; j++) {
+      //LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+      //LOG_ERROR("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+       LOG_ERROR("rates->deacetylation_num[%d]=%d\n", j, rates->deacetylation_num[j]);
+    }
 
   /* if enabled, check for rounding error and recompute rates */
   /* check drift from koff every RATE_OPERATIONS operations or if they go negative */
@@ -3825,6 +3841,8 @@ int do_single_timestep(Genotype *genotype,
     *t += *dt;                  /* advance time by the dt */
     *x -= (*dt)*(*konrate);
     
+     
+    
     LOG_VERBOSE("dt=%g t=%g fixed event old x=%g new x=%g\n", *dt, *t, (*x)+(*dt)*(*konrate), *x);
     
     /* re-compute a new dt */
@@ -3879,10 +3897,17 @@ int do_single_timestep(Genotype *genotype,
      * Gillespie events, note that konrate is *not* included in
      * rates->subtotal, so it needs to be added here
      */
+      LOG_ERROR("rates subtotal = %f\n", rates->subtotal);
+      LOG_ERROR("koff = %f, transport = %f, mrnadecay = %f, pic dis = %f, salphc = %f, max s = %f, min s = %f\n", 
+    rates->koff, rates->transport, rates->mRNAdecay, rates->pic_disassembly, rates->salphc, rates->max_salphc, rates->min_salphc);
+    for(i=0; i<MAX_COPIES; i++){
+             LOG_ERROR("ace_num[%d] = %d, deace_num[%d] = %d, pic[%d] = %d, trans_num[%d] = %d, pic_dis[%d] = %d\n",
+             i,rates->acetylation_num[i],i,rates->deacetylation_num[i],i, rates->pic_assembly_num[i],i, rates->transcript_init_num[i],i, rates->pic_disassembly_num[i]);
+    }
     *x = ran1(&seed)*(rates->subtotal + *konrate);  
-    LOG_ERROR("*x = %f, rates + kon  = %f \n", *x, (rates->subtotal+ *konrate ));
-    LOG_ERROR("rates koff = %f\n", rates->koff);
-    LOG_ERROR("rates pic = %f\n sum rate ACE = %f\n sum rate DEACE = %f\n sum rate PIC = %f\n sum rate trans = %f\n", rates->pic_disassembly, sum_rate_counts(rates->acetylation_num) * ACETYLATE, sum_rate_counts(rates->deacetylation_num) * DEACETYLATE, sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY, sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT);
+    //LOG_ERROR("*x = %f, rates + kon  = %f \n", *x, (rates->subtotal+ *konrate ));
+   // LOG_ERROR("rates koff = %f\n", rates->koff);
+   // LOG_ERROR("rates pic = %f\n sum rate ACE = %f\n sum rate DEACE = %f\n sum rate PIC = %f\n sum rate trans = %f\n", rates->pic_disassembly, sum_rate_counts(rates->acetylation_num) * ACETYLATE, sum_rate_counts(rates->deacetylation_num) * DEACETYLATE, sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY, sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT);
     //printf("*x = %f\n", *x);
     //system("PAUSE");
     if (verbose) {
@@ -3901,8 +3926,12 @@ int do_single_timestep(Genotype *genotype,
      * STOCHASTIC EVENT: a TF unbinds (koff) 
      */
      //printf("*x = %f, rates transport= %f, rates koff= %f\n", *x, rates->transport, rates->koff);
-     //LOG_ERROR("*x = %f\n", *x);
+     LOG_ERROR("*x = %f\n", *x);
+     LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
+     
+    LOG_ERROR("\n");
     if (*x < rates->koff) {  
+           LOG_ERROR("unbinding event\n");
       int ignore_event;
       tf_unbinding_event(rates, state, genotype, kon_states, koffvalues,
                          timecoursestart, timecourselast, (*konrate), *dt, *t, *x, 1, &ignore_event);
@@ -3910,47 +3939,68 @@ int do_single_timestep(Genotype *genotype,
         return 0;
       }
     } else {
+           LOG_ERROR("x = %f\n", *x);
       *x -= rates->koff;  
+      LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
       //printf("*x = %f\n", *x);
       /* 
        * STOCHASTIC EVENT: a transport event
        */
       if (*x < rates->transport) {     
+             LOG_ERROR("transport event\n");
         transport_event(rates, state, genotype, kon_states, transport, 
                         timecoursestart, timecourselast, *dt, *t, *x);
+                        
+                      
+       for (j=0; j < MAX_COPIES; j++) {
+      //LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+      LOG_ERROR("2rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);}
+    
       } else {
-        
+        LOG_ERROR("x = %f\n", *x);
         *x -= rates->transport;
+        LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
         /* 
          * STOCHASTIC EVENT: an mRNA decay event
          */
         if (*x < rates->mRNAdecay) {  
+               LOG_ERROR("decay event\n");
           mRNA_decay_event(rates, state, genotype, kon_states, mRNAdecay,
                            timecoursestart, timecourselast, *dt, *t, *x);
         } else {
+               LOG_ERROR("x = %f\n", *x);
           *x -= rates->mRNAdecay;
+          LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
           /* 
            * STOCHASTIC EVENT: PIC disassembly
            */
           if (*x < rates->pic_disassembly) {
+                 LOG_ERROR("pic disassembly event\n");
             disassemble_PIC_event(rates, state, genotype, kon_states, 
                                   timecoursestart,  timecourselast, *dt, *t, *x);
           } else {
+                 LOG_ERROR("x = %f\n", *x);
             *x -= rates->pic_disassembly;
+            LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
             /* 
              * STOCHASTIC EVENT: TF binding event
              */
             if (*x < rates->salphc + (*konrate)) {   /* get total on rate = sum of (salphc) and (konrate) */
+              LOG_ERROR("binding event\n");
               tf_binding_event(rates, state, genotype, kon_states, koffvalues,
                                timecoursestart, timecourselast, (*konrate), *dt, *t, 
                                maxbound2, maxbound3, 1);
             } else {
+                   LOG_ERROR("Before x = %f\n", *x);
               *x -= (rates->salphc + (*konrate));
+              LOG_ERROR("after x = %f\n", *x);
+              LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
               /* 
                * STOCHASTIC EVENT: histone acetylation
                */
+                LOG_ERROR("ACHECK! x = %f,  sum_rate_counts = %d, acetylate = %f, PIC num = %f\n", *x, sum_rate_counts(rates->acetylation_num), ACETYLATE, sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY );
               if (*x < (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE) {
-                
+                LOG_ERROR("hist act event\n");
                 histone_acteylation_event(rates, state, genotype, kon_states, 
                                           timecoursestart, timecourselast, *dt, *t);
               } else {
@@ -3959,8 +4009,9 @@ int do_single_timestep(Genotype *genotype,
                 /* 
                  * STOCHASTIC EVENT: histone deacetylation
                  */
+                 LOG_ERROR("CHECK! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
                 if (*x < (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE) {
-                  
+                  LOG_ERROR("deact event\n");
                   histone_deacteylation_event(rates, state, genotype, kon_states, 
                                               timecoursestart, timecourselast, *dt, *t);
                 } else {
@@ -3969,6 +4020,7 @@ int do_single_timestep(Genotype *genotype,
                    * STOCHASTIC EVENT: PIC assembly
                    */
                   if (*x < (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY) {
+                         LOG_ERROR("pic assembly event\n");
                     assemble_PIC_event(rates, state, genotype, kon_states, 
                                        timecoursestart, timecourselast, *dt, *t);
                   } else {
@@ -3977,6 +4029,7 @@ int do_single_timestep(Genotype *genotype,
                      * STOCHASTIC EVENT: transcription initiation
                      */
                     if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
+                           LOG_ERROR("transcript init event time = %f\n", *t);
                       transcription_init_event(rates, state, genotype, kon_states, 
                                                timecoursestart, timecourselast, *dt, *t, *x);
                     } else {
@@ -4009,10 +4062,14 @@ int do_single_timestep(Genotype *genotype,
       }
     }
     
+    
+    
     /* Gillespie step: advance time to next event at dt */
     *t += *dt;
     LOG_VERBOSE("dt=%g t=%g\n", *dt, *t);
   } else {
+         
+         
     /* we will reach the end of development in dt */
     LOG_VERBOSE("finish at t=%g dt=%g\n", *t, *dt);
     
@@ -4026,7 +4083,11 @@ int do_single_timestep(Genotype *genotype,
                                   state->protein_conc);
     /* advance to end of development (this exits the outer while loop) */
     *t = tdevelopment;
+    
+    
   }
+  
+   
   return 0;
 }
 
@@ -4145,6 +4206,12 @@ void init_run_pop(Genotype genotype[POP_SIZE],
     insert_with_priority_heap(priority_queue, j, t[j]);
     LOG_NOCELLID("[cell=%03d] inserted at time=%g\n", j, t[j]); 
   }
+  
+  if (1) //VERBOSE JU CHANGE
+    for (j=0; j < MAX_COPIES; j++) {
+      //LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+      LOG_ERROR("1rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
+    }
 
   while ((no_fixed_dev_time && divisions < max_divisions) ||    /* no fixed dev time, run until # divisions reached */
          (!no_fixed_dev_time && t_next < tdevelopment)) {       /* or, if fixed dev time, run until tdevelopment reached */
