@@ -949,6 +949,7 @@ void end_transcription(float *dt,
   transport[i] += KRNA;
   rates->transport += KRNA;
   rates->transport_operations++;
+  rates->transcript_init_num[i] = 0;
 
   LOG_VERBOSE("add one new mRNA in nucleus, updating transport[%d]=%g, rates->transport=%g\n", i, transport[i], rates->transport);
 
@@ -1058,9 +1059,9 @@ void revise_activity_state(int gene_id,
     LOG_ERROR("Increase PIC assembly num\n");
     LOG_ERROR(" Before state change num = %d\n", rates->pic_assembly_num[gene_copy]);
       //if(numactive?){
-      state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
-      (rates->pic_assembly_num[gene_copy])++;
-      LOG_ERROR(" num = %d\n", rates->pic_assembly_num[gene_copy]); 
+      //state->state_change_ids[PICASSEMBLY_STATE][gene_copy][rates->pic_assembly_num[gene_copy]] = gene_id;
+      //(rates->pic_assembly_num[gene_copy])++;
+     // LOG_ERROR(" num = %d\n", rates->pic_assembly_num[gene_copy]); 
      // }
     }
   }
@@ -3064,6 +3065,7 @@ int do_single_timestep(Genotype *genotype,
 #endif
   
   *x = expdev(&seed);        /* draw random number */
+ // LOG_ERROR("random x = %f\n", *x);
   
     
   *dt = .03 * (*x);
@@ -3274,12 +3276,12 @@ int do_single_timestep(Genotype *genotype,
     }
  
  
-    *x = ran1(&seed)*rates->subtotal;//*(876.76);//*(rates->subtotal);  // + *konrate
+    *x = ran1(&seed);//*rates->subtotal;//*(876.76);//*(rates->subtotal);  // + *konrate
     LOG_ERROR("NEW x = %f\n", *x);
     float test2, *testProb, *deaceProb;
     testProb = malloc(NGENES*sizeof(float));
     deaceProb = malloc(NGENES*sizeof(float));
-    test2 = *x / rates->subtotal;
+    test2 = *x; /// rates->subtotal;
     LOG_ERROR("test2 = %f\n", test2);
     for(i=0;i<NGENES; i++){
        testProb[i] = genesActive[i]*ACETYLATE*(float)sum_rate_counts(rates->acetylation_num)*10;
@@ -3312,8 +3314,8 @@ int do_single_timestep(Genotype *genotype,
     //LOG_ERROR("testProb = %f\n", testProb);
    // printf("x* = %f \n rates_transport = %f \n rates subtotal =%f \n rates->mRNAdecay= %f \n rates->pic_disassembly= %f \n sumrate = %f\n", *x, rates->transport, rates->subtotal, rates->mRNAdecay,  rates->pic_disassembly,  (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE);
     //LOG_ERROR("*x = %f, rates subtotal = %f\n", *x, rates->subtotal);
-    //LOG_ERROR("rates transport = %f\n rates mRNAdecay = %f\n", rates->transport, rates->mRNAdecay);
-    //LOG_ERROR("rates pic = %f\n sum rate ACE = %f\n sum rate DEACE = %f\n sum rate PIC = %f\n sum rate trans = %f\n", rates->pic_disassembly, sum_rate_counts(rates->acetylation_num) * ACETYLATE, sum_rate_counts(rates->deacetylation_num) * DEACETYLATE, sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY, sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT);
+    LOG_ERROR("rates transport = %f\n rates mRNAdecay = %f\n", rates->transport, rates->mRNAdecay);
+    LOG_ERROR("rates pic = %f\n sum rate ACE = %f\n sum rate DEACE = %f\n sum rate PIC = %f\n sum rate trans = %f\n", rates->pic_disassembly, sum_rate_counts(rates->acetylation_num) * ACETYLATE, sum_rate_counts(rates->deacetylation_num) * DEACETYLATE, sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY, sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT);
     
     
     if (verbose) {

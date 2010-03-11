@@ -3781,6 +3781,7 @@ int do_single_timestep(Genotype *genotype,
     switch (event) {
     case 1:   /* if a transcription event ends */
       end_transcription(dt, *t, state, transport, rates);
+      LOG_ERROR("END TRANSCRIPTION\n");
       
       update_protein_conc_cell_size(state->protein_conc, state, genotype, *dt,
                                     rates, kon_states, *t,
