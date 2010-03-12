@@ -3276,7 +3276,7 @@ int do_single_timestep(Genotype *genotype,
     }
  
  
-    *x = ran1(&seed);//*rates->subtotal;//*(876.76);//*(rates->subtotal);  // + *konrate
+    *x = ran1(&seed)*rates->subtotal;//*(876.76);//*(rates->subtotal);  // + *konrate
     LOG_ERROR("NEW x = %f\n", *x);
     float test2, *testProb, *deaceProb;
     testProb = malloc(NGENES*sizeof(float));
@@ -3336,7 +3336,17 @@ int do_single_timestep(Genotype *genotype,
      LOG_ERROR("a to r = %f, ace = %f\n", genesActive[0], (float)sum_rate_counts(rates->acetylation_num)*ACETYLATE);
      //*x = ran
      LOG_ERROR("x = %f\n", *x);
-      if (*x < rates->transport) {  
+     
+     float part1, part2, part3, part4, part5, part6, part7;
+     part1 = .3;
+     part2= .5;
+     part3= .53;
+     part4= .7;
+     part5= .72;
+     part6= .98;
+     part7 =1;
+     // if (*x < rates->transport) { 
+           if (*x < part1) { 
              LOG_ERROR("transport event\n");  
              //LOG_ERROR("Inside if statement\n"); 
                
@@ -3344,67 +3354,93 @@ int do_single_timestep(Genotype *genotype,
                         timecoursestart, timecourselast, *dt, *t, *x);//kon_states,
       
       } else {
-        
-        *x -= rates->transport;
+        //*x -= part1;
+        //*x -= rates->transport;
         /* 
          * STOCHASTIC EVENT: an mRNA decay event
          */
-        if (*x < rates->mRNAdecay) {  
+       // if (*x < rates->mRNAdecay) {  
+             if ( *x < part2) { 
                LOG_ERROR("decay event\n");
           mRNA_decay_event(rates, state, genotype,  mRNAdecay,
                            timecoursestart, timecourselast, *dt, *t, *x);//kon_states,
            
         } else {
-          *x -= rates->mRNAdecay;
+          //*x -= part2;
+          //*x -= rates->mRNAdecay;
           /* 
            * STOCHASTIC EVENT: PIC disassembly
            */
-          if (*x < rates->pic_disassembly) {
+          //if (*x < rates->pic_disassembly) {
+               if (*x < part3) {
                   LOG_ERROR("pic disassembly event\n");
             disassemble_PIC_event(rates, state, genotype,  
                                   timecoursestart,  timecourselast, *dt, *t, *x);//kon_states,
           } else {
-            *x -= rates->pic_disassembly;
+           // *x -= part3;
+            //*x -= rates->pic_disassembly;
             
                //LOG_ERROR("rates salphc = %f\n", rates->salphc);
                LOG_ERROR("transcript init num = %d, pic assemb = %d, pic assem *PIC = %f\n", sum_rate_counts(rates->transcript_init_num), sum_rate_counts(rates->pic_assembly_num), sum_rate_counts(rates->pic_assembly_num)*PICASSEMBLY);
                LOG_ERROR("CHECK! x = %f, sum_rate_counts = %d, acetylate = %f\n", *x, sum_rate_counts(rates->acetylation_num), ACETYLATE );
-              if (*x < (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE) {
+            
+            
+            
+             // if (*x < (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE) {
+                   if (*x < part4){
                 LOG_ERROR("hist act event\n");
                 histone_acteylation_event(rates, state, genotype, //kon_states, 
                                           timecoursestart, timecourselast, *dt, *t);
                 //active_vect(genotype[0], state->protein_conc, genesActive);
               } else {
                 LOG_ERROR("x = %f\n", *x);
-                *x -= (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE;
+               
+               
+              // *x -= part4;
+               // *x -= (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE;
                 LOG_ERROR("x = %f\n", *x);
                 /* 
                  * STOCHASTIC EVENT: histone deacetylation
                  */
                   LOG_ERROR("CHECK! x = %f, sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
-                if (*x < (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE) {
+               
+               
+               
+               if (*x < part5){
+               // if (*x < (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE) {
                    LOG_ERROR("deact event\n");
                   histone_deacteylation_event(rates, state, genotype, //kon_states, 
                                               timecoursestart, timecourselast, *dt, *t);
                  
                   //active_vect(genotype[0], state->protein_conc, genesActive);
                 } else {
-                  *x -= (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE;
+                 
+                 //*x -= part5;
+                 // *x -= (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE;
                   /* 
                    * STOCHASTIC EVENT: PIC assembly
                    */
-                  if (*x < (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY) {
+                 
+                 if (*x < part6){
+                 // if (*x < (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY) {
                     LOG_ERROR("pic assembly event\n"); 
                     assemble_PIC_event(rates, state, genotype, //kon_states, 
                                        timecoursestart, timecourselast, *dt, *t);
                     //active_vect(genotype[0], state->protein_conc, genesActive);
                   } else {
-                    *x -= (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY;
+                   
+                   
+                   
+                  // *x -= part6;
+                   // *x -= (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY;
                     /* 
                      * STOCHASTIC EVENT: transcription initiation
                      */
                      LOG_ERROR("transcript init num = %d\n", sum_rate_counts(rates->transcript_init_num));
-                    if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
+                   
+                   
+                   if (*x < part7){
+                   // if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
                        LOG_ERROR("transcript init event time = %f\n", *t);
                       transcription_init_event(rates, state, genotype, //kon_states, 
                                                timecoursestart, timecourselast, *dt, *t, *x);
