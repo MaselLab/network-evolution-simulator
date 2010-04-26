@@ -96,7 +96,7 @@
  * element KON_PROTEIN_DECAY is proteindecay
  * element KON_SALPHC        is salphc
  */
-enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
+//enum { KON_DIFF_INDEX = 0, KON_PROTEIN_DECAY_INDEX = 1, KON_SALPHC_INDEX = 2 };
 
 /*
  * enum for 'CellState'->active indices
@@ -108,17 +108,22 @@ enum { OFF_FULL = 1,           /* repr>activ, still nuclesome, and PIC */
        OFF_PIC = 5,            /* repr>activ, no nucleosome, and PIC */
        ON_FULL = 6 };          /* activ>repr, no nucleosome, and a PIC: ready to go!  */
 
+enum {STATE_ZERO = 0, 
+      STATE_ONE = 1,
+      STATE_TWO = 2
+};
+
 /*
  * enum for state_change_ids
  */
-enum { ACETYLATION_STATE = 0, 
+/*enum { ACETYLATION_STATE = 0, 
        DEACETYLATION_STATE = 1, 
        PICASSEMBLY_STATE = 2,
        TRANSCRIPTINIT_STATE = 3, 
        PICDISASSEMBLY_STATE = 4,
 };
 
-/*
+
  * Rates for Gillespie algorithm
  *
  * Events with exponentially-distributed waiting times are:
@@ -287,8 +292,9 @@ struct CellState {
    */
 
   /* stores corresponding gene_ids ready for [de]acteylation,
-     PIC[dis]assembly, transcriptinit, see enum above*/
-  int state_change_ids[5][MAX_COPIES][NGENES]; 
+     PIC[dis]assembly, transcriptinit, see enum above
+     element 0 says which gene copy it is, element 1 says which geneID*/
+  int state_change_ids[3][MAX_COPIES*NGENES][2]; 
   float RTlnKr;
   float temperature;
 };

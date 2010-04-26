@@ -142,12 +142,12 @@ void delete_queues(CellState *state) {
     free(info);
   }
 
-  /* start = state->mRNA_transl_time_end_last;  
+   start = state->mRNA_transl_time_end_last;  
   while (start) {
     info = start;
     start = start->next;
     free(info);  
-    } */
+    } 
 
   start = state->mRNA_transcr_time_end;  
   while (start) {
@@ -156,12 +156,12 @@ void delete_queues(CellState *state) {
     free(info);
   }
 
-  /* start = state->mRNA_transcr_time_end_last;  
+   start = state->mRNA_transcr_time_end_last;  
   while (start){
     info = start;
     start = start->next;
     free(info);  
-    } */
+    } 
 
   start = state->replication_time_end;  
   while (start) {

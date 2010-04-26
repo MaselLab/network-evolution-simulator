@@ -58,7 +58,7 @@ float timemax = -1.0;      /* set an upper limit to development time (default to
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121;         /* something is wrong here: changing seed changes nothing */
-int dummyrun = 7;          /* used to change seed */
+int dummyrun = 43;          /* used to change seed */
 int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
 int recompute_kon = 1;     /* likewise for kon */
@@ -1369,6 +1369,7 @@ void disassemble_PIC(CellState *state,
                      GillespieRates *rates)
 {
   float disassembly = genotype->pic_disassembly[gene_id][gene_copy];
+  LOG_ERROR("PIC DIS2\n");
   remove_from_array(gene_id, TRANSCRIPTINIT_STATE, state->state_change_ids[TRANSCRIPTINIT_STATE][gene_copy], 
                     &(rates->transcript_init_num[gene_copy]), (int) 1);
   remove_from_array(gene_id, PICDISASSEMBLY_STATE, state->state_change_ids[PICDISASSEMBLY_STATE][gene_copy], 

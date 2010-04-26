@@ -61,7 +61,7 @@ float timemax = -1.0;      /* set an upper limit to development time (default to
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
 long seed = 28121; //94571       /* something is wrong here: changing seed changes nothing */
-int dummyrun = 7;          /* used to change seed */
+int dummyrun = 45;          /* used to change seed */
 int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
 int recompute_kon = 1;     /* likewise for kon */
@@ -1702,7 +1702,7 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
   get_gene(rates->transcript_init_num, (int)trunc(x), &gene_loc, &gene_copy);
   gene_id = state->state_change_ids[TRANSCRIPTINIT_STATE][gene_copy][gene_loc];
   LOG_VERBOSE("transcription event gene %d, copy %d\n", gene_id, gene_copy);
-   LOG_ERROR("transcription event gene %d, copy %d\n", gene_id, gene_copy);
+   LOG_ERROR("transcription event gene %d, copy %d  gene loc %d\n", gene_id, gene_copy, gene_loc);
 
   if (state->active[gene_id][gene_copy] != ON_FULL && state->active[gene_id][gene_copy] != OFF_PIC) {
     LOG_ERROR("transcription event attempted from state %d\n", state->active[gene_id][gene_copy]);
