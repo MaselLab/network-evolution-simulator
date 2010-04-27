@@ -294,7 +294,7 @@ struct CellState {
   /* stores corresponding gene_ids ready for [de]acteylation,
      PIC[dis]assembly, transcriptinit, see enum above
      element 0 says which gene copy it is, element 1 says which geneID*/
-  int state_change_ids[3][MAX_COPIES*NGENES][2]; 
+  int state_change_ids[5][MAX_COPIES[NGENES]; 
   float RTlnKr;
   float temperature;
 };
