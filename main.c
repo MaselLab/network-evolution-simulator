@@ -17,9 +17,9 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#include "random.h"
-#include "lib.h"
-#include "netsim.h"
+#include "randomD.h"
+#include "libD.h"
+#include "netsimJ4-26.h"
 
 int main(int argc, char *argv[])
 {
@@ -55,12 +55,8 @@ int main(int argc, char *argv[])
         {"criticalsize",  required_argument, 0, 'c'},
         {"divisions",  required_argument, 0, 's'},
         {"random-replication",  no_argument, 0, 0},
-        {"no-recompute-koff",  no_argument, 0, 0},
-        {"no-recompute-kon",  no_argument, 0, 0},
         {"nofixedtime",  no_argument, 0, 'n'},
         {"burnin",  no_argument, 0, 'b'},
-        {"kon",  required_argument, 0, 0},
-        {"konafter",  required_argument, 0, 0},
         {"timesphase",  required_argument, 0, 0},
         {"timeg2phase",  required_argument, 0, 0},
         {"growthscaling",  required_argument, 0, 0},
@@ -86,14 +82,7 @@ int main(int argc, char *argv[])
       /* If this option set a flag, do nothing else now. */
       if (long_options[option_index].flag != 0)
         break;
-      if (strcmp("kon", long_options[option_index].name) == 0) {
-        kon  = strtof(optarg, &endptr);
-        printf("setting kon=%g\n", kon);
-      } else if (strcmp("konafter", long_options[option_index].name) == 0) {
-        kon_after_burnin  = strtof(optarg, &endptr);
-        printf("setting konafter=%g\n", kon_after_burnin);
-        burn_in = 1;
-      } else if (strcmp("timesphase", long_options[option_index].name) == 0) {
+      if (strcmp("timesphase", long_options[option_index].name) == 0) {
         time_s_phase  = strtof(optarg, &endptr);
         printf("setting time_s_phase=%g\n", time_s_phase);
       } else if (strcmp("timeg2phase", long_options[option_index].name) == 0) {
@@ -108,12 +97,6 @@ int main(int argc, char *argv[])
       } else if (strcmp("no-random-replication", long_options[option_index].name) == 0) {
         printf("don't make replication times random in S phase\n");
         random_replication_time = 0;
-      } else if (strcmp("no-recompute-koff", long_options[option_index].name) == 0) {
-        printf("don't recompute rates->koff\n");
-        recompute_koff = 0;
-      } else if (strcmp("no-recompute-kon", long_options[option_index].name) == 0) {
-        printf("don't recompute rates->kon\n");
-        recompute_kon = 0;
       } else { 
         printf ("option %s", long_options[option_index].name);
         if (optarg)
@@ -162,15 +145,11 @@ int main(int argc, char *argv[])
  -s,  --divisions=DIVISONS  maximum number of divisions\n\
  -c,  --criticalsize=SIZE   critical size for cell division\n\
  -b,  --burnin              whether to do burn-in (off by default)\n\
-      --kon=KON             initial kon value\n\
-      --konafter=KON        kon value post-burnin\n\
       --no-random-replication  don't make replication times in S phase random\n\
       --timesphase=TIME     length of S-phase (30 mins by default)\n\
       --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
       --growthscaling=GS    amount to accelerate the growth rate\n\
                               (2.0 by default)\n\
-      --no-recompute-koff   don't recompute koff rates after a fixed number of operations\n\
-      --no-recompute-kon    don't recompute kon rates after a fixed number of operations\n\
  -h,  --help                display this help and exit\n\
  -v,  --verbose             verbose output to error file\n\
 \n", argv[0]);
@@ -192,6 +171,8 @@ int main(int argc, char *argv[])
     putchar ('\n');
   }
 
+
+
   /* create output directory if needed */
   create_output_directory(output_directory);
 
@@ -202,7 +183,6 @@ int main(int argc, char *argv[])
   for (j = 0; j < POP_SIZE; j++) {
     create_output_file("cellsize", output_directory, &(fp_cellsize[j]), j);
 #if 0 /* currently disable these file outputs */
-    create_output_file("koff", output_directory, &(fp_koff[j]), j);
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
     create_output_file("tfsbound", output_directory, &(fp_tfsbound[j]), j);
     create_output_file("rounding", output_directory, &(fp_rounding[j]), j);
@@ -215,7 +195,8 @@ int main(int argc, char *argv[])
   }
   
   /* slight hack to initialize seed  */
-  for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+
+  //for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
 
   initialize_growth_rate_parameters();
 
@@ -223,8 +204,8 @@ int main(int argc, char *argv[])
   read_kdisassembly(kdis);
 
   /* now create and run the population of cells */
-  init_run_pop(indivs, state, timecoursestart, timecourselast, (float) 293.0, 
-               kdis, output_binding_sites, no_fixed_dev_time, max_divisions);
+  init_run_pop(indivs, state, timecoursestart, timecourselast, (float) 293.0,
+              kdis, output_binding_sites, no_fixed_dev_time, max_divisions);
 
   print_all_protein_time_courses(timecoursestart, timecourselast);
   //system("PAUSE");
@@ -232,11 +213,13 @@ int main(int argc, char *argv[])
   for (j = 0; j < POP_SIZE; j++) {
     fprintf(fperrors,"cleanup cell %03d\n", j);
     for (i=0; i < NGENES; i++) {
-      LOG_VERBOSE("deleting protein %02d timecourse\n", i);
+
+      //TODO: FIX LOGGING
+      //LOG_VERBOSE("deleting protein %02d timecourse\n", i);
       delete_time_course(timecoursestart[j][i]);
       timecoursestart[j][i] = timecourselast[j][i] = NULL;
     }
-    free_mem_CellState(&state[j]);
+    //free_mem_CellState(&state[j]);
     free(indivs[j].all_binding_sites);
   }
 
@@ -245,11 +228,14 @@ int main(int argc, char *argv[])
   for (j = 0; j < POP_SIZE; j++) {
     fclose(fp_cellsize[j]);
     
+
+
 #if 0  /* currently disable */
-    fclose(fp_koff[j]);
     fclose(fp_growthrate[j]);
     fclose(fp_tfsbound[j]);
     fclose(fp_rounding[j]);
 #endif
   }
+
+  return 0;
 }

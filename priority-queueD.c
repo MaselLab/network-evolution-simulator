@@ -2,8 +2,8 @@
 
 #include <stdlib.h>
 #include <math.h>
-#include "netsimJ.h"
-#include "priority-queueJ.h"
+#include "netsimJ4-26.h"
+#include "priority-queueD.h"
 
 /* add an element to the queue with an associated priority */
 int insert_with_priority(FixedEvent **queue, FixedEvent **end, int cell, float time) {

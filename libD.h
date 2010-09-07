@@ -6,11 +6,10 @@
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
-#include "netsimJ.h" 
+#include "netsimJ4-26.h"
 
 //CHANGE
-extern float rtsafe(void (*funcd)(float, float, GillespieRates *, float *, float *), // KonStates *
-		    float x, GillespieRates *rates,  float x1, float x2, float xacc);//KonStates *konStates,
+
 extern void delete_queues(CellState *state);
 extern void free_mem_CellState(CellState *state);
 extern int sls_store(FixedEvent *i, 
