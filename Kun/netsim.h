@@ -57,6 +57,9 @@
 #define HIND_LENGTH 15         /* default length of hindrance (original was 6) */
 #endif
 
+//for parallelize mutation trials
+#define N_para_threads 1
+
 /* 
  * define macros for logging output and warning/errors 
  */
@@ -321,8 +324,9 @@ const float GASCONSTANT;
 const float COOPERATIVITY;
 const float COOPERATIVE_DISTANCE; 
 const float NUMSITESINGENOME ;
-
 const float mN ;     
+
+
 
 /* see netsim.c for documentation for these global variables */
 float kon; 
@@ -709,9 +713,29 @@ extern int do_single_timestep(Genotype *,
                                int,
                                int,
 							   int *) ;
+ 
+extern float calc_avg_growth_rate(int,
+                           Genotype *, 
+						   CellState *, 
+						   float [NGENES],
+						   float [NGENES],
+						   float *,
+						   float *,
+						   float [NGENES],
+						   float [NGENES],
+						   float *,
+						   float *,
+						   float *,
+						   KonStates *,
+						   GillespieRates *,
+						   float ,
+						   float ,
+						   float ,
+						   int ); 
+ 
   
-extern void init_run_pop(Genotype [2],
-                         CellState [2],
+extern void init_run_pop(Genotype [N_para_threads],
+                         CellState [N_para_threads],
 //                         TimeCourse *[2][NGENES],
 //                         TimeCourse *[2][NGENES], 
                          float, /* in Kelvin */
@@ -725,6 +749,9 @@ extern void print_time_course(TimeCourse *,
 
 extern void print_all_protein_time_courses(TimeCourse *[2][NPROTEINS],
                                           TimeCourse *[2][NPROTEINS]);
+                                          
+extern void clone_cell(Genotype *,                
+                		Genotype *);
 
 extern void log_snapshot(GillespieRates *,
                          CellState *,

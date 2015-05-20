@@ -21,11 +21,13 @@
 #include "lib.h"
 #include "netsim.h"
 
+
+
 int main(int argc, char *argv[])
 {
   int i, j;
-  CellState state[2];
-  Genotype indivs[2];
+  CellState state[N_para_threads];
+  Genotype indivs[N_para_threads];
 //  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
 //  TimeCourse *timecourselast[2][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
