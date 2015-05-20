@@ -10,8 +10,13 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 2         /* default to a single cell if not otherwise defined */
+#define POP_SIZE 1000         
 #endif
+
+#ifndef MAX_MUT_STEP         
+#define MAX_MUT_STEP 10   // default 
+#endif
+
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
@@ -58,7 +63,7 @@
 #endif
 
 //for parallelize mutation trials
-#define N_para_threads 1
+#define N_para_threads 2
 
 /* 
  * define macros for logging output and warning/errors 
@@ -224,16 +229,16 @@ struct Genotype {
   int binding_sites_num;                    /* total number of binding sites */
   AllTFBindingSites *all_binding_sites;
   float mRNAdecay[NGENES];            /* kinetic rates*/
-  float proteindecay[NGENES];
-  float translation[NGENES];
+  float proteindecay[NGENES];			/* kinetic rates*/
+  float translation[NGENES];			/* kinetic rates*/
   int activating[NGENES][MAX_COPIES]; /* 1 is activating, 0 is repressing */
   float pic_disassembly[NGENES][MAX_COPIES];
   int copies[NGENES];                 /* current per-gene ploidy */
 
 
   /* cached quantities for efficiency, can be recomputed from the above genotype, not part of model */
-  int sites_per_gene[NGENES];               /* cache number of TFBSs per gene */
-  int site_id_pos[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs for each cis-reg sequence for use during replication and division*/
+//  int sites_per_gene[NGENES];               /* cache number of TFBSs per gene */
+//  int site_id_pos[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs for each cis-reg sequence for use during replication and division*/
 };
 
 /* 
@@ -375,8 +380,9 @@ extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
                                     char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                    char [NGENES][MAX_COPIES][CISREG_LEN],
-                                    int [NGENES][MAX_COPIES][2]);
+                                    char [NGENES][MAX_COPIES][CISREG_LEN]
+//                                    int [NGENES][MAX_COPIES][2]
+									);
 
 extern void print_tf_occupancy(CellState *,
                                AllTFBindingSites *,
@@ -400,9 +406,7 @@ extern void calc_all_binding_sites(int [NGENES],
                                    char[TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
                                    int *,
                                    AllTFBindingSites **,
-                                   int [TFGENES],
-                                   int [NGENES],
-                                   int [NGENES][MAX_COPIES][2]);
+                                   int [TFGENES]);
 
 extern int add_fixed_event(int,
                            int,
@@ -734,7 +738,10 @@ extern float calc_avg_growth_rate(int,
                                     float ,
                                     float ,
                                     int ); 
- 
+                                    
+extern int try_fixation(float, float);
+
+extern int mutate(Genotype *);
   
 extern void init_run_pop(Genotype [N_para_threads],
                          CellState [N_para_threads],
@@ -753,7 +760,8 @@ extern void print_all_protein_time_courses(TimeCourse *[2][NPROTEINS],
                                           TimeCourse *[2][NPROTEINS]);
                                           
 extern void clone_cell(Genotype *,                
-                		Genotype *);
+                		Genotype *,
+						int);
 
 extern void log_snapshot(GillespieRates *,
                          CellState *,
