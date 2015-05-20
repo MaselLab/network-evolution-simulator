@@ -25,7 +25,7 @@
 
 #ifdef  NO_SEPARATE_GENE    /* set to true if selection gene is also a TF */
   #ifndef TFGENES
-  #define TFGENES 10          /* number of genes encoding TFs */
+  #define TFGENES 3          /* number of genes encoding TFs */
   #endif
   #ifndef NGENES
   #define NGENES TFGENES      /* total number of cisreg genes */
@@ -33,10 +33,11 @@
   #ifndef NPROTEINS
   #define NPROTEINS TFGENES   /* total number of types of proteins, may be >#GENES if extracellular signals */
   #endif
-  #define SELECTION_GENE (TFGENES-1)    /* index of selection gene */
+  #define SELECTION_GENE_A (TFGENES-2)    /* index of selection gene */
+  #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 10
+  #define TFGENES 1
   #endif
   #ifndef NGENES
   #define NGENES (TFGENES+2)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
@@ -44,7 +45,8 @@
   #ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
   #define NPROTEINS (TFGENES+2)
   #endif
-  #define SELECTION_GENE NGENES-1   /* index of selection gene: always the last two genes */
+  #define SELECTION_GENE_A (NGENES-2)    /* index of selection gene */
+  #define SELECTION_GENE_B (NGENES-1)   /* index of selection gene: always the last two genes */
 #endif
 
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
@@ -258,6 +260,10 @@ struct CellState {
   int mRNA_transcr_num[NGENES][MAX_COPIES];  /* mRNAs which haven't finished transcription yet */
   FixedEvent *mRNA_transcr_time_end;  /* times when transcription is complete and an mRNA is available to move to cytoplasm */
   FixedEvent *mRNA_transcr_time_end_last;
+  FixedEvent *env0_time_end; // times when env=0 ends. Note, this event is not gene- or copy-specific. I just use the structure of FixedEvent for convenience.
+  FixedEvent *env0_time_end_last;
+  FixedEvent *env1_time_end;
+  FixedEvent *env1_time_end_last;
    
 
   float protein_conc[NPROTEINS];
@@ -503,6 +509,8 @@ extern void calc_from_state(Genotype *,
 
 extern int does_fixed_event_end(FixedEvent *,
                                 FixedEvent *,
+                                FixedEvent *,
+                                FixedEvent *,
                                 float);
 
 extern void calc_dt(float *,
@@ -584,7 +592,7 @@ extern float compute_growth_rate_dimer(float *,
                                        float,
                                        float,
                                        float,
-									   int);
+									   int );
 
 extern void update_protein_conc_cell_size(float[],
                                           CellState *,
@@ -596,7 +604,7 @@ extern void update_protein_conc_cell_size(float[],
                                           TimeCourse **,
                                           TimeCourse **,
                                           float [],
-										  int);
+										  int *);
 
 extern void calc_num_bound(float[],
                            int );
@@ -615,31 +623,31 @@ extern void transport_event(GillespieRates *,
                             float,
                             float,
                             float,
-							int);
+							int *);
 
 extern void tf_binding_event(GillespieRates *, CellState *, Genotype *, 
                              KonStates *, float *, TimeCourse **, TimeCourse **,
-                             float, float, float, int, int, int,int);
+                             float, float, float, int, int, int,int *);
 
 extern void tf_unbinding_event(GillespieRates *, CellState *, Genotype *, 
                                KonStates *, float *, TimeCourse **, TimeCourse **,
-                               float, float, float, float, int, int *,int);
+                               float, float, float, float, int, int *,int *);
 
 extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, 
                              KonStates *, float *, TimeCourse **, TimeCourse **,
-                             float, float, float, int);
+                             float, float, float, int *);
 
 extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, 
                                       KonStates *, TimeCourse **, TimeCourse **,
-                                      float, float, int);
+                                      float, float, int *);
 
 extern void histone_deacteylation_event(GillespieRates *, CellState *, Genotype *, 
                                         KonStates *, TimeCourse **, TimeCourse **,
-                                        float, float, int);
+                                        float, float, int *);
 
 extern void assemble_PIC_event(GillespieRates *, CellState *, Genotype *, 
                                KonStates *, TimeCourse **, TimeCourse **,
-                               float, float, int);
+                               float, float, int *);
 
 extern void disassemble_PIC_event(GillespieRates *, CellState *, Genotype *, 
                                   KonStates *, TimeCourse **, TimeCourse **,
@@ -647,7 +655,7 @@ extern void disassemble_PIC_event(GillespieRates *, CellState *, Genotype *,
 
 extern void transcription_init_event(GillespieRates *, CellState *, Genotype *,
                                      KonStates *, TimeCourse **, TimeCourse **,
-                                     float, float, float, int);
+                                     float, float, float, int *);
 
 extern void shift_binding_site_ids(CellState *, 
                                    KonStates *,
@@ -692,7 +700,7 @@ extern int do_single_timestep(Genotype *,
                                int,
                                int,
                                int,
-							   int) ;
+							   int *) ;
   
 extern void init_run_pop(Genotype [2],
                          CellState [2],

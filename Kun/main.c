@@ -67,15 +67,17 @@ int main(int argc, char *argv[])
 
   /* now create and run the population of cells */
 
-  init_run_pop(indivs, state, timecoursestart, timecourselast, (float) 293.0,
+  init_run_pop(indivs, state, 
+  timecoursestart, timecourselast, 
+				(float) 293.0,
               kdis, output_binding_sites,no_fixed_dev_time);
 //			  , no_fixed_dev_time, max_divisions);
 
-//  print_all_protein_time_courses(timecoursestart, timecourselast);
+  print_all_protein_time_courses(timecoursestart, timecourselast);
   //system("PAUSE");
   /* cleanup memory */
   
-  for (j = 0; j < 2; j++) {
+  for (j = 0; j < 1; j++) {
     fprintf(fperrors,"cleanup cell %03d\n", j);
     
     for (i=0; i < NPROTEINS; i++) {
