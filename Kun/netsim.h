@@ -25,7 +25,7 @@
 
 #ifdef  NO_SEPARATE_GENE    /* set to true if selection gene is also a TF */
   #ifndef TFGENES
-  #define TFGENES 3          /* number of genes encoding TFs */
+  #define TFGENES 10          /* number of genes encoding TFs */
   #endif
   #ifndef NGENES
   #define NGENES TFGENES      /* total number of cisreg genes */
@@ -37,7 +37,7 @@
   #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 1
+  #define TFGENES 3
   #endif
   #ifndef NGENES
   #define NGENES (TFGENES+2)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
@@ -172,7 +172,7 @@ struct GillespieRates {
  */
 typedef struct KonList KonList;
 struct KonList {
-  int *available_sites;   /* list of available sites for this TF */
+  int *available_sites;   /* list of available sites for this TF */ 
   int site_count;         /* number of available binding sites for a
                              given TF. Zero if protein is not a TF. */
 };
@@ -576,7 +576,7 @@ extern void add_integer_time_points(float,
 
 extern float compute_tprime(float, float, float, float);
 
-extern float compute_integral(float, float, float, float, float, float, float, float, float);
+extern float compute_integral(float, float, float, float, float, float, float, float);
 
 extern float compute_growth_rate_dimer(float *,
                                        float , 
@@ -591,12 +591,11 @@ extern float compute_growth_rate_dimer(float *,
                                        float,
                                        float,
                                        float,
+                                       float,                                       
                                        float,
                                        float,
                                        float,
-                                       float,
-                                       float,
-									   int );
+				       int );
 
 extern void update_protein_conc_cell_size(float[],
                                           CellState *,
@@ -702,36 +701,39 @@ extern int do_single_timestep(Genotype *,
                                GillespieRates *, 
                                float *,
                                float *,
-                               float [NGENES],
-                               float [NGENES],
+                               float *,
+                               float *,
                                float *,
                                float *,
                                float *,
 //                               TimeCourse *[NPROTEINS],
 //                               TimeCourse *[NPROTEINS],
+                               int,
                                int,
                                int,
                                int,
 							   int *) ;
+							   
+extern void free_fixedevent(CellState *);
  
 extern float calc_avg_growth_rate(int,
-                           Genotype *, 
-						   CellState *, 
-						   float [NGENES],
-						   float [NGENES],
-						   float *,
-						   float *,
-						   float [NGENES],
-						   float [NGENES],
-						   float *,
-						   float *,
-						   float *,
-						   KonStates *,
-						   GillespieRates *,
-						   float ,
-						   float ,
-						   float ,
-						   int ); 
+                                  Genotype *, 
+                                    CellState *, 
+                                    float [NGENES],
+                                    float [NGENES],
+                                    float *,
+                                    float *,
+                                    float [NGENES],
+                                    float [NGENES],
+                                    float *,
+                                    float *,
+                                    float *,
+                                    KonStates *,
+                                    GillespieRates *,
+                                    float ,
+                                    float ,
+                                    float ,
+                                    int ); 
  
   
 extern void init_run_pop(Genotype [N_para_threads],

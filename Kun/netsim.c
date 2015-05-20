@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <omp.h>
 
 /* local includes */
 #include "random.h"
@@ -55,19 +56,19 @@ float kon_after_burnin=1e-4; /* lower value value after burn is so things run fa
 
 int burn_in = 1;             /* disable burn-in by default */
 
-float tdevelopment = 20.0;/* default  development time: can be changed at runtime */
+float tdevelopment = 60.0;/* default  development time: can be changed at runtime */
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
-long seed = -1058;        
+long seed = -58;        
 int dummyrun = 0;          /* used to change seed */
 int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
 int recompute_kon = 1;     /* likewise for kon */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
-float growth_rate_scaling = 5.0; /* set default growth rate scaling factor */
-float duration_env0 = 20.1; // in minutes
+float growth_rate_scaling = 2.0; /* set default growth rate scaling factor */
+float duration_env0 = 60.1; // in minutes
 float duration_env1 = 0.1;
 int N_replicates=10;
 /* end default options */
@@ -645,7 +646,7 @@ void delete_fixed_event_start(FixedEvent **start,
  * burn-in of high kon rate or not
  */
 void initialize_cell(CellState *state,
-                     int cell_id,
+                     int id,
                      int copies[NGENES],
                      float mRNAdecay[NGENES],
                      float meanmRNA[NGENES],
@@ -656,7 +657,7 @@ void initialize_cell(CellState *state,
   float t;
 
   /* initialize the ID of the cell */
-  state->cell_id = cell_id;
+  state->cell_id = id;
 
   /* initialize whether to do kon burn-in or not */
   state->burn_in = burn_in;
@@ -678,8 +679,9 @@ void initialize_cell(CellState *state,
 
   state->tf_bound_num = 0;  /* initialize with nothing bound */
   state->tf_hindered_num = 0;
-  state->tf_bound_indexes = NULL;
-  state->tf_hindered_indexes = NULL;
+   
+//  state->tf_bound_indexes = NULL; // moved to the beginning of calc_avg_growth_rate
+//  state->tf_hindered_indexes = NULL;
 
   for (i=0; i < NGENES; i++) {
 
@@ -739,18 +741,31 @@ void initialize_cell_cache(CellState *state,
                            int maxbound2,
                            int maxbound3)
 {
-  int i;
+  int i,j;
   /* number of possible binding sites */
   /* currently create for all proteins, not just TFs, as we need info for protein decay */
   for (i=0; i < NPROTEINS; i++){
     kon_states->kon_list[i] = malloc(sizeof(KonList));
     kon_states->kon_list[i]->available_sites = malloc(genes.binding_sites_num*sizeof(int));
-  }
+    for(j=0;j<genes.binding_sites_num;j++){   
+        kon_states->kon_list[i]->available_sites[j]=-1;
+    }
+   }
   
-  state->tf_bound_indexes = realloc(state->tf_bound_indexes, maxbound2*sizeof(int));
-  *koffvalues = malloc(maxbound2*sizeof(float)); 
+ state->tf_bound_indexes = realloc(state->tf_bound_indexes,maxbound2*sizeof(int));
+ 
+ *koffvalues = malloc(maxbound2*sizeof(float)); 
+   for(i=0;i<maxbound2;i++){
+      state->tf_bound_indexes[i]=-1;
+      (*koffvalues)[i]=0.0;
+  } 
+  
   state->tf_hindered_indexes = realloc(state->tf_hindered_indexes, 2*maxbound3*sizeof(int));
-  
+ 
+  for(i=0;i<2*maxbound3;i++){
+      state->tf_hindered_indexes[0][i]=-1;
+      state->tf_hindered_indexes[1][i]=-1;
+  }  
   if (!kon_states->konvalues || !state->tf_bound_indexes || !koffvalues ||
       !state->tf_hindered_indexes || !kon_states->kon_list) {
     LOG_ERROR("memory allocation error at start of develop\n");
@@ -810,7 +825,7 @@ void calc_kon_rate(float t,
                    KonStates *kon_states,
                    float *konrate)
 {
-  float r,ct,ect;
+  float r,ct=0.0,ect=0.0;
   int i;
   
   r = 0.0;
@@ -871,12 +886,17 @@ void calc_koff(int k,
   
   front = back = 0;
   Gibbs = (((float) all_binding_sites[k].hamming_dist)/3.0 - 1.0) * state->RTlnKr; /* subject to revision of TF_ELEMENT_LEN */
-  for (j=0; j < state->tf_bound_num; j++) {
-    if (all_binding_sites[k].cisreg_id==all_binding_sites[state->tf_bound_indexes[j]].cisreg_id &&
-        all_binding_sites[k].gene_copy==all_binding_sites[state->tf_bound_indexes[j]].gene_copy &&
-        !(k==state->tf_bound_indexes[j])) {
+  
+  for (j=0; j < state->tf_bound_num; j++) { //search for any cooperation or hindrance
+      
+    if (all_binding_sites[k].cisreg_id==all_binding_sites[state->tf_bound_indexes[j]].cisreg_id && //which gene this bs is on 
+        all_binding_sites[k].gene_copy==all_binding_sites[state->tf_bound_indexes[j]].gene_copy && // and which copy
+        !(k==state->tf_bound_indexes[j])) 
+    {
       posdiff = all_binding_sites[k].left_edge_pos - all_binding_sites[state->tf_bound_indexes[j]].left_edge_pos;
-      if (abs(posdiff) < HIND_LENGTH) {
+      
+      if (abs(posdiff) < HIND_LENGTH) 
+      {
         LOG_ERROR("t=%g steric hindrance breached with site %d (at pos %d, strand %d copy %d gene %d), %d away from site %d \
                    (at pos %d, strand %d copy %d of gene %d)\n",
                   t, k, all_binding_sites[k].left_edge_pos, all_binding_sites[k].strand, all_binding_sites[k].gene_copy, all_binding_sites[k].cisreg_id,
@@ -885,14 +905,17 @@ void calc_koff(int k,
                   all_binding_sites[state->tf_bound_indexes[j]].cisreg_id);
         exit(-1);
       }
-      if (abs(posdiff) < COOPERATIVE_DISTANCE) {
-        if (posdiff>0) front++; else back++;
+      
+      if (abs(posdiff) < COOPERATIVE_DISTANCE) 
+      { 
+            if (posdiff>0) front++; else back++;
       }
     }
-    if ((front) && (back)) 
+    
+    if ((front) && (back)) // if there's cooperation
       j=state->tf_bound_num;
   }
-  if (front>0) Gibbs -= COOPERATIVITY*state->RTlnKr/3;
+  if (front>0) Gibbs -= COOPERATIVITY*state->RTlnKr/3; 
   if (back>0) Gibbs -= COOPERATIVITY*state->RTlnKr/3;
   *koff = NUMSITESINGENOME*kon*0.25/exp(-Gibbs/(GASCONSTANT*state->temperature));
   LOG_VERBOSE("state->RTlnKr=%g front=%d back=%d H=%d Gibbs=%g koff=%g\n",state->RTlnKr,front,back,all_binding_sites[k].hamming_dist,Gibbs,*koff);
@@ -924,6 +947,7 @@ void scan_nearby_sites(int indexChanged,
        if (abs(posdiff) < HIND_LENGTH) { /* within HIND_LENGTH: bad: shouldn't happen */
         LOG_ERROR("t=%g steric hindrance 2 has been breached with site %d %d away from site %d\n",
                   t, indexChanged, posdiff, state->tf_bound_indexes[j]);
+        exit(-1);
       }
       if (abs(posdiff) < COOPERATIVE_DISTANCE) {  /* within cooperative distance adjust koff */
 
@@ -979,6 +1003,7 @@ void remove_kon(int site_id,
 
     /* move the last element end of array into space vacated by site k */
     kon_states->kon_list[TFID]->available_sites[k] = kon_states->kon_list[TFID]->available_sites[kon_states->kon_list[TFID]->site_count];
+    kon_states->kon_list[TFID]->available_sites[kon_states->kon_list[TFID]->site_count]=-1;
   } else {
     LOG_VERBOSE_NOCELLID("||| couldn't remove site %d from TF %d in kon_list (k=%d)\n", site_id, TFID, k);
   }
@@ -1073,8 +1098,8 @@ void calc_from_state(Genotype *genotype,
                      CellState *state,
                      GillespieRates *rates,
                      KonStates *kon_states,
-                     float transport[],
-                     float mRNAdecay[])
+                     float transport_rate[NGENES],
+                     float mRNAdecay[NGENES]) 
 {
   int i, j, k;
   float salphc, protein_conc_for_tfid; 
@@ -1097,13 +1122,13 @@ void calc_from_state(Genotype *genotype,
     
     LOG_VERBOSE("protein decay[%d]=%g\n", i, kon_states->konvalues[i][KON_PROTEIN_DECAY_INDEX]);
   }
+  
   state->tf_bound_num=0;
-
   rates->koff=0.0;
   rates->koff_operations = 0;
   rates->transport=0.0;
   rates->transport_operations = 0;
-  rates->mRNAdecay=0.0;
+  rates->mRNAdecay=0.0; // these rates are calced in calc_dt  
   rates->mRNAdecay_operations = 0;
   rates->pic_disassembly=0.0;
   rates->pic_disassembly_operations = 0;
@@ -1140,9 +1165,9 @@ void calc_from_state(Genotype *genotype,
 //    LOG("after initializing kon_states for gene=%d, site_count=%d, sites_per_gene=%d, nkon=%d\n", 
 //        i, kon_states->kon_list[i]->site_count, genotype->sites_per_gene[i], kon_states->nkon);
 
-    transport[i] = KRNA * (float) (state->mRNA_nuclear_num[i]);
-//    printf("in calc-from-state: N_mRNA %d = %d, rate= %f, the address is %i\n", i, state->mRNA_nuclear_num[i], transport[i],&transport[i]);
-    rates->transport += transport[i];
+    transport_rate[i] = KRNA * (float) (state->mRNA_nuclear_num[i]);
+//    printf("in calc-from-state: N_mRNA %d = %d, rate= %f, the address is %i\n", i, state->mRNA_nuclear_num[i], transport_rate[i],&transport_rate[i]);
+    rates->transport += transport_rate[i];
     rates->transport_operations++;
 //    LOG_VERBOSE("mRNA_nuclear_num=%d, initializing transport[%d]=%g\n", state->mRNA_nuclear_num[i], i, transport[i]);
   }
@@ -1206,7 +1231,7 @@ int does_fixed_event_end(FixedEvent *mRNA_transl_time_end,
                          FixedEvent *mRNA_transcr_time_end,
                          FixedEvent *env0_time_end,
                          FixedEvent *env1_time_end,
-						float t) 
+			 float t) 
 {
 	int retval;
 	float t1;
@@ -1414,7 +1439,7 @@ void revise_activity_state(int gene_id,
                            CellState *state,
                            GillespieRates *rates)
 {
-  int transcriptrule, oldstate, numactive;
+  int transcriptrule=-1, oldstate=-1, numactive=-1;
 
   transcriptrule = ready_to_transcribe(gene_id, gene_copy, 
                                        state->tf_bound_indexes, 
@@ -1440,7 +1465,7 @@ void revise_activity_state(int gene_id,
                        //printf("A\n");
     state->active[gene_id][gene_copy] = ON_WITH_NUCLEOSOME;
     state->state_change_ids[ACETYLATION_STATE][gene_copy][rates->acetylation_num[gene_copy]] = gene_id;
-    (rates->acetylation_num[gene_copy])++;
+    (rates->acetylation_num[gene_copy])++; // rates will be updated in calc_dt
   }
   /* OFF_NO_PIC -> ON_NO_PIC */
   if ((transcriptrule) && oldstate==OFF_NO_PIC) {
@@ -1619,7 +1644,7 @@ void attempt_tf_binding(Genotype *genotype,
                         int site_id,
                         float t)
 {
-  int gene_id, gene_copy, k, posdiff;
+  int gene_id, gene_copy, k, posdiff,i;
 
   LOG_VERBOSE("kon1 event at site %d out of %d possible, %d TFs previously bound binding_sites_num=%d\n",
               site_id, kon_states->nkon, state->tf_bound_num, genotype->binding_sites_num);
@@ -1628,8 +1653,14 @@ void attempt_tf_binding(Genotype *genotype,
   if (state->tf_bound_num >= *maxbound2){
     (*maxbound2) *= 2;
     state->tf_bound_indexes = realloc(state->tf_bound_indexes, (*maxbound2)*sizeof(int));
+    
     /* do the copy */
     *koffvalues = realloc(*koffvalues, (*maxbound2)*sizeof(float));
+    
+    for(i=*maxbound2/2;i<*maxbound2;i++){
+        state->tf_bound_indexes[i]=-1;
+        (*koffvalues)[i]=0.0;
+    }
     /* check return value */
     if (!state->tf_bound_indexes || !(*koffvalues)) {
       LOG_ERROR("memory allocation error resetting maxbound2=%d\n", *maxbound2);
@@ -1683,12 +1714,17 @@ void attempt_tf_binding(Genotype *genotype,
       LOG_VERBOSE("site_id=%d k=%d\n", genotype->all_binding_sites[site_id].left_edge_pos, genotype->all_binding_sites[k].left_edge_pos);
       posdiff = genotype->all_binding_sites[site_id].left_edge_pos - genotype->all_binding_sites[k].left_edge_pos;
 
-      /* if within HIND_LENGTH, we prevent binding by adding to steric hindrance */
+      /* if within HIND_LENGTH, we prevent future binding by adding to steric hindrance */
       if (abs(posdiff) < HIND_LENGTH) {
         /* if not enough memory, reallocate */
-        if (state->tf_hindered_num > *maxbound3 - 1) {
+        if (state->tf_hindered_num >= *maxbound3) {
           (*maxbound3) *= 2;
           state->tf_hindered_indexes = realloc(state->tf_hindered_indexes,2*(*maxbound3)*sizeof(int));
+         
+          for(i=*maxbound3/2;i<*maxbound3;i++){
+            state->tf_hindered_indexes[1][i]=-1;
+            state->tf_hindered_indexes[0][i]=-1;
+          }
         }
         /* record hindrance: 'site_id' blocks 'k' */
         state->tf_hindered_indexes[state->tf_hindered_num][0] = k;
@@ -1759,8 +1795,7 @@ float compute_integral(float alpha,
                        float deltat, 
                        float s_mRNA, 
                        float P, 
-                       float Pp, 
-                       float ect, 
+                       float Pp,                       
                        float ect1) 
 {
   return 1.0/(pow(c,2)*Pp) * gmax * (-alpha*ect1*s_mRNA + c*(P*ect1 + alpha*deltat*s_mRNA));
@@ -1779,16 +1814,15 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                                 int all_s_mRNA[NGENES],
                                 float P_a,
                                 float P_b,
-                                float P_next,
+                                float P_next_a,
+                                float P_next_b,
                                 float t, 
                                 float deltat,
-                                float c_a,
-                                float ect_a,
+                                float c_a,                                
                                 float ect1_a,
-                                float c_b,
-                                float ect_b,
+                                float c_b,                                
                                 float ect1_b,
-								int env) 
+				int env) 
 {
   int i;
   float instantaneous_growth_rate;  /* this is returned from the function */
@@ -1805,46 +1839,43 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
 	  case 1:{ // protein A is necessary!
 	  
 			 /* choose the appropriate piecewise linear integral */
-		  if (((P_a >= Pp_a) && (P_next >= P_a)) || ((P_next >= Pp_a) && (P_a >= P_next))) {          /* P > Pp throughout */
+		  if (((P_a >= Pp_a) && (P_next_a >= P_a)) || ((P_next_a >= Pp_a) && (P_a >= P_next_a))) {          /* P > Pp throughout */
 //		    if (verbose)
 //		      LOG_VERBOSE_NOCELLID("case 1: P=%g, P_next=%g > Pp=%g\n", P, P_next, Pp);
 		
-		    *integrated_growth_rate = gmax_a * deltat;
-//		    printf("alpha_b=%f, c_b=%f,s_mRNA_b=%f,P_b=%f, ect_b=%f, ect1_b=%f\n",alpha_a, c_a, deltat, s_mRNA_a, P_a,  ect_a, ect1_a);		    
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect_b, ect1_b);
-//		     if (!(*integrated_growth_rate==*integrated_growth_rate)) { printf("NAN1! \n"); printf("%f\n",*integrated_growth_rate);}
-		     
+		    *integrated_growth_rate = gmax_a * deltat;	    
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect1_b);	     
 		  } 
 		  
-		  else if (((P_next <= Pp_a) && (P_next >= P_a)) || ((P_a <= Pp_a) && (P_a >= P_next))) {   /* P < Pp throughout */
+		  else if (((P_next_a <= Pp_a) && (P_next_a >= P_a)) || ((P_a <= Pp_a) && (P_a >= P_next_a))) {   /* P < Pp throughout */
 //		    LOG_VERBOSE_NOCELLID("case 2: P=%g, P_next=%g < Pp=%g\n", P, P_next, Pp);
-		    *integrated_growth_rate = compute_integral(alpha_a, c_a, gmax_a, deltat, s_mRNA_a, P_a, Pp_a, ect_a, ect1_a);
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect_b, ect1_b);
-//		    if (!(*integrated_growth_rate==*integrated_growth_rate)) printf("NAN2! \n");
+		    *integrated_growth_rate = compute_integral(alpha_a, c_a, gmax_a, deltat, s_mRNA_a, P_a, Pp_a, ect1_a);
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect1_b);
+
 		  } 
 		  
 		  
-		  else if ((Pp_a > P_a) && (P_next > Pp_a)) {    /* P < Pp up until t' then P > Pp */
+		  else if ((Pp_a > P_a) && (P_next_a > Pp_a)) {    /* P < Pp up until t' then P > Pp */
 		    deltatprime = compute_tprime(c_a, P_a, alpha_a, s_mRNA_a);
 		    deltatrest = deltat - deltatprime;
 //		    LOG_VERBOSE_NOCELLID("case 3: P=%g < Pp=%g until t'=%g (deltatprime=%g) then P_next=%g > Pp=%g\n", 
 //		                         P, Pp, t+deltatprime, deltatprime, P_next, Pp);
-		    *integrated_growth_rate = compute_integral(alpha_a, c_a, gmax_a, deltatprime, s_mRNA_a, P_a, Pp_a, ect_a, ect1_a);
+		    *integrated_growth_rate = compute_integral(alpha_a, c_a, gmax_a, deltatprime, s_mRNA_a, P_a, Pp_a, ect1_a);
 		    *integrated_growth_rate += gmax_a * deltatrest;
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect_b, ect1_b);
-//		    if (!(*integrated_growth_rate==*integrated_growth_rate)) printf("NAN3! \n");
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect1_b);
+
 		  } 
 		  
 		  
-		  else if ((P_a > Pp_a) && (Pp_a > P_next)) {   /* P > Pp up until t' then P < Pp */
+		  else if ((P_a > Pp_a) && (Pp_a > P_next_a)) {   /* P > Pp up until t' then P < Pp */
 		    deltatprime = compute_tprime(c_a, P_a, alpha_a, s_mRNA_a);
 		    deltatrest = deltat - deltatprime;
 //		    LOG_VERBOSE_NOCELLID("case 4: P=%g > Pp=%g until t'=%g (deltatprime=%g) then P_next=%g < Pp=%g\n", 
 //		                         P, Pp, t+deltatprime, deltatprime, P_next, Pp);
 		    *integrated_growth_rate = gmax_a * deltatprime;
-		    *integrated_growth_rate += compute_integral(alpha_a, c_a, gmax_a, deltatrest, s_mRNA_a, P_a, Pp_a, ect_a, ect1_a);
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect_b, ect1_b);
-//		    if (!(*integrated_growth_rate==*integrated_growth_rate)) printf("NAN4! \n");
+		    *integrated_growth_rate += compute_integral(alpha_a, c_a, gmax_a, deltatrest, s_mRNA_a, P_a, Pp_a, ect1_a);
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_b, c_b, 1.0, deltat, s_mRNA_b, P_b, 1.0, ect1_b);
+
 		  } 
 		  
 		  
@@ -1852,56 +1883,54 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
 //		    LOG_ERROR_NOCELLID("[cell %03d] P=%g, P_next=%g, c=%g, t=%g (in min) t+deltat=%g (in min), s_mRNA=%g\n", 
 //		                       cell_id, P, P_next, c, t, t+deltat, s_mRNA);
 //		    LOG_ERROR_NOCELLID("[cell %03d] growth rate computation error: should not reach here.  Exiting\n", 
-//		                       cell_id);
-			printf("here!");
+//		                       cell_id);		
 			
-			printf("P_a=%f, Pp_a=%f, P_next=%f \n",P_a,Pp_a,P_next);
 		    exit(1);
 		  }
 		
 		  /* compute instantaneous growth rate at t */
-		  if (P_a < Pp_a)
-		    instantaneous_growth_rate = gmax_a*P_a/Pp_a - penalty*P_b;
+		  if (P_next_a < Pp_a)
+		    instantaneous_growth_rate = gmax_a*P_next_a/Pp_a - penalty*P_next_b;
 		  else
-		    instantaneous_growth_rate = gmax_a - penalty*P_b;
+		    instantaneous_growth_rate = gmax_a - penalty*P_next_b;
 			
 			break;
 	}
 	case 0:{ // protein b is necessary!
 		 /* choose the appropriate piecewise linear integral */
-		  if (((P_b >= Pp_b) && (P_next >= P_b)) || ((P_next >= Pp_b) && (P_b >= P_next))) {          /* P > Pp throughout */
+		  if (((P_b >= Pp_b) && (P_next_b >= P_b)) || ((P_next_b >= Pp_b) && (P_b >= P_next_b))) {          /* P > Pp throughout */
 //		    if (verbose)
 //		      LOG_VERBOSE_NOCELLID("case 1: P=%g, P_next=%g > Pp=%g\n", P, P_next, Pp);
 		    *integrated_growth_rate = gmax_b * deltat;
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect_a, ect1_a);
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect1_a);
 		  } 
 		  
-		  else if (((P_next <= Pp_b) && (P_next >= P_b)) || ((P_b <= Pp_b) && (P_b >= P_next))) {   /* P < Pp throughout */
+		  else if (((P_next_b <= Pp_b) && (P_next_b >= P_b)) || ((P_b <= Pp_b) && (P_b >= P_next_b))) {   /* P < Pp throughout */
 //		    LOG_VERBOSE_NOCELLID("case 2: P=%g, P_next=%g < Pp=%g\n", P, P_next, Pp);
-		    *integrated_growth_rate = compute_integral(alpha_b, c_b, gmax_b, deltat, s_mRNA_b, P_b, Pp_b, ect_b, ect1_b);
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect_a, ect1_a);
+		    *integrated_growth_rate = compute_integral(alpha_b, c_b, gmax_b, deltat, s_mRNA_b, P_b, Pp_b, ect1_b);
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect1_a);
 		  } 
 		  
 		  
-		  else if ((Pp_b > P_b) && (P_next > Pp_b)) {    /* P < Pp up until t' then P > Pp */
+		  else if ((Pp_b > P_b) && (P_next_b > Pp_b)) {    /* P < Pp up until t' then P > Pp */
 		    deltatprime = compute_tprime(c_b, P_b, alpha_b, s_mRNA_b);
 		    deltatrest = deltat - deltatprime;
 //		    LOG_VERBOSE_NOCELLID("case 3: P=%g < Pp=%g until t'=%g (deltatprime=%g) then P_next=%g > Pp=%g\n", 
 //		                         P, Pp, t+deltatprime, deltatprime, P_next, Pp);
-		    *integrated_growth_rate = compute_integral(alpha_b, c_b, gmax_b, deltatprime, s_mRNA_b, P_b, Pp_b, ect_b, ect1_b);
+		    *integrated_growth_rate = compute_integral(alpha_b, c_b, gmax_b, deltatprime, s_mRNA_b, P_b, Pp_b, ect1_b);
 		    *integrated_growth_rate += gmax_b * deltatrest;
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect_a, ect1_a);
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect1_a);
 		  } 
 		  
 		  
-		  else if ((P_b > Pp_b) && (Pp_b > P_next)) {   /* P > Pp up until t' then P < Pp */
+		  else if ((P_b > Pp_b) && (Pp_b > P_next_b)) {   /* P > Pp up until t' then P < Pp */
 		    deltatprime = compute_tprime(c_b, P_b, alpha_b, s_mRNA_b);
 		    deltatrest = deltat - deltatprime;
 //		    LOG_VERBOSE_NOCELLID("case 4: P=%g > Pp=%g until t'=%g (deltatprime=%g) then P_next=%g < Pp=%g\n", 
 //		                         P, Pp, t+deltatprime, deltatprime, P_next, Pp);
 		    *integrated_growth_rate = gmax_b * deltatprime;
-		    *integrated_growth_rate += compute_integral(alpha_b, c_b, gmax_b, deltatrest, s_mRNA_b, P_b, Pp_b, ect_b, ect1_b);
-		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect_a, ect1_a);
+		    *integrated_growth_rate += compute_integral(alpha_b, c_b, gmax_b, deltatrest, s_mRNA_b, P_b, Pp_b, ect1_b);
+		    *integrated_growth_rate -= penalty*compute_integral(alpha_a, c_a, 1.0, deltat, s_mRNA_a, P_a, 1.0, ect1_a);
 		  } 
 		  
 		  
@@ -1914,10 +1943,10 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
 		  }
 		
 		  /* compute instantaneous growth rate at t */
-		  if (P_b < Pp_b)
-		    instantaneous_growth_rate = gmax_b*P_b/Pp_b - penalty*P_a;
+		  if (P_next_b < Pp_b)
+		    instantaneous_growth_rate = gmax_b*P_next_b/Pp_b - penalty*P_next_a;
 		  else
-		    instantaneous_growth_rate = gmax_b - penalty*P_a;
+		    instantaneous_growth_rate = gmax_b - penalty*P_next_a;
 		
 		  break;
 	}
@@ -2018,11 +2047,11 @@ void update_protein_conc_cell_size(float protein_conc[],
 //                                   TimeCourse **timecoursestart,
 //                                   TimeCourse **timecourselast,
                                    float otherdata[],
-								   int *env)
+				   int *env)
 {
   int i;
   float ct, ect, ect1,ect_a,ect1_a,ect_b,ect1_b;
-  float L_a, L_next, L_b;
+  float L_a, L_b;
   float instantaneous_growth_rate = 0.0;
   float integrated_growth_rate = 0.0;
   float adjusted_decay;
@@ -2083,15 +2112,14 @@ void update_protein_conc_cell_size(float protein_conc[],
 // printf("La=%f,Lb=%f\n",L_a,L_b);
 
   if (*env==1) {  /* now find out the protein concentration at end of dt interval and compute growth rate */ // a is the required
-      L_next = protein_conc[SELECTION_GENE_A];
-     //TODO: finish growth formular
+      
       instantaneous_growth_rate = compute_growth_rate_dimer(&integrated_growth_rate, 
                                                             genotype->translation[SELECTION_GENE_A], state->mRNA_cyto_num[SELECTION_GENE_A], 
                                                             genotype->translation[SELECTION_GENE_B], state->mRNA_cyto_num[SELECTION_GENE_B],
                                                             genotype->translation, state->mRNA_cyto_num, 
-                                                            L_a, L_b, L_next, t, dt, 
-                                                            kon_states->konvalues[SELECTION_GENE_A][KON_PROTEIN_DECAY_INDEX], ect_a, ect1_a,
-                                                            kon_states->konvalues[SELECTION_GENE_B][KON_PROTEIN_DECAY_INDEX],ect_b, ect1_b,1);
+                                                            L_a, L_b, protein_conc[SELECTION_GENE_A], protein_conc[SELECTION_GENE_B],t, dt, 
+                                                            kon_states->konvalues[SELECTION_GENE_A][KON_PROTEIN_DECAY_INDEX], ect1_a,
+                                                            kon_states->konvalues[SELECTION_GENE_B][KON_PROTEIN_DECAY_INDEX], ect1_b,1);
       /* us the integrated growth rate to compute the cell size in the next timestep */
        
       state->cell_size = (state->cell_size)*exp(integrated_growth_rate);
@@ -2100,15 +2128,14 @@ void update_protein_conc_cell_size(float protein_conc[],
     }
     
     if (*env==0) {  /* now find out the protein concentration at end of dt interval and compute growth rate */ // b is the required
-      L_next = protein_conc[SELECTION_GENE_B];
-     //TODO: finish growth formular
+         
       instantaneous_growth_rate = compute_growth_rate_dimer(&integrated_growth_rate, 
                                                             genotype->translation[SELECTION_GENE_A], state->mRNA_cyto_num[SELECTION_GENE_A], 
                                                             genotype->translation[SELECTION_GENE_B], state->mRNA_cyto_num[SELECTION_GENE_B], 
                                                             genotype->translation, state->mRNA_cyto_num, 
-                                                            L_a, L_b, L_next, t, dt, 
-                                                            kon_states->konvalues[SELECTION_GENE_A][KON_PROTEIN_DECAY_INDEX], ect_a, ect1_a,
-                                                            kon_states->konvalues[SELECTION_GENE_B][KON_PROTEIN_DECAY_INDEX], ect_b, ect1_b,0);
+                                                            L_a, L_b, protein_conc[SELECTION_GENE_A],protein_conc[SELECTION_GENE_B], t, dt, 
+                                                            kon_states->konvalues[SELECTION_GENE_A][KON_PROTEIN_DECAY_INDEX], ect1_a,
+                                                            kon_states->konvalues[SELECTION_GENE_B][KON_PROTEIN_DECAY_INDEX], ect1_b,0);
       /* us the integrated growth rate to compute the cell size in the next timestep */
        
       state->cell_size = (state->cell_size)*exp(integrated_growth_rate);
@@ -2199,7 +2226,7 @@ void transport_event(GillespieRates *rates,
                      CellState *state,
                      Genotype *genotype,
                      KonStates *kon_states,
-                     float transport[NGENES],
+                     float transport_rate[NGENES],
 //                     TimeCourse **timecoursestart, 
 //                     TimeCourse **timecourselast, 
                      float dt,
@@ -2210,9 +2237,10 @@ void transport_event(GillespieRates *rates,
   int i;
   float temp_rate;
   float endtime = t + dt + TTRANSLATION; 
+
 //for(i=0;i<NGENES;i++)
 //{
-//	printf("rate=%f\n",transport[i]);
+//	printf("rate%d=%f the address is %i\n",i,transport_rate[i],&transport_rate[i]);
 //	
 //}
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt, 
@@ -2220,7 +2248,7 @@ void transport_event(GillespieRates *rates,
                                 t, 
 //								timecoursestart, timecourselast, 
                                 state->protein_conc,env);
- 
+  
   i = -1;
   temp_rate = 0.0;  
  
@@ -2228,16 +2256,16 @@ void transport_event(GillespieRates *rates,
      based on weighting in transport[] array */
   while (i < NGENES && x > temp_rate) {
     i++;
-    x -= transport[i];
-//    printf("mRNA=%d, rate=%f\n",state->mRNA_nuclear_num[i],transport[i]);
-//    printf("%f\n",transport[i]);
+    x -= transport_rate[i];
+//    printf("mRNA%d=%d, rate=%f\n",i,state->mRNA_nuclear_num[i],transport_rate[i]);
+//    printf("%f\n",transport_rate[i]);
   }
-
+ 
   if (i >= NGENES) {
     LOG_ERROR("[cell %03d] attempted to choose mRNA for gene=%d which doesn't exist\n", state->cell_id, i);
     exit(0);
   } 
- 
+
   LOG_VERBOSE("do transport event mRNA from gene=%d from %d copies (x=%g)\n", i, state->mRNA_nuclear_num[i], x);
 
 
@@ -2248,11 +2276,11 @@ void transport_event(GillespieRates *rates,
   LOG_VERBOSE("add translation event endtime=%f for mRNA encoded by gene=%d \n", endtime, i);
   add_fixed_event_end(i, -1, endtime, &(state->mRNA_transl_time_end), &(state->mRNA_transl_time_end_last));
 
-  transport[i] -= KRNA;   /* decrease transport frequency */
+  transport_rate[i] -= KRNA;   /* decrease transport frequency */
 
   /* if below a threshold, make zero */
-  if (transport[i] < 0.1*KRNA) 
-    transport[i]=0.0;
+  if (transport_rate[i] < 0.1*KRNA) 
+    transport_rate[i]=0.0;
 
   /* adjust rates */
   rates->transport -= KRNA;
@@ -2823,7 +2851,7 @@ void recalibrate_cell(GillespieRates *rates,
                       KonStates *kon_states,
                       float **koffvalues,
                       float mRNAdecay[NGENES],
-                      float transport[NGENES],
+                      float transport_rate[NGENES],
                       float dt) 
 {
   int i, j; 
@@ -2872,8 +2900,8 @@ void recalibrate_cell(GillespieRates *rates,
 
   for (i=0; i < NGENES; i++) {
     /* transport rates */
-    transport[i] = KRNA * (float) (state->mRNA_nuclear_num[i]);
-    rates->transport += transport[i];
+    transport_rate[i] = KRNA * (float) (state->mRNA_nuclear_num[i]);
+    rates->transport += transport_rate[i];
     rates->transport_operations++;
 
     /* regenerate decay rates */
@@ -3020,7 +3048,7 @@ int do_single_timestep(Genotype *genotype,
                        GillespieRates *rates, 
                        float *t,
                        float *koffvalues,
-                       float transport[NGENES],
+                       float *transport_rate,
                        float mRNAdecay[NGENES],
                        float *x,
                        float *dt,
@@ -3030,13 +3058,15 @@ int do_single_timestep(Genotype *genotype,
                        int maxbound2,
                        int maxbound3,
                        int no_fixed_dev_time, 
-					   int *env) 
+                       int burn_in,
+		       int *env) 
 {
   int i,j;
   int event;     /* boolean to keep track of whether FixedEvent has ended */
   int total;     /* total possible translation events */
   float fixed_time;
- 
+  float temp_t;
+  
 //  if (verbose) //VERBOSE JU CHANGE
 //    for (j=0; j < MAX_COPIES; j++) {
 //      LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
@@ -3070,7 +3100,7 @@ int do_single_timestep(Genotype *genotype,
 //    printf("recalibrating cell %3d after burn-in!\n", state->cell_id);
     LOG("recalibrating cell %3d after burn-in!\n", state->cell_id);
     log_snapshot(rates, state, genotype, kon_states, &koffvalues,
-                 mRNAdecay, transport, *konrate, *x, *t);
+                 mRNAdecay, transport_rate, *konrate, *x, *t);
 
     kon = kon_after_burnin;     /* reset kon to the post-burn-in value */
     recalibrate_cell(rates,
@@ -3079,11 +3109,11 @@ int do_single_timestep(Genotype *genotype,
                      kon_states,
                      &koffvalues,
                      mRNAdecay,
-                     transport,
+                     transport_rate,
                      *dt); 
 
     log_snapshot(rates, state, genotype, kon_states, &koffvalues,
-                 mRNAdecay, transport, *konrate, *x, *t);
+                 mRNAdecay, transport_rate, *konrate, *x, *t);
     state->burn_in = 0;    /* now disable burn-in */
   } 
   
@@ -3103,7 +3133,7 @@ int do_single_timestep(Genotype *genotype,
     exit(-1);
   }
 
-
+	
   LOG_VERBOSE("next stochastic event due at t=%g dt=%g x=%g\n", *t+*dt, *dt, *x);
   
   /* first check to see if a fixed event occurs in current t->dt window,
@@ -3123,7 +3153,7 @@ int do_single_timestep(Genotype *genotype,
     
     switch (event) {
     case 1:   /* if a transcription event ends */
-      end_transcription(dt, *t, state, transport, rates);
+      end_transcription(dt, *t, state, transport_rate, rates);
       LOG_ERROR("END TRANSCRIPTION\n");
       
       update_protein_conc_cell_size(state->protein_conc, state, genotype, *dt,
@@ -3233,10 +3263,11 @@ int do_single_timestep(Genotype *genotype,
 
     /* if the total rates falls below zero, we do an emergency recalibration of cell */
     if (!(rates->subtotal + *konrate > 0.0)) {
-      log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
+        
+      log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport_rate, *konrate, *x, *t);
       LOG_ERROR("x should always be >0 t=%g (x=%g) rates->subtotal=%g, konrate=%g, recalibrate cell!\n", *t, *x, rates->subtotal, *konrate); 
-      recalibrate_cell(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *dt); 
-      log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport, *konrate, *x, *t);
+      recalibrate_cell(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport_rate, *dt); 
+      log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay, transport_rate, *konrate, *x, *t);
 
       /* if this still results in either zero or negative total rates,
          this most likely due the cell being "dead" no TFs bound, no
@@ -3247,7 +3278,7 @@ int do_single_timestep(Genotype *genotype,
         return -1;        /* return cell status as "dead" */
       }
     }
-    
+   
     /* 
      * choose a new uniform random number weighted by the rate of all
      * Gillespie events, note that konrate is *not* included in
@@ -3274,7 +3305,7 @@ int do_single_timestep(Genotype *genotype,
                    kon_states,
                    &koffvalues,
                    mRNAdecay,
-                   transport, 
+                   transport_rate, 
                    *konrate,
                    *x,
                    *t);
@@ -3285,15 +3316,15 @@ int do_single_timestep(Genotype *genotype,
      //printf("*x = %f, rates transport= %f, rates koff= %f\n", *x, rates->transport, rates->koff);
      LOG_ERROR("*x = %f\n", *x);
      LOG_ERROR("CHECKBOB! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
-//    printf("here4\n");
-    if (*x < rates->koff) {  
+
+    if (*x < rates->koff) {     // printf("here4\n");
            LOG_ERROR("unbinding event\n");
       int ignore_event;
       tf_unbinding_event(rates, state, genotype, kon_states, koffvalues,
 //                         timecoursestart, timecourselast, 
 						 (*konrate), *dt, *t, *x, 1, &ignore_event, env);
       if (ignore_event) { /* if the TF unbinding event failed, we return without updating *t  */
-//      printf("here5.1\n");
+     // printf("here5.1\n");
         return 0;
       }
     } else {
@@ -3305,13 +3336,13 @@ int do_single_timestep(Genotype *genotype,
        * STOCHASTIC EVENT: a transport event
        */
 //       printf("here5.2\n");
-      if (*x < rates->transport) {     //printf("here5.3\n");printf("%f\n",rates->transport);
+      if (*x < rates->transport) {    // printf("here5.3\n"); printf("%f\n",rates->transport);
              LOG_ERROR("transport event\n");
-        transport_event(rates, state, genotype, kon_states, transport, 
+        transport_event(rates, state, genotype, kon_states, transport_rate, 
 //                        timecoursestart, timecourselast,
 						 *dt, *t, *x, env);
                         
-//                printf("here5.3.1\n");      
+               // printf("here5.3.1\n");      
        for (j=0; j < MAX_COPIES; j++) {
       //LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
       LOG_ERROR("2rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);}
@@ -3375,7 +3406,7 @@ int do_single_timestep(Genotype *genotype,
                  * STOCHASTIC EVENT: histone deacetylation
                  */
                  LOG_ERROR("CHECK! x = %f,  sum_rate_counts = %d, deacetylate = %f\n", *x, sum_rate_counts(rates->deacetylation_num), DEACETYLATE );
-                if (*x < (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE) {//printf("here5.8\n");
+                if (*x < (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE) {
                   LOG_ERROR("deact event\n"); 
                   histone_deacteylation_event(rates, state, genotype, kon_states, 
 //                                              timecoursestart, timecourselast, 
@@ -3385,7 +3416,7 @@ int do_single_timestep(Genotype *genotype,
                   /* 
                    * STOCHASTIC EVENT: PIC assembly
                    */
-                  if (*x < (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY) {//printf("here5.9\n");
+                  if (*x < (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY) {
                          LOG_ERROR("pic assembly event\n");
                     assemble_PIC_event(rates, state, genotype, kon_states, 
 //                                       timecoursestart, timecourselast, 
@@ -3395,12 +3426,12 @@ int do_single_timestep(Genotype *genotype,
                     /* 
                      * STOCHASTIC EVENT: transcription initiation
                      */
-                    if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {//printf("here5.10\n");
+                    if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
                            LOG_ERROR("transcript init event time = %f\n", *t);
                       transcription_init_event(rates, state, genotype, kon_states, 
 //                                               timecoursestart, timecourselast, 
 											   *dt, *t, *x, env);
-                    } else {//printf("here5.11\n");
+                    } else {
                       /*
                        * FALLBACK: shouldn't get here, previous
                        * events should be exhaustive
@@ -3410,11 +3441,11 @@ int do_single_timestep(Genotype *genotype,
                                 state->cell_id, *t, *x, rates->subtotal + *konrate);
 
                       log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay,
-                                   transport, *konrate, *x, *t);
+                                   transport_rate, *konrate, *x, *t);
                       recalibrate_cell(rates, state, genotype, kon_states, &koffvalues,
-                                       mRNAdecay, transport, *dt); 
+                                       mRNAdecay, transport_rate, *dt); 
                       log_snapshot(rates, state, genotype, kon_states, &koffvalues, mRNAdecay,
-                                   transport, *konrate, *x, *t);
+                                   transport_rate, *konrate, *x, *t);
                       if (*t > 1000.0) {
                         LOG_ERROR("cell has been running for %g which is > 1000 mins\n", *t);
                       }
@@ -3459,59 +3490,101 @@ int do_single_timestep(Genotype *genotype,
   return 0;
 }
 
+
+void free_fixedevent(CellState *state)
+{
+	FixedEvent *temp1, *temp2;
+	
+	temp1=state->env1_time_end;
+	
+	while(temp1){		
+		temp1=temp1->next;
+		temp2=temp1;
+		free(temp2);	
+	}
+	
+	temp1=state->env0_time_end;
+	while(temp1){		
+		temp1=temp1->next;
+		temp2=temp1;
+		free(temp2);	
+	}
+	
+	temp1=state->mRNA_transcr_time_end;
+	while(temp1){		
+		temp1=temp1->next;
+		temp2=temp1;
+		free(temp2);	
+	}
+	
+	temp1=state->mRNA_transl_time_end;
+	while(temp1){		
+		temp1=temp1->next;
+		temp2=temp1;
+		free(temp2);	
+	}
+}
+
 float calc_avg_growth_rate(int current_genotype,
-						   Genotype *genotype, 
-						   CellState *state, 
-						   float init_mRNA[NGENES],
-						   float init_protein_conc[NGENES],
-						   float *t,
-						   float *koffvalues,
-						   float transport[NGENES],
-						   float mRNAdecay[NGENES],
-						   float *x,
-						   float *dt,
-						   float *konrate,
-						   KonStates *kon_states,
-						   GillespieRates *rates,
-						   float maxbound2,
-						   float maxbound3,
-						   float temperature,
-						   int no_fixed_dev_time)
+                           Genotype *genotype, 
+                           CellState *state, 
+                           float init_mRNA[NGENES],
+                           float init_protein_conc[NGENES],
+                           float *t,
+                           float *koffvalues,
+                           float transport_rate[NGENES],
+                           float mRNAdecay[NGENES],
+                           float *x,
+                           float *dt,
+                           float *konrate,
+                           KonStates *kon_states,
+                           GillespieRates *rates,
+                           float maxbound2,
+                           float maxbound3,
+                           float temperature,
+                           int no_fixed_dev_time)
 {
 	
-	int cell_status; 
+	int cell_status=0; 
 	int i,j;
 	int env=0;
 	float avg_GR=0;
 	
+	state->tf_bound_indexes=NULL; //moved from init_cell
+	state->tf_hindered_indexes = NULL;
+
+	initialize_cell_cache(state, *genotype, kon_states, &koffvalues, maxbound2, maxbound3);
 	
 	for(i=0;i<N_replicates;i++)
 	{	 
-		env=0;
-		printf("%d\n",i);
-		for (j=0; j < NGENES; j++) {
-		    init_protein_conc[j] = exp(1.25759*gasdev(&seed)+7.25669);
-		    init_mRNA[j] = exp(0.91966*gasdev(&seed)-0.465902);
-	    }
+            env=0;
 		
-		initialize_cell(state, current_genotype, genotype->copies, genotype->mRNAdecay, init_mRNA, init_protein_conc, burn_in);
+            printf("%d\n",i);
+			
 		
-		state->temperature = temperature;
+            for (j=0; j < NGENES; j++) {
+		init_protein_conc[j] = exp(1.25759*gasdev(&seed)+7.25669);
+		init_mRNA[j] = exp(0.91966*gasdev(&seed)-0.465902);
+            }
+		
+            initialize_cell(state, current_genotype, genotype->copies, genotype->mRNAdecay, init_mRNA, init_protein_conc, burn_in);
+	
+            state->temperature = temperature;
 	    state->RTlnKr = GASCONSTANT * temperature * log(KR);
-	    
-	    initialize_cell_cache(state, *genotype, kon_states, &koffvalues, maxbound2, maxbound3);
-	    
-	    calc_from_state(genotype, state, rates, kon_states, transport, mRNAdecay);
-	    
+	    	    
+	    calc_from_state(genotype, state, rates, kon_states, transport_rate, mRNAdecay);
+	    	
 	    *t = 0.0; 
-    
-	    do_single_timestep(genotype, 
+                     
+            
+            
+            do_single_timestep(genotype, 
 	                       state, 
 	                       kon_states, 
 	                       rates, 
 	                       t,
 	                       koffvalues,
-	                       transport,
+	                       transport_rate,
 	                       mRNAdecay,
 	                       x,
 	                       dt,
@@ -3519,19 +3592,20 @@ float calc_avg_growth_rate(int current_genotype,
 	                       maxbound2,
 	                       maxbound3,
 	                       no_fixed_dev_time,
-						   &env);
+	                       burn_in,
+                                &env);
 						   
 		
-					   
-		while((*t<tdevelopment) && (cell_status != -1)){                                                          
-	    	    
+				   
+		while(*t<tdevelopment){  		                                 
+	    	   
 		    cell_status = do_single_timestep(genotype, 
 		                                     state, 
 		                                     kon_states, 
 		                                     rates, 
 		                                     t,
 		                                     koffvalues,
-		                                     transport,
+		                                     transport_rate,
 		                                     mRNAdecay,
 		                                     x,
 		                                     dt,
@@ -3539,17 +3613,42 @@ float calc_avg_growth_rate(int current_genotype,
 		                                     maxbound2,
 		                                     maxbound3,
 		                                     no_fixed_dev_time,
-											 &env);
+		                                     burn_in,
+						     &env);
+											 
+			if(cell_status==-1) {
+				printf("tdevelopment=%f, t=%f\n",tdevelopment, *t);
+				printf("dead!\n");
+				break;				
+			}
 		 		    
 	   }
-	   avg_GR += log(state->cell_size)/tdevelopment; 
 	   
-//	   for (i=0; i < NPROTEINS; i++) {
-//	      free(kon_states[j].kon_list[i]->available_sites);
-//	      free(kon_states[j].kon_list[i]);
-//    	}	
+	   printf("t=%f\n",*t);
+	   
+	   avg_GR += log(state->cell_size)/tdevelopment; 
+	   	   
+	   free_fixedevent(state);
 	   			   
 	}
+	
+	free(state->tf_bound_indexes);
+    free(koffvalues);
+    free(state->tf_hindered_indexes);
+	
+	state->tf_bound_indexes=NULL;
+	koffvalues=NULL;
+	state->tf_hindered_indexes=NULL; 
+	
+	for(i=0;i<NGENES;i++){
+		
+		free(kon_states->kon_list[i]->available_sites);
+		kon_states->kon_list[i]->available_sites= NULL;
+		free(kon_states->kon_list[i]);
+		kon_states->kon_list[i]=NULL;
+		
+	}
+	
 	return avg_GR/N_replicates;
 
 }
@@ -3575,7 +3674,7 @@ void init_run_pop(Genotype genotype[N_para_threads],
   float init_mRNA[N_para_threads][NGENES], init_protein_conc[N_para_threads][NGENES];
   float t[N_para_threads];             /* time of last event */
   float *koffvalues[N_para_threads];   /* rates of unbinding */
-  float transport[N_para_threads][NGENES];  /* transport rates of each mRNA */
+  float transport_rate[N_para_threads][NGENES];  /* transport rates of each mRNA */
   float mRNAdecay[N_para_threads][NGENES];  /* mRNA decay rates */
   float x[N_para_threads];                  /* random number */
   float dt[N_para_threads];                 /* delta-t */
@@ -3597,37 +3696,60 @@ void init_run_pop(Genotype genotype[N_para_threads],
   {
   	clone_cell(&genotype[current_genotype],&genotype[i]);  	
   }
-  	
-  	
+  
   current_fitness = calc_avg_growth_rate(current_genotype,
-  									     &genotype[current_genotype],
-  										 &state[current_genotype],
-										 &init_mRNA[current_genotype][NGENES],
-										 &init_protein_conc[current_genotype][NGENES],
-										 &t[current_genotype],
-										 koffvalues[current_genotype],
-										 &transport[current_genotype][NGENES],
-										 &mRNAdecay[current_genotype][NGENES],
-										 &x[current_genotype],
-										 &dt[current_genotype],
-										 &konrate[current_genotype],
-										 &kon_states[current_genotype],
-										 &rates[current_genotype],
-										 maxbound2,
-										 maxbound3,
-										 temperature,
-										 no_fixed_dev_time);
-									 
-	for (j = 0; j < N_para_threads; j++) {
-		
-    free(koffvalues[j]);
-    
-    for (i=0; i < NPROTEINS; i++) {
-      free(kon_states[j].kon_list[i]->available_sites);
-      free(kon_states[j].kon_list[i]);
-    }
-  }									 
-  printf("current_fitness=%f\n", current_fitness);
+                                         &genotype[current_genotype],
+                                         &state[current_genotype],
+                                         &init_mRNA[current_genotype][0],
+                                         &init_protein_conc[current_genotype][0],
+                                         &t[current_genotype],
+                                         koffvalues[current_genotype],
+                                         &transport_rate[current_genotype][0],
+                                         &mRNAdecay[current_genotype][0],
+                                         &x[current_genotype],
+                                         &dt[current_genotype],
+                                         &konrate[current_genotype],
+                                         &kon_states[current_genotype],
+                                         &rates[current_genotype],
+                                         maxbound2,
+                                         maxbound3,
+                                         temperature,
+                                         no_fixed_dev_time);										 
+	
+	 									 
+	  printf("current_fitness=%f\n", current_fitness);
+//  omp_set_num_threads(N_para_threads);	
+//  #pragma omp parallel
+//  {	
+//  	  int ID = omp_get_thread_num();
+//	  current_fitness = calc_avg_growth_rate(ID,
+//	  									     &genotype[ID],
+//	  										 &state[ID],
+//											 &init_mRNA[ID][NGENES],
+//											 &init_protein_conc[ID][NGENES],
+//											 &t[ID],
+//											 koffvalues[ID],
+//											 &transport[ID][NGENES],
+//											 &mRNAdecay[ID][NGENES],
+//											 &x[ID],
+//											 &dt[ID],
+//											 &konrate[ID],
+//											 &kon_states[ID],
+//											 &rates[ID],
+//											 maxbound2,
+//											 maxbound3,
+//											 temperature,
+//											 no_fixed_dev_time);
+//
+////	    free(koffvalues[ID]);
+////	    
+//	    for (i=0; i < NPROTEINS; i++) {
+//	      free(kon_states[ID].kon_list[i]->available_sites);
+//	      free(kon_states[ID].kon_list[i]);
+//	    }
+//	  									 
+//	  printf("ID %d, current_fitness=%f\n", ID, current_fitness);
+//  }
 }
 
 //void print_time_course(TimeCourse *start,
