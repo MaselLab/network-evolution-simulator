@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 1         /* default to a single cell if not otherwise defined */
+#define POP_SIZE 2         /* default to a single cell if not otherwise defined */
 #endif
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -23,9 +23,6 @@
 #define MAX_COPIES 1       /* each gene can exists with four copies during replication */
 #endif
 
-
-#define NO_SEPARATE_GENE 0
-
 #ifdef  NO_SEPARATE_GENE    /* set to true if selection gene is also a TF */
   #ifndef TFGENES
   #define TFGENES 10          /* number of genes encoding TFs */
@@ -36,7 +33,7 @@
   #ifndef NPROTEINS
   #define NPROTEINS TFGENES   /* total number of types of proteins, may be >#GENES if extracellular signals */
   #endif
-  #define SELECTION_GENE (NGENES-1)    /* index of selection gene */
+  #define SELECTION_GENE (TFGENES-1)    /* index of selection gene */
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
   #define TFGENES 10
@@ -47,7 +44,7 @@
   #ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
   #define NPROTEINS (TFGENES+1)
   #endif
-  #define SELECTION_GENE (NGENES-1)   /* index of selection gene: always the last gene */
+  #define SELECTION_GENE TFGENES   /* index of selection gene: always the last gene */
 #endif
 
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
@@ -227,7 +224,7 @@ struct Genotype {
   int activating[NGENES][MAX_COPIES]; /* 1 is activating, 0 is repressing */
   float pic_disassembly[NGENES][MAX_COPIES];
   int copies[NGENES];                 /* current per-gene ploidy */
-  float replication_time[NGENES];     /* per-gene replication time within S phase*/
+
 
   /* cached quantities for efficiency, can be recomputed from the above genotype, not part of model */
   int sites_per_gene[NGENES];               /* cache number of TFBSs per gene */
@@ -250,11 +247,7 @@ struct FixedEvent {
 typedef struct CellState CellState;
 struct CellState {
   int cell_id;                        /* cell ID */
-  int founder_id;                     /* keep track of the founder cell */
   int burn_in;                        /* keep track of whether burn-in has finished */
-  int in_s_phase;                     /* whether cell has entered S (synthesis) phase */
-  int divisions;                      /* total number of divisions cell has undergone as mother, reset as daughter */
-  float division_time;                /* in global time, TIME_INFINITY until start of S phase*/ 
   float cell_size;                    /* size of cell */
   float growth_rate;                  /* total growth rate in the previous deltat */
   int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
@@ -265,8 +258,7 @@ struct CellState {
   int mRNA_transcr_num[NGENES][MAX_COPIES];  /* mRNAs which haven't finished transcription yet */
   FixedEvent *mRNA_transcr_time_end;  /* times when transcription is complete and an mRNA is available to move to cytoplasm */
   FixedEvent *mRNA_transcr_time_end_last;
-  FixedEvent *replication_time_end;   /* times when genes (start and) finish replicating */
-  FixedEvent *replication_time_end_last;    
+   
 
   float protein_conc[NPROTEINS];
   int tf_bound_num;
@@ -338,26 +330,22 @@ long seed ;
 int dummyrun;        
 int recompute_koff;  
 int recompute_kon;
-float critical_size;
 float growth_rate_scaling; 
 float Pp;         
 float h;
 float gmax;
-float time_s_phase;          
-float time_g2_phase;         
-int random_replication_time; 
 float protein_aging;
 
 /* file output parameters */
 char *output_directory ;
 int verbose ;
 FILE *fperrors;
-FILE *fp_cellsize[POP_SIZE];
+FILE *fp_cellsize[2];
 #if 0 
-FILE *fp_koff[POP_SIZE];
-FILE *fp_growthrate[POP_SIZE];
-FILE *fp_tfsbound[POP_SIZE];
-FILE *fp_rounding[POP_SIZE];
+FILE *fp_koff[2];
+FILE *fp_growthrate[2];
+FILE *fp_tfsbound[2];
+FILE *fp_rounding[2];
 #endif
 
 /* function prototypes */
@@ -384,12 +372,6 @@ extern void initialize_genotype(Genotype *,
                                 Genotype *,
                                 float [],
                                 int);
-
-
-extern void mutate(Genotype *,
-                   int,
-                   int,
-                   float);
 
 extern int calc_all_binding_sites_copy(char [NGENES][MAX_COPIES][CISREG_LEN],
                                        char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
@@ -518,7 +500,6 @@ extern void calc_from_state(Genotype *,
 
 extern int does_fixed_event_end(FixedEvent *,
                                 FixedEvent *,
-//                                FixedEvent *,
                                 float);
 
 extern void calc_dt(float *,
@@ -577,8 +558,6 @@ extern void add_integer_time_points(float,
                                     int [NPROTEINS],
                                     TimeCourse **,
                                     TimeCourse **);
-
-extern void reach_s_phase(CellState *, Genotype *, float);
 
 extern float compute_tprime(float, float, float, float);
 
@@ -664,13 +643,6 @@ extern void shift_binding_site_ids(CellState *,
                                    int,
                                    int);
 
-extern void replicate_gene(CellState *,
-                           Genotype *,
-                           GillespieRates *,
-                           KonStates *,
-                           float *,
-                           int,
-                           float);
 
 extern void recompute_kon_rates(GillespieRates *,
                                 CellState *,
@@ -693,8 +665,6 @@ extern void recalibrate_cell(GillespieRates *,
                              float [NGENES],
                              float);
 
-extern void initialize_new_cell_genotype(Genotype *, Genotype *);
-
 extern int do_single_timestep(Genotype *, 
                                CellState *, 
                                KonStates *, 
@@ -712,21 +682,21 @@ extern int do_single_timestep(Genotype *,
                                int,
                                int) ;
   
-extern void init_run_pop(Genotype [POP_SIZE],
-                         CellState [POP_SIZE],
-                         TimeCourse *[POP_SIZE][NGENES],
-                         TimeCourse *[POP_SIZE][NGENES], 
+extern void init_run_pop(Genotype [2],
+                         CellState [2],
+                         TimeCourse *[2][NGENES],
+                         TimeCourse *[2][NGENES], 
                          float, /* in Kelvin */
                          float [NUM_K_DISASSEMBLY],
                          int,
-                         int,
-                         int); 
+                         int);
+
 
 extern void print_time_course(TimeCourse *,
                               int, int);
 
-extern void print_all_protein_time_courses(TimeCourse *[POP_SIZE][NPROTEINS],
-                                          TimeCourse *[POP_SIZE][NPROTEINS]);
+extern void print_all_protein_time_courses(TimeCourse *[2][NPROTEINS],
+                                          TimeCourse *[2][NPROTEINS]);
 
 extern void log_snapshot(GillespieRates *,
                          CellState *,

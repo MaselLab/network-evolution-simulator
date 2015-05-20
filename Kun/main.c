@@ -24,171 +24,15 @@
 int main(int argc, char *argv[])
 {
   int i, j;
-  CellState state[POP_SIZE];
-  Genotype indivs[POP_SIZE];
-  TimeCourse *timecoursestart[POP_SIZE][NPROTEINS]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[POP_SIZE][NPROTEINS];
+  CellState state[2];
+  Genotype indivs[2];
+  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
+  TimeCourse *timecourselast[2][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
 
   int output_binding_sites = 0; /*verbose flag*/
-  int no_fixed_dev_time = 1; /* 0 = fixed development time, 1 = divides when ready  */
-  int max_divisions = 10; /* per population */
+  int no_fixed_dev_time = 0; /* 0 = fixed development time, 1 = divides when ready  */
   int curr_seed; /*still needs to be fixed by Barry*/
-
-  int c;  /* argv index */
-
-  burn_in = 0;  /* don't do burn-in of kon by default */
-  verbose = 1;  /* no verbose out by default */
-
-  /* parse command-line options */
-  while (1) {
-    static struct option long_options[] =
-      {
-        /* These options set a flag. */
-        /* These options don't set a flag.
-           We distinguish them by their indices. */
-/*         {
- *             const char *optionname; int has_arg; int *flag; int val;
- *         }
- *         no_argument 0
- *         required_argument 1
- *         optional_argument 2
- *
- *         if *flag = NULL getopt_long returns val, else val=*flag and returns 0.
- *
- */
-
-        {"directory",  required_argument, 0, 'd'},
-        {"randomseed", required_argument, 0, 'r'},
-        {"ploidy",  required_argument, 0, 'p'},
-        {"timedev",  required_argument, 0, 't'},
-        {"timemax",  required_argument, 0, 0},
-        {"criticalsize",  required_argument, 0, 'c'},
-        {"divisions",  required_argument, 0, 's'},
-        {"random-replication",  no_argument, 0, 0},
-        {"nofixedtime",  no_argument, 0, 'n'},
-        {"burnin",  no_argument, 0, 'b'},
-        {"timesphase",  required_argument, 0, 0},
-        {"timeg2phase",  required_argument, 0, 0},
-        {"growthscaling",  required_argument, 0, 0},
-        {"verbose", no_argument,  0, 'v'},
-        {"help",  no_argument, 0, 'h'},
-        {"outputbindingsites",  no_argument, 0, 'o'},
-        {0, 0, 0, 0}
-      };
-
-    /* `getopt_long' stores the option index here. */
-    int option_index = 0;
-    char *endptr;
-
-/*     prototype:
- *     int getopt_long(int argc, char * const argv[],
- *                   const char *optstring,
- *                   const struct option *longopts, int *longindex);
- */
-
-    c = getopt_long (argc, argv, "d:r:p:t:c:s:vhonb",
-                     long_options, &option_index);
-
-    /* Detect the end of the options. */
-    if (c == -1)
-      break;
-
-    switch (c)  {
-    case 0:  /* long option without a short arg */
-      /* If this option set a flag, do nothing else now. */
-      if (long_options[option_index].flag != 0)
-        break;
-      if (strcmp("timesphase", long_options[option_index].name) == 0) {
-        time_s_phase  = strtof(optarg, &endptr);
-        printf("setting time_s_phase=%g\n", time_s_phase);
-      } else if (strcmp("timeg2phase", long_options[option_index].name) == 0) {
-        time_g2_phase  = strtof(optarg, &endptr);
-        printf("setting time_g2_phase=%g\n", time_g2_phase);
-      } else if (strcmp("growthscaling", long_options[option_index].name) == 0) {
-        growth_rate_scaling  = strtof(optarg, &endptr);
-        printf("setting growthscaling=%g\n", growth_rate_scaling);
-      } else if (strcmp("timemax", long_options[option_index].name) == 0) {
-        timemax  = strtof(optarg, &endptr);
-        printf("setting timemax=%g\n", timemax);
-      } else if (strcmp("no-random-replication", long_options[option_index].name) == 0) {
-        printf("don't make replication times random in S phase\n");
-        random_replication_time = 0;
-      } else {
-        printf ("option %s", long_options[option_index].name);
-        if (optarg)
-          printf (" with arg %s", optarg);
-        printf ("\n");
-      }
-      break;
-    case 'd':
-      output_directory = optarg;
-      break;
-    case 'r':
-      dummyrun = atoi(optarg);
-      break;
-    case 'p':
-      current_ploidy = atoi(optarg);
-      break;
-    case 's':
-      max_divisions = atoi(optarg);
-      break;
-    case 't':
-      tdevelopment = atof(optarg);
-      break;
-    case 'n':
-      no_fixed_dev_time = 1;
-      break;
-    case 'c':
-      critical_size = atof(optarg);
-      break;
-    case 'b':
-      burn_in = 1;
-      break;
-    case 'v':
-      verbose = 1;
-      break;
-    case 'h':
-      fprintf(stderr, "Usage: %s [OPTION]\n\
-\n\
- -o,  --outputbindingsites  print out binding sites\n\
- -d,  --directory=DIRECTORY directory to store output\n\
- -r,  --randomseed=SEED     random seed\n\
- -p,  --ploidy=PLOIDY       ploidy (1=haploid, 2=diploid)\n\
- -t,  --timedev=TIME        length of time to run development\n\
- -t,  --timemax=TIME        set a maximum length of time to run development\n\
-                             (no upper limit by default)\n\
- -n,  --nofixedtime         no fixed development time\n\
- -s,  --divisions=DIVISONS  maximum number of divisions\n\
- -c,  --criticalsize=SIZE   critical size for cell division\n\
- -b,  --burnin              whether to do burn-in (off by default)\n\
-      --no-random-replication  don't make replication times in S phase random\n\
-      --timesphase=TIME     length of S-phase (30 mins by default)\n\
-      --timeg2phase=TIME    length of G2-phase (30 mins by default)\n\
-      --growthscaling=GS    amount to accelerate the growth rate\n\
-                              (2.0 by default)\n\
- -h,  --help                display this help and exit\n\
- -v,  --verbose             verbose output to error file\n\
-\n", argv[0]);
-      exit(0);
-      break;
-    case 'o':
-      output_binding_sites = 1;
-      break;
-    default:
-      abort();
-    }
-  }
-
-  /* Print any remaining command line arguments (not options). */
-  if (optind < argc) {
-    printf ("non-option ARGV-elements: ");
-    while (optind < argc)
-      printf ("%s ", argv[optind++]);
-    putchar ('\n');
-  }
-
-
 
   /* create output directory if needed */
   create_output_directory(output_directory);
@@ -197,7 +41,8 @@ int main(int argc, char *argv[])
   create_output_file("netsimerrors.txt", output_directory, &(fperrors), -1);
 
   /* create output files for cell size, growth rate, TFs */
-  for (j = 0; j < POP_SIZE; j++) {
+  for (j = 0; j < 2; j++) {
+
     create_output_file("cellsize", output_directory, &(fp_cellsize[j]), j);
 #if 0 /* currently disable these file outputs */
     create_output_file("growthrate", output_directory, &(fp_growthrate[j]), j);
@@ -213,7 +58,7 @@ int main(int argc, char *argv[])
 
   /* slight hack to initialize seed  */
 
-  //for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
+  for (curr_seed=0; curr_seed<dummyrun; curr_seed++) ran1(&seed);
 
   initialize_growth_rate_parameters();
 
@@ -221,29 +66,40 @@ int main(int argc, char *argv[])
   read_kdisassembly(kdis);
 
   /* now create and run the population of cells */
-  
-  init_run_pop(indivs, state, timecoursestart, timecourselast, (float) 293.0,
-              kdis, output_binding_sites, no_fixed_dev_time, max_divisions);
 
-  print_all_protein_time_courses(timecoursestart, timecourselast);
+  init_run_pop(indivs, state, timecoursestart, timecourselast, (float) 293.0,
+              kdis, output_binding_sites,no_fixed_dev_time);
+//			  , no_fixed_dev_time, max_divisions);
+
+//  print_all_protein_time_courses(timecoursestart, timecourselast);
   //system("PAUSE");
   /* cleanup memory */
-  for (j = 0; j < POP_SIZE; j++) {
+  
+  for (j = 0; j < 2; j++) {
     fprintf(fperrors,"cleanup cell %03d\n", j);
-    for (i=0; i < NGENES; i++) {
-
+    
+    for (i=0; i < NPROTEINS; i++) {
+		
+	
       //TODO: FIX LOGGING
       //LOG_VERBOSE("deleting protein %02d timecourse\n", i);
-      delete_time_course(timecoursestart[j][i]);
-      timecoursestart[j][i] = timecourselast[j][i] = NULL;
+      delete_time_course(timecoursestart[j][i]); 
+           
+      timecoursestart[j][i] = NULL;
+      
+	  timecourselast[j][i] = NULL;
+	  
     }
-    //free_mem_CellState(&state[j]);
-    free(indivs[j].all_binding_sites);
+   
+    free_mem_CellState(&state[j]);
+    
+    free(indivs[j].all_binding_sites); // memo leakage here. but should not matter when the code is complete
   }
 
   /* close file descriptors */
   fclose(fperrors);
-  for (j = 0; j < POP_SIZE; j++) {
+  
+  for (j = 0; j < 2; j++) {
     fclose(fp_cellsize[j]);
 
 
