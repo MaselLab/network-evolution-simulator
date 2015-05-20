@@ -601,8 +601,8 @@ extern void update_protein_conc_cell_size(float[],
                                           GillespieRates *,
                                           KonStates *,
                                           float,
-                                          TimeCourse **,
-                                          TimeCourse **,
+//                                          TimeCourse **,
+//                                          TimeCourse **,
                                           float [],
 										  int *);
 
@@ -618,43 +618,51 @@ extern void transport_event(GillespieRates *,
                             Genotype *,
                             KonStates *,
                             float [NGENES],
-                            TimeCourse **, 
-                            TimeCourse **, 
+//                            TimeCourse **, 
+//                            TimeCourse **, 
                             float,
                             float,
                             float,
 							int *);
 
 extern void tf_binding_event(GillespieRates *, CellState *, Genotype *, 
-                             KonStates *, float *, TimeCourse **, TimeCourse **,
+                             KonStates *, float *, 
+//							 TimeCourse **, TimeCourse **,
                              float, float, float, int, int, int,int *);
 
 extern void tf_unbinding_event(GillespieRates *, CellState *, Genotype *, 
-                               KonStates *, float *, TimeCourse **, TimeCourse **,
+                               KonStates *, float *, 
+//							   TimeCourse **, TimeCourse **,
                                float, float, float, float, int, int *,int *);
 
 extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, 
-                             KonStates *, float *, TimeCourse **, TimeCourse **,
+                             KonStates *, float *,
+//							  TimeCourse **, TimeCourse **,
                              float, float, float, int *);
 
 extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, 
-                                      KonStates *, TimeCourse **, TimeCourse **,
+                                      KonStates *, 
+//									  TimeCourse **, TimeCourse **,
                                       float, float, int *);
 
 extern void histone_deacteylation_event(GillespieRates *, CellState *, Genotype *, 
-                                        KonStates *, TimeCourse **, TimeCourse **,
+                                        KonStates *,
+//										 TimeCourse **, TimeCourse **,
                                         float, float, int *);
 
 extern void assemble_PIC_event(GillespieRates *, CellState *, Genotype *, 
-                               KonStates *, TimeCourse **, TimeCourse **,
+                               KonStates *, 
+//							   TimeCourse **, TimeCourse **,
                                float, float, int *);
 
 extern void disassemble_PIC_event(GillespieRates *, CellState *, Genotype *, 
-                                  KonStates *, TimeCourse **, TimeCourse **,
+                                  KonStates *, 
+//								  TimeCourse **, TimeCourse **,
                                   float, float, float);
 
 extern void transcription_init_event(GillespieRates *, CellState *, Genotype *,
-                                     KonStates *, TimeCourse **, TimeCourse **,
+                                     KonStates *,
+//									  TimeCourse **, TimeCourse **,
                                      float, float, float, int *);
 
 extern void shift_binding_site_ids(CellState *, 
@@ -695,8 +703,8 @@ extern int do_single_timestep(Genotype *,
                                float *,
                                float *,
                                float *,
-                               TimeCourse *[NPROTEINS],
-                               TimeCourse *[NPROTEINS],
+//                               TimeCourse *[NPROTEINS],
+//                               TimeCourse *[NPROTEINS],
                                int,
                                int,
                                int,
@@ -704,8 +712,8 @@ extern int do_single_timestep(Genotype *,
   
 extern void init_run_pop(Genotype [2],
                          CellState [2],
-                         TimeCourse *[2][NGENES],
-                         TimeCourse *[2][NGENES], 
+//                         TimeCourse *[2][NGENES],
+//                         TimeCourse *[2][NGENES], 
                          float, /* in Kelvin */
                          float [NUM_K_DISASSEMBLY],
                          int,

@@ -26,8 +26,8 @@ int main(int argc, char *argv[])
   int i, j;
   CellState state[2];
   Genotype indivs[2];
-  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
-  TimeCourse *timecourselast[2][NPROTEINS];
+//  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
+//  TimeCourse *timecourselast[2][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
 
   int output_binding_sites = 0; /*verbose flag*/
@@ -68,30 +68,30 @@ int main(int argc, char *argv[])
   /* now create and run the population of cells */
 
   init_run_pop(indivs, state, 
-  timecoursestart, timecourselast, 
+//  timecoursestart, timecourselast, 
 				(float) 293.0,
               kdis, output_binding_sites,no_fixed_dev_time);
 //			  , no_fixed_dev_time, max_divisions);
 
-  print_all_protein_time_courses(timecoursestart, timecourselast);
+//  print_all_protein_time_courses(timecoursestart, timecourselast);
   //system("PAUSE");
   /* cleanup memory */
   
   for (j = 0; j < 1; j++) {
     fprintf(fperrors,"cleanup cell %03d\n", j);
     
-    for (i=0; i < NPROTEINS; i++) {
-		
-	
-      //TODO: FIX LOGGING
-      //LOG_VERBOSE("deleting protein %02d timecourse\n", i);
-      delete_time_course(timecoursestart[j][i]); 
-           
-      timecoursestart[j][i] = NULL;
-      
-	  timecourselast[j][i] = NULL;
-	  
-    }
+//    for (i=0; i < NPROTEINS; i++) {
+//		
+//	
+//      //TODO: FIX LOGGING
+//      //LOG_VERBOSE("deleting protein %02d timecourse\n", i);
+//      delete_time_course(timecoursestart[j][i]); 
+//           
+//      timecoursestart[j][i] = NULL;
+//      
+//	  timecourselast[j][i] = NULL;
+//	  
+//    }
    
     free_mem_CellState(&state[j]);
     

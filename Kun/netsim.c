@@ -2006,8 +2006,8 @@ void update_protein_conc_cell_size(float protein_conc[],
                                    GillespieRates *rates,
                                    KonStates *kon_states,
                                    float t,
-                                   TimeCourse **timecoursestart,
-                                   TimeCourse **timecourselast,
+//                                   TimeCourse **timecoursestart,
+//                                   TimeCourse **timecourselast,
                                    float otherdata[],
 								   int *env)
 {
@@ -2116,8 +2116,8 @@ void update_protein_conc_cell_size(float protein_conc[],
   /* scale up the rates using kon global */
   rates->max_salphc *= kon;
   rates->min_salphc *= kon;
-  if ((output) && (*timecourselast)->time < t+dt-0.1) 
-    add_time_points(t+dt, otherdata, timecoursestart, timecourselast);
+//  if ((output) && (*timecourselast)->time < t+dt-0.1) 
+//    add_time_points(t+dt, otherdata, timecoursestart, timecourselast);
 
   /* update the instantaneous growth rate for the beginning of the next timestep */
   state->growth_rate = instantaneous_growth_rate;
@@ -2191,8 +2191,8 @@ void transport_event(GillespieRates *rates,
                      Genotype *genotype,
                      KonStates *kon_states,
                      float transport[NGENES],
-                     TimeCourse **timecoursestart, 
-                     TimeCourse **timecourselast, 
+//                     TimeCourse **timecoursestart, 
+//                     TimeCourse **timecourselast, 
                      float dt,
                      float t,
                      float x,
@@ -2204,7 +2204,8 @@ void transport_event(GillespieRates *rates,
 
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt, 
                                 rates, kon_states, 
-                                t, timecoursestart, timecourselast, 
+                                t, 
+//								timecoursestart, timecourselast, 
                                 state->protein_conc,env);
  
   i = -1;
@@ -2248,7 +2249,8 @@ void transport_event(GillespieRates *rates,
 
 
 void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                      KonStates *kon_states, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                      KonStates *kon_states, float *koffvalues, 
+//					  TimeCourse **timecoursestart, TimeCourse **timecourselast,
                       float konrate, float dt, float t, int maxbound2, int maxbound3, int update_protein_flag,int *env)
 {
   float x = ran1(&seed) * (rates->salphc + konrate)/kon;
@@ -2337,7 +2339,8 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genotyp
     
     update_protein_conc_cell_size(state->protein_conc, state, genotype, dt, 
                                   rates, kon_states, 
-                                  t, timecoursestart, timecourselast,
+                                  t,
+//								   timecoursestart, timecourselast,
                                   state->protein_conc,env);
   }
    
@@ -2351,7 +2354,8 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genotyp
 }
 
 void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                       KonStates *kon_states, float *koffvalues, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                       KonStates *kon_states, float *koffvalues, 
+//					   TimeCourse **timecoursestart, TimeCourse **timecourselast,
                        float konrate, float dt, float t, float x, int update_protein_flag, int *ignore_event,int *env)
 {
   int i, j = -1;
@@ -2400,7 +2404,8 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genot
     /* update protein concentration before removing TF */
     update_protein_conc_cell_size(state->protein_conc, state, genotype, dt, 
                                   rates, kon_states, 
-                                  t, timecoursestart, timecourselast, 
+                                  t, 
+//								  timecoursestart, timecourselast, 
                                   state->protein_conc,env);
   
   /* remove TF binding from 'site' */
@@ -2409,7 +2414,8 @@ void tf_unbinding_event(GillespieRates *rates, CellState *state, Genotype *genot
 }
 
 void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                      KonStates *kon_states, float *mRNAdecay, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                      KonStates *kon_states, float *mRNAdecay, 
+//					  TimeCourse **timecoursestart, TimeCourse **timecourselast,
                       float dt, float t, float x, int *env)
 {
   int i = -1, j;
@@ -2431,7 +2437,8 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
 
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt,
                                 rates, kon_states, 
-                                t, timecoursestart, timecourselast,
+                                t, 
+//								timecoursestart, timecourselast,
                                 state->protein_conc, env);
   /* decay mRNA in cytoplasm */
   if (x < (float)state->mRNA_cyto_num[i]) {
@@ -2462,7 +2469,8 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
 }
 
 void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                               KonStates *kon_states, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                               KonStates *kon_states, 
+//							   TimeCourse **timecoursestart, TimeCourse **timecourselast,
                                float dt, float t, int *env)
 {
   int gene_loc, gene_copy;
@@ -2481,7 +2489,8 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
   /* update protein concentration and cell size */
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt,
                                 rates, kon_states, 
-                                t, timecoursestart, timecourselast,
+                                t,
+//								 timecoursestart, timecourselast,
                                 state->protein_conc,env);
   
   /* set state: eject nucleosome, but there is no PIC yet */
@@ -2495,7 +2504,8 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
 }
 
 void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                                 KonStates *kon_states, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                                 KonStates *kon_states, 
+//								 TimeCourse **timecoursestart, TimeCourse **timecourselast,
                                  float dt, float t, int *env)
 {
   int gene_copy, gene_loc; 
@@ -2513,7 +2523,8 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
 
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt, 
                                 rates, kon_states, 
-                                t, timecoursestart, timecourselast,
+                                t,
+//								 timecoursestart, timecourselast,
                                 state->protein_conc,env);
   /* set state: nucleosome returns */
   state->active[gene_id][gene_copy] = OFF_FULL;
@@ -2521,7 +2532,8 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
 }
 
 void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                      KonStates *kon_states, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                      KonStates *kon_states, 
+//					  TimeCourse **timecoursestart, TimeCourse **timecourselast,
                       float dt, float t, int *env)
 {
   float x = ran1(&seed)*((float) sum_rate_counts(rates->pic_assembly_num));
@@ -2542,7 +2554,8 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genot
 
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt,
                                 rates, kon_states, 
-                                t, timecoursestart, timecourselast,
+                                t, 
+//								timecoursestart, timecourselast,
                                 state->protein_conc, env);
   
   /* turn gene fully on: ready for transcription and adjust rates */
@@ -2560,7 +2573,8 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genot
 }
 
 void disassemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genotype, 
-                           KonStates *kon_states, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                           KonStates *kon_states,
+//						    TimeCourse **timecoursestart, TimeCourse **timecourselast,
                            float dt, float t, float x)
 {
   int gene_copy, gene_loc, gene_id;
@@ -2581,7 +2595,8 @@ void disassemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *ge
 }
 
 void transcription_init_event(GillespieRates *rates, CellState *state, Genotype *genotype,
-                              KonStates *kon_states, TimeCourse **timecoursestart, TimeCourse **timecourselast,
+                              KonStates *kon_states, 
+//							  TimeCourse **timecoursestart, TimeCourse **timecourselast,
                               float dt, float t, float x, int *env)
 {
   int gene_id;
@@ -2602,7 +2617,8 @@ LOG_ERROR("TRANSCRIPT INIT\n");
 
   update_protein_conc_cell_size(state->protein_conc, state, genotype, dt,
                                 rates, kon_states, 
-                                t, timecoursestart, timecourselast,
+                                t, 
+//								timecoursestart, timecourselast,
                                 state->protein_conc, env);
 
   /* now that transcription of gene has been initiated, 
@@ -2952,8 +2968,8 @@ int do_single_timestep(Genotype *genotype,
                        float *x,
                        float *dt,
                        float *konrate,
-                       TimeCourse *timecoursestart[NPROTEINS],
-                       TimeCourse *timecourselast[NPROTEINS],
+//                       TimeCourse *timecoursestart[NPROTEINS],
+//                       TimeCourse *timecourselast[NPROTEINS],
                        int maxbound2,
                        int maxbound3,
                        int no_fixed_dev_time, 
@@ -3056,7 +3072,7 @@ int do_single_timestep(Genotype *genotype,
       
       update_protein_conc_cell_size(state->protein_conc, state, genotype, *dt,
                                     rates, kon_states, *t,
-                                    timecoursestart, timecourselast,
+//                                    timecoursestart, timecourselast,
                                     state->protein_conc, env);
       break;
     case 2:            /* if a translation event ends */
@@ -3085,7 +3101,7 @@ int do_single_timestep(Genotype *genotype,
       /* update protein concentration */
       update_protein_conc_cell_size(state->protein_conc, state, genotype, *dt,
                                     rates, kon_states, *t,
-                                    timecoursestart, timecourselast,
+//                                    timecoursestart, timecourselast,
                                     state->protein_conc, env);
       
       /* the number of mRNAs in cytoplasm affects binding */
@@ -3214,7 +3230,8 @@ int do_single_timestep(Genotype *genotype,
            LOG_ERROR("unbinding event\n");
       int ignore_event;
       tf_unbinding_event(rates, state, genotype, kon_states, koffvalues,
-                         timecoursestart, timecourselast, (*konrate), *dt, *t, *x, 1, &ignore_event, env);
+//                         timecoursestart, timecourselast, 
+						 (*konrate), *dt, *t, *x, 1, &ignore_event, env);
       if (ignore_event) { /* if the TF unbinding event failed, we return without updating *t  */
         return 0;
       }
@@ -3229,7 +3246,8 @@ int do_single_timestep(Genotype *genotype,
       if (*x < rates->transport) {     
              LOG_ERROR("transport event\n");
         transport_event(rates, state, genotype, kon_states, transport, 
-                        timecoursestart, timecourselast, *dt, *t, *x, env);
+//                        timecoursestart, timecourselast,
+						 *dt, *t, *x, env);
                         
                       
        for (j=0; j < MAX_COPIES; j++) {
@@ -3246,7 +3264,8 @@ int do_single_timestep(Genotype *genotype,
         if (*x < rates->mRNAdecay) {  
                LOG_ERROR("decay event\n");
           mRNA_decay_event(rates, state, genotype, kon_states, mRNAdecay,
-                           timecoursestart, timecourselast, *dt, *t, *x, env);
+//                           timecoursestart, timecourselast,
+						    *dt, *t, *x, env);
         } else {
                LOG_ERROR("x = %f\n", *x);
           *x -= rates->mRNAdecay;
@@ -3257,7 +3276,8 @@ int do_single_timestep(Genotype *genotype,
           if (*x < rates->pic_disassembly) {
                  LOG_ERROR("pic disassembly event\n");
             disassemble_PIC_event(rates, state, genotype, kon_states, 
-                                  timecoursestart,  timecourselast, *dt, *t, *x);
+//                                  timecoursestart,  timecourselast, 
+								  *dt, *t, *x);
           } else {
                  LOG_ERROR("x = %f\n", *x);
             *x -= rates->pic_disassembly;
@@ -3268,7 +3288,8 @@ int do_single_timestep(Genotype *genotype,
             if (*x < rates->salphc + (*konrate)) {   /* get total on rate = sum of (salphc) and (konrate) */
               LOG_ERROR("binding event\n");
               tf_binding_event(rates, state, genotype, kon_states, koffvalues,
-                               timecoursestart, timecourselast, (*konrate), *dt, *t, 
+//                               timecoursestart, timecourselast, 
+							   (*konrate), *dt, *t, 
                                maxbound2, maxbound3, 1, env);  
 							  
             } else {
@@ -3283,7 +3304,8 @@ int do_single_timestep(Genotype *genotype,
               if (*x < (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE) {
                 LOG_ERROR("hist act event\n");
                 histone_acteylation_event(rates, state, genotype, kon_states, 
-                                          timecoursestart, timecourselast, *dt, *t, env);
+//                                          timecoursestart, timecourselast,
+										   *dt, *t, env);
               } else {
                 
                 *x -= (float) sum_rate_counts(rates->acetylation_num) * ACETYLATE;
@@ -3294,7 +3316,8 @@ int do_single_timestep(Genotype *genotype,
                 if (*x < (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE) {
                   LOG_ERROR("deact event\n");
                   histone_deacteylation_event(rates, state, genotype, kon_states, 
-                                              timecoursestart, timecourselast, *dt, *t, env);
+//                                              timecoursestart, timecourselast, 
+											  *dt, *t, env);
                 } else {
                   *x -= (float) sum_rate_counts(rates->deacetylation_num) * DEACETYLATE;
                   /* 
@@ -3303,7 +3326,8 @@ int do_single_timestep(Genotype *genotype,
                   if (*x < (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY) {
                          LOG_ERROR("pic assembly event\n");
                     assemble_PIC_event(rates, state, genotype, kon_states, 
-                                       timecoursestart, timecourselast, *dt, *t, env);
+//                                       timecoursestart, timecourselast, 
+									   *dt, *t, env);
                   } else {
                     *x -= (float) sum_rate_counts(rates->pic_assembly_num) * PICASSEMBLY;
                     /* 
@@ -3312,7 +3336,8 @@ int do_single_timestep(Genotype *genotype,
                     if (*x < (float) sum_rate_counts(rates->transcript_init_num) * TRANSCRIPTINIT) {
                            LOG_ERROR("transcript init event time = %f\n", *t);
                       transcription_init_event(rates, state, genotype, kon_states, 
-                                               timecoursestart, timecourselast, *dt, *t, *x, env);
+//                                               timecoursestart, timecourselast, 
+											   *dt, *t, *x, env);
                     } else {
                       /*
                        * FALLBACK: shouldn't get here, previous
@@ -3359,8 +3384,8 @@ int do_single_timestep(Genotype *genotype,
     
     /* final update of protein concentration */
     update_protein_conc_cell_size(state->protein_conc, state, genotype, *dt,
-                                  rates, kon_states,
-                                  *t, timecoursestart, timecourselast,
+                                  rates, kon_states,*t,
+//								   timecoursestart, timecourselast,
                                   state->protein_conc, env);
     /* advance to end of development (this exits the outer while loop) */
     *t = tdevelopment;
@@ -3378,8 +3403,8 @@ int do_single_timestep(Genotype *genotype,
  */
 void init_run_pop(Genotype genotype[2],
                   CellState state[2],
-                  TimeCourse *timecoursestart[2][NPROTEINS],
-                  TimeCourse *timecourselast[2][NPROTEINS],
+//                  TimeCourse *timecoursestart[2][NPROTEINS],
+//                  TimeCourse *timecourselast[2][NPROTEINS],
                   float temperature,   /* in Kelvin */
                   float kdis[NUM_K_DISASSEMBLY],
                   int output_binding_sites,
@@ -3436,14 +3461,14 @@ void init_run_pop(Genotype genotype[2],
     state[current_genotype].RTlnKr = GASCONSTANT * temperature * log(KR);
 
     /* initialize time courses */
-    for(j=0;j<2;j++){    
-	    for (i=0; i < NPROTEINS; i++){
-	      timecoursestart[j][i] = NULL;
-	      timecourselast[j][i] = NULL;
-	    } 
-	}
-	
-    add_time_points((float) 0.0, state[current_genotype].protein_conc, timecoursestart[current_genotype], timecourselast[current_genotype]);
+//    for(j=0;j<2;j++){    
+//	    for (i=0; i < NPROTEINS; i++){
+//	      timecoursestart[j][i] = NULL;
+//	      timecourselast[j][i] = NULL;
+//	    } 
+//	}
+//	
+//    add_time_points((float) 0.0, state[current_genotype].protein_conc, timecoursestart[current_genotype], timecourselast[current_genotype]);
 
     /* initialize KonStates data structures */
     initialize_cell_cache(&(state[current_genotype]), genotype[current_genotype], &(kon_states[current_genotype]), &(koffvalues[current_genotype]), maxbound2, maxbound3);
@@ -3465,8 +3490,8 @@ void init_run_pop(Genotype genotype[2],
                        &(x[current_genotype]),
                        &(dt[current_genotype]),
                        &(konrate[current_genotype]),
-                       timecoursestart[current_genotype],
-                       timecourselast[current_genotype],
+//                       timecoursestart[current_genotype],
+//                       timecourselast[current_genotype],
                        maxbound2,
                        maxbound3,
                        no_fixed_dev_time,
@@ -3493,8 +3518,8 @@ void init_run_pop(Genotype genotype[2],
 	                                     &(x[current_genotype]),
 	                                     &(dt[current_genotype]),
 	                                     &(konrate[current_genotype]),
-	                                     timecoursestart[current_genotype],
-	                                     timecourselast[current_genotype],
+//	                                     timecoursestart[current_genotype],
+//	                                     timecourselast[current_genotype],
 	                                     maxbound2,
 	                                     maxbound3,
 	                                     no_fixed_dev_time,
@@ -3522,38 +3547,38 @@ void init_run_pop(Genotype genotype[2],
   }
 }
 
-void print_time_course(TimeCourse *start,
-                       int i,
-                       int j)
-{
-  FILE *fpout;
-  char filename[80];
-  
-  /* do the normal thing on the first cell */
-  if (POP_SIZE == 1)
-    sprintf(filename, "%s/p%d.dat", output_directory, i);
-  else
-    sprintf(filename, "%s/p%d-%d.dat", output_directory, j, i);
-  if ((fpout = fopen(filename,"w"))==NULL) {
-    LOG_ERROR_NOCELLID("error: Can't open %s file\n", filename);
-  }
-  while (start) {
-    fprintf(fpout,"%g %g\n", start->time, start->concentration);
-    start = start->next;
-  }
-  fclose(fpout);  
-}
-//
-void print_all_protein_time_courses(TimeCourse *timecoursestart[2][NPROTEINS],
-                                    TimeCourse *timecourselast[2][NPROTEINS])
-{
-//  int i, j;
-//  for (j = 0; j < 1; j++) {
-//    for (i=0; i < NPROTEINS; i++) {
-//      if ((output)) print_time_course(timecoursestart[j][i], i, j);
-//    }
+//void print_time_course(TimeCourse *start,
+//                       int i,
+//                       int j)
+//{
+//  FILE *fpout;
+//  char filename[80];
+//  
+//  /* do the normal thing on the first cell */
+//  if (POP_SIZE == 1)
+//    sprintf(filename, "%s/p%d.dat", output_directory, i);
+//  else
+//    sprintf(filename, "%s/p%d-%d.dat", output_directory, j, i);
+//  if ((fpout = fopen(filename,"w"))==NULL) {
+//    LOG_ERROR_NOCELLID("error: Can't open %s file\n", filename);
 //  }
-print_time_course(timecoursestart[0][SELECTION_GENE_A],1,0);
-print_time_course(timecoursestart[0][SELECTION_GENE_B],2,0);
-}
+//  while (start) {
+//    fprintf(fpout,"%g %g\n", start->time, start->concentration);
+//    start = start->next;
+//  }
+//  fclose(fpout);  
+//}
+////
+//void print_all_protein_time_courses(TimeCourse *timecoursestart[2][NPROTEINS],
+//                                    TimeCourse *timecourselast[2][NPROTEINS])
+//{
+////  int i, j;
+////  for (j = 0; j < 1; j++) {
+////    for (i=0; i < NPROTEINS; i++) {
+////      if ((output)) print_time_course(timecoursestart[j][i], i, j);
+////    }
+////  }
+//print_time_course(timecoursestart[0][SELECTION_GENE_A],1,0);
+//print_time_course(timecoursestart[0][SELECTION_GENE_B],2,0);
+//}
 
