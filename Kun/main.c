@@ -31,9 +31,12 @@ int main()
 //  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
 //  TimeCourse *timecourselast[2][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
+  FILE *OUTPUT;
+  
+  OUTPUT=fopen("output.txt","w");
 
-  int output_binding_sites = 0; /*verbose flag*/
-  int no_fixed_dev_time = 0; /* 0 = fixed development time, 1 = divides when ready  */
+//  int output_binding_sites = 0; /*verbose flag*/
+//  int no_fixed_dev_time = 0; /* 0 = fixed development time, 1 = divides when ready  */
 //  int curr_seed; /*still needs to be fixed by Barry*/
 
   /* create output directory if needed */
@@ -69,7 +72,7 @@ int main()
 
   /* now create and run the population of cells */
 
-  init_run_pop(indivs, state, (float) 293.0, kdis, output_binding_sites,no_fixed_dev_time);
+  init_run_pop(kdis, OUTPUT);
 //			  , no_fixed_dev_time, max_divisions);
 
 //  print_all_protein_time_courses(timecoursestart, timecourselast);
@@ -112,5 +115,6 @@ int main()
 //#endif
 //  }
 
+  fclose(OUTPUT);
   return 0;
 }
