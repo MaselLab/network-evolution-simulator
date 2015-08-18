@@ -14,7 +14,7 @@
 #endif
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 10   // default 
+#define MAX_MUT_STEP 5   // default 
 #endif
 
 
@@ -189,6 +189,8 @@ struct Genotype {
   float translation[NGENES];                            /* kinetic rates*/   
   float pic_disassembly[NGENES][MAX_COPIES];  
   int copies[NGENES];                 /* current per-gene ploidy */
+  
+  float fitness;
 };
 
 /* 
@@ -645,11 +647,10 @@ extern float calc_avg_growth_rate(int,
                                     float *,                                    
                                     GillespieRates *,
                                     float ,
-                                    float ,
-                                    float ,
+                                    float ,                                   
                                     int ); 
                                     
-extern int try_fixation(float, float);
+extern void try_fixation(Genotype *, Genotype *, int *, int *);
 
 extern int mutate(Genotype *);
   
