@@ -334,14 +334,80 @@ void initialize_genotype(Genotype *genotype,
   calc_all_binding_sites(genotype);
 }
 
+
+/* calc the numbers of TF binding configurations:
+ * determine the maximal number of repressors that can bind to a promoter
+ * and the numbers of activators that can bind given the number of repressors that bind
+ * Use these information to accelerate the calculation of rep-to-act ratios.
+ */
+void calc_configurations(Genotype *genotype, int gene_id)
+{
+    int j,k,l;
+    int hindered_rep;
+    int hindered_act; 
+    int N_rep_BS=0;
+    int N_act_BS=0;
+    
+    genotype->N_configurations[gene_id]=malloc(genotype->N_rep_BS[gene_id]*sizeof(int));
+    
+    genotype->N_configurations[gene_id][0]=1;
+    
+    genotype->max_N_rep_bound[gene_id]=0;   
+
+    for(j=0;j<genotype->binding_sites_num[gene_id];j++)
+    {
+        hindered_rep=0;
+        hindered_act=0;
+
+        for(k=0;k<j;k++)
+        {
+            /* for BS within hindrance range*/
+           if((genotype->all_binding_sites[gene_id][k].BS_pos) > (genotype->all_binding_sites[gene_id][j].BS_pos-TF_ELEMENT_LEN-2*HIND_LENGTH))
+           {
+               if(genotype->activating[genotype->all_binding_sites[gene_id][k].tf_id][0]==0) hindered_rep++;
+               else hindered_act++;
+           }
+        }
+
+        if(genotype->activating[genotype->all_binding_sites[gene_id][j].tf_id][0]==0)
+        {
+            N_rep_BS++;
+            
+            if((N_rep_BS-hindered_rep)!=1)
+            {
+                genotype->max_N_rep_bound[gene_id]++; 
+                
+                for(l=1;l<genotype->max_N_rep_bound[gene_id]+1;l++)
+                {
+                    genotype->N_configurations[gene_id][l]=genotype->N_configurations[gene_id][l-1];
+                }
+            }
+        }
+        else
+        {
+            N_act_BS++;
+            
+            if((N_act_BS-hindered_act)!=1)
+            {
+                for(l=0;l<genotype->max_N_rep_bound[gene_id]-hindered_rep+1;l++)
+                    genotype->N_configurations[gene_id][l]++;
+            }
+        }
+    } 
+}
+
 /*
  * compute the list binding sites for specified gene and gene copy
  */
+/*considering computing all the possible configurations here*/
 void calc_all_binding_sites_copy(Genotype *genotype, int gene_id, int *max_binding_sites_alloc)
 {
   int i, j, k, match,match_rc;
   int N_hindered_BS=0;
-  int N_binding_sites=0;   
+  int N_hindered_BS_copy;
+  int FOUND_AT_THE_SAME_POS;
+  int N_binding_sites=0;  
+  
   
   genotype->N_act_BS[gene_id]=0;
   genotype->N_rep_BS[gene_id]=0;
@@ -356,23 +422,31 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id, int *max_bindi
   char *tf_seq_rc; 
   cis_seq=&(genotype->cisreg_seq[gene_id][0][0]);  
   
-  for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) /* scan forwards */
+   for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) /* scan promoter */
   {  
-        if(i>=TF_ELEMENT_LEN+2*HIND_LENGTH)
+        /*calc the number of BS within the hindrance range*/
+        N_hindered_BS=0;
+        
+        if(N_binding_sites>0)
         {
-            N_hindered_BS=0;
-            
             for(j=0;j<N_binding_sites;j++)
             {
                if(p_all_BS[j].BS_pos> i-TF_ELEMENT_LEN-2*HIND_LENGTH)
-                   N_hindered_BS++; 
+                    N_hindered_BS++;
             }
-        }
-      
-        for (k=0; k < TFGENES; k++) /* only loop through TF genes */
-        {   
+        }  
+        
+        /* set flags and copy*/
+        N_hindered_BS_copy=N_hindered_BS; 
+        
+        FOUND_AT_THE_SAME_POS=0;        
+        
+        /* loop through TFs */
+        for (k=0; k < TFGENES; k++) 
+        {    
             tf_seq=&(genotype->tf_seq[k][0][0]);
             tf_seq_rc=&(genotype->tf_seq_rc[k][0][0]); 
+            
             /*find BS on the template strand*/
             match=0;
 
@@ -382,12 +456,10 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id, int *max_bindi
             }
 
             if (match >= NMIN)
-            {          
-                  
-                if (N_binding_sites + 1 >= *max_binding_sites_alloc) 
+            {  
+                if (N_binding_sites + 1 >= MAXELEMENTS) 
                 {                    
-                    (*max_binding_sites_alloc)*=2;
-                    p_all_BS = realloc(p_all_BS, *max_binding_sites_alloc*sizeof(AllTFBindingSites));
+                    p_all_BS = realloc(p_all_BS, 2*MAXELEMENTS*sizeof(AllTFBindingSites));
                     if (!p_all_BS) 
                     {
 //                      LOG_ERROR_NOCELLID("realloc of all_binding_sites to binding_sites_num=%d \n",*max_binding_sites_alloc);
@@ -397,55 +469,87 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id, int *max_bindi
                 }
                 
                 p_all_BS[N_binding_sites].tf_id = k;
-                p_all_BS[N_binding_sites].Koff = Koff[TF_ELEMENT_LEN-match];
-                p_all_BS[N_binding_sites].N_hindered = N_hindered_BS;
-                p_all_BS[N_binding_sites].BS_pos = i ;
-                N_binding_sites++;
-                N_hindered_BS++;
-
-                if(genotype->activating[k][0]==1) genotype->N_act_BS[gene_id]++;
-            }
-
-            /*find BS on the non-template strand*/
-            match_rc=0;
-
-            for (j=i; j < i+TF_ELEMENT_LEN; j++) 
-            {
-                if (cis_seq[j] == tf_seq_rc[j-i]) match_rc++;
-            }
-            
-            if (match_rc >= NMIN)
-            {
-                /**********************************************************************/     
-                if (N_binding_sites + 1 >= *max_binding_sites_alloc) 
-                {  
-                    (*max_binding_sites_alloc)*=2;  
-                    p_all_BS = realloc(p_all_BS, *max_binding_sites_alloc*sizeof(AllTFBindingSites));
-
-                    if (!p_all_BS) 
-                    {
-//                      LOG_ERROR_NOCELLID("realloc of all_binding_sites to N_binding_sites = %d failed.\n", *max_binding_sites_alloc);
-                      exit(1);
-                    }
-//                  else LOG_VERBOSE_NOCELLID("realloc of all_binding_sites to N_binding_sites = %d succeeded\n", *max_binding_sites_alloc);
+                genotype->all_binding_sites[gene_id][N_binding_sites].Koff = Koff[TF_ELEMENT_LEN-match];                
+                p_all_BS[N_binding_sites].BS_pos = i ;           
+                
+                if(!FOUND_AT_THE_SAME_POS) /* first BS found at this pos */                   
+                {
+                    p_all_BS[N_binding_sites].N_hindered = N_hindered_BS;
+                    
+                    N_hindered_BS_copy++;
+                    
+                    FOUND_AT_THE_SAME_POS=1;
                 }
-                /************************************************************************************************************/
-                p_all_BS[N_binding_sites].tf_id = k;
-                p_all_BS[N_binding_sites].Koff = Koff[TF_ELEMENT_LEN-match_rc];
-                p_all_BS[N_binding_sites].N_hindered = N_hindered_BS;
-                p_all_BS[N_binding_sites].BS_pos = i;
+                else /* found BS of another TF at this pos again*/
+                {
+                    p_all_BS[N_binding_sites].N_hindered = N_hindered_BS_copy;
+                    
+                    N_hindered_BS_copy++;
+                }
+                
                 N_binding_sites++;
-                N_hindered_BS++;
 
                 if(genotype->activating[k][0]==1) genotype->N_act_BS[gene_id]++;
-               
             }
-        }
-        
-        genotype->max_hindered_sites[gene_id]=(genotype->max_hindered_sites[gene_id]>N_hindered_BS)? genotype->max_hindered_sites[gene_id]:N_hindered_BS;
-  } 
-  genotype->binding_sites_num[gene_id]=N_binding_sites; 
+            else /*find BS on the non-template strand*/
+            {
+                match_rc=0;
+
+                for (j=i; j < i+TF_ELEMENT_LEN; j++) 
+                {
+                    if (cis_seq[j] == tf_seq_rc[j-i]) match_rc++;
+                }
+
+                if (match_rc >= NMIN)
+                {
+                    /**********************************************************************/     
+                    if (N_binding_sites + 1 >= MAXELEMENTS) 
+                    {                  
+                      p_all_BS = realloc(p_all_BS, 2*MAXELEMENTS*sizeof(AllTFBindingSites));
+
+                      if (!p_all_BS) 
+                        {
+    //                      LOG_ERROR_NOCELLID("realloc of all_binding_sites to N_binding_sites = %d failed.\n", *max_binding_sites_alloc);
+                          exit(1);
+                        }
+    //                  else LOG_VERBOSE_NOCELLID("realloc of all_binding_sites to N_binding_sites = %d succeeded\n", *max_binding_sites_alloc);
+                    }
+                    /************************************************************************************************************/
+                    p_all_BS[N_binding_sites].tf_id = k;
+                    p_all_BS[N_binding_sites].Koff = Koff[TF_ELEMENT_LEN-match_rc];                   
+                    p_all_BS[N_binding_sites].BS_pos = i;                    
+                   
+                    if(!FOUND_AT_THE_SAME_POS) /* first BS found at this pos */                   
+                    {
+                        p_all_BS[N_binding_sites].N_hindered = N_hindered_BS;
+
+                        N_hindered_BS_copy++;
+
+                        FOUND_AT_THE_SAME_POS=1;
+                    }
+                    else /* found BS of another TF at this pos again*/
+                    {
+                        p_all_BS[N_binding_sites].N_hindered = N_hindered_BS_copy;
+
+                        N_hindered_BS_copy++;
+                    }
+                    
+                    N_binding_sites++;
+                    
+                    if(genotype->activating[k][0]==1) genotype->N_act_BS[gene_id]++;
+                }
+            } 
+        }/* looping through TFs ends */
+    }/*end of promoter scanning*/ 
+  genotype->binding_sites_num[gene_id]=N_binding_sites;  
   genotype->N_rep_BS[gene_id]=N_binding_sites-(genotype->N_act_BS[gene_id]);
+
+  /* calc max_hindered_sites */
+  for(i=0;i<N_binding_sites;i++)
+  {
+      genotype->max_hindered_sites[gene_id]=(genotype->max_hindered_sites[gene_id] > p_all_BS[i].N_hindered)?
+                                    genotype->max_hindered_sites[gene_id] : p_all_BS[i].N_hindered;
+  }
 }
 
 /*
@@ -469,6 +573,8 @@ void calc_all_binding_sites(Genotype *genotype)
     }
     
     calc_all_binding_sites_copy(genotype,gene_id,&max_binding_site_alloc);
+    
+    calc_configurations(genotype, gene_id);
   } 
 }
 
@@ -480,23 +586,29 @@ int mod(int a, int b) // b is the base
         return (abs(a+b)%b);
 }
 
+/**/
 float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
                            int max_N_hindered_BS,
                            int N_BS,
                            int N_act_BS,
                            int N_rep_BS, 
                            int activating[NGENES][MAX_COPIES],
+                           int max_N_rep_bound,
+                           int *N_act_bound,
                            float protein_conc[NGENES])
 {
-    double ratio_matrices[max_N_hindered_BS+1][N_rep_BS+1][N_act_BS+1];   
+    double ratio_matrices[max_N_hindered_BS+1][max_N_rep_bound+1][N_act_BS+1];   
     double transition_matrix[N_rep_BS+1][N_act_BS+1];
-    double sum,prob_act_over_rep=0.0;
+    double sum,prob_act_over_rep=0.0;    
     double product_of_freq;    
     float Kon[TFGENES];      
     
     int pos_of_last_record;    
     int pos_next_record;
-    int i,j,k,m,n; 
+    int i,j,k,m,n;
+    int n_col1=1;
+    int n_col2=1;
+    int n_row=1;
     
     /*calc Kon based on TF concentration*/
     for(i=0;i<TFGENES;i++)
@@ -507,18 +619,18 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
     /* initializing matrices to all zeros */
     for(i=0;i<max_N_hindered_BS+1;i++)
     {
-        for(j=0;j<N_rep_BS+1;j++)
+        for(j=0;j<max_N_rep_bound+1;j++)
         {
-            for(k=0;k<N_act_BS+1;k++)
+            for(k=0;k<N_act_bound[j];k++)
             {
                 ratio_matrices[i][j][k]=0.0;
             }
         }
     }
     
-    for(j=0;j<N_rep_BS+1;j++)
+    for(j=0;j<max_N_rep_bound+1;j++)
     {
-        for(k=0;k<N_act_BS+1;k++)
+        for(k=0;k<N_act_bound[j];k++)
         {
             transition_matrix[j][k]=0.0;            
         }
@@ -531,11 +643,13 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
     
     if(activating[BS_info[0].tf_id][0]==1) // if a activator binds to this BS
     {
-        ratio_matrices[pos_next_record][0][1]=Kon[BS_info[0].tf_id];        
+        ratio_matrices[pos_next_record][0][1]=Kon[BS_info[0].tf_id]; 
+        n_col2++;
     }
     else
     {
-        ratio_matrices[pos_next_record][1][0]=Kon[BS_info[0].tf_id];       
+        ratio_matrices[pos_next_record][1][0]=Kon[BS_info[0].tf_id];  
+        n_row++;
     }    
     
     for(m=1;m<N_BS;m++)
@@ -555,17 +669,21 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
         switch(activating[BS_info[m].tf_id][0])
         {
             case 1: // a BS of activators
+                n_col2++;
+                
                 if(m-BS_info[m].N_hindered!=0)
                 {
                   // suppose the first dimension of ratio_matrices is 10 (0-9), then the 11th ratio matrix should be put in 0 and  
                   // the 10th record is at 9. Note in gcc mod does not follow the conventional mathematical definition 
                   pos_of_last_record=mod(pos_next_record-BS_info[m].N_hindered-1,max_N_hindered_BS+1); //find the closest BS that is not hindered                                              
 
-                  for(i=0;i<N_rep_BS+1;i++)
+                  for(i=0;i<n_row;i++)
                   {
-                      transition_matrix[i][0]=ratio_matrices[pos_of_last_record][i][N_act_BS];
+                      transition_matrix[i][0]=0.0;
+                      
+                      n_col1=(n_col2<N_act_bound[i])? n_col2:N_act_bound[i];
 
-                      for(j=1;j<N_act_BS+1;j++)
+                      for(j=1;j<n_col1;j++)
                       {
                           transition_matrix[i][j]=ratio_matrices[pos_of_last_record][i][j-1];
                       }
@@ -573,9 +691,11 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
                 }
                 else
                 {
-                    for(i=0;i<N_rep_BS+1;i++)
+                    for(i=0;i<n_row;i++)
                     {
-                        for(j=0;j<N_act_BS+1;j++)
+                        n_col1=(n_col2<N_act_bound[i])?n_col2:N_act_bound[i];
+                        
+                        for(j=0;j<n_col1;j++)
                         {
                             transition_matrix[i][j]=0.0;
                         }
@@ -586,9 +706,11 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
                     
                 pos_of_last_record=mod(pos_next_record-1,max_N_hindered_BS+1);  //find last record              
 
-                for(i=0;i<N_rep_BS+1;i++)
+                for(i=0;i<n_row;i++)
                 {
-                    for(j=0;j<N_act_BS+1;j++)
+                    n_col1=(n_col2<N_act_bound[i])?n_col2:N_act_bound[i];
+                    
+                    for(j=0;j<n_col1;j++)
                     {
                         ratio_matrices[pos_next_record][i][j]=BS_info[m].Koff*ratio_matrices[pos_of_last_record][i][j]+
                                                       product_of_freq*transition_matrix[i][j];                            
@@ -597,15 +719,27 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
                 break;
 
             case 0: // a BS of repressors
+                
+                n_row++;
+                
+                n_row=(n_row < max_N_rep_bound+1)?n_row:max_N_rep_bound+1;
+                
                 if(m-BS_info[m].N_hindered!=0)
                 {
                   pos_of_last_record=mod(pos_next_record-BS_info[m].N_hindered-1,max_N_hindered_BS+1);                                 
 
-                  for(j=0;j<N_act_BS+1;j++)
+                  n_col1=(n_col2<N_act_bound[0])?n_col2:N_act_bound[0];
+                  
+                  for(j=0;j<n_col1;j++)
                   {
-                      transition_matrix[0][j]=ratio_matrices[pos_of_last_record][N_rep_BS][j];
-
-                      for(i=1;i<N_rep_BS+1;i++)
+                      transition_matrix[0][j]=0.0;
+                  }
+                  
+                  for(i=1;i<n_row;i++)
+                  {
+                      n_col1=(n_col2<N_act_bound[i])?n_col2:N_act_bound[i];
+                      
+                      for(j=0;j<n_col1;j++)
                       {
                           transition_matrix[i][j]=ratio_matrices[pos_of_last_record][i-1][j];
                       }
@@ -613,9 +747,11 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
                 }
                 else
                 {
-                    for(i=0;i<N_rep_BS+1;i++)
+                    for(i=0;i<n_row;i++)
                     {
-                        for(j=0;j<N_act_BS+1;j++)
+                        n_col1=(n_col2<N_act_bound[i])?n_col2:N_act_bound[i];
+                        
+                        for(j=0;j<n_col1;j++)
                         {
                             transition_matrix[i][j]=0.0;
                         }
@@ -626,9 +762,11 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
                     
                 pos_of_last_record=mod(pos_next_record-1,max_N_hindered_BS+1);
 
-                for(i=0;i<N_rep_BS+1;i++)
+                for(i=0;i<n_row;i++)
                 {
-                    for(j=0;j<N_act_BS+1;j++)
+                    n_col1=(n_col2<N_act_bound[i])?n_col2:N_act_bound[i];
+                     
+                    for(j=0;j<n_col1;j++)
                     {
                         ratio_matrices[pos_next_record][i][j]=BS_info[m].Koff*ratio_matrices[pos_of_last_record][i][j]+
                                                       product_of_freq*transition_matrix[i][j];                            
@@ -640,18 +778,19 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
 
     sum=0.0;
 
-    for(i=0;i<N_rep_BS+1;i++)
+    for(i=0;i<max_N_rep_bound+1;i++)
     {
-        for(j=0;j<N_act_BS+1;j++)
+        for(j=0;j<N_act_bound[i];j++)
         {
             sum+=ratio_matrices[pos_next_record][i][j];
         }
-    }
+    }   
 
-    for(i=0;i<N_rep_BS+1;i++)
+    for(i=0;i<max_N_rep_bound+1;i++)
     {
-        j=round(fabs((i-0.31)/0.33)); // need at least one act to transcribe                     
-        for(;j<N_act_BS+1;j++)
+        j=round(fabs((i-0.31)/0.33)); // need at least one act to transcribe    
+        
+        for(;j<N_act_bound[i];j++)
         {
             prob_act_over_rep+=ratio_matrices[pos_next_record][i][j];
         }
@@ -956,7 +1095,9 @@ void calc_all_rates(Genotype *genotype,
                                             genotype->binding_sites_num[i],
                                             genotype->N_act_BS[i],
                                             genotype->N_rep_BS[i],
-                                            genotype->activating,                            
+                                            genotype->activating, 
+                                            genotype->max_N_rep_bound[i],
+                                            genotype->N_configurations[i],
                                             state->protein_conc);
         
         /* calc other rates*/
@@ -2392,7 +2533,7 @@ void init_run_pop(Genotype genotype[N_para_threads+1],
     float dt[N_para_threads+1];                 /* delta-t */  
     int clone_type=4;    
 
-    omp_set_num_threads(N_para_threads);
+//    omp_set_num_threads(N_para_threads);
 
     GillespieRates rates[N_para_threads+1];
 	
@@ -2408,29 +2549,30 @@ void init_run_pop(Genotype genotype[N_para_threads+1],
     initialize_genotype(&genotype[current_genotype], &genotype[current_genotype], kdis, current_genotype); // checked
 
     genotype[current_genotype].fitness = calc_avg_growth_rate(current_genotype,
-                                           &genotype[current_genotype],
-                                           &state[current_genotype],
-                                           &init_mRNA[current_genotype][0],
-                                           &init_protein_conc[current_genotype][0],
-                                           &t[current_genotype],                                         
-                                           &x[current_genotype],
-                                           &dt[current_genotype],
-                                           &rates[current_genotype],
-                                           maxbound2,
-                                           maxbound3,                                           
-                                           no_fixed_dev_time);										 
+                                                                &genotype[current_genotype],
+                                                                &state[current_genotype],
+                                                                &init_mRNA[current_genotype][0],
+                                                                &init_protein_conc[current_genotype][0],
+                                                                &t[current_genotype],                                         
+                                                                &x[current_genotype],
+                                                                &dt[current_genotype],
+                                                                &rates[current_genotype],
+                                                                maxbound2,
+                                                                maxbound3,                                           
+                                                                no_fixed_dev_time);										 
 
     i=0;
 
-    #pragma omp parallel
+//    #pragma omp parallel
     {
-        int ID=omp_get_thread_num();
-
+//        int ID=omp_get_thread_num();
+        int ID=0;
+        
         while(i<MAX_MUT_STEP)
         {
             fixation=0;
             
-            #pragma omp single
+//            #pragma omp single
             printf("Step %d, fitness=%f\n",i,genotype[current_genotype].fitness);
                     
             while(!fixation)
@@ -2450,12 +2592,13 @@ void init_run_pop(Genotype genotype[N_para_threads+1],
                                                     &rates[ID],
                                                     maxbound2,
                                                     maxbound3,                                               
-                                                    no_fixed_dev_time);    
+                                                    no_fixed_dev_time); 
+//                printf("fitness=%f\n",genotype[ID].fitness);
 
-                #pragma omp critical
+//                #pragma omp critical
                 try_fixation(&genotype[current_genotype], &genotype[ID], &fixation, &i);   
             } 
-            #pragma omp barrier
+//            #pragma omp barrier
         }
     }    
 }

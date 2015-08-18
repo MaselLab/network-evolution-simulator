@@ -14,7 +14,7 @@
 #endif
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 5   // default 
+#define MAX_MUT_STEP 100   // default 
 #endif
 
 
@@ -44,7 +44,7 @@
   #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 10
+  #define TFGENES 3
   #endif
   #ifndef NGENES
   #define NGENES (TFGENES+2)  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
@@ -65,7 +65,7 @@
 #endif
 
 //for parallelize mutation trials
-#define N_para_threads 1
+#define N_para_threads 2
 
 /* 
  * define macros for logging output and warning/errors 
@@ -181,6 +181,8 @@ struct Genotype {
   int N_rep_BS[NGENES];                                 /* total number of binding sites of repressing TF */
   int N_act;                                            /* number of activating TF*/
   int N_rep;                                            /* number of repressing TF*/
+  int *N_configurations[NGENES];                        /* maximal numbers of activators bound given n rep bound */ 
+  int max_N_rep_bound[NGENES];                          /* maximal number of repressors bound to a promoter */ 
   AllTFBindingSites *all_binding_sites[NGENES];
   int activating[TFGENES][MAX_COPIES];                  /* 1 is activating TF, 0 is repressing */ 
   
@@ -346,7 +348,9 @@ extern float calc_ratio_act_to_rep(AllTFBindingSites *,
                                     int ,
                                     int ,
                                     int , 
-                                    int [NGENES][MAX_COPIES],
+                                    int [NGENES][MAX_COPIES],                                    
+                                    int ,
+                                    int *,
                                     float [NGENES]);
 
 extern int add_fixed_event(int,
@@ -698,4 +702,7 @@ extern void do_fixed_event(Genotype *,
                             int *);
 
 extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float);
+
+extern void calc_configurations(Genotype *, int);
+
 #endif /* !FILE_NETSIM_SEEN */
