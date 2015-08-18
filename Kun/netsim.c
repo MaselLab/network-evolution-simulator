@@ -43,7 +43,7 @@ const float NUMSITESINGENOME = 1.3e+6; /* updated from 1.8e+6 */
 const float mN = 3.3e-10 * 5e6;    /* Lynch et al. (2008), Tsai et al. (2008)  */
 
 const int avg_protein_conc = 12000;
-const float penalty = 0.001;
+const float penalty = 0.0;
 
 
 const float avg_inset=5.0;
@@ -63,7 +63,7 @@ float tdevelopment = 30.0;/* default  development time: can be changed at runtim
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
-long seed = -188058;        
+long seed = -1808;        
 int dummyrun = 10;          /* used to change seed */
 int recompute_koff = 1;    /* toggle whether to recompute certain features at each time to avoid
                               compounding rounding error (off by default) */
@@ -71,8 +71,8 @@ int recompute_kon = 1;     /* likewise for kon */
 float critical_size = 1.0; /* critical size at which cell divides, 
                               set to negative to prevent division  */
 float growth_rate_scaling = 2.0; /* set default growth rate scaling factor */
-float duration_env0 = 60.1; // in minutes
-float duration_env1 = 0.1;
+float duration_env0 = 10.0; // in minutes
+float duration_env1 = 1.0;
 int N_replicates=10;
 /* end default options */
 
@@ -143,27 +143,27 @@ void initialize_sequence(char *Seq,
 }
 
 void print_genotype(Genotype *genotype, int genotype_id) {
-  int i, p;
-
-  printf("[genotype %03d] hind_pos: ", genotype_id);
-  for (i=0; i < TFGENES; i++) {
-    printf("%d ", genotype->hindrance_positions[i]);
-  }
-  printf("\n");
-
-  for (i=0; i < NGENES; i++) {
-    printf("[genotype %03d gene %02d] ", genotype_id, i);
-//    printf("repl=%g, ", genotype->replication_time[i]);
-    printf("mRNAdy=%g, ", genotype->mRNAdecay[i]);
-    printf("protdy=%g, ", genotype->proteindecay[i]);
-    printf("transl=%g, ", genotype->translation[i]);
-
-    for (p=0; p < MAX_COPIES; p++) {
-      printf("act[%d]=%d, ", p, genotype->activating[i][p]);
-      printf("PICd[%d]=%g ", p, genotype->pic_disassembly[i][p]);
-    }
-    printf("\n");
-  }
+//  int i, p;
+//
+//  printf("[genotype %03d] hind_pos: ", genotype_id);
+//  for (i=0; i < TFGENES; i++) {
+//    printf("%d ", genotype->hindrance_positions[i]);
+//  }
+//  printf("\n");
+//
+//  for (i=0; i < NGENES; i++) {
+//    printf("[genotype %03d gene %02d] ", genotype_id, i);
+////    printf("repl=%g, ", genotype->replication_time[i]);
+//    printf("mRNAdy=%g, ", genotype->mRNAdecay[i]);
+//    printf("protdy=%g, ", genotype->proteindecay[i]);
+//    printf("transl=%g, ", genotype->translation[i]);
+//
+//    for (p=0; p < MAX_COPIES; p++) {
+//      printf("act[%d]=%d, ", p, genotype->activating[i][p]);
+//      printf("PICd[%d]=%g ", p, genotype->pic_disassembly[i][p]);
+//    }
+//    printf("\n");
+//  }
 }
 
 
@@ -175,48 +175,48 @@ void print_all_binding_sites(int copies[NGENES],
 //                             int site_id_pos[NGENES][MAX_COPIES][2]
 							 )
 {
-  int i, j;
-
-  // TODO: tidy up logic, a bit messy now, but works
-  /* loop through the maximum of either the number of genes or number
-     of TFs, as they can now be different */
-  int max_elements = NGENES >= TFGENES ? NGENES : TFGENES;
-
-  for (i=0; i < max_elements; i++) {
-    j=0; 
-    /* if copies for this element isn't set, still print out the TFs */
-    while (i >= NGENES || j < copies[i]) {
-      if (i < TFGENES) 
-        printf("TF sequence gene %2d (copy %d): %.*s\n", i, j, TF_ELEMENT_LEN, tf_seq[i][j]);
-      else
-        printf("            gene %2d (copy %d) does not encode a TF\n", i, j);
-      if (i < NGENES) {
-        printf("cis-reg     gene %2d (copy %d): %.*s\n", i, j, CISREG_LEN, cisreg_seq[i][j]);
-//        printf("ID range    gene %2d (copy %d): [%3d, %3d]\n", i, j, site_id_pos[i][j][0], site_id_pos[i][j][1]);
-        printf("\n");
-      } else {
-        printf("            gene %2d (copy %d): no cis-reg gene here\n", i, j);
-        printf("\n");
-        break;       /* run out of cisreg genes skip to next element */
-      }
-      j++;
-    }
-  } 
-
-  printf("numElements: %3d\n", numElements);
-  
-  for (i=0; i < numElements; i++) {
-    printf("binding site %3d:\n", i);
-    printf("       cis-reg region: %3d", all_binding_sites[i].cisreg_id);
-    printf("         cis-reg copy: %3d", all_binding_sites[i].gene_copy);
-    printf(" (sequence %.*s)\n", CISREG_LEN, cisreg_seq[all_binding_sites[i].cisreg_id][all_binding_sites[i].gene_copy]);
-    printf(" transcription-factor: %3d", all_binding_sites[i].tf_id);
-    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, tf_seq[all_binding_sites[i].tf_id][all_binding_sites[i].gene_copy]); 
-    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, all_binding_sites[i].left_edge_pos);        
-    printf("  Hind offset position: %3d\n", all_binding_sites[i].hind_pos); 
-    printf("               strand: %3d\n", all_binding_sites[i].strand);
-    printf("         Hamming dist: %3d\n", all_binding_sites[i].hamming_dist); 
-  }
+//  int i, j;
+//
+//  // TODO: tidy up logic, a bit messy now, but works
+//  /* loop through the maximum of either the number of genes or number
+//     of TFs, as they can now be different */
+//  int max_elements = NGENES >= TFGENES ? NGENES : TFGENES;
+//
+//  for (i=0; i < max_elements; i++) {
+//    j=0; 
+//    /* if copies for this element isn't set, still print out the TFs */
+//    while (i >= NGENES || j < copies[i]) {
+//      if (i < TFGENES) 
+//        printf("TF sequence gene %2d (copy %d): %.*s\n", i, j, TF_ELEMENT_LEN, tf_seq[i][j]);
+//      else
+//        printf("            gene %2d (copy %d) does not encode a TF\n", i, j);
+//      if (i < NGENES) {
+//        printf("cis-reg     gene %2d (copy %d): %.*s\n", i, j, CISREG_LEN, cisreg_seq[i][j]);
+////        printf("ID range    gene %2d (copy %d): [%3d, %3d]\n", i, j, site_id_pos[i][j][0], site_id_pos[i][j][1]);
+//        printf("\n");
+//      } else {
+//        printf("            gene %2d (copy %d): no cis-reg gene here\n", i, j);
+//        printf("\n");
+//        break;       /* run out of cisreg genes skip to next element */
+//      }
+//      j++;
+//    }
+//  } 
+//
+//  printf("numElements: %3d\n", numElements);
+//  
+//  for (i=0; i < numElements; i++) {
+//    printf("binding site %3d:\n", i);
+//    printf("       cis-reg region: %3d", all_binding_sites[i].cisreg_id);
+//    printf("         cis-reg copy: %3d", all_binding_sites[i].gene_copy);
+//    printf(" (sequence %.*s)\n", CISREG_LEN, cisreg_seq[all_binding_sites[i].cisreg_id][all_binding_sites[i].gene_copy]);
+//    printf(" transcription-factor: %3d", all_binding_sites[i].tf_id);
+//    printf(" (sequence: %.*s)\n", TF_ELEMENT_LEN, tf_seq[all_binding_sites[i].tf_id][all_binding_sites[i].gene_copy]); 
+//    printf("  L-edge of %2dbp hind: %3d\n", HIND_LENGTH, all_binding_sites[i].left_edge_pos);        
+//    printf("  Hind offset position: %3d\n", all_binding_sites[i].hind_pos); 
+//    printf("               strand: %3d\n", all_binding_sites[i].strand);
+//    printf("         Hamming dist: %3d\n", all_binding_sites[i].hamming_dist); 
+//  }
 }
 
 #if 0
@@ -262,14 +262,16 @@ void initialize_genotype_fixed(Genotype *genotype,
 
   LOG_NOCELLID("[genotype %03d] activators vs repressors ", genotype_id);
 
-  /* initialize hindrance for all TFGENES */
-  for (p=0; p < TFGENES; p++) {
-    if (HIND_LENGTH == TF_ELEMENT_LEN) {
-      genotype->hindrance_positions[p]=0;
-    } else  {
-      genotype->hindrance_positions[p]=rint(ran1(&seed)*(HIND_LENGTH - TF_ELEMENT_LEN));
-    }
-  } 
+  
+/*now hindrance is simulated in a simple way: HIND_LENGTH is equal on the two sides of a BS, and is the same for all TFs*/  
+  /* initialize hindrance for all TFGENES */ 
+//  for (p=0; p < TFGENES; p++) {
+//    if (HIND_LENGTH == TF_ELEMENT_LEN) {
+//      genotype->hindrance_positions[p]=0;
+//    } else  {
+//      genotype->hindrance_positions[p]=rint(ran1(&seed)*(HIND_LENGTH - TF_ELEMENT_LEN));
+//    }
+//  } 
   
   for (i=0; i < NGENES; i++) {
     genotype->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
@@ -287,10 +289,14 @@ void initialize_genotype_fixed(Genotype *genotype,
       genotype->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
 
     /* make the activations the same in each copy */
+    genotype->N_act=0;
+    genotype->N_rep=0;
     if (ran1(&seed)<PROB_ACTIVATING) {
+      genotype->N_act++;  
       for (p=0; p < MAX_COPIES; p++) 
         genotype->activating[i][p] = 1;
     } else {
+      genotype->N_rep++;
       for (p=0; p < MAX_COPIES; p++) 
         genotype->activating[i][p] = 0;
     }
@@ -316,40 +322,41 @@ void initialize_genotype(Genotype *genotype,
                          Genotype *clone,
                          float kdis[],
                          int genotype_id)
-{
-  int p;
+{ 
+  int i,j,k;
   
   initialize_sequence((char *)genotype->cisreg_seq, CISREG_LEN*MAX_COPIES*NGENES, MAX_COPIES, NGENES);
-
-  /* within a replicate:
-   * initialize all individuals with the same:
-   *
-   * TF sequence
-   * hindrance positions
-   * per-gene replication times
-   * mRNA and protein decay rates
-   * translation rates
-   * activators or inhibitors
-   * PIC disassembly rates
-   */
-  // if initializing the first cell, then create from scratch
-//  if (genotype_id == 0) {
-    initialize_sequence((char *)genotype->tf_seq, TF_ELEMENT_LEN*MAX_COPIES*TFGENES, MAX_COPIES, TFGENES);
+  
+  initialize_sequence((char *)genotype->tf_seq, TF_ELEMENT_LEN*MAX_COPIES*TFGENES, MAX_COPIES, TFGENES);
+ 
+  /* We now generate the complementary sequence of BS that are on the non-template strand.
+   * The complementary sequence is used to search for BS that on the non-template strand.  
+   * We also assume that all the TFs have strong orientation preference.*/  
+    for(i=0;i<TFGENES;i++)
+    {
+        for(j=0;j<MAX_COPIES;j++)
+        {
+            for(k=0;k<TF_ELEMENT_LEN;k++)
+            {
+                switch (genotype->tf_seq[i][j][k])
+                {
+                    case 'a': genotype->tf_seq_rc[i][j][k]='t'; break;
+                    case 't': genotype->tf_seq_rc[i][j][k]='a'; break;
+                    case 'c': genotype->tf_seq_rc[i][j][k]='g'; break;
+                    case 'g': genotype->tf_seq_rc[i][j][k]='c'; break;
+                }
+            }
+        }
+    }
+       
     initialize_genotype_fixed(genotype, kdis, genotype_id);
-  // otherwise clone it from the first instance
-//  } else {
-//    /* copy the TF sequence data */
-//    memcpy(genotype->tf_seq, clone->tf_seq, sizeof(char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN]));
-//    initialize_new_cell_genotype(genotype, clone);
-//  }
 
   /* start number of copies of gene at current_ploidy */
-  for (p=0; p < NGENES; p++) {
-    genotype->copies[p] = current_ploidy;
-  }
+//  for (p=0; p < NGENES; p++) {
+//    genotype->copies[p] = current_ploidy;
+//  }
 
-  calc_all_binding_sites(genotype->copies, genotype->cisreg_seq, genotype->tf_seq, 
-                         &(genotype->binding_sites_num), &(genotype->all_binding_sites), genotype->hindrance_positions);
+  calc_all_binding_sites(genotype);
 
 					 
 }
@@ -382,167 +389,367 @@ void initialize_genotype(Genotype *genotype,
 //  }
 //}
 
-
-
-
-
 /*
  * compute the list binding sites for specified gene and gene copy
  */
-int calc_all_binding_sites_copy(char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN],
-                                char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                int binding_sites_num,
-                                AllTFBindingSites **all_binding_sites,
-                                int *max_alloc,
-                                int gene_id,
-                                int gene_copy,
-                                int hind_pos[TFGENES])
+void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
 {
-  int i, j, tfind, match, max_binding_site_alloc;
+  int i, j, k, match,match_rc;
+  int N_hindered_BS=0;
+  int N_binding_sites=0;
+  
+  genotype->N_act_BS[gene_id]=0;
+  genotype->N_rep_BS[gene_id]=0;
+  genotype->max_hindered_sites[gene_id]=0;
+  
+  //make the code looks cleaner
+  #define p_all_BS genotype->all_binding_sites[gene_id]
 
-  max_binding_site_alloc = *max_alloc;
+  //some helper pointer 
+  char *tf_seq;
+  char *cis_seq;
+  char *tf_seq_rc; 
+  cis_seq=&(genotype->cisreg_seq[gene_id][0][0]);  
+  
+  /*This is just an temporary improvise. Should be put somewhere else*/  
+  float Koff[TF_ELEMENT_LEN-NMIN+1];
+  
+  for(i=0;i<TF_ELEMENT_LEN-NMIN+1;i++)
+  {      
+      Koff[i]=NUMSITESINGENOME*kon*0.25*KR/exp(-((float)i/3.0-1.0));      
+  }
+  /**********************/
+  
+  for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) /* scan forwards */
+  {  
+        if(i>=TF_ELEMENT_LEN+2*HIND_LENGTH)
+        {
+            N_hindered_BS=0;
+            
+            for(j=0;j<CISREG_LEN*(genotype->N_act+genotype->N_rep);j++)
+            {
+               if(p_all_BS[j].BS_pos<i+1 && p_all_BS[j].BS_pos> i-TF_ELEMENT_LEN-2*HIND_LENGTH+1)
+                   N_hindered_BS++; 
+            }
+        }
+      
+        for (k=0; k < TFGENES; k++) /* only loop through TF genes */
+        {   
+            tf_seq=&(genotype->tf_seq[k][0][0]);
+            tf_seq_rc=&(genotype->tf_seq_rc[k][0][0]); 
+            /*find BS on the template strand*/
+            match=0;
 
-  for (i=0; i < CISREG_LEN-TF_ELEMENT_LEN; i++) {  /* scan forwards */
-    for (tfind=0; tfind < TFGENES; tfind++) {      /* only loop through TF genes */
-      match=0;
-      for (j=i; j < i+TF_ELEMENT_LEN; j++) {
-        if (cisreg_seq[gene_id][gene_copy][j] == tf_seq[tfind][gene_copy][j-i])
-          match++;
-      }
-      if (match >= NMIN){
-        if (binding_sites_num + 1 >= max_binding_site_alloc) {
-          max_binding_site_alloc = 2*max_binding_site_alloc;
-          *all_binding_sites = realloc(*all_binding_sites, max_binding_site_alloc*sizeof(AllTFBindingSites));
-          if (!(*all_binding_sites)) {
-            LOG_ERROR_NOCELLID("realloc of all_binding_sites to binding_sites_num = %d failed.\n", max_binding_site_alloc);
-            exit(1);
-          }
-          else LOG_VERBOSE_NOCELLID("realloc of all_binding_sites to binding_sites_num = %d succeeded\n", max_binding_site_alloc);
+            for (j=i; j < i+TF_ELEMENT_LEN; j++) 
+            {
+                if (cis_seq[j] == tf_seq[j-i]) match++;
+            }
+
+            if (match >= NMIN)
+            {          
+                  
+                if (N_binding_sites + 1 >= MAXELEMENTS) 
+                {                    
+                    p_all_BS = realloc(p_all_BS, 2*MAXELEMENTS*sizeof(AllTFBindingSites));
+                    if (!p_all_BS) 
+                    {
+                      LOG_ERROR_NOCELLID("realloc of all_binding_sites to binding_sites_num = %d failed.\n", max_binding_site_alloc);
+                      exit(1);
+                    }
+                    else LOG_VERBOSE_NOCELLID("realloc of all_binding_sites to binding_sites_num = %d succeeded\n", max_binding_site_alloc);
+                }
+                
+                p_all_BS[N_binding_sites].tf_id = k;
+                p_all_BS[N_binding_sites].Koff = Koff[TF_ELEMENT_LEN-match];
+                p_all_BS[N_binding_sites].N_hindered = N_hindered_BS;
+                p_all_BS[N_binding_sites].BS_pos = i ;
+                N_binding_sites++;
+                N_hindered_BS++;
+
+                if(genotype->activating[k][0]==1) genotype->N_act_BS[gene_id]++;
+            }
+
+            /*find BS on the non-template strand*/
+            match_rc=0;
+
+            for (j=i; j < i+TF_ELEMENT_LEN; j++) 
+            {
+                if (cis_seq[j] == tf_seq_rc[j-i]) match_rc++;
+            }
+            
+            if (match_rc >= NMIN)
+            {
+                /**********************************************************************/     
+                if (N_binding_sites + 1 >= MAXELEMENTS) 
+                {                  
+                  p_all_BS = realloc(p_all_BS, 2*MAXELEMENTS*sizeof(AllTFBindingSites));
+                  
+                  if (!p_all_BS) 
+                  {
+                    LOG_ERROR_NOCELLID("realloc of all_binding_sites to N_binding_sites = %d failed.\n", max_binding_site_alloc);
+                    exit(1);
+                  }
+                  else LOG_VERBOSE_NOCELLID("realloc of all_binding_sites to N_binding_sites = %d succeeded\n", max_binding_site_alloc);
+                }
+                /************************************************************************************************************/
+                p_all_BS[N_binding_sites].tf_id = k;
+                p_all_BS[N_binding_sites].Koff = Koff[TF_ELEMENT_LEN-match_rc];
+                p_all_BS[N_binding_sites].N_hindered = N_hindered_BS;
+                p_all_BS[N_binding_sites].BS_pos = i;
+                N_binding_sites++;
+                N_hindered_BS++;
+
+                if(genotype->activating[k][0]==1) genotype->N_act_BS[gene_id]++;
+               
+            }
         }
-        if(((i - hind_pos[tfind]) >=0) && (((i - hind_pos[tfind]) + (HIND_LENGTH -1)) < CISREG_LEN)) {
-          (*all_binding_sites)[binding_sites_num].cisreg_id = gene_id;
-          (*all_binding_sites)[binding_sites_num].gene_copy = gene_copy; 
-          (*all_binding_sites)[binding_sites_num].tf_id = tfind;
-          (*all_binding_sites)[binding_sites_num].strand = 0;
-          (*all_binding_sites)[binding_sites_num].hamming_dist = TF_ELEMENT_LEN-match;
-          (*all_binding_sites)[binding_sites_num].hind_pos = hind_pos[tfind];
-          (*all_binding_sites)[binding_sites_num].left_edge_pos = i - hind_pos[tfind];
-          binding_sites_num++;
-        }
-      }
-    }
-  }
-  for (i=CISREG_LEN-1; i>=TF_ELEMENT_LEN-1; i--) {  /* scan backwards */
-    for (tfind=0; tfind < TFGENES; tfind++) {       /* only loop through TF genes */
-      match=0;
-      for (j=i; j>i-TF_ELEMENT_LEN; j--)
-        if (
-            (cisreg_seq[gene_id][gene_copy][j]=='a' && tf_seq[tfind][gene_copy][i-j]=='t')
-            || (cisreg_seq[gene_id][gene_copy][j]=='t' && tf_seq[tfind][gene_copy][i-j]=='a')
-             || (cisreg_seq[gene_id][gene_copy][j]=='c' && tf_seq[tfind][gene_copy][i-j]=='g')
-            || (cisreg_seq[gene_id][gene_copy][j]=='g' && tf_seq[tfind][gene_copy][i-j]=='c')            
-            ) match++;
-      if (match >= NMIN){
-        if (binding_sites_num + 1 >= max_binding_site_alloc){
-          max_binding_site_alloc = 2*max_binding_site_alloc;
-          *all_binding_sites = realloc(*all_binding_sites, max_binding_site_alloc*sizeof(AllTFBindingSites));
-          if (!(*all_binding_sites)){
-            LOG_ERROR_NOCELLID("realloc of all_binding_sites to binding_sites_num = %d failed.\n", max_binding_site_alloc);
-            exit(1);
-          }
-          else LOG_VERBOSE_NOCELLID("realloc of all_binding_sites to binding_sites_num = %d succeeded\n", max_binding_site_alloc);
-        }
-        if (((i-TF_ELEMENT_LEN+1 - hind_pos[tfind]) >=0) && (((i-TF_ELEMENT_LEN+1 - hind_pos[tfind])+(HIND_LENGTH-1))< CISREG_LEN)) {
-          (*all_binding_sites)[binding_sites_num].cisreg_id = gene_id;
-          (*all_binding_sites)[binding_sites_num].gene_copy = gene_copy; 
-          (*all_binding_sites)[binding_sites_num].tf_id = tfind;
-          (*all_binding_sites)[binding_sites_num].strand = 1;
-          (*all_binding_sites)[binding_sites_num].hamming_dist = TF_ELEMENT_LEN-match;
-          (*all_binding_sites)[binding_sites_num].hind_pos = hind_pos[tfind];
-          (*all_binding_sites)[binding_sites_num].left_edge_pos = i-TF_ELEMENT_LEN+1 - hind_pos[tfind];
-          binding_sites_num++;
-        }
-      }
-    }
-  }
-  *max_alloc = max_binding_site_alloc;
-  return binding_sites_num;
+        
+        genotype->max_hindered_sites[gene_id]=(genotype->max_hindered_sites[gene_id]>N_hindered_BS)? genotype->max_hindered_sites[gene_id]:N_hindered_BS;
+  } 
+  genotype->binding_sites_num[gene_id]=N_binding_sites; 
+  genotype->N_rep_BS[gene_id]=N_binding_sites-(genotype->N_act_BS[gene_id]);
 }
 
 /*
  * compute the list of binding sites for the specified number of gene
  * copies
  */
-void calc_all_binding_sites(int copies[NGENES],
-                            char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN],
-                            char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                            int *new_binding_sites_num,
-                            AllTFBindingSites **all_binding_sites,
-                            int hind_pos[TFGENES]
-//                            int sites_per_gene[NGENES],
- //                           int site_id_pos[NGENES][MAX_COPIES][2]
-							)
+void calc_all_binding_sites(Genotype *genotype)
 {
-  int p, max_binding_site_alloc, binding_sites_num;
-  int gene_id;
-
-  max_binding_site_alloc = MAXELEMENTS;
+  int p; 
+  int max_binding_site_alloc= MAXELEMENTS;
+  int gene_id;  
    
-  *all_binding_sites = malloc(max_binding_site_alloc*sizeof(AllTFBindingSites));
-  
-  if (!(*all_binding_sites)) {
-    LOG_ERROR_NOCELLID("initial setting of all_binding_sites failed.\n");
-    exit(1);
-  }
-  
-  
-  binding_sites_num = 0;
+  for(gene_id=0;gene_id<NGENES;gene_id++)
+  {
+    genotype->all_binding_sites[gene_id] = malloc(max_binding_site_alloc*sizeof(AllTFBindingSites));
+    
+    if (!(genotype->all_binding_sites[gene_id])) 
+    {
+        LOG_ERROR_NOCELLID("initial setting of all_binding_sites failed.\n");
+        exit(1);
+    }
+    
+    calc_all_binding_sites_copy(genotype,gene_id);
+  }   
 
-  /* initialize per gene # of sites */
-//  for (gene_id=0; gene_id < NGENES; gene_id++) {
-////    sites_per_gene[gene_id] = 0;
-//    for (p=0; p < MAX_COPIES; p++) {
-//      site_id_pos[gene_id][p][0] = -1;
-//      site_id_pos[gene_id][p][1] = -1;
+//  for (gene_id=0; gene_id < NGENES; gene_id++) {  /* now which cis-reg region */
+//    for (p=0; p < MAX_COPIES; p++) {     /* loop through the maximum copies possible */
+//      if (p < copies[gene_id]) {
+//        /* if this particular gene has this copy number then generate binding sites
+//           for all the relevant gene copies (assume no gene divergence) */
+//        binding_sites_num = calc_all_binding_sites_copy(cisreg_seq, 
+//                                                    tf_seq, 
+//                                                    tf_seq_rc,
+//                                                    N_act,
+//                                                    N_rep,
+//                                                    binding_sites_num,
+//                                                    all_binding_sites,
+//                                                    &max_binding_site_alloc,
+//                                                    gene_id,
+//                                                    p, 
+//                                                    hind_pos);      
+//      }
 //    }
 //  }
-
-  for (gene_id=0; gene_id < NGENES; gene_id++) {  /* now which cis-reg region */
-    for (p=0; p < MAX_COPIES; p++) {     /* loop through the maximum copies possible */
-      if (p < copies[gene_id]) {  
-        int before = binding_sites_num;
-
-        /* record initial site_id for this copy */
-//        site_id_pos[gene_id][p][0] = binding_sites_num;
-
-        /* if this particular gene has this copy number then generate binding sites
-           for all the relevant gene copies (assume no gene divergence) */
-        binding_sites_num = calc_all_binding_sites_copy(cisreg_seq, 
-                                                    tf_seq, 
-                                                    binding_sites_num,
-                                                    all_binding_sites,
-                                                    &max_binding_site_alloc,
-                                                    gene_id,
-                                                    p, 
-                                                    hind_pos);
-
-        /* record end site_id for this copy */
-//        site_id_pos[gene_id][p][1] = binding_sites_num - 1;
-
-        /* add the new number of sites */
-//        sites_per_gene[gene_id] += (binding_sites_num-before);
-      }
-    }
-  }
-
-  *all_binding_sites = realloc(*all_binding_sites, binding_sites_num*sizeof(AllTFBindingSites));
-  if (!(*all_binding_sites)) {
-    LOG_ERROR_NOCELLID("realloc of all_binding_sites down to binding_sites_num = %d failed.\n", binding_sites_num);
-    exit(1);
-  }
-  *new_binding_sites_num = binding_sites_num;
+//
+//  *all_binding_sites = realloc(*all_binding_sites, binding_sites_num*sizeof(AllTFBindingSites));
+//  if (!(*all_binding_sites)) {
+//    LOG_ERROR_NOCELLID("realloc of all_binding_sites down to binding_sites_num = %d failed.\n", binding_sites_num);
+//    exit(1);
+//  }
+//  *new_binding_sites_num = binding_sites_num;
 }
 
+int mod(int a, int b) // b is the base
+{
+    if(a>=0)
+        return (a%b);
+    else
+        return (abs(a+b)%b);
+}
+
+float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
+                           int max_N_hindered_BS,
+                           int N_BS,
+                           int N_act_BS,
+                           int N_rep_BS, 
+                           int activating[NGENES][MAX_COPIES],
+                           float Koff[TFGENES][TF_ELEMENT_LEN-NMIN],
+                           float protein_conc[NGENES])
+{
+    double ratio_matrices[max_N_hindered_BS+1][N_rep_BS+1][N_act_BS+1];   
+    double transition_matrix[N_rep_BS+1][N_act_BS+1];
+    double sum,prob_act_over_rep=0.0;
+    float product_of_freq;    
+    float Kon[TFGENES];      
+    
+    int pos_of_last_record;    
+    int pos_next_record;
+    int i,j,k,m,n; 
+    
+    /*calc Kon based on TF concentration*/
+    for(i=0;i<TFGENES;i++)
+    {
+        Kon[i]=kon*protein_conc[i];
+    }
+    
+    /* initializing matrices to all zeros */
+    for(i=0;i<max_N_hindered_BS+1;i++)
+    {
+        for(j=0;j<N_rep_BS+1;j++)
+        {
+            for(k=0;k<N_act_BS+1;k++)
+            {
+                ratio_matrices[i][j][k]=0.0;
+            }
+        }
+    }
+    
+    for(j=0;j<N_rep_BS+1;j++)
+    {
+        for(k=0;k<N_act_BS+1;k++)
+        {
+            transition_matrix[j][k]=0.0;            
+        }
+    }
+    
+    /* body of the forward algorithm*/    
+    pos_next_record=0; //where in the ratio_matrices to put the next record
+    
+    ratio_matrices[pos_next_record][0][0]=BS_info[0].Koff;   
+    
+    if(activating[BS_info[0].tf_id][0]==1) // if a activator binds to this BS
+    {
+        ratio_matrices[pos_next_record][0][1]=Kon[BS_info[0].tf_id];        
+    }
+    else
+    {
+        ratio_matrices[pos_next_record][1][0]=Kon[BS_info[0].tf_id];       
+    }    
+    
+    for(m=1;m<N_BS;m++)
+    {
+        pos_next_record=mod(pos_next_record+1,max_N_hindered_BS+1);
+
+        product_of_freq = Kon[BS_info[m].tf_id];
+
+        if(BS_info[m].N_hindered) // if binding to the current BS hinders other BS
+        {
+            for(n=m-BS_info[m].N_hindered;n<=m-1;n++)
+            {
+                product_of_freq*=BS_info[n].Koff;
+            }
+        }
+
+        switch(activating[BS_info[m].tf_id][0])
+        {
+            case 1: // a BS of activators
+                if(m-BS_info[m].N_hindered!=0)
+                {
+                  // suppose the first dimension of ratio_matrices is 10 (0-9), then the 11th ratio matrix should be put in 0 and  
+                  // the 10th record is at 9. Note in gcc mod does not follow the conventional mathematical definition 
+                  pos_of_last_record=mod(pos_next_record-BS_info[m].N_hindered-1,max_N_hindered_BS+1); //find the closest BS that is not hindered                                              
+
+                  for(i=0;i<N_rep_BS+1;i++)
+                  {
+                      transition_matrix[i][0]=ratio_matrices[pos_of_last_record][i][N_act_BS];
+
+                      for(j=1;j<N_act_BS+1;j++)
+                      {
+                          transition_matrix[i][j]=ratio_matrices[pos_of_last_record][i][j-1];
+                      }
+                  }
+                }
+                else
+                {
+                    for(i=0;i<N_rep_BS+1;i++)
+                    {
+                        for(j=0;j<N_act_BS+1;j++)
+                        {
+                            transition_matrix[i][j]=0.0;
+                        }
+                    }
+
+                    transition_matrix[0][1]=1.0;
+                }
+                    
+                pos_of_last_record=mod(pos_next_record-1,max_N_hindered_BS+1);  //find last record              
+
+                for(i=0;i<N_rep_BS+1;i++)
+                {
+                    for(j=0;j<N_act_BS+1;j++)
+                    {
+                        ratio_matrices[pos_next_record][i][j]=BS_info[m].Koff*ratio_matrices[pos_of_last_record][i][j]+
+                                                      product_of_freq*transition_matrix[i][j];                            
+                    }
+                }
+                break;
+
+            case 0: // a BS of repressors
+                if(m-BS_info[m].N_hindered!=0)
+                {
+                  pos_of_last_record=mod(pos_next_record-BS_info[m].N_hindered-1,max_N_hindered_BS+1);                                 
+
+                  for(j=0;j<N_act_BS+1;j++)
+                  {
+                      transition_matrix[0][j]=ratio_matrices[pos_of_last_record][N_rep_BS][j];
+
+                      for(i=1;i<N_rep_BS+1;i++)
+                      {
+                          transition_matrix[i][j]=ratio_matrices[pos_of_last_record][i-1][j];
+                      }
+                  }
+                }
+                else
+                {
+                    for(i=0;i<N_rep_BS+1;i++)
+                    {
+                        for(j=0;j<N_act_BS+1;j++)
+                        {
+                            transition_matrix[i][j]=0.0;
+                        }
+                    }
+
+                    transition_matrix[1][0]=1.0;
+                }
+                    
+                pos_of_last_record=mod(pos_next_record-1,max_N_hindered_BS+1);
+
+                for(i=0;i<N_rep_BS+1;i++)
+                {
+                    for(j=0;j<N_act_BS+1;j++)
+                    {
+                        ratio_matrices[pos_next_record][i][j]=BS_info[m].Koff*ratio_matrices[pos_of_last_record][i][j]+
+                                                      product_of_freq*transition_matrix[i][j];                            
+                    }
+                }
+                break;
+        }
+    }
+
+    sum=0.0;
+
+    for(i=0;i<N_rep_BS+1;i++)
+    {
+        for(j=0;j<N_act_BS+1;j++)
+        {
+            sum+=ratio_matrices[pos_next_record][i][j];
+        }
+    }
+
+    for(i=0;i<N_rep_BS+1;i++)
+    {
+        j=round(fabs((i-0.31)/0.33)); // need at least one act to transcribe                     
+        for(;j<N_act_BS+1;j++)
+        {
+            prob_act_over_rep+=ratio_matrices[pos_next_record][i][j];
+        }
+    } 
+
+    return prob_act_over_rep/sum;
+     // end of the forward algorithm   
+}
 
 int add_fixed_event(int i,
                     int p,
@@ -780,6 +987,7 @@ void initialize_cell_cache(CellState *state,
       state->tf_hindered_indexes[0][i]=-1;
       state->tf_hindered_indexes[1][i]=-1;
   }  
+  
   if (!kon_states->konvalues || !state->tf_bound_indexes || !koffvalues ||
       !state->tf_hindered_indexes || !kon_states->kon_list) {
     LOG_ERROR("memory allocation error at start of develop\n");
@@ -1839,7 +2047,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
 				int env) 
 {
   int i;
-  float instantaneous_growth_rate;  /* this is returned from the function */
+  float instantaneous_growth_rate=0.0;  /* this is returned from the function */
   float total_alpha_s = 0.0;
   float deltatprime, deltatrest;
 
@@ -2064,7 +2272,7 @@ void update_protein_conc_cell_size(float protein_conc[],
 				   int *env)
 {
   int i;
-  float ct, ect, ect1,ect_a,ect1_a,ect_b,ect1_b;
+  float ct, ect, ect1,ect1_a,ect1_b;
   float L_a, L_b;
   float instantaneous_growth_rate = 0.0;
   float integrated_growth_rate = 0.0;
@@ -2100,18 +2308,11 @@ void update_protein_conc_cell_size(float protein_conc[],
     ct = kon_states->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
     ect = exp(-ct);
     if (fabs(ct)<EPSILON) ect1=ct;
-    else ect1 = 1-ect;  
+    else ect1 = 1-ect; 
 	
-	if (i == SELECTION_GENE_A) 
-	{
-		ect_a=ect;
-		ect1_a=ect1;		
-	}
-	if (i == SELECTION_GENE_B)
-	{
-		ect_b=ect;
-		ect1_b=ect1;		
-	}
+    if (i == SELECTION_GENE_A) ect1_a=ect1;		
+    if (i == SELECTION_GENE_B) ect1_b=ect1;		
+	
 	
     /* get the new protein concentration for this gene */
     protein_conc[i] = kon_states->konvalues[i][KON_SALPHC_INDEX]*ect1 + ect*protein_conc[i];
@@ -2314,8 +2515,7 @@ void tf_binding_event(GillespieRates *rates, CellState *state, Genotype *genotyp
   float x = ran1(&seed) * (rates->salphc + konrate)/kon;
   int k, l = -1;  /* new */
   float total_konrate, konrate_for_TF = 0.0;     
-  int site_id = -1;
-  int tracker=0;
+  int site_id = -1; 
 
   /* loop through all TFs, then choose a particular binding site */
   for (k=0; k < TFGENES; k++) {
@@ -3081,8 +3281,7 @@ int do_single_timestep(Genotype *genotype,
   int event;     /* boolean to keep track of whether FixedEvent has ended */
   int total;     /* total possible translation events */
   float fixed_time;
-  float temp_t;
-  
+    
 //  if (verbose) //VERBOSE JU CHANGE
 //    for (j=0; j < MAX_COPIES; j++) {
 //      LOG_VERBOSE("rates->acetylation_num[%d]=%d\n", j, rates->acetylation_num[j]);
@@ -3509,36 +3708,36 @@ int do_single_timestep(Genotype *genotype,
 
 void free_fixedevent(CellState *state)
 {
-	FixedEvent *temp1, *temp2;
-	
-	temp1=state->env1_time_end;
-	
-	while(temp1){		
-		temp1=temp1->next;
-		temp2=temp1;
-		free(temp2);	
-	}
-	
-	temp1=state->env0_time_end;
-	while(temp1){		
-		temp1=temp1->next;
-		temp2=temp1;
-		free(temp2);	
-	}
-	
-	temp1=state->mRNA_transcr_time_end;
-	while(temp1){		
-		temp1=temp1->next;
-		temp2=temp1;
-		free(temp2);	
-	}
-	
-	temp1=state->mRNA_transl_time_end;
-	while(temp1){		
-		temp1=temp1->next;
-		temp2=temp1;
-		free(temp2);	
-	}
+    FixedEvent *temp1, *temp2;
+
+    temp1=state->env1_time_end;
+
+    while(temp1){		
+            temp1=temp1->next;
+            temp2=temp1;
+            free(temp2);	
+    }
+
+    temp1=state->env0_time_end;
+    while(temp1){		
+            temp1=temp1->next;
+            temp2=temp1;
+            free(temp2);	
+    }
+
+    temp1=state->mRNA_transcr_time_end;
+    while(temp1){		
+            temp1=temp1->next;
+            temp2=temp1;
+            free(temp2);	
+    }
+
+    temp1=state->mRNA_transl_time_end;
+    while(temp1){		
+            temp1=temp1->next;
+            temp2=temp1;
+            free(temp2);	
+    }
 }
 
 float calc_avg_growth_rate(int current_genotype,
@@ -3561,456 +3760,257 @@ float calc_avg_growth_rate(int current_genotype,
                            int no_fixed_dev_time)
 {
 	
-	int cell_status=0; 
-	int i,j;
-	int env=0;
-	float avg_GR=0;
-	
-	state->tf_bound_indexes=NULL; //moved from init_cell
-	state->tf_hindered_indexes = NULL;
+    int cell_status=0; 
+    int i,j;
+    int env=0;
+    float avg_GR=0;
 
-	initialize_cell_cache(state, *genotype, kon_states, &koffvalues, maxbound2, maxbound3);
-	
-	for(i=0;i<N_replicates;i++)
-	{	 
-            env=0;
-		
-//            printf("%d\n",i);
-//			
-		
-            for (j=0; j < NGENES; j++) {
-		init_protein_conc[j] = exp(1.25759*gasdev(&seed)+7.25669);
-		init_mRNA[j] = exp(0.91966*gasdev(&seed)-0.465902);
-            }
-		
-            initialize_cell(state, current_genotype, genotype->copies, genotype->mRNAdecay, init_mRNA, init_protein_conc, burn_in);
-	
-            state->temperature = temperature;
-	    state->RTlnKr = GASCONSTANT * temperature * log(KR);
-	    	    
-	    calc_from_state(genotype, state, rates, kon_states, transport_rate, mRNAdecay);
-	    	
-	    *t = 0.0; 
-                     
-            
-            
-            do_single_timestep(genotype, 
-	                       state, 
-	                       kon_states, 
-	                       rates, 
-	                       t,
-	                       koffvalues,
-	                       transport_rate,
-	                       mRNAdecay,
-	                       x,
-	                       dt,
-	                       konrate,
-	                       maxbound2,
-	                       maxbound3,
-	                       no_fixed_dev_time,
-	                       burn_in,
-                                &env);
-						   
-		
-				   
-		while(*t<tdevelopment){  		                                 
-	    	   
-		    cell_status = do_single_timestep(genotype, 
-		                                     state, 
-		                                     kon_states, 
-		                                     rates, 
-		                                     t,
-		                                     koffvalues,
-		                                     transport_rate,
-		                                     mRNAdecay,
-		                                     x,
-		                                     dt,
-		                                     konrate,
-		                                     maxbound2,
-		                                     maxbound3,
-		                                     no_fixed_dev_time,
-		                                     burn_in,
-						     &env);
-											 
-			if(cell_status==-1) {
-//				printf("tdevelopment=%f, t=%f\n",tdevelopment, *t);
-//				printf("dead!\n");
-				break;				
-			}
-		 		    
-	   }
-	   
-//	   printf("t=%f\n",*t);
-	   
-	   avg_GR += log(state->cell_size)/tdevelopment; 
-	   	   
-	   free_fixedevent(state);
-	   			   
-	}
-	
-	free(state->tf_bound_indexes);
+    state->tf_bound_indexes=NULL; //moved from init_cell
+    state->tf_hindered_indexes = NULL;
+
+    initialize_cell_cache(state, *genotype, kon_states, &koffvalues, maxbound2, maxbound3);
+
+    for(i=0;i<N_replicates;i++)
+    {	 
+        env=0;
+        for (j=0; j < NGENES; j++) {
+            init_protein_conc[j] = exp(1.25759*gasdev(&seed)+7.25669);
+            init_mRNA[j] = exp(0.91966*gasdev(&seed)-0.465902);
+        }
+
+        initialize_cell(state, current_genotype, genotype->copies, genotype->mRNAdecay, init_mRNA, init_protein_conc, burn_in);	
+        state->temperature = temperature;
+        state->RTlnKr = GASCONSTANT * temperature * log(KR);	    	    
+        calc_from_state(genotype, state, rates, kon_states, transport_rate, mRNAdecay);	    	
+        *t = 0.0;
+
+        do_single_timestep(genotype, 
+                           state, 
+                           kon_states, 
+                           rates, 
+                           t,
+                           koffvalues,
+                           transport_rate,
+                           mRNAdecay,
+                           x,
+                           dt,
+                           konrate,
+                           maxbound2,
+                           maxbound3,
+                           no_fixed_dev_time,
+                           burn_in,
+                            &env);
+
+        while(*t<tdevelopment){
+            cell_status = do_single_timestep(genotype, 
+                                             state, 
+                                             kon_states, 
+                                             rates, 
+                                             t,
+                                             koffvalues,
+                                             transport_rate,
+                                             mRNAdecay,
+                                             x,
+                                             dt,
+                                             konrate,
+                                             maxbound2,
+                                             maxbound3,
+                                             no_fixed_dev_time,
+                                             burn_in,
+                                             &env);
+            if(cell_status==-1) {
+                printf("dead!\n");
+                break;				
+            }		 		    
+       }
+       avg_GR += log(state->cell_size)/tdevelopment;	   	   
+       free_fixedevent(state);	   			   
+    }	
+    free(state->tf_bound_indexes);
     free(koffvalues);
-    free(state->tf_hindered_indexes);
-	
-	state->tf_bound_indexes=NULL;
-	koffvalues=NULL;
-	state->tf_hindered_indexes=NULL; 
-	
-	for(i=0;i<NGENES;i++){
-		
-		free(kon_states->kon_list[i]->available_sites);
-		kon_states->kon_list[i]->available_sites= NULL;
-		free(kon_states->kon_list[i]);
-		kon_states->kon_list[i]=NULL;
-		
-	}
-	
-	return avg_GR/N_replicates;
+    free(state->tf_hindered_indexes);	
+    state->tf_bound_indexes=NULL;
+    koffvalues=NULL;
+    state->tf_hindered_indexes=NULL; 
 
+    for(i=0;i<NGENES;i++){		
+            free(kon_states->kon_list[i]->available_sites);
+            kon_states->kon_list[i]->available_sites= NULL;
+            free(kon_states->kon_list[i]);
+            kon_states->kon_list[i]=NULL;		
+    }	
+    return avg_GR/N_replicates;
 }
 
-int try_fixation(float current_fitness, float new_fitness){
-	
-	float s, P_fix, ref;
-	
-	s = (new_fitness-current_fitness)/current_fitness;
-	
-	if (fabs(s)<EPSILON) P_fix = 1/(float)POP_SIZE;
-	
-	else P_fix = (1-exp(-s))/(1-exp(-s*(float)POP_SIZE)); 
-	
-	ref=ran1(&seed);
-	
-	if(ref > P_fix) return 0;
-	else return 1;
-	
-}
-
-
-//void mutate(int l_genome,char *Genome, char Genome_matrix[n_gene][n_copy][l_element],int l_BS, char *BS, char BS_matrix[n_TF][n_copy][l_bs])
-int mutate(Genotype *genotype)
+int try_fixation(float current_fitness, float new_fitness)
 {	
+    float s, P_fix, ref;
+    s = (new_fitness-current_fitness)/current_fitness;
 
+    if (fabs(s)<EPSILON){P_fix = 1/(float)POP_SIZE;}	
+    else{ P_fix = (1-exp(-s))/(1-exp(-s*(float)POP_SIZE)); }
+
+    ref=ran1(&seed);
+
+    if(ref > P_fix) return 0;
+    else return 1;	
+}
+
+int mutate(Genotype *genotype)
+{
    int l_genome = NGENES*MAX_COPIES*CISREG_LEN;
-   int l_BS = TFGENES*MAX_COPIES*TF_ELEMENT_LEN;
+ //  int l_BS = TFGENES*MAX_COPIES*TF_ELEMENT_LEN;
    char mut='c';
-   char str_buf[CISREG_LEN];
+//   char str_buf[CISREG_LEN];
    char *temp1, *temp2;
-   char n;	 
-   
+   char n;   
    int pos_n,i,pos_g, pos_c;
    float random;
-   int l_del;
-   int extra_n;
+ //  int l_del;
+ //  int extra_n;
    int offset;
-   int inset_size=0, delet_size=0;
-   
+   int inset_size=0, delet_size=0;   
   //two helper pointers 
    char *Genome;
-   Genome= (char*)genotype->cisreg_seq;
-     
+   Genome= (char*)genotype->cisreg_seq;     
    char *BS;
-   BS=(char*)genotype->tf_seq;
-      
+   BS=(char*)genotype->tf_seq;      
  // TODO: write a code to draw mutations
+    switch (mut)
+    {
+        case 's': //substitution        		
+            random=ran1(&seed)*l_genome;					
+            pos_n=floor(random);		
+            n=set_base_pair(random);
+            while (n == Genome[pos_n]){	
+                random=ran1(&seed);
+                n=set_base_pair(random);
+            }	
+            Genome[pos_n]=n;			
+            return 1;
+            break;
+        		
+        case 'i': // insertion        
+            while(inset_size<=0)
+            {
+                random=gasdev(&seed)+avg_inset;			
+                inset_size = round(random);
+            }							
+            random=ran1(&seed)*NGENES;			
+            pos_g=floor(random);			
+            random=ran1(&seed)*MAX_COPIES;			
+            pos_c=floor(random);			
+            random=ran1(&seed)*CISREG_LEN;			
+            pos_n=floor(random);					
+            if (pos_n+inset_size>CISREG_LEN) inset_size=CISREG_LEN-pos_n;
 
+            for(i=pos_n;i<pos_n+inset_size;i++){
+                random = ran1(&seed);					
+                genotype->cisreg_seq[pos_g][pos_c][i]=set_base_pair(random);							
+            }			
+            return 1;
+            break;	
+        		
+        case 'p': // partial deletion        
+            while(delet_size<=0)
+            {
+                random=gasdev(&seed)+avg_delet;			
+                delet_size = round(random);
+            }						
+            random=ran1(&seed)*NGENES;			
+            pos_g=floor(random);			
+            random=ran1(&seed)*MAX_COPIES;			
+            pos_c=floor(random);			
+            random=ran1(&seed)*CISREG_LEN;			
+            pos_n=floor(random);
 
-	switch (mut)
-	{
-		case 's': //substitution
-		{				
-			random=ran1(&seed)*l_genome;
-					
-			pos_n=floor(random);
-	
-//			printf("%d  %c  \n",pos_n,Genome[pos_n]);
-		
-			n=set_base_pair(random);
-				
-			while (n == Genome[pos_n]){
-	
-				random=ran1(&seed);
-				n=set_base_pair(random);
-			}
-	
-			Genome[pos_n]=n;
-//			printf("%c \n",Genome[pos_n]);
-			
-			return 1;
-			break;
-			
-		}
-		
-		case 'i': // insertion
-		{
-			while(inset_size<=0)
-			{
-				random=gasdev(&seed)+avg_inset;
-			
-				inset_size = round(random);
-			}
-							
-			random=ran1(&seed)*NGENES;
-			
-			pos_g=floor(random);
-			
-			random=ran1(&seed)*MAX_COPIES;
-			
-			pos_c=floor(random);
-			
-			random=ran1(&seed)*CISREG_LEN;
-			
-			pos_n=floor(random);
-					
-			if (pos_n+inset_size>CISREG_LEN)	inset_size=CISREG_LEN-pos_n;
-			
-//			printf("pos_g=%d  pos_c=%d  pos_n=%d inset_size=%d\n",pos_g,pos_c,pos_n,inset_size);
-			
-			for(i=pos_n;i<pos_n+inset_size;i++){
-				
-					random = ran1(&seed);
-					
-//					printf("before mut:%c  ", genotype->cisreg_seq[pos_g][pos_c][i]);
-					
-					genotype->cisreg_seq[pos_g][pos_c][i]=set_base_pair(random);
-					
-//					printf("after mut:%c  \n", genotype->cisreg_seq[pos_g][pos_c][i]);
-							
-			}
-			
-			return 1;
-			break;	
-		}
-		
-		case 'p': // partial deletion
-		{
-			while(delet_size<=0)
-			{
-				random=gasdev(&seed)+avg_delet;
-			
-				delet_size = round(random);
-			}
-						
-			random=ran1(&seed)*NGENES;
-			
-			pos_g=floor(random);
-			
-			random=ran1(&seed)*MAX_COPIES;
-			
-			pos_c=floor(random);
-			
-			random=ran1(&seed)*CISREG_LEN;
-			
-			pos_n=floor(random);
-			
-//			printf("pos_g=%d  pos_c=%d  pos_n=%d delet_size=%d\n",pos_g,pos_c,pos_n,delet_size);
-			
-//			printf("before deletion:");
-			
-//			printf("%s\n",genotype->cisreg_seq[pos_g][0]);
-			
-			if (pos_n+delet_size>=CISREG_LEN-1)	// if, only the tail is deleted, treat it like insertion
-			{
-				delet_size=CISREG_LEN-1-pos_n;
-				
-//				printf("pos_g=%d  pos_c=%d  pos_n=%d delet_size=%d\n",pos_g,pos_c,pos_n,delet_size);
-				
-				for(i=pos_n;i<pos_n+delet_size;i++){
-								
-					random = ran1(&seed);
-					
-//					printf("before mut:%c  ", genotype->cisreg_seq[pos_g][pos_c][i]);
-					
-					genotype->cisreg_seq[pos_g][pos_c][i]=set_base_pair(random);
-					
-//					printf("after mut:%c  \n", genotype->cisreg_seq[pos_g][pos_c][i]);
-							
-				}
-				
-			}
-			else // else, join the two fragments aside the deletion and 
-			{
-				for(i=pos_n;i<CISREG_LEN-delet_size;i++){
-					
-					genotype->cisreg_seq[pos_g][pos_c][i]=genotype->cisreg_seq[pos_g][pos_c][i+delet_size];
-					
-				}
-				
-				for(i++;i<CISREG_LEN;i++){
-					
-					random=ran1(&seed);
-					
-					genotype->cisreg_seq[pos_g][pos_c][i]= set_base_pair(random);
-				}						
-			}
-			
-//			printf("after deletion: ");
-			
-//			printf("%s\n",genotype->cisreg_seq[pos_g][0]);
-			
-			return 1;
-			break;
-			
-		}
-		
-		case 'w': // whole gene deletion
-		{
-			
-			random=ran1(&seed)*NGENES;
-			
-			pos_g=floor(random);
-			
-			
-//			printf("before deletion:");
-//			for(i=0;i<l_element;i++){
-//				
-//				printf("%c",genotype->cisreg_seq[pos_g][0][i]);
-//			}	
-//			printf("/");
-//			for(i=0;i<l_element;i++){
-//				
-//				printf("%c",genotype->cisreg_seq[pos_g+1][0][i]);
-//			}	
-//			printf("\n");
-				
-			temp1 = &genotype->cisreg_seq[pos_g][0][0];
-			
-			offset=MAX_COPIES*CISREG_LEN;
-			
-			for(i=0;i<CISREG_LEN*MAX_COPIES*(NGENES-pos_g-1);i++){
-				
-			*temp1=*(temp1+offset);
-			
-			temp1++;
-				
-			}
-				
-//			printf("after deletion: ");
-//			for(i=0;i<l_element;i++){
-//				
-//				printf("%c",genotype->cisreg_seq[pos_g][0][i]);
-//			}	
-//			printf("/");
-//			for(i=0;i<l_element;i++){
-//				
-//				printf("%c",genotype->cisreg_seq[pos_g+1][0][i]);
-//			}	
-//			printf("\n");
-					
-//			n_gene--;	// TODO: only TF-gene get mutated in this way
-		//	n_TF--;
-			return 1;
-			break;
-		}
-		
-		case 'd': // TODO: duplication. To simplify the code, maybe initialize a double-sized genome with empty space, so that duplicated genes can be put into the empty space
-		{
-//			random=ran1(&seed)*n_gene;
-//			
-//			pos_g=floor(random);
-//			
-//			char new_genome[n_gene+1][n_copy][l_element];
-//			
-//			temp1=(char*)new_genome;
-//			
-//			temp2=&Seq2[pos_g][0][0];
-//						
-//			for(i=0;i<len;i++){ //copy the original genome to the new genome
-//				
-//				temp1[i]=Seq1[i];
-//			}
-//			
-//			extra_n=n_copy*l_element;
-//						
-//			for(i++;i<len+extra_n;i++){
-//				
-//				temp1[i]=*temp2;
-//				
-//				temp2++;				
-//			}
-//	
-//			printf("before duplication:");
-//			for(i=0;i<l_element;i++){
-//				
-//				printf("%c",genotype->cisreg_seq[n_gene][0][i]);
-//			}	
-//			printf("\n");
+            if (pos_n+delet_size>=CISREG_LEN-1)	// if only the tail is deleted, treat it like insertion
+            {
+                delet_size=CISREG_LEN-1-pos_n;				
+                for(i=pos_n;i<pos_n+delet_size;i++){								
+                    random = ran1(&seed);					
+                    genotype->cisreg_seq[pos_g][pos_c][i]=set_base_pair(random);
+                }				
+            }
+            else // else, join the two fragments aside the deletion 
+            {
+                for(i=pos_n;i<CISREG_LEN-delet_size;i++){genotype->cisreg_seq[pos_g][pos_c][i]=genotype->cisreg_seq[pos_g][pos_c][i+delet_size];}                				
+                for(i++;i<CISREG_LEN;i++){					
+                    random=ran1(&seed);					
+                    genotype->cisreg_seq[pos_g][pos_c][i]= set_base_pair(random);
+                }						
+            }			
+            return 1;
+            break;			
+        		
+        case 'w': // whole gene (only tf genes get deleted) deletion.       			
+            random=ran1(&seed)*TFGENES;			
+            pos_g=floor(random);				
+            temp1 = &genotype->cisreg_seq[pos_g][0][0];			
+            offset=MAX_COPIES*CISREG_LEN;
 
-			random=ran1(&seed)*NGENES;
-			
-			pos_g=floor(random);
-			
-			temp1=&genotype->cisreg_seq[pos_g][0][0];
-			temp2=Genome+l_genome;
-			
-			for(i=0;i<CISREG_LEN*MAX_COPIES;i++){
-				
-				*temp2++=*temp1++;
-						
-			}
-			
-//			printf("after duplication: ");
-//			for(i=0;i<l_element;i++){
-//				
-//				printf("%c",genotype->cisreg_seq[n_gene][0][i]);
-//			}	
-//			printf("\n");
-//			n_gene++; // only TF-gene get mutated in this way
-			return 1;
-			break;
-		}
-		
-		case 'c': //binding sequence
-		{
-			random=ran1(&seed)*TF_ELEMENT_LEN;
-			
-			pos_n=floor(random);
-	
-//			printf("pos_n=%d  base_pair=%c  \n",pos_n,BS[pos_n]);
-		
-			n=set_base_pair(random);
-				
-			while (n == BS[pos_n]){
-	
-				random=ran1(&seed);
-				n=set_base_pair(random);
-			}
-	
-			BS[pos_n]=n;
-//			printf("base_pair=%c \n",BS[pos_n]);
-			
-			return 2;
-			break;				
-			
-		}
-		
-		case 'k': //mutations in kinetic constants
-		{
-			
-			
-			return 3;
-			break;
-		}
-	}
-
+            for(i=0;i<CISREG_LEN*MAX_COPIES*(TFGENES-pos_g-1);i++){				
+                *temp1=*(temp1+offset);
+                temp1++;				
+            }					
+//            NGENES--;
+//            TFGENES--;
+//            NPROTEINS--;
+//            SELECTION_GENE_A=NGENES-2;
+//            SELECTION_GENE_B=NGENES-1;            
+            return 1;
+            break;
+        		
+        case 'd': // only tf genes get duplicated                   
+//            random=ran1(&seed)*n_gene;
+//            pos_g=floor(random);
+//            char new_genome[n_gene+1][n_copy][l_element];
+//            temp1=(char*)new_genome;
+//            temp2=&Seq2[pos_g][0][0];//
+//            for(i=0;i<len;i++){ //copy the original genome to the new genome
+//
+//                    temp1[i]=Seq1[i];
+//            }
+//            extra_n=n_copy*l_element;
+//            for(i++;i<len+extra_n;i++){
+//                    temp1[i]=*temp2;
+//                    temp2++;				
+//            }
+//            random=ran1(&seed)*NGENES;
+//            pos_g=floor(random);
+//            temp1=&genotype->cisreg_seq[pos_g][0][0];
+//            temp2=Genome+l_genome;
+//            for(i=0;i<CISREG_LEN*MAX_COPIES;i++){*temp2++=*temp1++;}
+//	    n_gene++; // only TF-gene get mutated in this way
+            return 1;
+            break;
+        
+        case 'c': //binding sequence        
+            random=ran1(&seed)*TF_ELEMENT_LEN;			
+            pos_n=floor(random);
+            n=set_base_pair(random);				
+            while (n == BS[pos_n]){	
+                random=ran1(&seed);
+                n=set_base_pair(random);
+            }	
+            BS[pos_n]=n;
+            return 2;
+            break;  
+            
+        case 'k': //mutations in kinetic constants        
+            return 3;
+            break;        
+    }
 }
 
-/*
- * initialize the population of cells, then run for a given
- * number of divisions or run cell(s) for a specific length of time
- */
 void init_run_pop(Genotype genotype[N_para_threads],
                   CellState state[N_para_threads],
-//                  TimeCourse *timecoursestart[2][NPROTEINS],
-//                  TimeCourse *timecourselast[2][NPROTEINS],
                   float temperature,   /* in Kelvin */
                   float kdis[NUM_K_DISASSEMBLY],
                   int output_binding_sites,
                   int no_fixed_dev_time)
-//                  int max_divisions)
-{
-  
-  int i, j, mut_step;
+{  
+  int i;
   int current_genotype = 0;
   int new_genotype = 1;
   float current_fitness;
@@ -4033,11 +4033,8 @@ void init_run_pop(Genotype genotype[N_para_threads],
   maxbound2 = MAXBOUND;
   maxbound3 = 10*MAXBOUND;
  
-  output=1;
-    /* for all cells in this replicate initialize all parts of the
-       genotype, *except* for the cis-reg sequence using the initial
-       genes[0]  */
-      
+  //output=1;
+       
   initialize_genotype(&genotype[current_genotype], &genotype[current_genotype], kdis, current_genotype); // checked
   
   current_fitness = calc_avg_growth_rate(current_genotype,
@@ -4058,86 +4055,49 @@ void init_run_pop(Genotype genotype[N_para_threads],
                                          maxbound3,
                                          temperature,
                                          no_fixed_dev_time);										 
-	
-	 									 
-//	  printf("current_fitness=%f\n", current_fitness);
-	  
-//  omp_set_num_threads(N_para_threads);	
-//  #pragma omp parallel
-//  {	
-//  	  int ID = omp_get_thread_num();
-//	  current_fitness = calc_avg_growth_rate(ID,
-//                                         &genotype[ID],
-//                                         &state[ID],
-//                                         &init_mRNA[ID][0],
-//                                         &init_protein_conc[ID][0],
-//                                         &t[ID],
-//                                         koffvalues[ID],
-//                                         &transport_rate[ID][0],
-//                                         &mRNAdecay[ID][0],
-//                                         &x[ID],
-//                                         &dt[ID],
-//                                         &konrate[ID],
-//                                         &kon_states[ID],
-//                                         &rates[ID],
-//                                         maxbound2,
-//                                         maxbound3,
-//                                         temperature,
-//                                         no_fixed_dev_time);		
-//								 
-//	  printf("ID %d, current_fitness=%f\n", ID, current_fitness);
-//  }
 
-	for(mut_step=0;mut_step<MAX_MUT_STEP;mut_step++){
-		
-		printf("step:%d, gr=%f \n",mut_step,current_fitness);
-	
-		while(!fixation){
-			
-		clone_cell(&genotype[current_genotype],&genotype[new_genotype],clone_type); // use type to decide which element in genotype needs clone
-				
-		clone_type=mutate(&genotype[new_genotype]); // type 0: genome type 1: tf-element type 3: kinetic rate constant type 4: everything
-		
-		calc_all_binding_sites((genotype[new_genotype]).copies, 
-								(genotype[new_genotype]).cisreg_seq, 
-								(genotype[new_genotype]).tf_seq, 
-                         		&((genotype[new_genotype]).binding_sites_num), 
-								&((genotype[new_genotype]).all_binding_sites), 
-								(genotype[new_genotype]).hindrance_positions);
-		
-		new_fitness = calc_avg_growth_rate(new_genotype,
-                                         &genotype[new_genotype],
-                                         &state[new_genotype],
-                                         &init_mRNA[new_genotype][0],
-                                         &init_protein_conc[new_genotype][0],
-                                         &t[new_genotype],
-                                         koffvalues[new_genotype],
-                                         &transport_rate[new_genotype][0],
-                                         &mRNAdecay[new_genotype][0],
-                                         &x[new_genotype],
-                                         &dt[new_genotype],
-                                         &konrate[new_genotype],
-                                         &kon_states[new_genotype],
-                                         &rates[new_genotype],
-                                         maxbound2,
-                                         maxbound3,
-                                         temperature,
-                                         no_fixed_dev_time);
-         printf("n_gr=%f\n",new_fitness);                                
-		fixation = try_fixation(current_fitness, new_fitness); // returns 0 if fails to fix
-				
-		}
-		
-		current_genotype = 1 - current_genotype; 
-		
-		new_genotype = 1 - new_genotype;
-		
-		current_fitness = new_fitness;	
-		
-		fixation=0;	
-		
-	}
+for(i=0;i<MAX_MUT_STEP;i++){
 
+    printf("step:%d, gr=%f \n",i,current_fitness);
+
+    while(!fixation){
+        clone_cell(&genotype[current_genotype],&genotype[new_genotype],clone_type); // use type to decide which element in genotype needs clone
+        clone_type=mutate(&genotype[new_genotype]); // type 0: genome type 1: tf-element type 3: kinetic rate constant type 4: everything
+
+        calc_all_binding_sites((genotype[new_genotype]).copies, 
+                                (genotype[new_genotype]).cisreg_seq, 
+                                (genotype[new_genotype]).tf_seq, 
+                                &((genotype[new_genotype]).binding_sites_num), 
+                                &((genotype[new_genotype]).all_binding_sites), 
+                                (genotype[new_genotype]).hindrance_positions);
+
+        new_fitness = calc_avg_growth_rate(new_genotype,
+                                 &genotype[new_genotype],
+                                 &state[new_genotype],
+                                 &init_mRNA[new_genotype][0],
+                                 &init_protein_conc[new_genotype][0],
+                                 &t[new_genotype],
+                                 koffvalues[new_genotype],
+                                 &transport_rate[new_genotype][0],
+                                 &mRNAdecay[new_genotype][0],
+                                 &x[new_genotype],
+                                 &dt[new_genotype],
+                                 &konrate[new_genotype],
+                                 &kon_states[new_genotype],
+                                 &rates[new_genotype],
+                                 maxbound2,
+                                 maxbound3,
+                                 temperature,
+                                 no_fixed_dev_time);
+
+        printf("n_gr=%f\n",new_fitness);
+        fixation = try_fixation(current_fitness, new_fitness); // returns 0 if fails to fix				
+    }		
+    current_genotype = 1 - current_genotype; 
+    new_genotype = 1 - new_genotype;
+    current_fitness = new_fitness;
+    fixation=0;		
+ }
 }
 
 //void print_time_course(TimeCourse *start,

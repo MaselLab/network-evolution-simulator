@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 1000         
+#define POP_SIZE 500         
 #endif
 
 #ifndef MAX_MUT_STEP         
@@ -28,6 +28,8 @@
 #define MAX_COPIES 1       /* each gene can exists with four copies during replication */
 #endif
 
+//because of gene deletion and duplication, the number of genes are no longer constant
+//now declared as global integers: line357-361
 #ifdef  NO_SEPARATE_GENE    /* set to true if selection gene is also a TF */
   #ifndef TFGENES
   #define TFGENES 10          /* number of genes encoding TFs */
@@ -64,6 +66,12 @@
 
 //for parallelize mutation trials
 #define N_para_threads 2
+
+//int TFGENES = 3;
+//int NGENES = 5;
+//int NPROTEINS = 5;
+//int SELECTION_GENE_A = 3;
+//int SELECTION_GENE_B = 4;
 
 /* 
  * define macros for logging output and warning/errors 
@@ -211,31 +219,36 @@ struct KonStates {
 
 typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
-  int cisreg_id;     /* cis-reg region */
   int tf_id;         /* transcription factor */
-  int strand;        /* strand 0 (forward) or 1 (backward)*/
-  int hamming_dist;  /* hamming distance */
-  int gene_copy;     /* which copy of gene, 0 to MAX_COPIES-1 */
-  int left_edge_pos; /* start position of TF on DNA, always with reference to forward strand */
-                     /* note that recognition sitePos, can be computed from: (left_edge_pos+hind_pos) */
-  int hind_pos;      /* position of recognition site within the HIND_LENGTH bp hindrance (offset) */
+  float Koff;        /* replacing hamming_dist */
+  int BS_pos;        /* start position of BS on DNA, always with reference to forward strand */                     
+  int N_hindered;      /* the number of BS hindered by this TF when it binds to the current BS */  
+  //  int cisreg_id;     /* cis-reg region */
+  //  int hamming_dist;  /* hamming distance */
+  //  int strand;        /* strand 0 (forward) or 1 (backward)*/
+  //  int gene_copy;     /* which copy of gene, 0 to MAX_COPIES-1 */
 };
 
 typedef struct Genotype Genotype;
 struct Genotype {
   char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN];
   char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
-  int hindrance_positions[TFGENES];     /* offset positions of each TF's hindrance area relative to recognition site*/
-  int binding_sites_num;                    /* total number of binding sites */
-  AllTFBindingSites *all_binding_sites;
-  float mRNAdecay[NGENES];            /* kinetic rates*/
-  float proteindecay[NGENES];			/* kinetic rates*/
-  float translation[NGENES];			/* kinetic rates*/
-  int activating[NGENES][MAX_COPIES]; /* 1 is activating, 0 is repressing */
-  float pic_disassembly[NGENES][MAX_COPIES];
-  int copies[NGENES];                 /* current per-gene ploidy */
-
-
+  char tf_seq_rc[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+  int binding_sites_num[NGENES];                        /* total number of binding sites */
+  int max_hindered_sites[NGENES];                       /* maximal number of BS a BS can hinder*/ 
+  int N_act_BS[NGENES];                                 /* total number of binding sites of activating TF */
+  int N_rep_BS[NGENES];                                 /* total number of binding sites of repressing TF */
+  int N_act;                                            /* number of activating TF*/
+  int N_rep;                                            /* number of repressing TF*/
+  AllTFBindingSites *all_binding_sites[NGENES];
+  int activating[TFGENES][MAX_COPIES];                  /* 1 is activating TF, 0 is repressing */ 
+  
+  float mRNAdecay[NGENES];                              /* kinetic rates*/
+  float proteindecay[NGENES];                           /* kinetic rates*/
+  float translation[NGENES];                            /* kinetic rates*/   
+  float pic_disassembly[NGENES][MAX_COPIES];  
+  
+//  int copies[NGENES];                 /* current per-gene ploidy */
   /* cached quantities for efficiency, can be recomputed from the above genotype, not part of model */
 //  int sites_per_gene[NGENES];               /* cache number of TFBSs per gene */
 //  int site_id_pos[NGENES][MAX_COPIES][2];  /* cache start and end positions of binding siteIDs for each cis-reg sequence for use during replication and division*/
@@ -354,6 +367,7 @@ float gmax_b;
 float protein_aging;
 
 
+
 /* file output parameters */
 char *output_directory ;
 int verbose ;
@@ -387,26 +401,27 @@ extern void print_all_binding_sites(int [NGENES],
 extern void print_tf_occupancy(CellState *,
                                AllTFBindingSites *,
                                float);
+
 extern void initialize_genotype(Genotype *, 
                                 Genotype *,
                                 float [],
                                 int);
 
-extern int calc_all_binding_sites_copy(char [NGENES][MAX_COPIES][CISREG_LEN],
-                                       char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                       int ,
-                                       AllTFBindingSites **,
-                                       int *,
-                                       int ,
-                                       int ,
-                                       int [TFGENES]);
+extern void initialize_genotype_fixed(Genotype *,
+                                      float *,
+                                      int);
 
-extern void calc_all_binding_sites(int [NGENES],
-                                   char[NGENES][MAX_COPIES][CISREG_LEN],
-                                   char[TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                   int *,
-                                   AllTFBindingSites **,
-                                   int [TFGENES]);
+extern void calc_all_binding_sites_copy(Genotype *, int);
+
+extern void calc_all_binding_sites(Genotype *);
+
+extern float calc_ratio_act_to_rep(AllTFBindingSites *, 
+                                    int,
+                                    int,
+                                    int,
+                                    int, 
+                                    int [NGENES][MAX_COPIES], 
+                                    float *);
 
 extern int add_fixed_event(int,
                            int,
@@ -611,7 +626,7 @@ extern void update_protein_conc_cell_size(float[],
 //                                          TimeCourse **,
 //                                          TimeCourse **,
                                           float [],
-										  int *);
+					  int *);
 
 extern void calc_num_bound(float[],
                            int );
@@ -630,7 +645,7 @@ extern void transport_event(GillespieRates *,
                             float,
                             float,
                             float,
-							int *);
+                            int *);
 
 extern void tf_binding_event(GillespieRates *, CellState *, Genotype *, 
                              KonStates *, float *, 
@@ -716,7 +731,7 @@ extern int do_single_timestep(Genotype *,
                                int,
                                int,
                                int,
-							   int *) ;
+                               int *) ;
 							   
 extern void free_fixedevent(CellState *);
  
@@ -760,8 +775,8 @@ extern void print_all_protein_time_courses(TimeCourse *[2][NPROTEINS],
                                           TimeCourse *[2][NPROTEINS]);
                                           
 extern void clone_cell(Genotype *,                
-                		Genotype *,
-						int);
+                	Genotype *,
+			int);
 
 extern void log_snapshot(GillespieRates *,
                          CellState *,
@@ -774,5 +789,6 @@ extern void log_snapshot(GillespieRates *,
                          float ,
                          float );
 
+extern int mod(int, int); //thanks to the stupid % in gcc
 
 #endif /* !FILE_NETSIM_SEEN */
