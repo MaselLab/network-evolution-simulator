@@ -39,11 +39,12 @@ const float PICASSEMBLY=0.0277;
 const float STARTNUCLEUS=0.1;
 const float KR=10.0;                  /* don't put this less than 1, weird things happen to koff calculation */
 const float GASCONSTANT=8.31447;
-const float COOPERATIVITY=1.0;        /* dGibbs, relative to 1 additional specific nt */
-const float COOPERATIVE_DISTANCE=11;  /* distance co-operativity operates (changed from 20) */ 
+//const float COOPERATIVITY=1.0;        /* dGibbs, relative to 1 additional specific nt */
+//const float COOPERATIVE_DISTANCE=11;  /* distance co-operativity operates (changed from 20) */ 
 const float NUMSITESINGENOME = 1.3e+6; /* updated from 1.8e+6 */
 
 const float mN = 3.3e-10 * 5e6;    /* Lynch et al. (2008), Tsai et al. (2008)  */
+const float rate_of_event_x= 0.1;
 
 const int avg_protein_conc = 12000;
 const float penalty = 0.0;
@@ -53,12 +54,13 @@ const float avg_inset=5.0;
 const float avg_delet=5.0;
 /* below are default options, can be changed on command line*/
 
-float kon=1e-4;              /* lower value is so things run faster */
+float kon=1e-7;              /* lower value is so things run faster */
                              /* actual value should be kon=0.2225 is
                                 based on 1 molecule taking
                                 240seconds=4 minutes and 89% of the
                                 proteins being in the nucleus*/
-float kon_after_burnin=1e-4; /* lower value value after burn is so things run faster */
+
+//float kon_after_burnin=1e-4; /* lower value value after burn is so things run faster */
 //float Koff[TF_ELEMENT_LEN-NMIN+1];
 
 int burn_in = 1;             /* disable burn-in by default */
@@ -67,7 +69,7 @@ float tdevelopment = 60.0;/* default  development time: can be changed at runtim
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
-long seed = -1808;        
+long seed = -18745308;        
 int dummyrun = 10;          /* used to change seed */
 
 float growth_rate_scaling = 2.0; /* set default growth rate scaling factor */
@@ -232,51 +234,57 @@ void initialize_genotype_fixed(Genotype *genotype,
                                float kdis[],
                                int genotype_id)
 {
-  int i, j, p;
-  
-  genotype->N_act=0;
-  genotype->N_rep=0;
+    int i, j, p;
 
-  LOG_NOCELLID("[genotype %03d] activators vs repressors ", genotype_id);
-  
-  for (i=0; i < NGENES; i++) {
-    genotype->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
-    while (genotype->mRNAdecay[i]<0.0)
-      genotype->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
-    genotype->proteindecay[i]=-1.0;
-    while (genotype->proteindecay[i] < 0.0) {
-      if (ran1(&seed) < 0.08421)
-        genotype->proteindecay[i] = 0.0;
-      else genotype->proteindecay[i] = exp(0.7874*gasdev(&seed)-3.7665);
-    }
-    /* dilution no longer done here, because it is now variable (function of instantaneous growth rate) */
-    genotype->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
-    while (genotype->translation[i] < 0.0)
-      genotype->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
+    genotype->N_act=0;
+    genotype->N_rep=0;
 
-    /* make the activations the same in each copy */ 
-    if(i<TFGENES)
+    LOG_NOCELLID("[genotype %03d] activators vs repressors ", genotype_id);
+
+    for (i=0; i < NGENES; i++) 
     {
-        if (ran1(&seed)<PROB_ACTIVATING) {
-          genotype->N_act++;  
-          for (p=0; p < MAX_COPIES; p++) 
-            genotype->activating[i][p] = 1;
-        } else {
-          genotype->N_rep++;
-          for (p=0; p < MAX_COPIES; p++) 
-            genotype->activating[i][p] = 0;
+        genotype->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
+        while (genotype->mRNAdecay[i]<0.0)
+          genotype->mRNAdecay[i] = exp(0.4909*gasdev(&seed)-3.20304);
+        genotype->proteindecay[i]=-1.0;
+        while (genotype->proteindecay[i] < 0.0) 
+        {
+            if (ran1(&seed) < 0.08421)
+              genotype->proteindecay[i] = 0.0;
+            else genotype->proteindecay[i] = exp(0.7874*gasdev(&seed)-3.7665);
         }
+        /* dilution no longer done here, because it is now variable (function of instantaneous growth rate) */
+        genotype->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
+        while (genotype->translation[i] < 0.0)
+          genotype->translation[i] = exp(0.7406*gasdev(&seed)+4.56);
+
+        /* make the activations the same in each copy */
+
+        if(i<TFGENES)
+        {
+            if (ran1(&seed)<PROB_ACTIVATING) 
+            {
+                genotype->N_act++;  
+                for (p=0; p < MAX_COPIES; p++) 
+                    genotype->activating[i][p] = 1;
+            } 
+            else 
+            {
+                genotype->N_rep++;
+                for (p=0; p < MAX_COPIES; p++) 
+                    genotype->activating[i][p] = 0;
+            }
+        }
+
+    //    for (p=0; p < MAX_COPIES; p++) 
+    //      LOG_NOFUNC("%d ", genotype->activating[i][p]);
+
+        j = trunc(NUM_K_DISASSEMBLY * ran1(&seed));
+
+        for (p=0; p < MAX_COPIES; p++) 
+          genotype->pic_disassembly[i][p] = kdis[j];
     }
-
-//    for (p=0; p < MAX_COPIES; p++) 
-//      LOG_NOFUNC("%d ", genotype->activating[i][p]);
-
-    j = trunc(NUM_K_DISASSEMBLY * ran1(&seed));
-    
-    for (p=0; p < MAX_COPIES; p++) 
-      genotype->pic_disassembly[i][p] = kdis[j];
-  }
-  LOG_NOFUNC("\n");
+    LOG_NOFUNC("\n");
  
 }
 
@@ -483,7 +491,7 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
     double ratio_matrices[max_N_hindered_BS+1][N_rep_BS+1][N_act_BS+1];   
     double transition_matrix[N_rep_BS+1][N_act_BS+1];
     double sum,prob_act_over_rep=0.0;
-    float product_of_freq;    
+    double product_of_freq;    
     float Kon[TFGENES];      
     
     int pos_of_last_record;    
@@ -649,7 +657,7 @@ float calc_ratio_act_to_rep(AllTFBindingSites *BS_info,
         }
     } 
 
-    return prob_act_over_rep/sum;
+    return (float)(prob_act_over_rep/sum);
      // end of the forward algorithm   
 }
 
@@ -956,7 +964,7 @@ void calc_all_rates(Genotype *genotype,
         {
             case NUC_NO_PIC:
                 rates->acetylation_rate[i]=state->Pact[i]*ACETYLATE;
-                rates->subtotal+=rates->acetylation_rate[i];
+                rates->acetylation+=rates->acetylation_rate[i];
                 break;
                 
             case NO_NUC_NO_PIC:
@@ -974,6 +982,7 @@ void calc_all_rates(Genotype *genotype,
                 break;
         }
     }
+    rates->subtotal+=rates->acetylation;
     rates->subtotal+=rates->transport;
     rates->subtotal+=rates->mRNAdecay;
     rates->subtotal+=rates->pic_disassembly;
@@ -1915,6 +1924,8 @@ int do_single_timestep(Genotype *genotype,
 
         update_protein_conc_cell_size(genotype, state, rates, *dt, *t, *env);
         
+        calc_all_rates(genotype,state,rates,NO_KON_UPDATE);
+        
         /* Gillespie step: advance time to next event at dt */
         *t += *dt;
         LOG_VERBOSE("dt=%g t=%g\n", *dt, *t);
@@ -1928,7 +1939,7 @@ int do_single_timestep(Genotype *genotype,
         *dt = tdevelopment - *t;
 
         /* final update of protein concentration */
-        update_protein_conc_cell_size(genotype, state, rates, *dt, *t, *env);    
+        update_protein_conc_cell_size(genotype, state, rates, *dt, *t, *env);          
                                        
         /* advance to end of development (this exits the outer while loop) */
         *t = tdevelopment;
@@ -2132,7 +2143,8 @@ float calc_avg_growth_rate(int current_genotype,
                            float *dt,                           
                            GillespieRates *rates,
                            float maxbound2,
-                           float maxbound3,                           
+                           float maxbound3,
+                           float temperature,
                            int no_fixed_dev_time)
 {	
     int cell_status=0; 
@@ -2154,16 +2166,16 @@ float calc_avg_growth_rate(int current_genotype,
     	
         *t = 0.0;
 
-        do_single_timestep(genotype, 
-                           state,                          
-                           rates, 
-                           t,
-                           x,
-                           dt,                          
-                           maxbound2,
-                           maxbound3,
-                           no_fixed_dev_time,                           
-                           &env);
+//        do_single_timestep(genotype, 
+//                           state,                          
+//                           rates, 
+//                           t,
+//                           x,
+//                           dt,                          
+//                           maxbound2,
+//                           maxbound3,
+//                           no_fixed_dev_time,                           
+//                           &env);
 
         while(*t<tdevelopment)
         {
@@ -2190,28 +2202,18 @@ float calc_avg_growth_rate(int current_genotype,
     return avg_GR/N_replicates;
 }
 
-int try_fixation(Genotype *current_genotype, Genotype *new_genotype, int fixation)
+int try_fixation(float current_fitness, float new_fitness)
 {	
-    if(fixation) return 1; // if other threads have reported fixation
-    else
-    {
-        float s, P_fix, ref;
-        
-        s = (new_genotype->fitness-current_genotype->fitness)/current_genotype->fitness;
+    float s, P_fix, ref;
+    s = (new_fitness-current_fitness)/current_fitness;
 
-        if (fabs(s)<EPSILON){P_fix = 1/(float)POP_SIZE;}	
-        else{ P_fix = (1-exp(-s))/(1-exp(-s*(float)POP_SIZE)); }
+    if (fabs(s)<EPSILON){P_fix = 1/(float)POP_SIZE;}	
+    else{ P_fix = (1-exp(-s))/(1-exp(-s*(float)POP_SIZE)); }
 
-        ref=ran1(&seed);
+    ref=ran1(&seed);
 
-        if(ref > P_fix) return 0;
-        else 
-        {
-            int clone_type=4;            
-            clone_cell(new_genotype, current_genotype, clone_type);
-            return 1;
-        }
-    }
+    if(ref > P_fix) return 0;
+    else return 1;	
 }
 
 int mutate(Genotype *genotype)
@@ -2357,139 +2359,90 @@ int mutate(Genotype *genotype)
     }
 }
 
-void init_run_pop(Genotype genotype[N_para_threads+1],
-                  CellState state[N_para_threads+1],
+void init_run_pop(Genotype genotype[N_para_threads],
+                  CellState state[N_para_threads],
                   float temperature,   /* in Kelvin */
                   float kdis[NUM_K_DISASSEMBLY],
                   int output_binding_sites,
                   int no_fixed_dev_time)
 {  
-    int i;
-    int current_genotype = N_para_threads;   
-    int fixation = 0; 
-    int maxbound2, maxbound3; 
-    float init_mRNA[N_para_threads+1][NGENES]; 
-    float init_protein_conc[N_para_threads+1][NGENES];
-    float t[N_para_threads+1];             /* time of last event */
-    float x[N_para_threads+1];                  /* random number */
-    float dt[N_para_threads+1];                 /* delta-t */  
-    int clone_type=4;    
+  int i;
+  int current_genotype = 0;
+  int new_genotype = 1;
+  float current_fitness;
+  float new_fitness;
+  int fixation = 0;
+  int maxbound2, maxbound3; 
+  float init_mRNA[N_para_threads][NGENES]; 
+  float init_protein_conc[N_para_threads][NGENES];
+  float t[N_para_threads];             /* time of last event */
+  float x[N_para_threads];                  /* random number */
+  float dt[N_para_threads];                 /* delta-t */  
+  int clone_type=4;
+ 
+  GillespieRates rates[N_para_threads];
+	
+  maxbound2 = MAXBOUND;
+  maxbound3 = 10*MAXBOUND;
+  
+  for(i=0;i<TF_ELEMENT_LEN-NMIN+1;i++)
+  {      
+      Koff[i]=NUMSITESINGENOME*kon*0.25*KR/exp(-((float)i/3.0-1.0));      
+  }
+  //output=1;
+       
+  initialize_genotype(&genotype[current_genotype], &genotype[current_genotype], kdis, current_genotype); // checked
+  
+  current_fitness = calc_avg_growth_rate(current_genotype,
+                                         &genotype[current_genotype],
+                                         &state[current_genotype],
+                                         &init_mRNA[current_genotype][0],
+                                         &init_protein_conc[current_genotype][0],
+                                         &t[current_genotype],                                         
+                                         &x[current_genotype],
+                                         &dt[current_genotype],
+                                         &rates[current_genotype],
+                                         maxbound2,
+                                         maxbound3,
+                                         temperature,
+                                         no_fixed_dev_time);										 
 
-    omp_set_num_threads(N_para_threads);
+for(i=0;i<MAX_MUT_STEP;i++){
 
-    GillespieRates rates[N_para_threads+1];
+    printf("step:%d, gr=%f \n",i,current_fitness);
 
-    maxbound2 = MAXBOUND;
-    maxbound3 = 10*MAXBOUND;
+    while(!fixation){
+        
+        clone_cell(&genotype[current_genotype],&genotype[new_genotype],clone_type); // use type to decide which element in genotype needs clone
+        
+        clone_type=mutate(&genotype[new_genotype]); // type 0: genome type 1: tf-element type 3: kinetic rate constant type 4: everything
 
-    for(i=0;i<TF_ELEMENT_LEN-NMIN+1;i++)
-    {      
-        Koff[i]=NUMSITESINGENOME*kon*0.25*KR/exp(-((float)i/3.0-1.0));      
-    }
-    //output=1;
+        calc_all_binding_sites(&genotype[new_genotype]);
 
-    initialize_genotype(&genotype[current_genotype], &genotype[current_genotype], kdis, current_genotype); // checked
+        new_fitness = calc_avg_growth_rate(new_genotype,
+                                            &genotype[new_genotype],
+                                            &state[new_genotype],
+                                            &init_mRNA[new_genotype][0],
+                                            &init_protein_conc[new_genotype][0],
+                                            &t[new_genotype],
+                                            &x[new_genotype],
+                                            &dt[new_genotype],                                
+                                            &rates[new_genotype],
+                                            maxbound2,
+                                            maxbound3,
+                                            temperature,
+                                            no_fixed_dev_time);
 
-    genotype[current_genotype].fitness = calc_avg_growth_rate(current_genotype,
-                                                                &genotype[current_genotype],
-                                                                &state[current_genotype],
-                                                                &init_mRNA[current_genotype][0],
-                                                                &init_protein_conc[current_genotype][0],
-                                                                &t[current_genotype],                                         
-                                                                &x[current_genotype],
-                                                                &dt[current_genotype],
-                                                                &rates[current_genotype],
-                                                                maxbound2,
-                                                                maxbound3,                                           
-                                                                no_fixed_dev_time);										 
-
-//    for(i=0;i<MAX_MUT_STEP;i++)
-//    {
-        printf("step:%d, gr=%f \n",0,genotype[current_genotype].fitness);
-//
-//        fixation=0;
-//
-//        #pragma omp parallel
-//        {
-//            int ID=omp_get_thread_num();
-//            
-//            while(!fixation)
-//            {
-//                clone_cell(&genotype[current_genotype],&genotype[ID],clone_type); // use type to decide which element in genotype needs clone
-//
-//                clone_type=mutate(&genotype[ID]); // type 0: genome type 1: tf-element type 3: kinetic rate constant type 4: everything
-//
-//                calc_all_binding_sites(&genotype[ID]);
-//
-//                genotype[ID].fitness = calc_avg_growth_rate(ID,
-//                                                    &genotype[ID],
-//                                                    &state[ID],
-//                                                    &init_mRNA[ID][0],
-//                                                    &init_protein_conc[ID][0],
-//                                                    &t[ID], &x[ID], &dt[ID],                                                                              
-//                                                    &rates[ID],
-//                                                    maxbound2,
-//                                                    maxbound3,                                               
-//                                                    no_fixed_dev_time);
-//                
-//                printf("n_gr=%f\n",genotype[ID].fitness);
-//                
-//                #pragma omp critical
-//                fixation = try_fixation(&genotype[current_genotype], &genotype[ID], fixation); // returns 0 if fails to fix   
-//            }
-//
-//            
-//        }
-//    }
+        printf("n_gr=%f\n",new_fitness);
+        fixation = try_fixation(current_fitness, new_fitness); // returns 0 if fails to fix				
+    }		
+    current_genotype = 1 - current_genotype; 
+    new_genotype = 1 - new_genotype;
+    current_fitness = new_fitness;
+    fixation=0;		
+ }
 }
 
-/**/
-//void shell_parallel(Genotype *genotype, 
-//                    CellState, *state, 
-//                    GillespieRates *rates, 
-//                    float init_mRNA[NGENES], 
-//                    float init_protein_conc[NGENES],
-//                    float *t, float *x, float *dt,
-//                    int maxbound2, int maxbound3, 
-//                    int no_fixed_dev_time, int thread_id, 
-//                    int *pFixation, float *pCurrent_fitness)
-//{
-//    int fixation=0;
-//    int new_fitness=0.0;
-//    int clone_type =4;
-//    
-//    while(!*pFixation){         
-//                
-//        clone_cell(genotype[current_genotype],genotype[thread_id],clone_type); // use type to decide which element in genotype needs clone
-//
-//        clone_type=mutate(genotype[thread_id]); // type 0: genome type 1: tf-element type 3: kinetic rate constant type 4: everything
-//
-//        calc_all_binding_sites(&genotype[thread_id]);
-//
-//        new_fitness = calc_avg_growth_rate(thread_id,
-//                                           genotype[thread_id],
-//                                           state[thread_id],
-//                                           init_mRNA,
-//                                           init_protein_conc,
-//                                           t, x, dt,                                                                              
-//                                           rates[thread_id],
-//                                           maxbound2,
-//                                           maxbound3,                                               
-//                                           no_fixed_dev_time);
-//
-//        printf("n_gr=%f\n",new_fitness);
-//        *pFixation = try_fixation(*pCurrent_fitness, new_fitness); // returns 0 if fails to fix   
-//        if(*pFixation)
-//        {
-//            
-//        }
-//    }
-//    
-//    if(*pFixation)
-//   
-//    *pCurrent_fitness = new_fitness;
-//    fixation=0;		
-//}
 //void print_time_course(TimeCourse *start,
 //                       int i,
 //                       int j)
