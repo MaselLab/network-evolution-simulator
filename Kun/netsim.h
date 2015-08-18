@@ -189,6 +189,8 @@ struct Genotype {
   float translation[NGENES];                            /* kinetic rates*/   
   float pic_disassembly[NGENES][MAX_COPIES];  
   int copies[NGENES];                 /* current per-gene ploidy */
+  
+  float fitness;
 };
 
 /* 
@@ -289,7 +291,6 @@ float gmax_a;
 float gmax_b;
 float protein_aging;
 float Koff[TF_ELEMENT_LEN-4+1];
-
 
 /* file output parameters */
 char *output_directory ;
@@ -644,11 +645,10 @@ extern float calc_avg_growth_rate(int,
                                     float *,                                    
                                     GillespieRates *,
                                     float ,
-                                    float ,
-                                    float ,
+                                    float ,                                    
                                     int ); 
                                     
-extern int try_fixation(float, float);
+extern int try_fixation(Genotype *, Genotype *, int);
 
 extern int mutate(Genotype *);
   
