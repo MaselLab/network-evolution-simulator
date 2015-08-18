@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 10000        
+#define POP_SIZE 50        
 #endif
 
 #ifndef MAX_MUT_STEP         
@@ -66,7 +66,7 @@
 #endif
 
 //for parallelize mutation trials
-#define N_para_threads 2
+//#define N_para_threads 3
 
 /* 
  * define macros for logging output and warning/errors 
@@ -177,27 +177,27 @@ struct Genotype {
     int ngenes;                                           /* the number of actual loci */
     int ntfgenes;                                         /* the number of actual tf loci */
     int nproteins;                                        /* because of gene duplication, the number of proteins and mRNAs can be different 
-                                                           * form the number of genes. This nprotein is the number of elements in protein_pool*/
+                                                           * from the number of genes. This nprotein is the number of elements in protein_pool*/
     int *protein_pool[NPROTEINS][2];                      /* element 1 record how many genes/mRNAs producing this protein, 
-                                                           * ele 2 is which genes/mRNAs*/
-    int which_protein[NGENES];                            /* in case of gene duplication, this array tells which protein given a gene id */
+                                                           * ele 2 stores which genes/mRNAs*/
+    int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
    
     char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN];
     char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
     char tf_seq_rc[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int N_act;                                            /* number of activating TF*/
     int N_rep;                                            /* number of repressing TF*/
-    int activating[NPROTEINS][MAX_COPIES];                /* 1 is activating TF, 0 is repressing */ 
+    int activating[NPROTEINS][MAX_COPIES];                /* 1 for activating TF, 0 for repressing, -1 for non-tf */ 
 
     float mRNAdecay[NGENES];                              /* kinetic rates*/
     float proteindecay[NGENES];                           /* kinetic rates*/
     float translation[NGENES];                            /* kinetic rates*/   
     float pic_disassembly[NGENES][MAX_COPIES];            /* kinetic rates*/
                            
- /* binding sites related data, not directly subjected to mutation*/
+ /* binding sites related data*/
     int re_calc[NGENES][4];                               /* If there is no mutation to a duplicated gene, don't calc the distribution
                                                            * for it. Element 1: where to copy the distribution from, -1 means re_calc. 
-                                                           * Ele 2: 1 for the binding distribution can be copied from this gene.
+                                                           * Ele 2: 1 for the binding distribution can be copied from this gene. (this gene haven't been mutated since the last duplication)
                                                            * Ele 3: 1 for re_calc the bing sites.
                                                            * Ele 4: 1 for update binding sites info for this gene in clone_cell */    
     int binding_sites_num[NGENES];                        /* total number of binding sites */
@@ -210,9 +210,6 @@ struct Genotype {
     AllTFBindingSites *all_binding_sites[NGENES];      
 
     float fitness;
-//    float death;
-//    float avg_dt;
-//    float max_dt;
 };
 
 /* 
@@ -231,7 +228,10 @@ struct FixedEvent {
 typedef struct CellState CellState;
 struct CellState {   
     float cell_size;                    /* size of cell */
+    float cell_size_copy;               /* this is the cell size right after an env change*/
     float growth_rate;                  /* total growth rate in the previous deltat */
+    float cumulative_growth_rate;       /* the product of the avg growth rates of an env */
+    int env_change;                     /* number of env change */
     int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
     int mRNA_nuclear_num[NGENES];       /* mRNAs in nucleus */
     int mRNA_transl_cyto_num[NGENES];   /* mRNAs are in the cytoplasm, but only recently */
@@ -654,7 +654,7 @@ extern void transcription_init_event(GillespieRates *, CellState *, Genotype *,
 //                             float [NGENES],
 //                             float);
 
-extern int do_single_timestep(Genotype *, 
+extern void do_single_timestep(Genotype *, 
                                CellState *,
                                GillespieRates *,                              
                                float *,                    
@@ -665,7 +665,7 @@ extern int do_single_timestep(Genotype *,
 							   
 extern void free_fixedevent(CellState *);
  
-extern float calc_avg_growth_rate(Genotype *, 
+extern void calc_avg_growth_rate(Genotype *, 
                                     CellState *, 
                                     float [NGENES],
                                     float [NGENES],
@@ -674,9 +674,9 @@ extern float calc_avg_growth_rate(Genotype *,
                                     float ,
                                     long int *); 
                                     
-extern void try_fixation(Genotype *, Genotype *, int *, int *, long int *);
+extern void try_fixation(Genotype *, Genotype *, float, int *, int *, long int *);
 
-extern int mutate(Genotype *, float [NUM_K_DISASSEMBLY],long int *);
+extern int mutate(Genotype *, float [NUM_K_DISASSEMBLY],long int *, char *);
   
 extern void init_run_pop(//Genotype [N_para_threads+1],
 //                         CellState [N_para_threads+1],

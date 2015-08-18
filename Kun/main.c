@@ -26,8 +26,8 @@
 int main()
 {
 //  int i, j;
-  CellState state[N_para_threads+1];
-  Genotype indivs[N_para_threads+1];
+//  CellState state[N_para_threads+1];
+//  Genotype indivs[N_para_threads+1];
 //  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
 //  TimeCourse *timecourselast[2][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY];
