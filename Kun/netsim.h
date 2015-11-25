@@ -10,11 +10,11 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 100        
+#define POP_SIZE 2        
 #endif
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 10   // default 
+#define MAX_MUT_STEP 200   // default 
 #endif
 
 
@@ -181,7 +181,7 @@ struct Genotype {
     int *protein_pool[NPROTEINS][2];                      /* element 1 record how many genes/mRNAs producing this protein, 
                                                            * ele 2 stores which genes/mRNAs*/
     int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
-   
+    int which_tf[NGENES];                                /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
     char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN];
     char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
     char tf_seq_rc[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
@@ -195,11 +195,14 @@ struct Genotype {
     float pic_disassembly[NGENES][MAX_COPIES];            /* kinetic rates*/
                            
  /* binding sites related data*/
-    int re_calc[NGENES][4];                               /* If there is no mutation to a duplicated gene, don't calc the distribution
-                                                           * for it. Element 1: where to copy the distribution from, -1 means re_calc. 
-                                                           * Ele 2: 1 for the binding distribution can be copied from this gene. (this gene haven't been mutated since the last duplication)
-                                                           * Ele 3: 1 for re_calc the bing sites.
-                                                           * Ele 4: 1 for update binding sites info for this gene in clone_cell */    
+    
+    /* For genes having the same cis-reg, tf distribution can be shared*/
+    int cisreg_cluster[NGENES][NGENES];                   /* genes having the same cis-reg are clustered.
+                                                           * 1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
+                                                           * cisreg_cluster works with which_cluster*/
+    int which_cluster[NGENES];                            /* which_cluster stores the cluster id of a gene*/                                                           
+    int recalc_TFBS[NGENES];                              /* whether to recalc the TFBS*/
+    int clone_info[NGENES];                               /* whether to copy info back to this gene in clone_cell*/    
     int binding_sites_num[NGENES];                        /* total number of binding sites */
     int max_hindered_sites[NGENES];                       /* maximal number of BS a BS can hinder*/ 
     int N_act_BS[NGENES];                                 /* total number of binding sites of activating TF */
@@ -430,7 +433,8 @@ extern void initialize_cell(CellState *,
                             float [NGENES],
                             float [NGENES],
                             float [NPROTEINS],
-                            long int *);
+                            long int *,
+                            int );
 //
 //extern void initialize_cell_cache(CellState *,
 //                                  Genotype,                                 
@@ -689,8 +693,6 @@ extern void calc_avg_growth_rate(Genotype *,
                                     long int *); 
                                     
 extern void try_fixation(Genotype *, Genotype *, float, int *, int *, long int *);
-
-extern int mutate(Genotype *, float [NUM_K_DISASSEMBLY],long int *, Mutation *);
   
 extern void init_run_pop(//Genotype [N_para_threads+1],
 //                         CellState [N_para_threads+1],
@@ -707,10 +709,6 @@ extern void print_time_course(TimeCourse *,
 
 extern void print_all_protein_time_courses(TimeCourse *[2][NPROTEINS],
                                           TimeCourse *[2][NPROTEINS]);
-                                          
-extern void clone_cell(Genotype *,                
-                	Genotype *,
-                        int);
 
 extern void log_snapshot(Genotype *,
                          CellState *,
@@ -739,22 +737,50 @@ extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, f
 
 extern void calc_configurations(Genotype *, int);
 
-extern void susbtitution(Genotype *, Mutation *, long int *);
+extern int mutate(Genotype *, float [NUM_K_DISASSEMBLY],long int *, Mutation *);
 
-extern void insertion(Genotype *,Mutation *, long int *);
+extern void mut_susbtitution(Genotype *, Mutation *, long int *);
 
-extern void partial_deletion(Genotype *,Mutation *, long int *);
+extern void mut_insertion(Genotype *,Mutation *, long int *);
 
-extern void whole_gene_deletion(Genotype *,Mutation *, long int *);
+extern void mut_partial_deletion(Genotype *,Mutation *, long int *);
 
-extern void gene_duplicaton(Genotype *,Mutation *, long int *);
+extern void mut_whole_gene_deletion(Genotype *,Mutation *, long int *);
+
+extern void mut_duplicaton(Genotype *,Mutation *, long int *);
 
 extern void mut_binding_sequence(Genotype *,Mutation *, long int *);
 
 extern void mut_kinetic_constant(Genotype *, Mutation *, float [NUM_K_DISASSEMBLY],long int *);
 
+extern int reproduce_mutate(Genotype *, Mutation *);
+
+extern void reproduce_susbtitution(Genotype *, Mutation *);
+
+extern void reproduce_insertion(Genotype *,Mutation *);
+
+extern void reproduce_partial_deletion(Genotype *,Mutation *);
+
+extern void reproduce_whole_gene_deletion(Genotype *,Mutation *);
+
+extern void reproduce_gene_duplicaton(Genotype *,Mutation *);
+
+extern void reproduce_mut_binding_sequence(Genotype *,Mutation *);
+
+extern void reproduce_mut_kinetic_constant(Genotype *, Mutation *);
+
 extern void draw_mutation(int, char *,long int *);
 
 extern void initialize_cache(Genotype *);
+
+extern void update_protein_pool(Genotype *, int, int, char);
+
+extern void update_cisreg_cluster(Genotype *, int, char);
+
+extern void update_which_tf(Genotype *, int, int, char);
+
+extern void clone_cell_forward(Genotype *, Genotype *, int);
+
+extern void clone_cell_backward(Genotype *, Genotype *, int);
 
 #endif /* !FILE_NETSIM_SEEN */
