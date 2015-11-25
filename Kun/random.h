@@ -8,5 +8,7 @@ extern float poidev(float xm, long *seed);
 extern float expdev(long *seed);
 // binomially distributed
 extern float bnldev(float pp, int n, long *seed);
-
-
+/* quantile function of t distribution*/
+extern float qt(float, float, float, float, float, float, int);
+/* f test*/
+extern float ftest(float, float, float, float);

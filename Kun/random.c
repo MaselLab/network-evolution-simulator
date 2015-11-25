@@ -14,6 +14,10 @@
 #define EPS 1.2e-7
 #define RNMX (1.0-EPS)
 #define PI 3.141592654
+#define MAXIT 100
+#define EPS2 3.0e-7
+#define FPMIN 1.0e-30
+float betai(float, float, float);
 
 float ran1(long *seed)
 {
@@ -36,11 +40,11 @@ float ran1(long *seed)
     }
     k=(*seed)/IQ;          /*Start here when not initializing.*/
     *seed=IA*(*seed-k*IQ)-IR*k;  /*Compute idum=(IA*idum) % IM without over- */
-     if (*seed < 0) *seed += IM;            /*flows by Schrage’s method.*/
+     if (*seed < 0) *seed += IM;            /*flows by Schrageï¿½s method.*/
      j=iy/NDIV;           /*Will be in the range 0..NTAB-1.*/
      iy=iv[j];               /*Output previously stored value and refill the*/
      iv[j] = *seed;          /*shuffle table. */
-     if ((temp=AM*iy) > RNMX) return RNMX;  /*Because users don’t expect endpoint values.*/
+     if ((temp=AM*iy) > RNMX) return RNMX;  /*Because users donï¿½t expect endpoint values.*/
      else return temp;
 }
 
@@ -67,7 +71,7 @@ float gasdev(long *seed)
 }
 
 float gammln(float xx)
-/*Returns the value ln[Ã(xx)] for xx > 0.*/
+/*Returns the value ln[ï¿½(xx)] for xx > 0.*/
 {
 /*Internal arithmetic will be done in double precision, a nicety that you can omit if five-figure
 accuracy is good enough.*/
@@ -86,7 +90,7 @@ accuracy is good enough.*/
 }
 
 float poidev(float xm, long *seed)
-{
+{    
     float gammln(float xx);
     float ran1(long *seed);
     static float sq,alxm,g,oldm=(-1.0);  /*oldm is a flag for whether xm has changed*/
@@ -95,7 +99,7 @@ float poidev(float xm, long *seed)
     if (xm < 12.0) {                       /*Use direct method.*/
         if (xm != oldm) {
         oldm=xm;
-        g=expf(-xm);                     /*If xm is new, compute the exponential.*/
+        g=exp(-xm);                     /*If xm is new, compute the exponential.*/
     }
     em = -1;
     t=1.0;
@@ -110,7 +114,7 @@ float poidev(float xm, long *seed)
           sq=sqrt(2.0*xm);
           alxm=log(xm);
           g=xm*alxm-gammln(xm+1.0);
-                            /*The function gammln is the natural log of the gamma function, as given in §6.1.*/
+                            /*The function gammln is the natural log of the gamma function, as given in ï¿½6.1.*/
         }
         do {
             do {                          /*y is a deviate from a Lorentzian comparison function.*/
@@ -118,7 +122,7 @@ float poidev(float xm, long *seed)
                em=sq*y+xm;                     /*em is y, shifted and scaled.*/
             } while (em < 0.0);             /*Reject if in regime of zero probability.*/
             em=floor(em);                   /*The trick for integer-valued distributions.*/
-            t=0.9*(1.0+y*y)*expf(em*alxm-gammln(em+1.0)-g);
+            t=0.9*(1.0+y*y)*exp(em*alxm-gammln(em+1.0)-g);
 /*The ratio of the desired distribution to the comparison function; we accept or
 reject by comparing it to another uniform deviate. The factor 0.9 is chosen so
 that t never exceeds 1.*/
@@ -145,14 +149,14 @@ float bnldev(float pp, int n, long *seed)
     static float pold=(-1.0),pc,plog,pclog,en,oldg;
     p=(pp <= 0.5 ? pp : 1.0-pp);
 /*The binomial distribution is invariant under changing pp to 1-pp, if we also change the
-answer to n minus itself; we’ll remember to do this below.*/
+answer to n minus itself; weï¿½ll remember to do this below.*/
     am=n*p;         /*This is the mean of the deviate to be produced.*/
     if (n < 25) {   /*Use the direct method while n is not too large.*/
          bnl=0.0;                   /*This can require up to 25 calls to ran1. */
          for (j=1;j<=n;j++)
              if (ran1(seed) < p) ++bnl;
          } else if (am < 1.0) {    /*If fewer than one event is expected out of 25*/
-               g=expf(-am);          /*or more trials, then the distribution is quite*/
+               g=exp(-am);          /*or more trials, then the distribution is quite*/
                t=1.0;               /*accurately Poisson. Use direct Poisson method.*/
                for (j=0;j<=n;j++) {
                     t *= ran1(seed);
@@ -178,7 +182,7 @@ answer to n minus itself; we’ll remember to do this below.*/
                em=sq*y+am;
             } while (em < 0.0 || em >= (en+1.0));  /*Reject.*/
             em=floor(em);     /*Trick for integer-valued distribution.*/
-            t=1.2*sq*(1.0+y*y)*expf(oldg-gammln(em+1.0)
+            t=1.2*sq*(1.0+y*y)*exp(oldg-gammln(em+1.0)
                         -gammln(en-em+1.0)+em*plog+(en-em)*pclog);
          } while (ran1(seed) > t);  /*Reject. This happens about 1.5 times per deviate,*/
          bnl=em;
@@ -187,24 +191,109 @@ answer to n minus itself; we’ll remember to do this below.*/
     return bnl;
 }
 
-// sampling with weight, rejection method
-int sampling(int length,float *weight, long *seed)
+float ftest(float varX, float nX, float varY, float nY)
 {
-    float ref;
-    int i;
-    while(1)
+    float df1, df2, prob, f;    
+    
+    if (varX>varY)
     {
-        ref = ran1(seed);
-
-        i = rand() % 3;
-
-        if(ref<weight[i])
-        {
-          break;
-
-          return i;
-        }
-
-        srand(time(NULL));
+        f=varX/varY;
+        df1=nX-1;
+        df2=nY-1;
     }
- }
+    else
+    {
+        f=varY/varX;
+        df1=nY-1;
+        df2=nX-1;
+    }
+    
+    prob=2.0*betai(0.5*df2,0.5*df1,df2/(df2+df1*f));
+    if(prob>1.0) prob=2.0-prob;
+    
+    return prob;
+}
+
+float betai(float a, float b, float x)
+{
+    float betacf(float, float, float );
+    float gammln(float xx);
+    float bt;
+    
+    if(x ==0.0 || x==1.0) bt=0.0;
+    else
+        bt=exp(gammln(a+b)-gammln(a)-gammln(b)+a*log(x)+b*log(1.0-x));
+    if(x<(a+1.0)/(a+b+2.0))
+        return bt*betacf(a,b,x)/a;
+    else
+        return 1.0-bt*betacf(b,a,1.0-x)/b;    
+}
+
+float betacf(float a, float b, float x)
+{
+    int m, m2;
+    float aa, c, d, del, h, qab, qam, qap;
+    
+    qab=a+b;
+    qap=a+1.0;
+    qam=a-1.0;
+    c=1.0;
+    d=1.0-qab*x/qap;
+    if(fabs(d)<FPMIN)d=FPMIN;
+    d=1.0/d;
+    h=d;
+    for(m=1;m<MAXIT;m++)
+    {
+        m2=2*m;
+        aa=m*(b-m)*x/((qam+m2)*(a+m2));
+        d=1.0+aa*d;
+        if(fabs(d)<FPMIN)d=FPMIN;
+        c=1.0+aa/c;
+        if(fabs(c)<FPMIN)c=FPMIN;
+        d=1.0/d;
+        h*=d*c;
+        aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+        d=1.0+aa*d;
+        if(fabs(d)<FPMIN)d=FPMIN;
+        c=1.0+aa/c;
+        if(fabs(c)<FPMIN)c=FPMIN;
+        d=1.0/d;
+        del=d*c;
+        h*=del;
+        if(fabs(del-1.0)<EPS2)break;
+    }
+    if(m>MAXIT)
+    {
+//        printf("error in betacf");
+        exit(-1);
+    }
+    return h;
+}
+
+float qt(float m1, float v1, float n1, float m2, float v2, float n2, int eq_var)
+{
+    float df, p, t, svar,N;
+    
+    if(eq_var)
+    {
+        df=n1+n2-2.0;
+        N=(n1+n2)/n1*n2;
+        svar=(v1*(n1-1.0)+v2*(n2-1.0))/df;
+    }
+    else
+    {
+        df=pow(m1/n1+m2/n2,2.0)/(pow(v1/n1,2.0)/(n1-1)+pow(v2/n2,2.0)/(n2-1));
+        svar=v1/n1+v2/n2;
+        N=1.0;
+    }
+    
+    t=fabs(m2-m1)/sqrt(svar*N); 
+    
+    if(m1>=m2)
+        p=1-0.5*betai(0.5*df,0.5,df/(df+t*t));
+    else
+        p=0.5*betai(0.5*df,0.5,df/(df+t*t));
+    
+    return p;
+}
+

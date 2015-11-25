@@ -14,7 +14,7 @@
 #endif
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 200   // default 
+#define MAX_MUT_STEP 50   // default 
 #endif
 
 
@@ -53,8 +53,6 @@
   #ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
   #define NPROTEINS 96
   #endif
-//  #define SELECTION_GENE_A (NGENES-2)    /* index of selection gene */
-//  #define SELECTION_GENE_B (NGENES-1)   /* index of selection gene: always the last two genes */
 #endif
 
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
@@ -215,6 +213,7 @@ struct Genotype {
     float avg_G1;
     float avg_G2;
     float fitness;
+    float var_fitness;
 };
 
 /* 
