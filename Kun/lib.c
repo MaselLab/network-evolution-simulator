@@ -241,7 +241,8 @@ void display2(TimeCourse *start)
     info = info->next;
   }
 }
-      
+
+/*append to the end*/      
 void sls_store_end(FixedEvent *i, 
                    FixedEvent **start, 
                    FixedEvent **last)

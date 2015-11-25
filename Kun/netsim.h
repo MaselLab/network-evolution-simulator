@@ -14,9 +14,10 @@
 #endif
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 50   // default 
+#define MAX_MUT_STEP 400   // default 
 #endif
 
+#define N_THREADS 12
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
@@ -45,13 +46,13 @@
   #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 80          /* the initial value is set in initiate_genotype*/
+  #define TFGENES 50          /* the initial value is set in initiate_genotype*/
   #endif
   #ifndef NGENES
-  #define NGENES 96  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
+  #define NGENES 60  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
   #endif
   #ifndef NPROTEINS           /* number of proteins: TODO: must be equal to the number of genes currently */
-  #define NPROTEINS 96
+  #define NPROTEINS 60
   #endif
 #endif
 
@@ -62,9 +63,6 @@
 #ifndef HIND_LENGTH
 #define HIND_LENGTH 15         /* default length of hindrance (original was 6) */
 #endif
-
-//for parallelize mutation trials
-//#define N_para_threads 3
 
 /* 
  * define macros for logging output and warning/errors 
@@ -176,7 +174,7 @@ struct Genotype {
     int ntfgenes;                                         /* the number of actual tf loci */
     int nproteins;                                        /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                            * from the number of genes. This nprotein is the number of elements in protein_pool*/
-    int *protein_pool[NPROTEINS][2];                      /* element 1 record how many genes/mRNAs producing this protein, 
+    int protein_pool[NPROTEINS][2][50];                      /* element 1 record how many genes/mRNAs producing this protein, 
                                                            * ele 2 stores which genes/mRNAs*/
     int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
     int which_tf[NGENES];                                /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
@@ -210,10 +208,12 @@ struct Genotype {
 //    int max_N_act_bound[NGENES];
     AllTFBindingSites *all_binding_sites[NGENES];      
 
-    float avg_G1;
-    float avg_G2;
+    float avg_GR1;
+    float avg_GR2;
+    float var_GR1;
+    float var_GR2;
     float fitness;
-    float var_fitness;
+//    float var_fitness;
 };
 
 /* 
@@ -428,12 +428,19 @@ extern void delete_fixed_event_start(FixedEvent **,
 extern void initialize_cell(CellState *,
                             int,
                             int,  
-                            int *[NPROTEINS][2],
+                            int [NPROTEINS][2][50],
                             float [NGENES],
                             float [NGENES],
                             float [NPROTEINS],
                             long int *,
-                            int );
+                            float,
+                            float,
+                            int, 
+                            TimeCourse **,
+                            TimeCourse **,
+                            TimeCourse **,
+                            TimeCourse **,       
+                            int);
 //
 //extern void initialize_cell_cache(CellState *,
 //                                  Genotype,                                 
@@ -556,9 +563,9 @@ extern void revise_activity_state(int,
 //                               int *,
 //                               int,
 //                               float);
-
+//
 //extern void add_time_points(float,
-//                            float [NPROTEINS],
+//                            float,
 //                            TimeCourse **,
 //                            TimeCourse **);
 //
@@ -587,9 +594,12 @@ extern void update_protein_conc_cell_size(Genotype *,
                                           GillespieRates *,
                                           float,                                        
                                           float,
-//                                          TimeCourse **,
-//                                          TimeCourse **,                                         
-					  int);
+                                          int,
+                                          TimeCourse **,
+                                          TimeCourse **, 
+                                          TimeCourse **,
+                                          TimeCourse **, 
+                                          int);
 
 //extern void calc_num_bound(float[],
 //                           int );
@@ -678,36 +688,29 @@ extern void do_single_timestep(Genotype *,
                                int,
                                int,                                                             
                                int *,
-                               long int *) ;
+                               float,
+                               float,
+                               long int *,
+                               TimeCourse **,
+                               TimeCourse **,
+                               TimeCourse **,
+                               TimeCourse **,
+                               int) ;
 							   
 extern void free_fixedevent(CellState *);
  
-extern void calc_avg_growth_rate(Genotype *, 
-                                    CellState *, 
+extern void calc_avg_growth_rate(Genotype *,                                    
                                     float [NGENES],
                                     float [NGENES],
-                                    GillespieRates *,
                                     float ,
-                                    float ,
-                                    long int *); 
-                                    
-extern void try_fixation(Genotype *, Genotype *, float, int *, int *, long int *);
+                                    float ); 
   
-extern void init_run_pop(//Genotype [N_para_threads+1],
-//                         CellState [N_para_threads+1],
-//                         TimeCourse *[2][NGENES],
-//                         TimeCourse *[2][NGENES], 
-//                         float, /* in Kelvin */
-                         float [NUM_K_DISASSEMBLY],
-//                         int,
-                         FILE *);
+extern void init_run_pop(float [NUM_K_DISASSEMBLY]);
 
 
-extern void print_time_course(TimeCourse *,
-                              int, int);
+extern void print_time_course(TimeCourse *, FILE *);
 
-extern void print_all_protein_time_courses(TimeCourse *[2][NPROTEINS],
-                                          TimeCourse *[2][NPROTEINS]);
+extern void print_all_protein_time_courses(int, TimeCourse **, TimeCourse **, FILE *);
 
 extern void log_snapshot(Genotype *,
                          CellState *,
@@ -730,9 +733,11 @@ extern void do_fixed_event(Genotype *,
                             float *,
                             float ,
                             int , 
+                            float ,
+                            float,
                             int *);
 
-extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, long int *);
+extern void do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, long int *);
 
 extern void calc_configurations(Genotype *, int);
 
@@ -781,5 +786,13 @@ extern void update_which_tf(Genotype *, int, int, char);
 extern void clone_cell_forward(Genotype *, Genotype *, int);
 
 extern void clone_cell_backward(Genotype *, Genotype *, int);
+
+extern void try_fixation(Genotype *, Genotype *, int *, float *);
+
+extern void calc_avg_growth_rate_plotting(Genotype *,                               
+                                            float [NGENES],
+                                            float [NGENES],                                    
+                                            float ,
+                                            float ); 
 
 #endif /* !FILE_NETSIM_SEEN */

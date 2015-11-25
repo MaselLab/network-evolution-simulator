@@ -14,10 +14,13 @@
 #define EPS 1.2e-7
 #define RNMX (1.0-EPS)
 #define PI 3.141592654
-#define MAXIT 100
-#define EPS2 3.0e-7
-#define FPMIN 1.0e-30
-float betai(float, float, float);
+#define SQRT2PI 2.506628275
+#define P 0.2316419
+#define B1 0.319381530
+#define B2 -0.356563782
+#define B3 1.781477937
+#define B4 -1.821255978
+#define B5 1.330274429
 
 float ran1(long *seed)
 {
@@ -191,109 +194,25 @@ answer to n minus itself; we�ll remember to do this below.*/
     return bnl;
 }
 
-float ftest(float varX, float nX, float varY, float nY)
-{
-    float df1, df2, prob, f;    
-    
-    if (varX>varY)
-    {
-        f=varX/varY;
-        df1=nX-1;
-        df2=nY-1;
-    }
-    else
-    {
-        f=varY/varX;
-        df1=nY-1;
-        df2=nX-1;
-    }
-    
-    prob=2.0*betai(0.5*df2,0.5*df1,df2/(df2+df1*f));
-    if(prob>1.0) prob=2.0-prob;
-    
-    return prob;
-}
 
-float betai(float a, float b, float x)
+/* returns the cumulative probability of standard normal distribution*/
+/* based on Abramowitz & Stegun 1974 algorithm 26.2.17*/
+float qz(float m1, float v1, float m2, float v2)
 {
-    float betacf(float, float, float );
-    float gammln(float xx);
-    float bt;
+    float x, t, zx;
     
-    if(x ==0.0 || x==1.0) bt=0.0;
+    if (m1>=m2)
+    {
+        x=(m1-m2)/sqrt(v1+v2);
+        t= 1.0/(1.0+P*x);
+        zx=exp(-0.5*x*x)/SQRT2PI;
+        return 1.0-zx*(B1*t+B2*t*t+B3*pow(t,3.0)+B4*pow(t,4.0)+B5*pow(t,5.0));
+    }
     else
-        bt=exp(gammln(a+b)-gammln(a)-gammln(b)+a*log(x)+b*log(1.0-x));
-    if(x<(a+1.0)/(a+b+2.0))
-        return bt*betacf(a,b,x)/a;
-    else
-        return 1.0-bt*betacf(b,a,1.0-x)/b;    
+    {
+        x=(m2-m1)/sqrt(v1+v2);
+        t=1.0/(1.0+P*x);
+        zx=exp(-0.5*x*x)/SQRT2PI;
+        return zx*(B1*t+B2*t*t+B3*pow(t,3.0)+B4*pow(t,4.0)+B5*pow(t,5.0));        
+    }   
 }
-
-float betacf(float a, float b, float x)
-{
-    int m, m2;
-    float aa, c, d, del, h, qab, qam, qap;
-    
-    qab=a+b;
-    qap=a+1.0;
-    qam=a-1.0;
-    c=1.0;
-    d=1.0-qab*x/qap;
-    if(fabs(d)<FPMIN)d=FPMIN;
-    d=1.0/d;
-    h=d;
-    for(m=1;m<MAXIT;m++)
-    {
-        m2=2*m;
-        aa=m*(b-m)*x/((qam+m2)*(a+m2));
-        d=1.0+aa*d;
-        if(fabs(d)<FPMIN)d=FPMIN;
-        c=1.0+aa/c;
-        if(fabs(c)<FPMIN)c=FPMIN;
-        d=1.0/d;
-        h*=d*c;
-        aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
-        d=1.0+aa*d;
-        if(fabs(d)<FPMIN)d=FPMIN;
-        c=1.0+aa/c;
-        if(fabs(c)<FPMIN)c=FPMIN;
-        d=1.0/d;
-        del=d*c;
-        h*=del;
-        if(fabs(del-1.0)<EPS2)break;
-    }
-    if(m>MAXIT)
-    {
-//        printf("error in betacf");
-        exit(-1);
-    }
-    return h;
-}
-
-float qt(float m1, float v1, float n1, float m2, float v2, float n2, int eq_var)
-{
-    float df, p, t, svar,N;
-    
-    if(eq_var)
-    {
-        df=n1+n2-2.0;
-        N=(n1+n2)/n1*n2;
-        svar=(v1*(n1-1.0)+v2*(n2-1.0))/df;
-    }
-    else
-    {
-        df=pow(m1/n1+m2/n2,2.0)/(pow(v1/n1,2.0)/(n1-1)+pow(v2/n2,2.0)/(n2-1));
-        svar=v1/n1+v2/n2;
-        N=1.0;
-    }
-    
-    t=fabs(m2-m1)/sqrt(svar*N); 
-    
-    if(m1>=m2)
-        p=1-0.5*betai(0.5*df,0.5,df/(df+t*t));
-    else
-        p=0.5*betai(0.5*df,0.5,df/(df+t*t));
-    
-    return p;
-}
-

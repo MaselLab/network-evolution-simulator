@@ -30,10 +30,7 @@ int main()
 //  Genotype indivs[N_para_threads+1];
 //  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
 //  TimeCourse *timecourselast[2][NPROTEINS];
-  float kdis[NUM_K_DISASSEMBLY];
-  FILE *OUTPUT;
-  
-  OUTPUT=fopen("output.txt","a+");
+  float kdis[NUM_K_DISASSEMBLY]; 
 
 //  int output_binding_sites = 0; /*verbose flag*/
 //  int no_fixed_dev_time = 0; /* 0 = fixed development time, 1 = divides when ready  */
@@ -72,7 +69,7 @@ int main()
 
   /* now create and run the population of cells */
 
-  init_run_pop(kdis, OUTPUT);
+  init_run_pop(kdis);
 //			  , no_fixed_dev_time, max_divisions);
 
 //  print_all_protein_time_courses(timecoursestart, timecourselast);
@@ -114,7 +111,5 @@ int main()
 //    fclose(fp_rounding[j]);
 //#endif
 //  }
-
-  fclose(OUTPUT);
   return 0;
 }
