@@ -3242,7 +3242,7 @@ void calc_avg_growth_rate(Genotype *genotype,
 
 /* begin of mutation functions*/
 
-void substitution(Genotype *genotype,long int *seed)
+void substitution(Genotype *genotype, Mutation *mut_record, long int *seed)
 {
     int l_genome = genotype->ngenes*CISREG_LEN;
     int pos_n, pos_g;
@@ -3265,14 +3265,20 @@ void substitution(Genotype *genotype,long int *seed)
     genotype->re_calc[pos_g][1]=0;  /* or copy the distribution from this promoter */
     genotype->re_calc[pos_g][2]=1;  /* we need to recalc the binding sites on this promoter*/
     genotype->re_calc[pos_g][3]=1;
+    
+    /*record mutation info*/
+    mut_record->pos_n=pos_n;
+    mut_record->pos_g=pos_g;
+    mut_record->nuc_diff[0]=n;
 }
 
 /* MAXCOPIES has to be 1*/
-void insertion(Genotype *genotype,long int *seed)
+void insertion(Genotype *genotype, Mutation *mut_record, long int *seed)
 {
     int inset_size=0;
     float random;
     int pos_g,pos_n,i;
+    char n;
     
     while(inset_size<=0 )
     {
@@ -3294,20 +3300,29 @@ void insertion(Genotype *genotype,long int *seed)
     
     for(i=pos_n;i<pos_n+inset_size;i++)
     {        					
-        genotype->cisreg_seq[pos_g][0][i]=set_base_pair(ran1(seed));							
+        n=set_base_pair(ran1(seed));	
+        genotype->cisreg_seq[pos_g][0][i]=n;
+        /*record mutation info*/
+        mut_record->nuc_diff[i-pos_n]=n;
+        
     }
     
     genotype->re_calc[pos_g][0]=-1;
     genotype->re_calc[pos_g][1]=0;
     genotype->re_calc[pos_g][2]=1;
     genotype->re_calc[pos_g][3]=1;
+    
+    /*record mutation info*/
+    mut_record->pos_n=pos_n;
+    mut_record->pos_g=pos_g;    
 }
 
-void partial_deletion(Genotype *genotype, long int *seed)
+void partial_deletion(Genotype *genotype, Mutation *mut_record, long int *seed)
 {
     int delet_size;
     float random;
     int pos_g, pos_n, i;
+    char n;
     
     while(delet_size<=0)
     {
@@ -3318,6 +3333,10 @@ void partial_deletion(Genotype *genotype, long int *seed)
     pos_g=floor(random);
     random=ran1(seed)*CISREG_LEN;			
     pos_n=floor(random);                /* from which a seq will be deleted */
+    
+    /*record mutation info*/
+    mut_record->pos_g=pos_g;
+    mut_record->pos_n=pos_n;
 
     if (pos_n+delet_size>CISREG_LEN)	/* if only the tail is deleted*/
     {
@@ -3325,7 +3344,10 @@ void partial_deletion(Genotype *genotype, long int *seed)
         
         for(i=pos_n;i<pos_n+delet_size;i++)
         {					
-            genotype->cisreg_seq[pos_g][0][i]=set_base_pair(ran1(seed));
+            n=set_base_pair(ran1(seed));
+            genotype->cisreg_seq[pos_g][0][i]=n;
+             /*record mutation info*/
+            mut_record->nuc_diff[i-pos_n]=n;
         }				
     }
     else /* else, join the two fragments aside the deletion */
@@ -3336,7 +3358,10 @@ void partial_deletion(Genotype *genotype, long int *seed)
         }                				
         for(i++;i<CISREG_LEN;i++) /* and fill the gab by generating new seq */
         {				
-            genotype->cisreg_seq[pos_g][0][i]= set_base_pair(ran1(seed));
+            n= set_base_pair(ran1(seed));
+            genotype->cisreg_seq[pos_g][0][i]=n;
+             /*record mutation info*/
+            mut_record->nuc_diff[i-CISREG_LEN-delet_size]=n;
         }						
     }	
     
@@ -3346,7 +3371,7 @@ void partial_deletion(Genotype *genotype, long int *seed)
     genotype->re_calc[pos_g][3]=1;
 }
 
-void whole_gene_deletion(Genotype *genotype,long int *seed) // any gene can be deleted
+void whole_gene_deletion(Genotype *genotype, Mutation *mut_record, long int *seed) // any gene can be deleted
 {
     float random;
     int pos_g, pos_g_copy, offset, i,j;
@@ -3394,7 +3419,10 @@ void whole_gene_deletion(Genotype *genotype,long int *seed) // any gene can be d
             }
         }
     } 
-    				
+    
+    /*record mutation info*/
+    mut_record->pos_g=pos_g;
+    
     temp1 = &genotype->cisreg_seq[pos_g][0][0];			
     offset=CISREG_LEN;
 
@@ -3768,7 +3796,7 @@ void whole_gene_deletion(Genotype *genotype,long int *seed) // any gene can be d
 //    genotype->ngenes++;
 //}
 
-void gene_duplication(Genotype *genotype,long int *seed) //any gene can be duplicated
+void gene_duplication(Genotype *genotype, Mutation *mut_record, long int *seed) //any gene can be duplicated
 {
     float random;
     int pos_g,pos_g_copy, i,j, protein_id;
@@ -3782,6 +3810,9 @@ void gene_duplication(Genotype *genotype,long int *seed) //any gene can be dupli
         pos_g_copy=pos_g+1; /* note that if the selection genes are to be duplicated, shifting sequences and info will cause problem*/
     else
         pos_g_copy=pos_g;
+    
+    /*record mutation info*/
+    mut_record->pos_g=pos_g;
     
     /* copy the promoter*/
     temp1=&genotype->cisreg_seq[pos_g_copy][0][0]; /* points to the gene to be duplicated*/
@@ -3923,7 +3954,7 @@ void gene_duplication(Genotype *genotype,long int *seed) //any gene can be dupli
         genotype->ntfgenes++;    
 }
 
-void mut_binding_sequence(Genotype *genotype,long int *seed)
+void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, long int *seed)
 {
     float random;
     int pos_g, pos_n, protein_id, i;
@@ -3936,13 +3967,17 @@ void mut_binding_sequence(Genotype *genotype,long int *seed)
     random=ran1(seed)*TF_ELEMENT_LEN;			
     pos_n=floor(random);
     n=set_base_pair(ran1(seed));
-    
+        
     while (n == tf_seq[pos_n])
     {	
         n=set_base_pair(ran1(seed));
     }	
     
     tf_seq[pos_n]=n;
+    
+    /*record mutation info*/
+    mut_record->pos_n=pos_n;
+    mut_record->nuc_diff[0]=n;
     
     /* update the complement sequence*/
     switch (n)
@@ -4008,7 +4043,7 @@ void mut_binding_sequence(Genotype *genotype,long int *seed)
  * will be mutated. We assume a mutation attacks the four constants with equal 
  * probability. 
  */
-void mut_kinetic_constant(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long int *seed)
+void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[NUM_K_DISASSEMBLY],long int *seed)
 {
     float random1, random2;
     int pos_kdis, pos_g, protein_id, i;
@@ -4018,6 +4053,9 @@ void mut_kinetic_constant(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long
     random2=ran1(seed)*genotype->ngenes;
         
     pos_g=floor(random2); /* which gene */
+    
+    /*record mutation info*/
+    mut_record->pos_g=pos_g;
     
     if(random1<=0.25) /* mut kdis */
     {        
@@ -4032,7 +4070,11 @@ void mut_kinetic_constant(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long
             pos_kdis=floor(random2);
         }
         
-        genotype->pic_disassembly[pos_g][0]=kdis[pos_kdis];        
+        genotype->pic_disassembly[pos_g][0]=kdis[pos_kdis]; 
+        
+        /*record mutation info*/
+        mut_record->kinetic_type=0;
+        mut_record->kinetic_diff=kdis[pos_kdis];
     }
     else if(random1<=0.5) /* mut mRNAdecay */
     {
@@ -4044,12 +4086,16 @@ void mut_kinetic_constant(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long
         }
 
         genotype->mRNAdecay[pos_g]=random2;
+       
+        /*record mutation info*/
+        mut_record->kinetic_type=1;
+        mut_record->kinetic_diff=random2;
     }
     else if(random1<=0.75) /* mut translation */
     {
         random2= exp(0.7406*gasdev(seed)+4.56);
         
-         while(genotype->translation[pos_g]==random2) /* be sure to choose a different value*/
+        while(genotype->translation[pos_g]==random2) /* be sure to choose a different value*/
         {
             random2= exp(0.7406*gasdev(seed)+4.56);
         }
@@ -4067,6 +4113,10 @@ void mut_kinetic_constant(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long
         {
             genotype->translation[pos_g]=random2;
         }
+        
+        /*record mutation info*/
+        mut_record->kinetic_type=2;
+        mut_record->kinetic_diff=random2;
     }
     else /* mut protein decay */
     {
@@ -4098,56 +4148,58 @@ void mut_kinetic_constant(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long
         }
         /* Theoretically,if this protein has more than one copy of genes, we need to make a new protein.
          * However, in order to reduce to burden of computing tf binding distribution, we treat the mutant as the 
-         * original tf. We combine the concentration of the mutant and the original to compute binding distribution*/         
+         * original tf. We combine the concentration of the mutant and the original to compute binding distribution*/      
+        
+        /*record mutation info*/
+        mut_record->kinetic_type=3;
+        mut_record->kinetic_diff=random2;
     }    
 }
 
-int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long int *seed, char *mut_type2)
+int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long int *seed, Mutation *mut_record)
 {
-    char mut_type;
- 
-    draw_mutation(genotype->ngenes,&mut_type,seed);
+    draw_mutation(genotype->ngenes,&(mut_record->mut_type),seed);
     
 //    mut_type='d';
-    *mut_type2=mut_type;
+   
     
 //    mut_type='k';
     
-    switch (mut_type)
+    switch (mut_record->mut_type)
     {
         case 's': //substitution        		
-            substitution(genotype,seed);			
+            substitution(genotype,mut_record,seed);			
             return 1;
             break;
         		
         case 'i': // insertion        
-            insertion(genotype,seed);	
+            insertion(genotype,mut_record,seed);	
             return 1;
             break;	
         		
         case 'p': // partial deletion        
-            partial_deletion(genotype,seed);
+            partial_deletion(genotype,mut_record,seed);
             return 1;
             break;			
         		
         case 'w': // whole gene deletion. This mutation has two versions: only tf genes get deleted or any
                   // gene can be deleted            
-            whole_gene_deletion(genotype,seed);
+            whole_gene_deletion(genotype,mut_record,seed);
             return 2;
             break;
         		
         case 'd': // Whole gene duplication also has two versions                  
-            gene_duplication(genotype,seed);
+            gene_duplication(genotype,mut_record,seed);
             return 2;
             break;
         
         case 'c': //binding sequence        
-            mut_binding_sequence(genotype,seed);
+            mut_binding_sequence(genotype,mut_record,seed);
             return 3;
             break;  
             
         case 'k': //mutations in kinetic constants        
-            mut_kinetic_constant(genotype, kdis,seed);
+            mut_kinetic_constant(genotype, mut_record,kdis,seed);
             return 4;
             break;        
     }
@@ -4156,6 +4208,7 @@ int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],long int *seed, cha
 /* this function calculates the probability of different mutations based on
  * the current genotype. It then modify the value of mut_type
  */
+
 void draw_mutation(int ngenes, char *mut_type, long int *seed)
 {
     float random,random2;
@@ -4273,15 +4326,15 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
     Genotype genotype_ori;
     CellState state_ori;
     float init_mRNA[NGENES]; 
-    float init_protein_conc[NGENES];    
+    float init_protein_conc[NGENES];   
     GillespieRates rates_ori;	
     maxbound2 = MAXBOUND;
     maxbound3 = 10*MAXBOUND;
     float avg_G1;
     float avg_G2;
     double t1,t2;
-    
-    
+    FILE *MUT;
+       
 
     for(i=0;i<TF_ELEMENT_LEN-NMIN+1;i++)
     {      
@@ -4319,7 +4372,7 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
     
     i=0;
     
-//    omp_set_num_threads(1);
+    omp_set_num_threads(2);
     t1=omp_get_wtime();
     printf("thread_num=%d \n", omp_get_max_threads());
     #pragma omp parallel
@@ -4335,7 +4388,7 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
         float init_mRNA_offspring[NGENES]; 
         float init_protein_conc_offspring[NGENES];
         float s,P_fix;
-        char mut_type;
+        Mutation mut_record_copy;
         
         initialize_cache(&genotype_offspring);
         initialize_cache(&genotype_ori_copy);
@@ -4348,7 +4401,9 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
             #pragma omp single
             {   
                 fixation=0; 
-                fprintf(OUTPUT,"Step %d, fitness=%f\n",ID,i,genotype_ori.fitness);
+//                OUTPUT=fopen("output.txt","a+");
+//                fprintf(OUTPUT,"Step %d, fitness=%f\n",ID,i,genotype_ori.fitness);
+//                fclose(OUTPUT);
                 printf("thread:%d, Step %d, fitness=%f\n",ID,i,genotype_ori.fitness);                   
             }
             
@@ -4357,7 +4412,7 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
 // //               #pragma omp critical
                 clone_cell(&genotype_ori_copy,&genotype_offspring,clone_type); 
              
-                clone_type=mutate(&genotype_offspring,kdis,&seed,&mut_type); 
+                clone_type=mutate(&genotype_offspring,kdis,&seed,&mut_record_copy); 
                 
                 calc_all_binding_sites(&genotype_offspring);
 
@@ -4385,8 +4440,13 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
                         
                         if(P_fix>ran1(&seed))
                         {
-                            printf("mutation=%c\n",mut_type);
-                            fprintf(OUTPUT,"mutation=%c\n",mut_type);
+                            printf("mutation=%c\n",mut_record_copy.mut_type);
+//                            OUTPUT=fopen("output.txt","a+");
+//                            fprintf(OUTPUT,"mutation=%c\n",mut_type);
+//                            fclose(OUTPUT);
+//                            MUT=fopen("MUT","a+");
+//                            fprintf(MUT,"%c %d %d %s %d %f\n",mut_record_copy.mut_type,mut_record_copy.pos_g,mut_record_copy.pos_n,mut_record_copy.nuc_diff,mut_record_copy.kinetic_type,mut_record_copy.kinetic_diff);
+//                            fclose(MUT);
                             fixation=1;
                             i++;
                             clone_type=6;
@@ -4411,7 +4471,9 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
         }
     } 
     t2=omp_get_wtime();
-    fprintf(OUTPUT,"runtime=%f\n",t2-t1);
+//    OUTPUT=fopen("output.txt","a+");
+//    fprintf(OUTPUT,"runtime=%f\n",t2-t1);
+//    fclose(OUTPUT);
     printf("%f",t2-t1);  
 }
 

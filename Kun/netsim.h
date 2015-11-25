@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #ifndef POP_SIZE
-#define POP_SIZE 50        
+#define POP_SIZE 100        
 #endif
 
 #ifndef MAX_MUT_STEP         
@@ -209,6 +209,8 @@ struct Genotype {
 //    int max_N_act_bound[NGENES];
     AllTFBindingSites *all_binding_sites[NGENES];      
 
+    float avg_G1;
+    float avg_G2;
     float fitness;
 };
 
@@ -266,7 +268,19 @@ struct TimeCourse
   float concentration;
   float time;
   TimeCourse *next;
-};     
+};    
+
+typedef struct Mutation Mutation;
+
+struct Mutation
+{
+    char mut_type;
+    int pos_g;
+    int pos_n;
+    char nuc_diff[3];    /*the first three elements store the nuc after mutation (max_indel=3)*/
+    int kinetic_type;    /*0 for pic_disassembly, 1 for mRNA_decay, 2 for translation, 3 for protein_decay*/
+    float kinetic_diff;
+};
 
 /*
  * global variables
@@ -676,7 +690,7 @@ extern void calc_avg_growth_rate(Genotype *,
                                     
 extern void try_fixation(Genotype *, Genotype *, float, int *, int *, long int *);
 
-extern int mutate(Genotype *, float [NUM_K_DISASSEMBLY],long int *, char *);
+extern int mutate(Genotype *, float [NUM_K_DISASSEMBLY],long int *, Mutation *);
   
 extern void init_run_pop(//Genotype [N_para_threads+1],
 //                         CellState [N_para_threads+1],
@@ -725,19 +739,19 @@ extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, f
 
 extern void calc_configurations(Genotype *, int);
 
-extern void susbtitution(Genotype *,long int *);
+extern void susbtitution(Genotype *, Mutation *, long int *);
 
-extern void insertion(Genotype *,long int *);
+extern void insertion(Genotype *,Mutation *, long int *);
 
-extern void partial_deletion(Genotype *,long int *);
+extern void partial_deletion(Genotype *,Mutation *, long int *);
 
-extern void whole_gene_deletion(Genotype *,long int *);
+extern void whole_gene_deletion(Genotype *,Mutation *, long int *);
 
-extern void gene_duplicaton(Genotype *,long int *);
+extern void gene_duplicaton(Genotype *,Mutation *, long int *);
 
-extern void mut_binding_sequence(Genotype *,long int *);
+extern void mut_binding_sequence(Genotype *,Mutation *, long int *);
 
-extern void mut_kinetic_constant(Genotype *, float [NUM_K_DISASSEMBLY],long int *);
+extern void mut_kinetic_constant(Genotype *, Mutation *, float [NUM_K_DISASSEMBLY],long int *);
 
 extern void draw_mutation(int, char *,long int *);
 

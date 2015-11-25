@@ -33,7 +33,7 @@ int main()
   float kdis[NUM_K_DISASSEMBLY];
   FILE *OUTPUT;
   
-  OUTPUT=fopen("output.txt","w");
+  OUTPUT=fopen("output.txt","a+");
 
 //  int output_binding_sites = 0; /*verbose flag*/
 //  int no_fixed_dev_time = 0; /* 0 = fixed development time, 1 = divides when ready  */
