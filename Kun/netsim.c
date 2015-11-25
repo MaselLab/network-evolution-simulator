@@ -78,7 +78,7 @@ float tdevelopment = 30.0;/* default  development time: can be changed at runtim
 float timemax = -1.0;      /* set an upper limit to development time (default to -1.0=no limit) */
 int current_ploidy = 1;    /* ploidy can be changed at run-time: 1 = haploid, 2 = diploid */
 int output = 0;
-long master_seed = -284671;  /* NOTE!!! parallel computation will mess up a shared seed*/
+long master_seed = -12698465413;//-284671;  /* NOTE!!! parallel computation will mess up a shared seed*/
 int dummyrun = 10;          /* used to change seed */
 
 float growth_rate_scaling = 1.0; /* set default growth rate scaling factor */
@@ -3775,11 +3775,14 @@ void update_cisreg_cluster(Genotype *genotype, int gene_id, char mut_type)
                     }
                     cluster_id_copy++;
                 }
-                /*update which_cluster*/                
+                /*update which_cluster for gene id>=gene_id*/                
                 for(i=gene_id;i<genotype->ngenes;i++)
                 {                
                     genotype->which_cluster[i]=(genotype->which_cluster[i+1]<cluster_id)?genotype->which_cluster[i+1]:genotype->which_cluster[i+1]-1;
-                }                
+                } 
+                /*take care of which_cluster for gene id<gene_id*/
+                for(i=0;i<gene_id;i++)
+                    genotype->which_cluster[i]=(genotype->which_cluster[i]>cluster_id)?genotype->which_cluster[i]-1:genotype->which_cluster[i];
             }
             /*take care of clusters<cluster_id*/
             for(i=0;i<cluster_id;i++)
@@ -3790,7 +3793,7 @@ void update_cisreg_cluster(Genotype *genotype, int gene_id, char mut_type)
                     genotype->cisreg_cluster[i][j]=(genotype->cisreg_cluster[i][j]<gene_id)?genotype->cisreg_cluster[i][j]:genotype->cisreg_cluster[i][j]-1;
                     j++;
                 }
-            }            
+            }                                            
         }
     }
     else /*is gene duplication*/
@@ -3947,25 +3950,25 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
 //    printf("fitness=%f\n",genotype_ori.fitness);
     
     
-    MUT=fopen("1MUT-0825","r");    
+    MUT=fopen("MUT-0842526","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
         
-        for(i=0;i<17;i++)
+        for(i=0;i<89;i++)
         {
             fscanf(MUT,"%c %d %d %s %d %f\n",&(mut_record.mut_type),&(mut_record.pos_g),&(mut_record.pos_n),mut_record.nuc_diff,&(mut_record.kinetic_type),&(mut_record.kinetic_diff));
             reproduce_mutate(&genotype_ori,&mut_record);
             calc_all_binding_sites(&genotype_ori);
-            calc_avg_growth_rate(&genotype_ori,
-                            &state_ori,
-                            init_mRNA,
-                            init_protein_conc,                                                                
-                            &rates_ori,
-                            maxbound2,
-                            maxbound3,
-                            &master_seed); 
+//            calc_avg_growth_rate(&genotype_ori,
+//                            &state_ori,
+//                            init_mRNA,
+//                            init_protein_conc,                                                                
+//                            &rates_ori,
+//                            maxbound2,
+//                            maxbound3,
+//                            &master_seed); 
             
             printf("%d, %c, %f\n",i,mut_record.mut_type,genotype_ori.fitness);
         }        
@@ -4010,9 +4013,9 @@ void init_run_pop(//Genotype genotype[N_para_threads+1],
                     }
                     fixation=0; 
                     OUTPUT=fopen("output.txt","a+");
-                    fprintf(OUTPUT,"Thread %d, Step %d, fitness=%f\n",ID,i,genotype_ori.fitness);
+                    fprintf(OUTPUT,"Thread %d, Step %d, fitness=%f, ngenes=%d, ntfgenes=%d, nproteins=%d, nact=%d, nrep=%d\n",ID,i,genotype_ori.fitness,genotype_ori.ngenes,genotype_ori.ntfgenes,genotype_ori.nproteins,genotype_ori.N_act,genotype_ori.N_rep);
                     fclose(OUTPUT);
-                    printf("thread:%d, Step %d, fitness=%f\n",ID,i,genotype_ori.fitness);                   
+                    printf("Thread %d, Step %d, fitness=%f, ngenes=%d, ntfgenes=%d, nproteins=%d, nact=%d, nrep=%d\n",ID,i,genotype_ori.fitness,genotype_ori.ngenes,genotype_ori.ntfgenes,genotype_ori.nproteins,genotype_ori.N_act,genotype_ori.N_rep);                   
                 }
 
                 while(!fixation)
