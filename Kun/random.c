@@ -3,16 +3,17 @@
 #include <sys/types.h>
 #include <time.h>
 #include <float.h>
+#include "RngStream.h" /*replace ran1 with parallel RNG*/
 
-#define IA 16807
-#define IM 2147483647
-#define AM (1.0/IM)
-#define IQ 127773
-#define IR 2836
-#define NTAB 32
-#define NDIV (1+(IM-1)/NTAB)
-#define EPS 1.2e-7
-#define RNMX (1.0-EPS)
+//#define IA 16807
+//#define IM 2147483647
+//#define AM (1.0/IM)
+//#define IQ 127773
+//#define IR 2836
+//#define NTAB 32
+//#define NDIV (1+(IM-1)/NTAB)
+//#define EPS 1.2e-7
+//#define RNMX (1.0-EPS)
 #define PI 3.141592654
 #define SQRT2PI 2.506628275
 #define P 0.2316419
@@ -22,36 +23,36 @@
 #define B4 -1.821255978
 #define B5 1.330274429
 
-float ran1(long *seed)
-{
-    int j;
-    long k;
-    static long iy=0;
-    static long iv[NTAB];
-    float temp;
+//float ran1(long *seed)
+//{
+//    int j;
+//    long k;
+//    static long iy=0;
+//    static long iv[NTAB];
+//    float temp;
+//
+//    if (*seed <= 0 || !iy) {    /*Initialize.*/
+//        if (-(*seed) < 1) *seed=1;  /*Be sure to prevent idum = 0.*/
+//        else *seed = -(*seed);
+//        for (j=NTAB+7;j>=0;j--) {   /*Load the shuffle table (after 8 warm-ups).*/
+//            k=(*seed)/IQ;
+//            *seed=IA*(*seed-k*IQ)-IR*k;
+//            if (*seed < 0) *seed += IM;
+//            if (j < NTAB) iv[j] = *seed;
+//        }
+//        iy=iv[0];
+//    }
+//    k=(*seed)/IQ;          /*Start here when not initializing.*/
+//    *seed=IA*(*seed-k*IQ)-IR*k;  /*Compute idum=(IA*idum) % IM without over- */
+//     if (*seed < 0) *seed += IM;            /*flows by Schrage�s method.*/
+//     j=iy/NDIV;           /*Will be in the range 0..NTAB-1.*/
+//     iy=iv[j];               /*Output previously stored value and refill the*/
+//     iv[j] = *seed;          /*shuffle table. */
+//     if ((temp=AM*iy) > RNMX) return RNMX;  /*Because users don�t expect endpoint values.*/
+//     else return temp;
+//}
 
-    if (*seed <= 0 || !iy) {    /*Initialize.*/
-        if (-(*seed) < 1) *seed=1;  /*Be sure to prevent idum = 0.*/
-        else *seed = -(*seed);
-        for (j=NTAB+7;j>=0;j--) {   /*Load the shuffle table (after 8 warm-ups).*/
-            k=(*seed)/IQ;
-            *seed=IA*(*seed-k*IQ)-IR*k;
-            if (*seed < 0) *seed += IM;
-            if (j < NTAB) iv[j] = *seed;
-        }
-        iy=iv[0];
-    }
-    k=(*seed)/IQ;          /*Start here when not initializing.*/
-    *seed=IA*(*seed-k*IQ)-IR*k;  /*Compute idum=(IA*idum) % IM without over- */
-     if (*seed < 0) *seed += IM;            /*flows by Schrage�s method.*/
-     j=iy/NDIV;           /*Will be in the range 0..NTAB-1.*/
-     iy=iv[j];               /*Output previously stored value and refill the*/
-     iv[j] = *seed;          /*shuffle table. */
-     if ((temp=AM*iy) > RNMX) return RNMX;  /*Because users don�t expect endpoint values.*/
-     else return temp;
-}
-
-float gasdev(long *seed)
+float gasdev(RngStream RS)
 {
    static int iset=0;
    static float gset;
@@ -59,8 +60,8 @@ float gasdev(long *seed)
 
    if (iset == 0) {
       do {
-         v1=2.0*ran1(seed)-1.0;
-         v2=2.0*ran1(seed)-1.0;
+         v1=2.0*RngStream_RandU01(RS)-1.0;
+         v2=2.0*RngStream_RandU01(RS)-1.0;
          r=v1*v1+v2*v2;
       } while (r >= 1.0);
       fac=sqrt(-2.0*log(r)/r);
@@ -92,10 +93,10 @@ accuracy is good enough.*/
     return -tmp+log(2.5066282746310005*ser/x);
 }
 
-float poidev(float xm, long *seed)
+float poidev(float xm, RngStream RS)
 {    
     float gammln(float xx);
-    float ran1(long *seed);
+    //float ran1(long *seed);
     static float sq,alxm,g,oldm=(-1.0);  /*oldm is a flag for whether xm has changed*/
     float em,t,y;                       /*since last call. */
 
@@ -108,7 +109,7 @@ float poidev(float xm, long *seed)
     t=1.0;
     do {                        /*Instead of adding exponential deviates it is equivalent*/
         ++em;                        /*to multiply uniform deviates. We never*/
-        t *= ran1(seed);                      /*actually have to take the log, merely compare*/
+        t *= RngStream_RandU01(RS);                      /*actually have to take the log, merely compare*/
     } while (t > g);                        /*to the pre-computed exponential.*/
 
     } else {                 /*Use rejection method.*/
@@ -121,7 +122,7 @@ float poidev(float xm, long *seed)
         }
         do {
             do {                          /*y is a deviate from a Lorentzian comparison function.*/
-               y=tan(PI*ran1(seed));
+               y=tan(PI*RngStream_RandU01(RS));
                em=sq*y+xm;                     /*em is y, shifted and scaled.*/
             } while (em < 0.0);             /*Reject if in regime of zero probability.*/
             em=floor(em);                   /*The trick for integer-valued distributions.*/
@@ -129,23 +130,23 @@ float poidev(float xm, long *seed)
 /*The ratio of the desired distribution to the comparison function; we accept or
 reject by comparing it to another uniform deviate. The factor 0.9 is chosen so
 that t never exceeds 1.*/
-    } while (ran1(seed) > t);
+    } while (RngStream_RandU01(RS) > t);
   }
   return em;
 }
 
-float expdev(long *seed)
+float expdev(RngStream RS)
 {
   float dum;
-  do dum=ran1(seed);
+  do dum=RngStream_RandU01(RS);
   while (dum == 0.0);
   return -log(dum);
 }
 
-float bnldev(float pp, int n, long *seed)
+float bnldev(float pp, int n, RngStream RS)
 {
     float gammln(float xx);
-    float ran1(long *seed);
+    //float ran1(long *seed);
     int j;
     static int nold=(-1);
     float am,em,g,angle,p,bnl,sq,t,y;
@@ -157,12 +158,12 @@ answer to n minus itself; we�ll remember to do this below.*/
     if (n < 25) {   /*Use the direct method while n is not too large.*/
          bnl=0.0;                   /*This can require up to 25 calls to ran1. */
          for (j=1;j<=n;j++)
-             if (ran1(seed) < p) ++bnl;
+             if (RngStream_RandU01(RS) < p) ++bnl;
          } else if (am < 1.0) {    /*If fewer than one event is expected out of 25*/
                g=exp(-am);          /*or more trials, then the distribution is quite*/
                t=1.0;               /*accurately Poisson. Use direct Poisson method.*/
                for (j=0;j<=n;j++) {
-                    t *= ran1(seed);
+                    t *= RngStream_RandU01(RS);
                     if (t < g) break;
               }
               bnl=(j <= n ? j : n);
@@ -180,14 +181,14 @@ answer to n minus itself; we�ll remember to do this below.*/
          sq=sqrt(2.0*am*pc);  /* The following code should by now seem familiar:*/
          do {                      /* rejection method with a Lorentzian comparison*/
             do {                   /*function.*/
-               angle=PI*ran1(seed);
+               angle=PI*RngStream_RandU01(RS);
                y=tan(angle);
                em=sq*y+am;
             } while (em < 0.0 || em >= (en+1.0));  /*Reject.*/
             em=floor(em);     /*Trick for integer-valued distribution.*/
             t=1.2*sq*(1.0+y*y)*exp(oldg-gammln(em+1.0)
                         -gammln(en-em+1.0)+em*plog+(en-em)*pclog);
-         } while (ran1(seed) > t);  /*Reject. This happens about 1.5 times per deviate,*/
+         } while (RngStream_RandU01(RS) > t);  /*Reject. This happens about 1.5 times per deviate,*/
          bnl=em;
     }                           /*on average. */
     if (p != pp) bnl=n-bnl;  /*Remember to undo the symmetry transformation.*/

@@ -31,7 +31,11 @@ int main()
 //  TimeCourse *timecoursestart[2][NPROTEINS]; /* array of pointers to list starts */
 //  TimeCourse *timecourselast[2][NPROTEINS];
   float kdis[NUM_K_DISASSEMBLY]; 
-
+	char filename1[32],filename2[32],filename3[32],filename4[32],filename5[32],filename6[32]; 
+	unsigned long int seed[6];
+	int i,j;
+//FILE *fp;
+//float GR1, GR2;
 //  int output_binding_sites = 0; /*verbose flag*/
 //  int no_fixed_dev_time = 0; /* 0 = fixed development time, 1 = divides when ready  */
 //  int curr_seed; /*still needs to be fixed by Barry*/
@@ -66,10 +70,24 @@ int main()
 
   /* get the kdis.txt values */
   read_kdisassembly(kdis);
+	
 
   /* now create and run the population of cells */
 
-  init_run_pop(kdis);
+for(i=9;i<=9;i++)
+{
+	snprintf(filename1,sizeof(char)*32,"output_%i.txt",i);
+	snprintf(filename2,sizeof(char)*32,"MUT_%i.txt",i);
+        snprintf(filename3,sizeof(char)*32,"error_%i.txt",i);
+	snprintf(filename4,sizeof(char)*32,"N_BS_act_%i.txt",i);
+	snprintf(filename5,sizeof(char)*32,"N_BS_rep_%i.txt",i);
+	snprintf(filename6,sizeof(char)*32,"N_BS_%i.txt",i);
+	for(j=0;j<6;j++)
+	{
+		seed[j]=i;
+	}
+ 	init_run_pop(kdis,filename1,filename2,filename3,filename4,filename5,filename6,seed);
+}
 //			  , no_fixed_dev_time, max_divisions);
 
 //  print_all_protein_time_courses(timecoursestart, timecourselast);
