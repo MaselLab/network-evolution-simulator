@@ -19,7 +19,7 @@
 #endif
 
 #ifndef BURN_IN
-#define BURN_IN 5000
+#define BURN_IN 10000
 #endif
 
 #define N_THREADS 12
@@ -722,7 +722,7 @@ extern void do_single_timestep( Genotype *,
                                 char *,
                                 int,
                                 Mutation *,
-                                int *) ;
+                                int *,int*) ;
 							   
 extern void free_fixedevent(CellState *);
  
@@ -834,6 +834,14 @@ extern void calc_avg_growth_rate_plotting(Genotype *,
                                             char *,
                                             int,
                                             Mutation *); 
-void summarize_binding_sites(Genotype *);
+extern void summarize_binding_sites(Genotype *);
 
+extern int check_concurrence(  float , 
+                                FixedEvent *, 
+                                FixedEvent *, 
+                                FixedEvent *, 
+                                FixedEvent *,
+                                FixedEvent *);
+
+extern void set_env(CellState *, char, float, float);
 #endif /* !FILE_NETSIM_SEEN */
