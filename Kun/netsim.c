@@ -1790,7 +1790,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                 dt_prime = compute_tprime(genotype,state,env,conc_a,conc_b,dt);                
                 dt_rest = dt - dt_prime;
                 *integrated_growth_rate = gmax_a * dt_prime;                
-                *integrated_growth_rate += gmax_a* compute_integral(genotype, state, conc_a, dt_prime, Pp_a,'A');
+                *integrated_growth_rate += gmax_a* compute_integral(genotype, state, conc_a, dt_rest , Pp_a,'A');
             }
             else 
             {               
@@ -1844,7 +1844,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                 dt_prime = compute_tprime(genotype,state,env,conc_a,conc_b,dt);
                 dt_rest = dt - dt_prime;
                 *integrated_growth_rate = gmax_b * dt_prime;
-                *integrated_growth_rate += gmax_b* compute_integral(genotype, state, conc_b, dt_prime, Pp_b,'B');
+                *integrated_growth_rate += gmax_b* compute_integral(genotype, state, conc_b, dt_rest, Pp_b,'B');
             }
             else 
             {
@@ -2740,6 +2740,7 @@ void do_fixed_event(Genotype *genotype,
 	case 5: /* finishing burn-in growth rate*/
             *dt=duration_of_burn_in_growth_rate-t;     
             update_protein_number_cell_size(genotype, state, rates, *dt, t, *env, end_state, error, mut_step, mut_record);
+            state->cell_size_after_burn_in=state->cell_size;
             delete_fixed_event_start(&(state->burn_in_growth_rate),&(state->burn_in_growth_rate_last));
             break;
 #if CAUTIOUS
@@ -2934,10 +2935,10 @@ void calc_avg_growth_rate(Genotype *genotype,
 #endif    
         
     omp_set_num_threads(N_THREADS);
-    #pragma omp parallel
+//    #pragma omp parallel
     {
-        int ID=omp_get_thread_num();
-//        int ID=0;
+//        int ID=omp_get_thread_num();
+        int ID=0;
         int i,j;
         int N_replicates_per_thread=N_replicates/N_THREADS;
         int end_state;
@@ -2959,7 +2960,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             gr1[i]=0.0;
             gr2[i]=0.0;
         }
-        #pragma omp critical
+//        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -2989,7 +2990,7 @@ void calc_avg_growth_rate(Genotype *genotype,
 #endif
         
         /* now calc growth rate under two environments*/
-        for(i=0;i<N_replicates_per_thread;i++) /* env 1, usually a constant signal that matches env*/
+        for(i=0;i<0;i++) /* env 1, usually a constant signal that matches env*/
         {	 
             env=init_env1;
             end_state=1;
@@ -3486,10 +3487,10 @@ void calc_avg_growth_rate_plotting(Genotype *genotype,
     }
     
     omp_set_num_threads(N_THREADS);
-    #pragma omp parallel
+//    #pragma omp parallel
     {
-        int ID=omp_get_thread_num();
-//        int ID=0;
+//        int ID=omp_get_thread_num();
+        int ID=0;
         int i,j,timepoint;    
         int end_state,did_burn_in;  
         int N_replicates_per_thread=N_replicates/N_THREADS;
@@ -3506,7 +3507,7 @@ void calc_avg_growth_rate_plotting(Genotype *genotype,
         initialize_cache(&genotype_offspring); 
         clone_cell_forward(genotype, &genotype_offspring, COPY_ALL);
         
-        #pragma omp critical
+//        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -5470,12 +5471,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_xx.txt","r");    
+    MUT=fopen("MUT_4.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
-        for(i=0;i<10000;i++)
+        for(i=0;i<480;i++)
         {
             clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
             fscanf(MUT,"%c %d %d %s %d %f\n",
@@ -5498,7 +5499,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         init_env1='B';
         init_env2='B';
         tdevelopment = 120.0;
-        duration_of_burn_in_growth_rate = 30.0; 
+        duration_of_burn_in_growth_rate = 59.9; 
         env1_t_signalA=60.0;    
         env1_t_signalB=60.0;     
         env2_t_signalA=10.0;
@@ -5507,19 +5508,19 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_as_noise=0;
         env1_signalA_mismatches=0;   
         env2_signalA_mismatches=1;
-        N_replicates=1200;
-        calc_avg_growth_rate_plotting(&genotype_ori, init_mRNA, init_protein_number, maxbound2, maxbound3, RS_parallel,filename1,filename3,0,NULL); 
+        N_replicates=1000;
+//        calc_avg_growth_rate_plotting(&genotype_ori, init_mRNA, init_protein_number, maxbound2, maxbound3, RS_parallel,filename1,filename3,0,NULL); 
         
-//        calc_avg_growth_rate(   &genotype_ori, 
-//                                init_mRNA,
-//                                init_protein_number,
-//                                maxbound2,
-//                                maxbound3,
-//                                RS_parallel,
-//                                filename1,
-//                                filename3,
-//                                0,
-//                                &mut_record);
+        calc_avg_growth_rate(   &genotype_ori, 
+                                init_mRNA,
+                                init_protein_number,
+                                maxbound2,
+                                maxbound3,
+                                RS_parallel,
+                                filename1,
+                                filename3,
+                                0,
+                                &mut_record);
 //        printf("%f %f\n",genotype_ori.avg_GR1,genotype_ori.avg_GR2);
 //        recalc_new_fitness=2;
 //        for(j=1;j<=recalc_new_fitness;j++)
