@@ -15,7 +15,7 @@
 #endif
 
 #ifndef BURN_IN
-#define BURN_IN 10000 
+#define BURN_IN 10000
 #endif
 
 #define RdcPdup 1
@@ -157,7 +157,7 @@ struct AllTFBindingSites {
   float Koff;        /* replacing hamming_dist */
   int BS_pos;        /* start position of BS on DNA, always with reference to forward strand */                     
   int N_hindered;    /* the number of BS hindered by this TF when it binds to the current BS */  
-  int compressed;    /* if this site has been compressed, set the value to 1 */ 
+//  int compressed;    /* if this site has been compressed, set the value to 1 */ 
 };
 
 typedef struct CompressedBindingSites CompressedBindingSites;
@@ -248,8 +248,8 @@ struct CellState {
     int mRNA_transl_cyto_num[NGENES];   /* mRNAs are in the cytoplasm, but only recently */
     int mRNA_transcr_num[NGENES];       /* mRNAs which haven't finished transcription yet */
 
-    FixedEvent *mRNA_transl_time_end;   /* times when mRNAs become fully loaded with ribosomes and start producing protein */
-    FixedEvent *mRNA_transl_time_end_last;  
+    FixedEvent *mRNA_transl_init_time_end;   /* times when mRNAs become fully loaded with ribosomes and start producing protein */
+    FixedEvent *mRNA_transl_init_time_end_last;  
     FixedEvent *mRNA_transcr_time_end;  /* times when transcription is complete and an mRNA is available to move to cytoplasm */
     FixedEvent *mRNA_transcr_time_end_last;
     FixedEvent *signalB_starts_end;          /* times when env=A ends. Note, this event is not gene- or copy-specific. I just use the structure of FixedEvent for convenience.*/
@@ -298,7 +298,7 @@ struct Mutation
  */
 
 /* see netsim.c for documentation for these global constant variables */
-extern const int MAXELEMENTS; 
+int MAXELEMENTS; 
 const int MAXBOUND;
 const int NMIN;
 const float KRNA;
@@ -387,7 +387,7 @@ extern void initialize_genotype_fixed(Genotype *,
                                       float *,
                                       RngStream );
 
-extern void calc_all_binding_sites_copy(Genotype *, int, int *);
+extern void calc_all_binding_sites_copy(Genotype *, int);
 
 extern void calc_all_binding_sites(Genotype *);
 
@@ -613,7 +613,7 @@ extern void calc_all_rates(Genotype *,
                             GillespieRates *,                     
                             int);
 
-extern void end_translation(Genotype *, CellState *, GillespieRates *, float *, float);
+extern void end_translation_init(Genotype *, CellState *, GillespieRates *, float *, float);
 
 extern void do_fixed_event(Genotype *, 
                             CellState *, 

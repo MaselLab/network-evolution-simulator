@@ -133,7 +133,7 @@ void delete_queues(CellState *state) {
 
  FixedEvent *start, *info;
 
-  start = state->mRNA_transl_time_end;  
+  start = state->mRNA_transl_init_time_end;  
   while (start) {
     info = start;
     start = start->next;
