@@ -2200,7 +2200,7 @@ void transcription_init_event(GillespieRates *rates, CellState *state, Genotype 
     int concurrent;
     
     x=RngStream_RandInt(RS,1,rates->transcript_init);
-    while(gene_id<genotype->ngenes-1 && x>=0)
+    while(gene_id<genotype->ngenes-1 && x>0)
     {
         gene_id++;
         x-=rates->transcript_init_rate[gene_id];
