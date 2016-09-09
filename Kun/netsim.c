@@ -26,7 +26,7 @@
 #define UPDATE_ALL 1
 #define NO_KON_UPDATE 0
 #define CAUTIOUS 0
-
+#define SET_BS_MANUALLY 1
 const float alpha=1.0e-3;
 
 enum {COPY_ALL=1,MUT_KCONST=2,MUT_CISSEQ=3,MUT_TFSEQ=4,MUT_N_GENE=5}; /*tags used in clone_cell*/
@@ -82,9 +82,9 @@ int recalc_new_fitness; /*calculate the growth rate of the new genotype four mor
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  float cost_term=1.0e-4;      /* this determined the cost of translation */
 
 /*initial conditions*/
-int init_TF_genes=6;
-int init_N_act=3;
-int init_N_rep=3;
+int init_TF_genes=1;
+int init_N_act=1;
+int init_N_rep=0;
 int min_act_to_transcr_A=2;
 int min_act_to_transcr_B=1;
 float penalty_of_extra_copies=2.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
@@ -218,22 +218,22 @@ void initialize_genotype_fixed( Genotype *genotype,
     /* make the activations the same in each copy */
     genotype->N_act=0;
     genotype->N_rep=0;
-     if(init_N_rep==-1 && init_N_act==-1) /*randomly generate activators and repressors*/
-     {
-    	for(i=2;i<genotype->ntfgenes;i++)
-    	{   
-        	if (RngStream_RandU01(RS)<PROB_ACTIVATING) 
-        	{
+    if(init_N_rep==-1 && init_N_act==-1) /*randomly generate activators and repressors*/
+    {
+        for(i=2;i<genotype->ntfgenes;i++)
+        {   
+                if (RngStream_RandU01(RS)<PROB_ACTIVATING) 
+                {
                     genotype->N_act++; 
                     genotype->activating[i] = 1;
-        	}
-        	else 
-        	{
+                }
+                else 
+                {
                     genotype->N_rep++;
                     genotype->activating[i]= 0;
-        	}
-    	}
-     }
+                }
+        }
+    }
      else
     {
 	genotype->N_act=init_N_act;
@@ -314,8 +314,34 @@ void initialize_genotype(Genotype *genotype,
             }
         }        
     }       
-    initialize_genotype_fixed(genotype, kdis, RS);   
+    initialize_genotype_fixed(genotype, kdis, RS); 
+    
+#if !SET_BS_MANUALLY    
     calc_all_binding_sites(genotype);
+#endif
+}
+
+/*
+ * Manually set binding sites
+ *
+ */
+void set_binding_sites(Genotype *genotype,int *N_BS_per_gene, int (*tf_id_per_site)[3], int (*hindrance_per_site)[3], float (*koff_per_site)[3])
+{
+    int i,j;
+    
+    for(i=2;i<genotype->ngenes;i++)
+    {
+        genotype->binding_sites_num[i]=N_BS_per_gene[i-2];
+        genotype->max_hindered_sites[i]=0;
+        for(j=0;j<N_BS_per_gene[i-2];j++)
+        {
+            genotype->all_binding_sites[i][j].tf_id=tf_id_per_site[i-2][j];
+            genotype->all_binding_sites[i][j].N_hindered=hindrance_per_site[i-2][j];
+            genotype->all_binding_sites[i][j].Koff=koff_per_site[i-2][j];
+            genotype->max_hindered_sites[i]=(genotype->max_hindered_sites[i]>hindrance_per_site[i-2][j])?
+                                            genotype->max_hindered_sites[i]:hindrance_per_site[i-2][j];
+        }       
+    }
 }
 
 /*
@@ -2406,6 +2432,20 @@ void clone_cell_forward(Genotype *genotype_orig,
     /* do not copy info for this gene, unless mutation changes it*/
     for(i=1;i<genotype_orig->ngenes;i++)    
         genotype_clone->clone_info[i]=0;
+    
+#if SET_BS_MANUALLY
+    for(i=2;i<genotype_orig->ngenes;i++)
+    {
+        genotype_clone->binding_sites_num[i]=genotype_orig->binding_sites_num[i];
+        genotype_clone->max_hindered_sites[i]=genotype_orig->max_hindered_sites[i];
+        for(j=0;j<genotype_orig->binding_sites_num[i];j++)
+        {
+            genotype_clone->all_binding_sites[i][j].tf_id=genotype_orig->all_binding_sites[i][j].tf_id;
+            genotype_clone->all_binding_sites[i][j].N_hindered=genotype_orig->all_binding_sites[i][j].N_hindered;
+            genotype_clone->all_binding_sites[i][j].Koff=genotype_orig->all_binding_sites[i][j].Koff;                    
+        }
+    }
+#endif
 }
 
 /*
@@ -2860,7 +2900,7 @@ void calc_avg_growth_rate(Genotype *genotype,
                             char *output,
                             char *error,
                             int mut_step,
-                            Mutation *mut_record)
+                            Mutation *mut_record)       
 {       
     float GR1[N_replicates],GR2[N_replicates]; 
 #if !RdcPdup
@@ -2871,10 +2911,10 @@ void calc_avg_growth_rate(Genotype *genotype,
 #endif    
         
     omp_set_num_threads(N_THREADS);
-    #pragma omp parallel
+//    #pragma omp parallel
     {
-        int ID=omp_get_thread_num();
-//        int ID=0;
+//        int ID=omp_get_thread_num();
+        int ID=0;
         int i,j;
         int N_replicates_per_thread=N_replicates/N_THREADS;
         int end_state;
@@ -2896,7 +2936,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             gr1[i]=0.0;
             gr2[i]=0.0;
         }
-        #pragma omp critical
+//        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -2907,8 +2947,23 @@ void calc_avg_growth_rate(Genotype *genotype,
                 init_mRNA_offspring[j] = init_mRNA[j];
                 init_protein_number_offspring[j] = init_protein_number[j];
             }
-        }        
+#if SET_BS_MANUALLY
+            for(i=2;i<genotype->ngenes;i++)
+            {
+                genotype_offspring.binding_sites_num[i]=genotype->binding_sites_num[i];
+                genotype_offspring.max_hindered_sites[i]=genotype->max_hindered_sites[i];
+                for(j=0;j<genotype->binding_sites_num[i];j++)
+                {
+                    genotype_offspring.all_binding_sites[i][j].tf_id=genotype->all_binding_sites[i][j].tf_id;
+                    genotype_offspring.all_binding_sites[i][j].N_hindered=genotype->all_binding_sites[i][j].N_hindered;
+                    genotype_offspring.all_binding_sites[i][j].Koff=genotype->all_binding_sites[i][j].Koff;                    
+                }
+            }   
+#endif
+        }
+#if !SET_BS_MANUALLY        
         calc_all_binding_sites(&genotype_offspring); 
+#endif
         
         /* now calc growth rate under two environments*/
         for(i=0;i<N_replicates_per_thread;i++) /* env 1, usually a constant signal that matches env*/
@@ -3070,7 +3125,7 @@ void calc_avg_growth_rate(Genotype *genotype,
         
         for(j=0;j<NGENES;j++)
             free(genotype_offspring.all_binding_sites[j]);
-        #pragma omp critical
+//        #pragma omp critical
         {
             j=0;
             for(i=ID*N_replicates_per_thread;i<(ID+1)*N_replicates_per_thread;i++)
@@ -4598,9 +4653,14 @@ int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],RngStream RS, Mutat
 {
     int i;
     int return_val;
+#if !SET_BS_MANUALLY    
     draw_mutation(genotype, &(mut_record->mut_type),RS);
+#endif
     for(i=0;i<3;i++)
 	mut_record->nuc_diff[i]='\0';
+#if SET_BS_MANUALLY    
+    mut_record->mut_type='k';
+#endif
     switch (mut_record->mut_type)
     {
         case 's': //substitution in cis-reg       		
@@ -5244,9 +5304,24 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     for(i=0;i<TF_ELEMENT_LEN-NMIN+1;i++)          
         Koff[i]=koff*pow(KR,(float)i/3.0);
     
+    /*manually input binding sites info below*/
+#if SET_BS_MANUALLY 
+    
+    int N_BS_per_gene[3]={2,2,2};
+    int tf_id_per_site[3][3]={{0,0,-1},{0,2,-1},{1,1,-1}};
+    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
+    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};
+    
+#endif    
+    
     initialize_cache(&genotype_ori);
     initialize_cache(&genotype_ori_copy);    
-    initialize_genotype(&genotype_ori, kdis, RS_main);   
+    initialize_genotype(&genotype_ori, kdis, RS_main); 
+    
+#if SET_BS_MANUALLY
+    set_binding_sites(&genotype_ori,N_BS_per_gene,tf_id_per_site,hindrance_per_site,koff_per_site);
+#endif
+    
     genotype_ori_copy.ngenes=genotype_ori.ngenes;
     genotype_ori_copy.ntfgenes=genotype_ori.ntfgenes;
     genotype_ori_copy.nproteins=genotype_ori.nproteins; 
@@ -5267,7 +5342,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
-        for(i=0;i<1275;i++)
+        for(i=0;i<102;i++)
         {
             clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
             fscanf(MUT,"%c %d %d %s %d %f\n",
@@ -5281,16 +5356,18 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
             clone_cell_forward(&genotype_ori_copy,&genotype_ori,COPY_ALL);
             printf("%d, %c, %f\n",i,mut_record.mut_type,genotype_ori.fitness);
         }        
-        fclose(MUT); 
+        fclose(MUT);
+#if !SET_BS_MANUALLY
         calc_all_binding_sites(&genotype_ori);
+#endif
         summarize_binding_sites(&genotype_ori,1);
 #if PLOTTING
-        init_env1='A';
+        init_env1='B';
         init_env2='B';
         tdevelopment = 120.0;
         duration_of_burn_in_growth_rate = 30.0; 
-        env1_t_signalA=150.0;    
-        env1_t_signalB=0.0;     
+        env1_t_signalA=60.0;    
+        env1_t_signalB=60.0;     
         env2_t_signalA=10.0;
         env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
@@ -5350,11 +5427,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_as_noise=0;
         env1_signalA_mismatches=0;   
         env2_signalA_mismatches=1;
-        N_replicates=600;
+        N_replicates=10;
         recalc_new_fitness=0;
         env1_occurence=0.2;
         env2_occurence=0.8;
 	ready_to_evolve=0;
+        burn_in=1;
         
         fp=fopen(RuntimeSumm,"a+");
         fprintf(fp,"**********Burn-in conditions**********\n");
@@ -5426,8 +5504,10 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 			mut_record.nuc_diff,
 			mut_record.kinetic_type,
 			mut_record.kinetic_diff);
-		fclose(OUTPUT);			
+		fclose(OUTPUT);	
+#if !SET_BS_MANUALLY		
                 calc_all_binding_sites(&genotype_ori_copy);
+#endif
                 calc_avg_growth_rate(&genotype_ori_copy,
                                         init_mRNA,
                                         init_protein_number,
@@ -5457,7 +5537,9 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 }
             }            
             clone_cell_forward(&genotype_ori_copy,&genotype_ori,COPY_ALL);
+#if !SET_BS_MANUALLY
 	    calc_all_binding_sites(&genotype_ori); 
+#endif
             
             /*increase the accuracy of the fitness of the new genotype*/                    
             for(j=1;j<=recalc_new_fitness;j++)
@@ -5519,8 +5601,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_mismatches=1;  
         N_replicates=1200;
         recalc_new_fitness=2;
-        env1_occurence=0.2;
-        env2_occurence=0.8;
+        env1_occurence=0.5;
+        env2_occurence=0.5;
         
         fp=fopen(RuntimeSumm,"a");
         fprintf(fp,"**********second phase conditions**********\n");
@@ -5533,14 +5615,14 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d, occurence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_signalA_mismatches,env2_occurence);        
         fclose(fp);
         
-        for(i=BURN_IN-1;i<MAX_MUT_STEP;i++)
+        for(i=burn_in-1;i<MAX_MUT_STEP;i++)
         {   
             if(genotype_ori.ntfgenes==2)
             { 
                 OUTPUT=fopen(filename1,"a+");                              
                 fprintf(OUTPUT,"ntfgenes critical!\n");
                 fclose(OUTPUT);  
-                  summarize_binding_sites(&genotype_ori,1);
+                summarize_binding_sites(&genotype_ori,1);
                 release_memory(&genotype_ori,&genotype_ori_copy,&RS_main, RS_parallel);
                 return 0;
             }
@@ -5581,8 +5663,10 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 			mut_record.nuc_diff,
 			mut_record.kinetic_type,
 			mut_record.kinetic_diff);
-		fclose(OUTPUT);			
+		fclose(OUTPUT);	
+#if !SET_BS_MANUALLY		
                 calc_all_binding_sites(&genotype_ori_copy);
+#endif
                 calc_avg_growth_rate(&genotype_ori_copy,
                                         init_mRNA,
                                         init_protein_number,
@@ -5612,7 +5696,9 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 }
             }            
             clone_cell_forward(&genotype_ori_copy,&genotype_ori,COPY_ALL);
+#if !SET_BS_MANUALLY
 	    calc_all_binding_sites(&genotype_ori); 
+#endif
             
             /*increase the accuracy of the fitness of the new genotype*/                    
             for(j=1;j<=recalc_new_fitness;j++)

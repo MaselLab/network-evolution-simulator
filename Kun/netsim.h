@@ -18,7 +18,7 @@
 #define BURN_IN 10000
 #endif
 
-#define RdcPdup 1
+#define RdcPdup 0
 
 #define N_THREADS 1
 
@@ -324,6 +324,8 @@ float h;
 float h_extra_copy;
 float gmax_a;
 float gmax_b;
+float gpeak_a;
+float gpeak_b;
 float protein_aging;
 int current_ploidy;
 int init_TF_genes;
@@ -396,6 +398,8 @@ extern void initialize_genotype_fixed(Genotype *,
 extern void calc_all_binding_sites_copy(Genotype *, int);
 
 extern void calc_all_binding_sites(Genotype *);
+
+extern void set_binding_sites(Genotype *,int *, int (*)[3], int (*)[3], float (*)[3]);
 
 extern void cluster_BS_cluster(Genotype *, int);
 
