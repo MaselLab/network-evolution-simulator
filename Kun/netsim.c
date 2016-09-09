@@ -1673,9 +1673,9 @@ float compute_integral(Genotype *genotype, CellState *state, float *protein, flo
         
     for(i=0;i<n_copies;i++)
     {
-        ect1=exp(exp(-state->konvalues[ids[i]][KON_PROTEIN_DECAY_INDEX]*dt)-1);
+        ect1=exp(-state->konvalues[ids[i]][KON_PROTEIN_DECAY_INDEX]*dt)-1;
     
-        integral+=1.0/Pp*(state->konvalues[ids[i]][KON_SALPHAC_INDEX]*ect1/state->konvalues[ids[i]][KON_PROTEIN_DECAY_INDEX]+
+        integral+=1.0/Pp*(state->konvalues[ids[i]][KON_SALPHAC_INDEX]*ect1/state->konvalues[ids[i]][KON_PROTEIN_DECAY_INDEX]-
                 protein[i]*ect1/state->konvalues[ids[i]][KON_PROTEIN_DECAY_INDEX]+ 
                 state->konvalues[ids[i]][KON_SALPHAC_INDEX]*dt);
     }
