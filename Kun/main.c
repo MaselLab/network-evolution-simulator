@@ -34,7 +34,7 @@ int main()
     /* get the kdis.txt values */
     read_kdisassembly(kdis);
     /* now create and run the population of cells */
-    for(i=3;i<=3;i++)
+    for(i=4;i<=4;i++)
     {
         for(j=0;j<6;j++)
             seed[j]=i;
@@ -47,7 +47,7 @@ int main()
         snprintf(filename6,sizeof(char)*32,"N_BS_%i.txt",i);
         snprintf(RuntimeSumm,sizeof(char)*32,"RuntimeSummary_%i.txt",i);
         
-        chdir("result"); 
+        chdir("result/test0601/c"); 
         fp=fopen(RuntimeSumm,"w");
         fprintf(fp,"BURN_IN=%d\n",BURN_IN);
         fprintf(fp,"MAX_MUT_STEP=%d\n",MAX_MUT_STEP);
@@ -58,7 +58,7 @@ int main()
         fprintf(fp,"Environment 1: T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d\n",env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_signalA_mismatches);
         fprintf(fp,"Environment 2: T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d\n",env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_signalA_mismatches);
         fprintf(fp,"cost_term=%f, penalty=%f\n",cost_term,penalty);
-        fprintf(fp,"initial TF number=%d",init_TF_genes);
+        fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);         
         fclose(fp);
         
         init_run_pop(kdis,filename1,filename2,filename3,filename4,filename5,filename6,seed);

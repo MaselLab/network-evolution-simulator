@@ -11,14 +11,14 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 2    
+#define MAX_MUT_STEP 12000    
 #endif
 
 #ifndef BURN_IN
-#define BURN_IN 1 
+#define BURN_IN 10000 
 #endif
 
-#define N_THREADS 2
+#define N_THREADS 12
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
@@ -176,6 +176,9 @@ struct Genotype {
     int ntfgenes;                                         /* the number of actual tf loci */
     int nproteins;                                        /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                            * from the number of genes. This nprotein is the number of elements in protein_pool*/
+    int ncopies_under_penalty;                            /* this is the number of gene copies that exceed the upperlim */
+    float P_dup_per_protein[NPROTEINS];                   /* probability of duplication of the copies for each protein */
+    
     int protein_pool[NPROTEINS][2][NGENES];                   /* element 1 record how many genes/mRNAs producing this protein, 
                                                            * ele 2 stores which genes/mRNAs*/
     int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
@@ -185,7 +188,7 @@ struct Genotype {
     char tf_seq_rc[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int N_act;                                            /* number of activating TF*/
     int N_rep;                                            /* number of repressing TF*/
-    int activating[NPROTEINS][MAX_COPIES];                /* 1 for activating TF, 0 for repressing, -1 for non-tf */ 
+    int activating[NPROTEINS][MAX_COPIES];                /* 1 for activator, 0 for repressor, -1 for non-tf */ 
 
     float mRNAdecay[NGENES];                              /* kinetic rates*/
     float proteindecay[NGENES];                           /* kinetic rates*/
@@ -318,12 +321,15 @@ float growth_rate_scaling;
 float Pp_a;
 float Pp_b;         
 float h;
+float h_extra_copy;
 float gmax_a;
 float gmax_b;
 float protein_aging;
 float Koff[TF_ELEMENT_LEN-4+1];
 int current_ploidy;
 int init_TF_genes;
+int upperlim_of_gene_copies;
+float penalty_of_extra_gene_copies;
 float signal_strength;
 float env1_t_signalA;    
 float env1_t_signalB;     
@@ -333,6 +339,8 @@ int env1_signalA_as_noise;
 int env2_signalA_as_noise;
 int env1_signalA_mismatches; 
 int env2_signalA_mismatches;
+int init_N_act;
+int init_N_rep;
 float cost_term;
 float penalty;
 int N_replicates;
@@ -403,7 +411,7 @@ extern float calc_TF_dist_from_compressed_BS(   CompressedBindingSites *,
                                                     int ,
                                                     int ,
                                                     int ,             
-                                                    int [NGENES][MAX_COPIES], 
+                                                    int [NPROTEINS][MAX_COPIES], 
                                                     float [NGENES]);
 extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
@@ -411,7 +419,7 @@ extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
                                         int ,
                                         int , 
-                                        int [NGENES][MAX_COPIES],                                    
+                                        int [NPROTEINS][MAX_COPIES],                                    
                                         int ,
                                         float [NGENES]);
 
@@ -662,6 +670,8 @@ extern void mut_binding_sequence(Genotype *,Mutation *, RngStream);
 
 extern void mut_kinetic_constant(Genotype *, Mutation *, float [NUM_K_DISASSEMBLY], RngStream);
 
+extern void mut_identity(Genotype *, Mutation *, RngStream);
+
 extern int reproduce_mutate(Genotype *, Mutation *);
 
 extern void reproduce_susbtitution(Genotype *, Mutation *);
@@ -678,7 +688,7 @@ extern void reproduce_mut_binding_sequence(Genotype *,Mutation *);
 
 extern void reproduce_mut_kinetic_constant(Genotype *, Mutation *);
 
-extern void draw_mutation(int, int, char *, RngStream);
+extern void draw_mutation(Genotype *, char *, RngStream);
 
 extern void initialize_cache(Genotype *);
 
