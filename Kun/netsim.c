@@ -69,6 +69,7 @@ float proportion_mut_binding_seq = 0.1;
 float proportion_mut_identity = 0.05;
 float max_inset=3.0;
 float max_delet=3.0;
+float sd_mut_koff=0.1;
 
 /*Cell growth and development*/
 int avg_protein_number = 12000;
@@ -188,6 +189,7 @@ void initialize_genotype_fixed( Genotype *genotype,
     for (i=2; i < genotype->ngenes; i++) 
     {
         genotype->min_act_to_transc[i]=1;
+        genotype->koff[i]=koff;
         genotype->mRNAdecay[i] = exp(0.4909*gasdev(RS)-3.20304);
         while (genotype->mRNAdecay[i]<0.0)
             genotype->mRNAdecay[i] = exp(0.4909*gasdev(RS)-3.20304);
@@ -259,6 +261,8 @@ void initialize_genotype_fixed( Genotype *genotype,
     genotype->pic_disassembly[1]=0.0; 
     genotype->activating[1]=1; /*make this signal an activator*/
     genotype->N_act++;
+    genotype->koff[0]=koff;
+    genotype->koff[1]=koff;
     genotype->min_act_to_transc[genotype->ngenes-2]=min_act_to_transcr_A; 
     genotype->min_act_to_transc[genotype->ngenes-1]=min_act_to_transcr_B; 
 }
@@ -340,6 +344,7 @@ void set_binding_sites(Genotype *genotype,int *N_BS_per_gene, int (*tf_id_per_si
             genotype->all_binding_sites[i][j].Koff=koff_per_site[i-2][j];
             genotype->max_hindered_sites[i]=(genotype->max_hindered_sites[i]>hindrance_per_site[i-2][j])?
                                             genotype->max_hindered_sites[i]:hindrance_per_site[i-2][j];
+            genotype->all_binding_sites[i][j].mis_match=0;
         }       
     }
 }
@@ -880,6 +885,7 @@ float calc_TF_dist_from_all_BS(AllTFBindingSites *BS_info,
                                             float protein_number[NGENES],
                                             int min_act_to_transcr)
 {
+    approximation=(approximation<(N_BS+1))?approximation:(N_BS+1);
     double ratio_matrices[max_N_hindered_BS+1][approximation][approximation];   
     double transition_matrix[approximation][approximation];
     double sum,prob_act_over_rep=0.0;    
@@ -2374,6 +2380,7 @@ void clone_cell_forward(Genotype *genotype_orig,
         
         for(i=0; i < genotype_orig->ngenes; i++) 
         {              
+            genotype_clone->koff[i]=genotype_orig->koff[i];
             genotype_clone->mRNAdecay[i]=genotype_orig->mRNAdecay[i];
             genotype_clone->proteindecay[i]=genotype_orig->proteindecay[i];
             genotype_clone->translation[i]=genotype_orig->translation[i];            
@@ -2442,7 +2449,8 @@ void clone_cell_forward(Genotype *genotype_orig,
         {
             genotype_clone->all_binding_sites[i][j].tf_id=genotype_orig->all_binding_sites[i][j].tf_id;
             genotype_clone->all_binding_sites[i][j].N_hindered=genotype_orig->all_binding_sites[i][j].N_hindered;
-            genotype_clone->all_binding_sites[i][j].Koff=genotype_orig->all_binding_sites[i][j].Koff;                    
+            genotype_clone->all_binding_sites[i][j].Koff=genotype_orig->all_binding_sites[i][j].Koff; 
+            genotype_clone->all_binding_sites[i][j].mis_match=genotype_orig->all_binding_sites[i][j].mis_match;
         }
     }
 #endif
@@ -4649,6 +4657,30 @@ void reproduce_mut_identity(Genotype *genotype, Mutation *mut_record)
     }
 }
 
+void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
+{
+    int i,j;
+    float new_koff;
+    int tf_id;
+
+    tf_id=RngStream_RandInt(RS,0,genotype->ntfgenes-1);
+    genotype->koff[tf_id]=genotype->koff[tf_id]*pow(10,gasdev(RS)*sd_mut_koff);
+    
+    for(i=2;i<genotype->ngenes-1;i++)
+    {
+        for(j=0;j<genotype->binding_sites_num[i];j++)
+        {
+            if(genotype->all_binding_sites[i][j].tf_id==tf_id)
+                genotype->all_binding_sites[i][j].Koff=genotype->koff[tf_id]*
+                        pow(KR,(float)genotype->all_binding_sites[i][j].mis_match/3.0);
+        }
+    }
+    
+    mut_record->kinetic_type='f';
+    mut_record->pos_g=tf_id;
+    mut_record->kinetic_diff=genotype->koff[tf_id];   
+}
+
 int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],RngStream RS, Mutation *mut_record)
 {
     int i;
@@ -4658,8 +4690,13 @@ int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],RngStream RS, Mutat
 #endif
     for(i=0;i<3;i++)
 	mut_record->nuc_diff[i]='\0';
-#if SET_BS_MANUALLY    
-    mut_record->mut_type='k';
+#if SET_BS_MANUALLY  
+    float random;
+    random=RngStream_RandU01(RS);
+    if(random<proportion_mut_binding_seq)
+        mut_record->mut_type='c';
+    else
+        mut_record->mut_type='k';    
 #endif
     switch (mut_record->mut_type)
     {
@@ -4688,8 +4725,12 @@ int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],RngStream RS, Mutat
             return_val=MUT_N_GENE;
             break;
         
-        case 'c': //binding sequence        
+        case 'c': //binding sequence 
+#if !SET_BS_MANUALLY
             mut_binding_sequence(genotype,mut_record,RS);
+#else
+            mut_koff(genotype,mut_record,RS);
+#endif
             return_val=MUT_TFSEQ;
             break;  
             

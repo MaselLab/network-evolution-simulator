@@ -156,6 +156,7 @@ typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
   int tf_id;         /* transcription factor */
   float Koff;        /* replacing hamming_dist */
+  int mis_match;     /* number of mismatched nuc */
   int BS_pos;        /* start position of BS on DNA, always with reference to forward strand */                     
   int N_hindered;    /* the number of BS hindered by this TF when it binds to the current BS */  
 //  int compressed;    /* if this site has been compressed, set the value to 1 */ 
@@ -175,44 +176,44 @@ typedef struct CompressedBindingSites CompressedBindingSites;
 typedef struct Genotype Genotype;
 struct Genotype {
 /* directly subjected to mutation*/
-    int ngenes;                                           /* the number of actual loci */
-    int ntfgenes;                                         /* the number of actual tf loci */
-    int nproteins;                                        /* because of gene duplication, the number of proteins and mRNAs can be different 
-                                                           * from the number of genes. This nprotein is the number of elements in protein_pool*/
-    int ncopies_under_penalty;                            /* this is the number of gene copies that exceed the MAX_COPIES */
-    float P_dup_per_protein[NPROTEINS];                   /* probability of duplication of the copies for each protein */
-    int protein_pool[NPROTEINS][2][NGENES];                   /* element 1 record how many genes/mRNAs producing this protein, 
-                                                           * ele 2 stores which genes/mRNAs*/
-    int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
-    int which_tf[NGENES];                                 /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
+    int ngenes;                                             /* the number of actual loci */
+    int ntfgenes;                                           /* the number of actual tf loci */
+    int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
+                                                               from the number of genes. This nprotein is the number of elements in protein_pool*/
+    int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */
+    float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
+    int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein, 
+                                                               ele 2 stores which genes/mRNAs*/
+    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
+    int which_tf[NGENES];                                   /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
     char cisreg_seq[NGENES][CISREG_LEN];
     char tf_seq[TFGENES][TF_ELEMENT_LEN];
-    char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
-    int N_act;                                            /* number of activating TF*/
-    int N_rep;                                            /* number of repressing TF*/
-    int activating[NPROTEINS];                /* 1 for activator, 0 for repressor, -1 for non-tf */ 
+    char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+    int N_act;                                              /* number of activating TF*/
+    int N_rep;                                              /* number of repressing TF*/
+    int activating[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
 
-    float mRNAdecay[NGENES];                              /* kinetic rates*/
-    float proteindecay[NGENES];                           /* kinetic rates*/
-    float translation[NGENES];                            /* kinetic rates*/   
-    float pic_disassembly[NGENES];            /* kinetic rates*/
-                           
+    float mRNAdecay[NGENES];                                /* kinetic rates*/
+    float proteindecay[NGENES];                             /* kinetic rates*/
+    float translation[NGENES];                              /* kinetic rates*/   
+    float pic_disassembly[NGENES];                          /* kinetic rates*/
+    float koff[NGENES];                                     /* kinetic rates*/                        
  /* binding sites related data*/
     
     /* For genes having the same cis-reg, tf distribution can be shared*/
-    int min_act_to_transc[NGENES];                        /* 1 for OR GATE, at leat 2 FOR AND GATE */  
-    int cisreg_cluster[NGENES][NGENES];                   /* genes having the same cis-reg are clustered.
-                                                           * 1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
-                                                           * cisreg_cluster works with which_cluster*/
-    int which_cluster[NGENES];                            /* which_cluster stores the cluster id of a gene*/                                                           
-    int recalc_TFBS[NGENES];                              /* whether to recalc the TFBS*/
-    int clone_info[NGENES];                               /* whether to copy info back to this gene in clone_cell*/    
-    int binding_sites_num[NGENES];                        /* total number of binding sites */
-    int max_hindered_sites[NGENES];                       /* maximal number of BSs a BS can hinder*/ 
-    int max_hindered_clusters[NGENES];                    /* maximal number of clusters a cluster can hinder*/   
+    int min_act_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */  
+    int cisreg_cluster[NGENES][NGENES];                     /* genes having the same cis-reg are clustered.
+                                                               1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
+                                                               cisreg_cluster works with which_cluster*/
+    int which_cluster[NGENES];                              /* which_cluster stores the cluster id of a gene*/                                                           
+    int recalc_TFBS[NGENES];                                /* whether to recalc the TFBS*/
+    int clone_info[NGENES];                                 /* whether to copy info back to this gene in clone_cell*/    
+    int binding_sites_num[NGENES];                          /* total number of binding sites */
+    int max_hindered_sites[NGENES];                         /* maximal number of BSs a BS can hinder*/ 
+    int max_hindered_clusters[NGENES];                      /* maximal number of clusters a cluster can hinder*/   
 //    int cluster_num[NGENES];                              /* number of clusters of compressed binding sites */
-    int N_act_BS[NGENES];                                 /* total number of binding sites of activating TF */
-    int N_rep_BS[NGENES];                                 /* total number of binding sites of repressing TF */
+    int N_act_BS[NGENES];                                   /* total number of binding sites of activating TF */
+    int N_rep_BS[NGENES];                                   /* total number of binding sites of repressing TF */
     int avg_N_BS_in_cluster[NGENES][NGENES][2];
 //    int *N_configurations[NGENES];                        /* maximal numbers of activators bound given n rep bound */ 
 //    int max_N_rep_bound[NGENES];                          /* maximal number of repressors bound to a promoter */ 
@@ -694,6 +695,8 @@ extern void mut_binding_sequence(Genotype *,Mutation *, RngStream);
 extern void mut_kinetic_constant(Genotype *, Mutation *, float [NUM_K_DISASSEMBLY], RngStream);
 
 extern void mut_identity(Genotype *, Mutation *, RngStream);
+
+extern void mut_koff(Genotype *, Mutation *, RngStream);
 
 extern int reproduce_mutate(Genotype *, Mutation *);
 
