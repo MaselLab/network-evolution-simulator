@@ -11,16 +11,16 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 20000    
+#define MAX_MUT_STEP 10000    
 #endif
 
 #ifndef BURN_IN
-#define BURN_IN 10000
+#define BURN_IN 0
 #endif
 
-#define RdcPdup 0
+#define RdcPdup 1
 
-#define N_THREADS 1
+#define N_THREADS 12
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -68,7 +68,7 @@
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
 #endif
 
-#define MAX_MODE 8  /* MAX_MODE is the max number of tf that can bind to a promoter*/
+#define MAX_MODE 8  /* MAX_MODE is the max number of tf that can bind to a promoter plus 1*/
 #define MAX_BS_IN_CLUSTER 100
 /* 
  * define macros for logging output and warning/errors 
@@ -715,6 +715,8 @@ extern void reproduce_mut_binding_sequence(Genotype *,Mutation *);
 extern void reproduce_mut_kinetic_constant(Genotype *, Mutation *);
 
 extern void reproduce_mut_identity(Genotype *, Mutation *);
+
+extern void reproduce_mut_koff(Genotype *, Mutation *);
 
 extern void draw_mutation(Genotype *, char *, RngStream);
 
