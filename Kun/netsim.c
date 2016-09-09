@@ -1005,7 +1005,7 @@ float calc_TF_dist_from_all_BS(AllTFBindingSites *BS_info,
     for(i=0;i<approximation;i++)
     {
 //        j=round(fabs((i-0.31)/0.33)); // need at least one act to transcribe    
-        j=min_act_to_transcr;
+        j=(min_act_to_transcr>round(fabs((i-0.31)/0.33)))?min_act_to_transcr:round(fabs((i-0.31)/0.33));
         for(;j<approximation;j++)
         {
             prob_act_over_rep+=ratio_matrices[pos_next_record][i][j];
