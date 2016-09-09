@@ -1725,14 +1725,14 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
             }
             else if ((P_a <= Pp_a) && (P_next_a <= Pp_a)) /* P < Pp throughout */
             {    
-                *integrated_growth_rate = compute_integral(genotype, state, conc_a, dt, Pp_a, 'A');
+                *integrated_growth_rate = gmax_a* compute_integral(genotype, state, conc_a, dt, Pp_a, 'A');
             }
             else if ((Pp_a >= P_a) && (P_next_a >= Pp_a)) /* P < Pp up until t' then P > Pp */
             {    
                 
                 dt_prime = compute_tprime(genotype,state,env,conc_a,conc_b,dt);                
                 dt_rest = dt - dt_prime;                
-                *integrated_growth_rate = compute_integral(genotype, state, conc_a, dt_prime, Pp_a,'A');                
+                *integrated_growth_rate = gmax_a* compute_integral(genotype, state, conc_a, dt_prime, Pp_a,'A');                
                 *integrated_growth_rate += gmax_a * dt_rest;
             }
             else if ((P_a >= Pp_a) && (Pp_a >= P_next_a)) /* P > Pp up until t' then P < Pp */
@@ -1740,7 +1740,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                 dt_prime = compute_tprime(genotype,state,env,conc_a,conc_b,dt);                
                 dt_rest = dt - dt_prime;
                 *integrated_growth_rate = gmax_a * dt_prime;                
-                *integrated_growth_rate += compute_integral(genotype, state, conc_a, dt_prime, Pp_a,'A');
+                *integrated_growth_rate += gmax_a* compute_integral(genotype, state, conc_a, dt_prime, Pp_a,'A');
             }
             else 
             {               
@@ -1780,13 +1780,13 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
             }
             else if ((P_b <= Pp_b) && (P_next_b <= Pp_b)) /* P < Pp throughout */
             {   
-                *integrated_growth_rate = compute_integral(genotype, state, conc_b, dt, Pp_b,'B');
+                *integrated_growth_rate = gmax_b* compute_integral(genotype, state, conc_b, dt, Pp_b,'B');
             }
             else if ((Pp_b >= P_b) && (P_next_b >= Pp_b)) /* P < Pp up until t' then P > Pp */
             {    
                 dt_prime = compute_tprime(genotype,state,env,conc_a,conc_b,dt);
                 dt_rest = dt - dt_prime;
-                *integrated_growth_rate = compute_integral(genotype, state, conc_b, dt_prime, Pp_b,'B');
+                *integrated_growth_rate = gmax_b* compute_integral(genotype, state, conc_b, dt_prime, Pp_b,'B');
                 *integrated_growth_rate += gmax_b * dt_rest;
             }
             else if ((P_b >= Pp_b) && (Pp_b >= P_next_b)) /* P > Pp up until t' then P < Pp */
@@ -1794,7 +1794,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                 dt_prime = compute_tprime(genotype,state,env,conc_a,conc_b,dt);
                 dt_rest = dt - dt_prime;
                 *integrated_growth_rate = gmax_b * dt_prime;
-                *integrated_growth_rate += compute_integral(genotype, state, conc_b, dt_prime, Pp_b,'B');
+                *integrated_growth_rate += gmax_b* compute_integral(genotype, state, conc_b, dt_prime, Pp_b,'B');
             }
             else 
             {
