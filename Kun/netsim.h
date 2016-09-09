@@ -20,7 +20,7 @@
 
 #define RdcPdup 1
 
-#define N_THREADS 12
+#define N_THREADS 1
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -68,7 +68,7 @@
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
 #endif
 
-#define MAX_MODE 8 /*this is the max number of tf molecules that can bind to a promoter*/
+#define MAX_MODE 8  /* MAX_MODE is the max number of tf that can bind to a promoter*/
 #define MAX_BS_IN_CLUSTER 100
 /* 
  * define macros for logging output and warning/errors 
@@ -111,7 +111,7 @@
  * element KON_PROTEIN_DECAY is proteindecay
  * element KON_SALPHC        is salphc
  */
-enum { KON_PROTEIN_DECAY_INDEX = 0, KON_SALPHC_INDEX = 1 };
+enum { KON_PROTEIN_DECAY_INDEX = 0, KON_SALPHAC_INDEX = 1 };
 
 /*
  * enum for 'CellState'->active indices
@@ -337,6 +337,8 @@ int env1_signalA_as_noise;
 int env2_signalA_as_noise;
 int env1_signalA_mismatches; 
 int env2_signalA_mismatches;
+float env1_occurence;
+float env2_occurence;
 int init_N_act;
 int init_N_rep;
 int recalc_new_fitness;
@@ -477,11 +479,27 @@ extern int does_fixed_event_end_plotting(   FixedEvent *,
                                             FixedEvent *,
                                             float);
 
+extern void update_protein_number_cell_size(Genotype *,
+                                            CellState *,
+                                            GillespieRates *,
+                                            float,                                        
+                                            float,
+                                            char,
+                                            int *,
+                                            char *,
+                                            int,
+                                            Mutation *);
+
 extern void end_transcription(float *,
                                 float,
                                 CellState *,
                                 GillespieRates *,
-                                int);
+                                Genotype *,
+                                int *,
+                                char *,
+                                int,
+                                Mutation *,
+                                char *);
 
 
 extern void disassemble_PIC(Genotype *,
@@ -494,15 +512,16 @@ extern void revise_activity_state(int,
                                   CellState *,
                                   GillespieRates *);
 
-extern float compute_tprime(float, float, float, float);
+extern float compute_tprime(Genotype*, CellState*, char, float*, float*, float);
 
-extern float compute_integral(float, float, float, float, float, float, float, float);
+//extern float compute_integral(float, float, float, float, float, float, float, float);
+extern float compute_integral(Genotype *, CellState *, float *, float, float, char);
 
 extern float compute_growth_rate_dimer( float *,
                                         Genotype *,
                                         CellState *,
-                                        float,
-                                        float,
+                                        float*,
+                                        float*,
                                         float, 
                                         float,
                                         float,
@@ -512,17 +531,6 @@ extern float compute_growth_rate_dimer( float *,
                                         char *,
                                         int,
                                         Mutation *);
-
-extern void update_protein_conc_cell_size(Genotype *,
-                                            CellState *,
-                                            GillespieRates *,
-                                            float,                                        
-                                            float,
-                                            char,
-                                            int *,
-                                            char *,
-                                            int,
-                                            Mutation *);
 
 extern void transport_event(Genotype *,
                             CellState *,
@@ -614,7 +622,16 @@ extern void calc_all_rates(Genotype *,
                             GillespieRates *,                     
                             int);
 
-extern void end_translation_init(Genotype *, CellState *, GillespieRates *, float *, float);
+extern void end_translation_init(   Genotype *, 
+                                    CellState *,    
+                                    GillespieRates *, 
+                                    float *, 
+                                    float,
+                                    int *,
+                                    char *,
+                                    int,
+                                    Mutation *,
+                                    char *);
 
 extern void do_fixed_event(Genotype *, 
                             CellState *, 
@@ -730,5 +747,7 @@ extern void set_env(CellState *, char, float, float);
 extern void output_genotype(char *, char *, char *, char *, Genotype *, int);
 
 extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THREADS]);
+
+extern void calc_fx_dfx(float, int, float*, float*, float*, float*, float*);
 
 #endif /* !FILE_NETSIM_SEEN */
