@@ -11,12 +11,14 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 12000    
+#define MAX_MUT_STEP 15000    
 #endif
 
 #ifndef BURN_IN
 #define BURN_IN 10000 
 #endif
+
+#define RdcPdup 0
 
 #define N_THREADS 12
 
@@ -46,18 +48,18 @@
   #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 14          /* the initial value is set in initiate_genotype*/
+  #define TFGENES 24          /* the initial value is set in initiate_genotype*/
   #endif
   #ifndef NGENES
-  #define NGENES 16  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
+  #define NGENES 26  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
   #endif
   #ifndef NPROTEINS           
-  #define NPROTEINS 14
+  #define NPROTEINS 24
   #endif
 #endif
 
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
-#define TF_ELEMENT_LEN 6      /* length of binding element on TF */
+#define TF_ELEMENT_LEN 8      /* length of binding element on TF */
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
 
 #ifndef HIND_LENGTH
@@ -178,7 +180,6 @@ struct Genotype {
                                                            * from the number of genes. This nprotein is the number of elements in protein_pool*/
     int ncopies_under_penalty;                            /* this is the number of gene copies that exceed the upperlim */
     float P_dup_per_protein[NPROTEINS];                   /* probability of duplication of the copies for each protein */
-    
     int protein_pool[NPROTEINS][2][NGENES];                   /* element 1 record how many genes/mRNAs producing this protein, 
                                                            * ele 2 stores which genes/mRNAs*/
     int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
@@ -329,7 +330,8 @@ float Koff[TF_ELEMENT_LEN-4+1];
 int current_ploidy;
 int init_TF_genes;
 int upperlim_of_gene_copies;
-float penalty_of_extra_gene_copies;
+float penalty_of_extra_copies;
+float reduction_in_P_dup;
 float signal_strength;
 float env1_t_signalA;    
 float env1_t_signalB;     
@@ -341,6 +343,9 @@ int env1_signalA_mismatches;
 int env2_signalA_mismatches;
 int init_N_act;
 int init_N_rep;
+int recalc_new_fitness;
+char init_env1;
+char init_env2;
 float cost_term;
 float penalty;
 int N_replicates;
@@ -597,7 +602,7 @@ extern void calc_avg_growth_rate(Genotype *,
                                     int,
                                     Mutation *); 
   
-extern int init_run_pop(float [NUM_K_DISASSEMBLY], char *, char *, char *, char *, char *, char *, unsigned long int [6]);
+extern int init_run_pop(float [NUM_K_DISASSEMBLY], char*, char *, char *, char *, char *, char *, char *, unsigned long int [6]);
 
 extern void print_time_course(TimeCourse *, FILE *);
 
@@ -687,6 +692,8 @@ extern void reproduce_gene_duplicaton(Genotype *,Mutation *);
 extern void reproduce_mut_binding_sequence(Genotype *,Mutation *);
 
 extern void reproduce_mut_kinetic_constant(Genotype *, Mutation *);
+
+extern void reproduce_mut_identity(Genotype *, Mutation *);
 
 extern void draw_mutation(Genotype *, char *, RngStream);
 
