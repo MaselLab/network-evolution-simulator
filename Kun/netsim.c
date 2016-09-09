@@ -26,9 +26,9 @@
 #define UPDATE_ALL 1
 #define NO_KON_UPDATE 0
 #define CAUTIOUS 0
-#define SET_BS_MANUALLY 1
-#define NO_REGULATION_COST 1
-#define UNLIMITED_MUTATION 0
+#define SET_BS_MANUALLY 0
+#define NO_REGULATION_COST 0
+#define UNLIMITED_MUTATION 1
 
 const float alpha=1.0e-3;
 
@@ -100,10 +100,10 @@ int recalc_new_fitness; /*calculate the growth rate of the new genotype four mor
 float cost_term=1.0e-4;      /* this determined the cost of translation */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
 
 /*initial conditions*/
-int init_TF_genes=1;
-int init_N_act=0;
-int init_N_rep=1;
-int min_act_to_transcr_A=1;
+int init_TF_genes=6;
+int init_N_act=3;
+int init_N_rep=3;
+int min_act_to_transcr_A=2;
 int min_act_to_transcr_B=1;
 float penalty_of_extra_copies=2.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
@@ -211,7 +211,7 @@ void initialize_genotype_fixed( Genotype *genotype,
         while (genotype->mRNAdecay[i]<0.0)
             genotype->mRNAdecay[i] = exp(0.4909*gasdev(RS)-3.20304);
     /************************************************************************************/
-//        genotype->mRNAdecay[i]=0.1386; //half life is about 5min
+        genotype->mRNAdecay[i]=0.1386; //half life is about 5min
     /************************************************************************************/    
         genotype->proteindecay[i]=-1.0;
         while (genotype->proteindecay[i] < 0.0) 
@@ -222,14 +222,14 @@ void initialize_genotype_fixed( Genotype *genotype,
                 genotype->proteindecay[i] = exp(0.7874*gasdev(RS)-3.7665);
         }
     /************************************************************************************/    
-//        genotype->proteindecay[i]=0.1386; 
+        genotype->proteindecay[i]=0.1386; 
     /************************************************************************************/
         /* dilution no longer done here, because it is now variable (function of instantaneous growth rate) */
         genotype->translation[i] = exp(0.7406*gasdev(RS)+4.56);
         while (genotype->translation[i] < 0.0)
             genotype->translation[i] = exp(0.7406*gasdev(RS)+4.56);
     /************************************************************************************/    
-//        genotype->translation[i]=360; // 1 protein per 6s
+        genotype->translation[i]=360; // 1 protein per 6s
     /************************************************************************************/
         j = RngStream_RandInt(RS,0,NUM_K_DISASSEMBLY-1);
         genotype->pic_disassembly[i] = kdis[j];
@@ -4567,7 +4567,7 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
         genotype->pic_disassembly[pos_g]=kdis[RngStream_RandInt(RS,0,NUM_K_DISASSEMBLY-1)];
 #else
         genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);  
-        if(genotype->pic_disassembly[pos_g]<MIN_PICDISASSEMBLE || genotype->pic_disassembly[pos_g]>MAX_PICDISASSEMBLE)
+        while(genotype->pic_disassembly[pos_g]<MIN_PICDISASSEMBLE || genotype->pic_disassembly[pos_g]>MAX_PICDISASSEMBLE)
             genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);
 #endif        
         /*record mutation info*/
@@ -4577,10 +4577,13 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
     else if(random1<=0.4) /* 30% mut mRNAdecay */
     {
 #if UNLIMITED_MUTATION
-        random2 = exp(0.4909*gasdev(RS)-3.20304);
+	random2 = exp(0.4909*gasdev(RS)-3.20304);
+	while(random2<MIN_mRNA_decay)
+        	random2 = exp(0.4909*gasdev(RS)-3.20304);
+	genotype->mRNAdecay[pos_g]=random2;
 #else
         genotype->mRNAdecay[pos_g]=genotype->mRNAdecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut); 
-        if(genotype->mRNAdecay[pos_g]>MAX_mRNA_decay || genotype->mRNAdecay[pos_g]<MIN_mRNA_decay)
+        while(genotype->mRNAdecay[pos_g]>MAX_mRNA_decay || genotype->mRNAdecay[pos_g]<MIN_mRNA_decay)
             genotype->mRNAdecay[pos_g]=genotype->mRNAdecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);
 #endif
         /*record mutation info*/
@@ -4591,9 +4594,12 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
     {
 #if UNLIMITED_MUTATION
         random2= exp(0.7406*gasdev(RS)+4.56);
+	while(random2>MAX_TRANSLATION)
+		random2=exp(0.7406*gasdev(RS)+4.56);
+	genotype->translation[pos_g]=random2;
 #else
         genotype->translation[pos_g]=genotype->translation[pos_g]*exp(sd_mut_effect*gasdev(RS)-bias_in_mut);
-        if(genotype->translation[pos_g]>MAX_TRANSLATION || genotype->translation[pos_g]< MIN_TRANSLATION)
+        while(genotype->translation[pos_g]>MAX_TRANSLATION || genotype->translation[pos_g]< MIN_TRANSLATION)
             genotype->translation[pos_g]=genotype->translation[pos_g]*exp(sd_mut_effect*gasdev(RS)-bias_in_mut);
 #endif
         mut_record->kinetic_type=2;
@@ -4609,9 +4615,10 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
                 random2 = (float)EPSILON;
             else random2 = exp(0.7874*gasdev(RS)-3.7665);
         }
+	genotype->proteindecay[pos_g]=random2;
 #else
         genotype->proteindecay[pos_g]=genotype->proteindecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);  
-        if(genotype->proteindecay[pos_g]>MAX_protein_decay || genotype->proteindecay[pos_g]<MIN_protein_decay)
+        while(genotype->proteindecay[pos_g]>MAX_protein_decay || genotype->proteindecay[pos_g]<MIN_protein_decay)
             genotype->proteindecay[pos_g]=genotype->proteindecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut); 
 #endif
         mut_record->kinetic_type=3;
@@ -4724,9 +4731,11 @@ void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
     tf_id=RngStream_RandInt(RS,0,genotype->ntfgenes-1);
 #if UNLIMITED_MUTATION
     genotype->koff[tf_id]=RngStream_RandU01(RS);
+    while(genotype->koff[tf_id]<MIN_koff || genotype->koff[tf_id]>MAX_koff)
+ 	genotype->koff[tf_id]=RngStream_RandU01(RS);
 #else
     genotype->koff[tf_id]=genotype->koff[tf_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
-    if(genotype->koff[tf_id]<MIN_koff || genotype->koff[tf_id]>MAX_koff)
+    while(genotype->koff[tf_id]<MIN_koff || genotype->koff[tf_id]>MAX_koff)
         genotype->koff[tf_id]=genotype->koff[tf_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
 #endif
     
@@ -5445,16 +5454,16 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     /*manually input binding sites info below*/
 #if SET_BS_MANUALLY 
 // this is a FFL
-//    int N_BS_per_gene[3]={2,2,2};
-//    int tf_id_per_site[3][3]={{0,0,-1},{0,2,2},{1,1,-1}};
-//    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
-//    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};    
+    int N_BS_per_gene[3]={2,2,2};
+    int tf_id_per_site[3][3]={{0,0,-1},{0,2,2},{1,1,-1}};
+    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
+    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};    
 
 // this is a BRA    
-    int N_BS_per_gene[3]={2,3,2};
-    int tf_id_per_site[3][3]={{1,1,-1},{0,2,0},{1,1,-1}};
-    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
-    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};
+//    int N_BS_per_gene[3]={2,3,2};
+//    int tf_id_per_site[3][3]={{1,1,-1},{0,2,0},{1,1,-1}};
+//    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
+//    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};
     
 #endif    
     
@@ -5509,7 +5518,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         init_env1='B';
         init_env2='B';
         tdevelopment = 119.9;
-        duration_of_burn_in_growth_rate = 50.0; 
+        duration_of_burn_in_growth_rate = 30.0; 
         env1_t_signalA=60.0;    
         env1_t_signalB=60.0;     
         env2_t_signalA=10.0;
@@ -5561,23 +5570,23 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     else
     { 	
         tdevelopment = 119.9;
-        duration_of_burn_in_growth_rate = 50.0; 
+        duration_of_burn_in_growth_rate = 30.1; 
         init_env1='B';
         init_env2='B';
-        env1_t_signalA=60.0;    
-        env1_t_signalB=60.0;     
+        env1_t_signalA=90.0;    
+        env1_t_signalB=30.0;     
         env2_t_signalA=10.0;
         env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
         env2_signalA_as_noise=0;
         env1_signalA_mismatches=0;   
         env2_signalA_mismatches=1;
-        N_replicates=1200;
-        recalc_new_fitness=2;
+        N_replicates=600;
+        recalc_new_fitness=0;
         env1_occurence=0.5;
         env2_occurence=0.5;
 	ready_to_evolve=0;
-        burn_in=1;
+        burn_in=BURN_IN;
         
         fp=fopen(RuntimeSumm,"a+");
         fprintf(fp,"**********Burn-in conditions**********\n");
@@ -5625,15 +5634,15 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 	    
             while(1)
             {
-		if(N_trials==100) /*if no fixation after 100 trials, we declare that a local optimal is found*/
-                {
-                    OUTPUT=fopen(filename1,"a+");
-                    fprintf(OUTPUT,"%d an optimal genotype is found\n",i);
-                    fclose(OUTPUT);
-                    summarize_binding_sites(&genotype_ori,1);
-                    release_memory(&genotype_ori,&genotype_ori_copy,&RS_main,RS_parallel);
-                    return 0;
-                }
+	//	if(N_trials==100) /*if no fixation after 100 trials, we declare that a local optimal is found*/
+          //      {
+            //        OUTPUT=fopen(filename1,"a+");
+            //        fprintf(OUTPUT,"%d an optimal genotype is found\n",i);
+            //        fclose(OUTPUT);
+            //        summarize_binding_sites(&genotype_ori,1);
+            //        release_memory(&genotype_ori,&genotype_ori_copy,&RS_main,RS_parallel);
+            //        return 0;
+            //    }
                 N_trials++;
                 N_tot_trials++;
 //                clone_cell_forward(&genotype_ori,&genotype_ori_copy,clone_type);
@@ -5733,11 +5742,11 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         DUPLICATION=1.5e-6*0.33;                 /* per gene per cell division (using 120min), excluding chromosome duplication. Lynch 2008*/
         SILENCING = 1.3e-6*0.33;          /* per gene per cell division (120min), excluding chromosome deletion.Lynch 2008*/
         tdevelopment=119.9;
-        duration_of_burn_in_growth_rate =50.0;
+        duration_of_burn_in_growth_rate =30.1;
         init_env1='B';
         init_env2='B';        
-        env1_t_signalA=60.0;     
-        env1_t_signalB=60.0;     
+        env1_t_signalA=90.0;     
+        env1_t_signalB=30.0;     
         env2_t_signalA=10.0;
         env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
@@ -5784,7 +5793,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 	    
             while(1)
             {
-		if(N_trials==100) /*if no fixation after 100 trials, we declare that a local optimal is found*/
+		if(N_trials==500) /*if no fixation after 500 trials, we declare that a local optimal is found*/
                 {
                     OUTPUT=fopen(filename1,"a+");
                     fprintf(OUTPUT,"%d an optimal genotype is found\n",i);
