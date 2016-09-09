@@ -11,14 +11,14 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 15000    
+#define MAX_MUT_STEP 20000    
 #endif
 
 #ifndef BURN_IN
 #define BURN_IN 10000 
 #endif
 
-#define RdcPdup 0
+#define RdcPdup 1
 
 #define N_THREADS 12
 
@@ -28,7 +28,7 @@
 #define TIME_INFINITY 9.99e10
 
 #ifndef MAX_COPIES
-#define MAX_COPIES 1       /* each gene can exists with four copies during replication. This is an old setting*/
+#define MAX_COPIES 2       /* each gene can have at most two copies*/
 #endif
 
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
@@ -178,23 +178,23 @@ struct Genotype {
     int ntfgenes;                                         /* the number of actual tf loci */
     int nproteins;                                        /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                            * from the number of genes. This nprotein is the number of elements in protein_pool*/
-    int ncopies_under_penalty;                            /* this is the number of gene copies that exceed the upperlim */
+    int ncopies_under_penalty;                            /* this is the number of gene copies that exceed the MAX_COPIES */
     float P_dup_per_protein[NPROTEINS];                   /* probability of duplication of the copies for each protein */
     int protein_pool[NPROTEINS][2][NGENES];                   /* element 1 record how many genes/mRNAs producing this protein, 
                                                            * ele 2 stores which genes/mRNAs*/
     int which_protein[NGENES];                            /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
     int which_tf[NGENES];                                 /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
-    char cisreg_seq[NGENES][MAX_COPIES][CISREG_LEN];
-    char tf_seq[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];
-    char tf_seq_rc[TFGENES][MAX_COPIES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+    char cisreg_seq[NGENES][CISREG_LEN];
+    char tf_seq[TFGENES][TF_ELEMENT_LEN];
+    char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];  /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int N_act;                                            /* number of activating TF*/
     int N_rep;                                            /* number of repressing TF*/
-    int activating[NPROTEINS][MAX_COPIES];                /* 1 for activator, 0 for repressor, -1 for non-tf */ 
+    int activating[NPROTEINS];                /* 1 for activator, 0 for repressor, -1 for non-tf */ 
 
     float mRNAdecay[NGENES];                              /* kinetic rates*/
     float proteindecay[NGENES];                           /* kinetic rates*/
     float translation[NGENES];                            /* kinetic rates*/   
-    float pic_disassembly[NGENES][MAX_COPIES];            /* kinetic rates*/
+    float pic_disassembly[NGENES];            /* kinetic rates*/
                            
  /* binding sites related data*/
     
@@ -233,8 +233,7 @@ struct Genotype {
  */
 typedef struct FixedEvent FixedEvent;
 struct FixedEvent {
-  int gene_id;
-  int copy;
+  int gene_id; 
   float time;
   FixedEvent *next;
 };
@@ -242,15 +241,12 @@ struct FixedEvent {
 typedef struct CellState CellState;
 struct CellState {   
     float cell_size;                    /* size of cell */
-    float cell_size_copy;               /* this is the cell size right after an env change*/
     float cell_size_after_burn_in;          
-    float growth_rate;                  /* total growth rate in the previous deltat */
-    float cumulative_growth_rate;       /* the product of the avg growth rates of an env */
-    int env_change;                     /* number of env change */
+    float growth_rate;                  /* total growth rate in the previous deltat */   
     int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
     int mRNA_nuclear_num[NGENES];       /* mRNAs in nucleus */
     int mRNA_transl_cyto_num[NGENES];   /* mRNAs are in the cytoplasm, but only recently */
-    int mRNA_transcr_num[NGENES][MAX_COPIES];  /* mRNAs which haven't finished transcription yet */
+    int mRNA_transcr_num[NGENES];       /* mRNAs which haven't finished transcription yet */
 
     FixedEvent *mRNA_transl_time_end;   /* times when mRNAs become fully loaded with ribosomes and start producing protein */
     FixedEvent *mRNA_transl_time_end_last;  
@@ -271,7 +267,7 @@ struct CellState {
                                                * can be considered temporary data. Make muation easier to
                                                * deal with. */
     float konvalues[NGENES][2];        /* moved from KonState*/  
-    int active[NGENES][MAX_COPIES];       /* gives the state of each of the genes, according to figure
+    int active[NGENES];       /* gives the state of each of the genes, according to figure
                                           *  NUC_NO_PIC = 0,
                                           *  NO_NUC_NO_PIC =1,
                                           *  PIC_NO_NUC = 3,
@@ -329,7 +325,6 @@ float protein_aging;
 float Koff[TF_ELEMENT_LEN-4+1];
 int current_ploidy;
 int init_TF_genes;
-int upperlim_of_gene_copies;
 float penalty_of_extra_copies;
 float reduction_in_P_dup;
 float signal_strength;
@@ -368,16 +363,16 @@ extern void initialize_parameters();
 
 extern void initialize_growth_rate_parameters();
 
-extern void initialize_sequence(char [], int, int, int, RngStream);
+extern void initialize_sequence(char [], int, int, RngStream);
 
 extern void print_genotype(Genotype *, int);
 
 extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
-                                    char [TFGENES][MAX_COPIES][TF_ELEMENT_LEN],
-                                    char [NGENES][MAX_COPIES][CISREG_LEN]
-//                                    int [NGENES][MAX_COPIES][2]
+                                    char [TFGENES][TF_ELEMENT_LEN],
+                                    char [NGENES][CISREG_LEN]
+//                                    int [NGENES][2]
 									);
 
 extern void print_tf_occupancy(CellState *,
@@ -406,7 +401,7 @@ extern float calc_ratio_act_to_rep(AllTFBindingSites *,
                                     int ,
                                     int ,
                                     int , 
-                                    int [NGENES][MAX_COPIES],                                    
+                                    int [NGENES],                                    
                                     int ,
                                     int ,
                                     int *,
@@ -416,7 +411,7 @@ extern float calc_TF_dist_from_compressed_BS(   CompressedBindingSites *,
                                                     int ,
                                                     int ,
                                                     int ,             
-                                                    int [NPROTEINS][MAX_COPIES], 
+                                                    int [NPROTEINS], 
                                                     float [NGENES]);
 extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
@@ -424,12 +419,11 @@ extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
                                         int ,
                                         int , 
-                                        int [NPROTEINS][MAX_COPIES],                                    
+                                        int [NPROTEINS],                                    
                                         int ,
                                         float [NGENES]);
 
-extern int add_fixed_event(int,
-                           int,
+extern int add_fixed_event(int,                           
                            float,
                            FixedEvent **,
                            FixedEvent **);
@@ -439,14 +433,12 @@ extern void add_time_point(float,
                            TimeCourse **,
                            TimeCourse **);
 
-extern void add_fixed_event_end(int,
-                                int,
+extern void add_fixed_event_end(int,                                
                                 float,
                                 FixedEvent **,
                                 FixedEvent **);
 
-extern void delete_fixed_event(int,
-                               int,
+extern void delete_fixed_event(int,                               
                                int,
                                FixedEvent **,
                                FixedEvent **);

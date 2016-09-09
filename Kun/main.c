@@ -34,7 +34,7 @@ int main()
     /* get the kdis.txt values */
     read_kdisassembly(kdis);
     /* now create and run the population of cells */
-    for(i=4;i<=4;i++)
+    for(i=8;i<=8;i++)
     {
         for(j=0;j<6;j++)
             seed[j]=i;
@@ -47,21 +47,27 @@ int main()
         snprintf(filename6,sizeof(char)*32,"N_BS_%i.txt",i);
         snprintf(RuntimeSumm,sizeof(char)*32,"RuntimeSummary_%i.txt",i);
         
-        chdir("result/test0601/c"); 
+        chdir("result"); 
         fp=fopen(RuntimeSumm,"w");
-        fprintf(fp,"BURN_IN=%d\n",BURN_IN);
-        fprintf(fp,"MAX_MUT_STEP=%d\n",MAX_MUT_STEP);
         fprintf(fp,"MAX_MODE=%d\n",MAX_MODE);
-        fprintf(fp,"N_replicates=%d\n",N_replicates);
-        fprintf(fp,"T-development=%f\n",tdevelopment);
-        fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);
-        fprintf(fp,"Environment 1: T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d\n",env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_signalA_mismatches);
-        fprintf(fp,"Environment 2: T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d\n",env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_signalA_mismatches);
+        fprintf(fp,"MAX gene copies per protein=%d\n",MAX_COPIES);
+        fprintf(fp,"penalty per copies=%f\n",penalty_of_extra_copies);        
+        if(RdcPdup==1)
+        {
+            fprintf(fp,"Reducing probability of duplcation once copy number exceeds upper limit!\n");
+            fprintf(fp,"fold reduction in probabiliy of duplicaton=%f\n",reduction_in_P_dup);
+        }
+        else
+        {
+            fprintf(fp,"Reducing growth rate once copy number exceeds upper limit!\n");
+            fprintf(fp,"penalty per copies=%f(percentage of maximal growth rate)\n",penalty_of_extra_copies);
+        }
+        fprintf(fp,"max gene number=%d, max tf gene number=%d,max protein number=%d\n",NGENES,TFGENES,NPROTEINS);            
         fprintf(fp,"cost_term=%f, penalty=%f\n",cost_term,penalty);
         fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);         
         fclose(fp);
         
-        init_run_pop(kdis,filename1,filename2,filename3,filename4,filename5,filename6,seed);
+        init_run_pop(kdis,RuntimeSumm,filename1,filename2,filename3,filename4,filename5,filename6,seed);
     }
     return 0;
 }
