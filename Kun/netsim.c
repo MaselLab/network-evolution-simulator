@@ -82,8 +82,8 @@ int recalc_new_fitness=4; /*calculate the growth rate of the new genotype four m
 
 /*initial conditions*/
 int init_TF_genes=10;
-int init_N_act=7;
-int init_N_rep=3;
+int init_N_act=6;
+int init_N_rep=4;
 float penalty_of_extra_copies=1.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
                                             * copy is this number times gmax_a (defined in initialized_growth_rate_parameters).
@@ -163,7 +163,8 @@ void initialize_sequence(char *Seq,
   int current_element = len/num_elements;
   int pos_n;
 
-  for (i=0; i<len; i++) {
+  for (i=0; i<len; i++) 
+  {
     pos_n = (i / current_element)*current_element + i % current_element;  
     x = RngStream_RandU01(RS);     
     Seq[pos_n] = set_base_pair(x);
@@ -190,7 +191,7 @@ void initialize_genotype_fixed( Genotype *genotype,
         while (genotype->proteindecay[i] < 0.0) 
         {
             if (RngStream_RandU01(RS) < 0.08421)
-                genotype->proteindecay[i] = (float)EPSILON; /* was 0.0. changed to non-zero for stability*/
+                genotype->proteindecay[i] = EPSILON; /* was 0.0. changed to non-zero for stability*/
             else 
                 genotype->proteindecay[i] = exp(0.7874*gasdev(RS)-3.7665);
         }
@@ -1550,13 +1551,9 @@ void end_transcription(float *dt,
 
 void end_translation_init(Genotype *genotype, CellState *state, GillespieRates *rates, float *dt,float t)
 {
-    int i;
-    int N_translation_event=0;
+    int i;    
     
     *dt = state->mRNA_transl_init_time_end->time - t;         /* make dt window smaller */
-    
-    /* count current number of mRNAs that have recently arrived in cytoplasm */
-    for (i=0; i<genotype->ngenes; i++) N_translation_event += state->mRNA_transl_cyto_num[i];
 
     /* get identity of gene that has just finished translating */
     i=state->mRNA_transl_init_time_end->gene_id;   
@@ -1941,33 +1938,34 @@ void update_protein_conc_cell_size( Genotype *genotype,
 		fclose(fp);
 		return;
 	}  
+#if CAUTIOUS
 	if(instantaneous_growth_rate<0.0)
 	{
             fp=fopen(error,"a+");
             fprintf(fp,"%d instant_GR=%.10f at t=%f\n",mut_step,instantaneous_growth_rate, t);
-//		fprintf(fp,"mRNA_a=%d tranl_rate_a=%f mRNA_decay_a=%f protein_decay_a=%f salphc_a=%f c_a=%f ect_a=%f L_a=%f dt=%f\n",
-//			state->mRNA_cyto_num[8],
-//			genotype->translation[8],
-//			genotype->mRNAdecay[8],
-//			genotype->proteindecay[8],
-//			state->konvalues[8][KON_SALPHC_INDEX],
-//			state->konvalues[8][KON_PROTEIN_DECAY_INDEX],
-//			ect1_a,
-//			L_a,
-//			dt);
-//		fprintf(fp,"mRNA_b=%d transl_rate_b=%f mRNA_decay_b=%f protein_decay_b=%f salphc_b=%f c_b=%f ect_b%f L_b=%f\n",			
-//			state->mRNA_cyto_num[9],
-//			genotype->translation[9],
-//			genotype->mRNAdecay[9],
-//			genotype->proteindecay[9],
-//			state->konvalues[9][KON_SALPHC_INDEX],
-//			state->konvalues[9][KON_PROTEIN_DECAY_INDEX],
-//			ect1_b,
-//			L_b);
-//		for(i=0;i<genotype->ngenes;i++)
-//		{
-//			fprintf(fp,"mRNA=%.10f alpha=%.10f \n",state->mRNA_cyto_num[i],genotype->translation[i]);
-//		}		
+            fprintf(fp,"mRNA_a=%d tranl_rate_a=%f mRNA_decay_a=%f protein_decay_a=%f salphc_a=%f c_a=%f ect_a=%f L_a=%f dt=%f\n",
+                    state->mRNA_cyto_num[8],
+                    genotype->translation[8],
+                    genotype->mRNAdecay[8],
+                    genotype->proteindecay[8],
+                    state->konvalues[8][KON_SALPHC_INDEX],
+                    state->konvalues[8][KON_PROTEIN_DECAY_INDEX],
+                    ect1_a,
+                    L_a,
+                    dt);
+            fprintf(fp,"mRNA_b=%d transl_rate_b=%f mRNA_decay_b=%f protein_decay_b=%f salphc_b=%f c_b=%f ect_b%f L_b=%f\n",			
+                    state->mRNA_cyto_num[9],
+                    genotype->translation[9],
+                    genotype->mRNAdecay[9],
+                    genotype->proteindecay[9],
+                    state->konvalues[9][KON_SALPHC_INDEX],
+                    state->konvalues[9][KON_PROTEIN_DECAY_INDEX],
+                    ect1_b,
+                    L_b);
+            for(i=0;i<genotype->ngenes;i++)
+            {
+                    fprintf(fp,"mRNA=%.10f alpha=%.10f \n",state->mRNA_cyto_num[i],genotype->translation[i]);
+            }		
             fclose(fp);
             *end_state=0;
             return;
@@ -1976,33 +1974,34 @@ void update_protein_conc_cell_size( Genotype *genotype,
 	{
             fp=fopen(error,"a+");
             fprintf(fp,"%d integra_GR=%.10f at t=%f\n",mut_step,integrated_growth_rate, t);
-//		fprintf(fp,"mRNA_a=%d tranl_rate_a=%f mRNA_decay_a=%f protein_decay_a=%f salphc_a=%f c_a=%f ect_a=%f L_a=%f dt=%f\n",
-//			state->mRNA_cyto_num[8],
-//			genotype->translation[8],
-//			genotype->mRNAdecay[8],
-//			genotype->proteindecay[8],
-//			state->konvalues[8][KON_SALPHC_INDEX],
-//			state->konvalues[8][KON_PROTEIN_DECAY_INDEX],
-//			ect1_a,
-//			L_a,
-//			dt);
-//		fprintf(fp,"mRNA_b=%d transl_rate_b=%f mRNA_decay_b=%f protein_decay_b=%f salphc_b=%f c_b=%f ect_b%f L_b=%f\n",			
-//			state->mRNA_cyto_num[9],
-//			genotype->translation[9],
-//			genotype->mRNAdecay[9],
-//			genotype->proteindecay[9],
-//			state->konvalues[9][KON_SALPHC_INDEX],
-//			state->konvalues[9][KON_PROTEIN_DECAY_INDEX],
-//			ect1_b,
-//			L_b);
-//		for(i=0;i<genotype->ngenes;i++)
-//		{
-//			fprintf(fp,"mRNA=%.10f alpha=%.10f \n",state->mRNA_cyto_num[i],genotype->translation[i]);
-//		}		
-//		fclose(fp);
+            fprintf(fp,"mRNA_a=%d tranl_rate_a=%f mRNA_decay_a=%f protein_decay_a=%f salphc_a=%f c_a=%f ect_a=%f L_a=%f dt=%f\n",
+                    state->mRNA_cyto_num[8],
+                    genotype->translation[8],
+                    genotype->mRNAdecay[8],
+                    genotype->proteindecay[8],
+                    state->konvalues[8][KON_SALPHC_INDEX],
+                    state->konvalues[8][KON_PROTEIN_DECAY_INDEX],
+                    ect1_a,
+                    L_a,
+                    dt);
+            fprintf(fp,"mRNA_b=%d transl_rate_b=%f mRNA_decay_b=%f protein_decay_b=%f salphc_b=%f c_b=%f ect_b%f L_b=%f\n",			
+                    state->mRNA_cyto_num[9],
+                    genotype->translation[9],
+                    genotype->mRNAdecay[9],
+                    genotype->proteindecay[9],
+                    state->konvalues[9][KON_SALPHC_INDEX],
+                    state->konvalues[9][KON_PROTEIN_DECAY_INDEX],
+                    ect1_b,
+                    L_b);
+            for(i=0;i<genotype->ngenes;i++)
+            {
+                    fprintf(fp,"mRNA=%.10f alpha=%.10f \n",state->mRNA_cyto_num[i],genotype->translation[i]);
+            }		
+            fclose(fp);
             *end_state=0;
             return;
 	}
+#endif
     /* use the integrated growth rate to compute the cell size in the next timestep */
     state->cell_size = (state->cell_size)*exp(integrated_growth_rate);    
     /* update the instantaneous growth rate for the beginning of the next timestep */
@@ -2022,29 +2021,24 @@ void transport_event(   Genotype *genotype,
 //                     long int *seed,
                         RngStream RS)
 {
-    int gene_id=1,concurrent;
+    int gene_id,concurrent;
     float x;
     float endtime = t + dt + TTRANSLATION;
-    FILE *fp;
 
-    x=RngStream_RandU01(RS)*rates->transport; 
-
-    /* choose gene product (mRNA) that gets transported to cytoplasm
-       based on weighting in transport[] array */
-    while (gene_id < genotype->ngenes-1 && x > 0.0) 
+    while(1)
     {
-        gene_id++;
-        x -= rates->transport_rate[gene_id];
+        x=RngStream_RandU01(RS)*rates->transport; 
+        gene_id=1;
+        /* choose gene product (mRNA) that gets transported to cytoplasm
+           based on weighting in transport[] array */
+        while (gene_id < genotype->ngenes-1 && x > 0.0) 
+        {
+            gene_id++;
+            x -= rates->transport_rate[gene_id];
+        }
+        if(rates->transport_rate[gene_id]>0.0)
+            break;
     }
-
-    if (gene_id >= genotype->ngenes) 
-    {
-        printf("error in transport_event");
-        fp=fopen("output.txt","a+");
-        fprintf(fp,"error in transport_event");
-        fclose(fp);
-        exit(0);
-    } 
     
     (state->mRNA_nuclear_num[gene_id])--;   /* one less mRNAs in nucleus */
     (state->mRNA_transl_cyto_num[gene_id])++;   /* it has just arrived in cytoplasm, ready to be translated */
@@ -2072,22 +2066,31 @@ void transport_event(   Genotype *genotype,
 
 void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
-    int gene_id = 1;
-    float x=RngStream_RandU01(RS)*rates->mRNAdecay;
+    int gene_id;
+    float x;
     int mRNA_id;
 
-    /* loop through mRNA products, to choose the mRNA with the
-       proportionally higher decay rate */
-    while (gene_id < genotype->ngenes-1 && x > 0.0) 
-    {
-        gene_id++;
-        x-= rates->mRNAdecay_rate[gene_id];
-    }
+    while(1)/*in case of numerical error*/    
+    {           
+        x=RngStream_RandU01(RS)*rates->mRNAdecay;   
+        gene_id=1;
+        /* loop through mRNA products, to choose the mRNA with the
+        proportionally higher decay rate */
+        while (gene_id < genotype->ngenes-1 && x > 0.0) 
+        {
+            gene_id++;
+            x-= rates->mRNAdecay_rate[gene_id];
+        }
+        /*rarely, numerical error picks up a gene that has not mRNA at all*/
+        if((state->mRNA_cyto_num[gene_id]+state->mRNA_transl_cyto_num[gene_id])>=1)
+            break;
+    } 
+    
     /* assume mRNA cytoplasm transport events equally likely */
-    x = RngStream_RandU01(RS)*((float) (state->mRNA_cyto_num[gene_id] + state->mRNA_transl_cyto_num[gene_id]));
+    x = RngStream_RandInt(RS,1,state->mRNA_cyto_num[gene_id] + state->mRNA_transl_cyto_num[gene_id]);
     
     /* decay mRNA in cytoplasm */
-    if (x < (float)state->mRNA_cyto_num[gene_id]) 
+    if (x <= state->mRNA_cyto_num[gene_id])
     {
         /* remove the mRNA from the cytoplasm count */
         (state->mRNA_cyto_num[gene_id])--;  
@@ -2109,13 +2112,19 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
 
 void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
-    int gene_id=1;
-    float x = RngStream_RandU01(RS)*rates->acetylation;
-
-    while(gene_id<genotype->ngenes-1 && x>0.0)
+    int gene_id;
+    float x;
+    while(1)
     {
-        gene_id++;
-        x-=rates->acetylation_rate[gene_id];
+        x= RngStream_RandU01(RS)*rates->acetylation;
+        gene_id=1;
+        while(gene_id<genotype->ngenes-1 && x>0.0)
+        {
+            gene_id++;
+            x-=rates->acetylation_rate[gene_id];
+        }
+        if(rates->acetylation_rate[gene_id]>0.0)
+            break;
     }
     /* set state: eject nucleosome, but there is no PIC yet */
     state->active[gene_id] = NO_NUC_NO_PIC;
@@ -2123,29 +2132,41 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
 
 void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
-    int gene_id=1; 
-    float x = RngStream_RandU01(RS)*rates->deacetylation;
-
-    /* choose a particular gene and copy to change state */
-    while(gene_id<genotype->ngenes-1 && x>0.0)
-    {
-        gene_id++;
-        x-=rates->deacetylation_rate[gene_id];
+    int gene_id; 
+    float x; 
+    while(1)
+    {    
+        x= RngStream_RandU01(RS)*rates->deacetylation;
+        gene_id=1;
+        /* choose a particular gene and copy to change state */
+        while(gene_id<genotype->ngenes-1 && x>0.0)
+        {
+            gene_id++;
+            x-=rates->deacetylation_rate[gene_id];
+        }
+        if(rates->deacetylation_rate[gene_id]>0.0)
+            break;
     }
-
     /* set state: nucleosome returns */
     state->active[gene_id] = NUC_NO_PIC;
 }
 
 void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
-    float x = RngStream_RandU01(RS)*rates->pic_assembly;
-    int gene_id=1;
-    /* choose a particular gene and copy to change state */
-    while(gene_id<genotype->ngenes-1 && x>0.0)
-    {
-        gene_id++;
-        x-=rates->pic_assembly_rate[gene_id];
+    float x; 
+    int gene_id;
+    while(1)
+    {    
+        x= RngStream_RandU01(RS)*rates->pic_assembly;
+        gene_id=1;
+        /* choose a particular gene and copy to change state */
+        while(gene_id<genotype->ngenes-1 && x>0.0)
+        {
+            gene_id++;
+            x-=rates->pic_assembly_rate[gene_id];
+        }
+        if(rates->pic_assembly_rate[gene_id]>0.0)
+            break;
     }
     /* turn gene fully on: ready for transcription and adjust rates */
     state->active[gene_id] = PIC_NO_NUC;  
@@ -2153,30 +2174,38 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genot
 
 void disassemble_PIC_event(Genotype *genotype, CellState *state,GillespieRates *rates, RngStream RS)
 {
-    int gene_id=1;
-    float x=RngStream_RandU01(RS)*rates->pic_disassembly;
-    /* choose an appropriate gene copy to disassemble the PIC from */
-    while (gene_id < genotype->ngenes-1 && x>0.0) 
+    int gene_id;
+    float x;
+    while(1)
     {
-        gene_id++;       
-        x -= rates->pic_disassembly_rate[gene_id];
-    }    
+        x=RngStream_RandU01(RS)*rates->pic_disassembly;   
+        gene_id=1;
+        /* choose an appropriate gene copy to disassemble the PIC from */
+        while(gene_id < genotype->ngenes-1 && x>0.0) 
+        {
+            gene_id++;       
+            x -= rates->pic_disassembly_rate[gene_id];
+        }
+        if(rates->pic_disassembly_rate[gene_id]>0.0)
+            break;
+    }
     state->active[gene_id]=NO_NUC_NO_PIC;   
 }
 
 void transcription_init_event(GillespieRates *rates, CellState *state, Genotype *genotype, float dt, float t, RngStream RS)
 {
     int gene_id=1;  
-    int x=RngStream_RandU01(RS)*rates->transcript_init;
+    int x;
     float candidate_t;
     int concurrent;
     
+    x=RngStream_RandInt(RS,1,rates->transcript_init);
     while(gene_id<genotype->ngenes-1 && x>=0)
     {
         gene_id++;
         x-=rates->transcript_init_rate[gene_id];
     }
- 
+     
     /* now that transcription of gene has been initiated, 
      * we add the timepoint at which the transcription ends, 
      * which is dt+time of transcription from now */

@@ -23,7 +23,7 @@
 #define N_THREADS 12
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
-#define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
+#define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
 #define TIME_INFINITY 9.99e10
 
