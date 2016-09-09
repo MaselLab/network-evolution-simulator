@@ -5112,7 +5112,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY],char *filename1, char *filename2,
             {
                 /*these rates are scaled down from the original literature, given that our promoters are shorter than the reported median (455). Kristiansson 2009*/
                 DUPLICATION=1.5e-6*0.33;                 /* per gene per cell division (using 120min), excluding chromosome duplication. Lynch 2008*/
-                SILENCING = (1.3e-6+0.6e-6)*0.33;          /* per gene per cell division (120min), excluding chromosome deletion.Lynch 2008*/
+                SILENCING = 1.3e-6*0.33;          /* per gene per cell division (120min), excluding chromosome deletion.Lynch 2008*/
                 MUTKINETIC = 5.25e-7*0.33;               /* subs and indel in a gene (~1.5kb, including introns) will change kinetic rates and binding seq */
                 proportion_mut_binding_seq = 0.1;   /*assuming 10% of MUTKINETIC in a TF gene change binding sequence*/
                                                     /* estimate this proportion based on data?*/
@@ -5121,7 +5121,9 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY],char *filename1, char *filename2,
             { 
                 OUTPUT=fopen(filename1,"a+");                              
                 fprintf(OUTPUT,"ntfgenes critical!\n");
-                fclose(OUTPUT);                
+                fclose(OUTPUT); 
+		summarize_binding_sites(&genotype_ori,1);
+		release_memory(&genotype_ori,&genotype_ori_copy,&RS_main, RS_parallel);               
                 return 0;
 
             }
