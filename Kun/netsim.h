@@ -10,25 +10,20 @@
 #include <stdio.h>
 #include "RngStream.h"
 
-//#ifndef POP_SIZE
-//#define POP_SIZE 2        
-//#endif
-
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 2000    
+#define MAX_MUT_STEP 2    
 #endif
 
 #ifndef BURN_IN
-#define BURN_IN 1000 // after burn_in 
+#define BURN_IN 1 
 #endif
 
-#define N_THREADS 12
+#define N_THREADS 2
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
 #define TIME_INFINITY 9.99e10
-//#define RATE_OPERATIONS 1e6   /* number of operations on a rate before recomputing that rate */
 
 #ifndef MAX_COPIES
 #define MAX_COPIES 1       /* each gene can exists with four copies during replication. This is an old setting*/
@@ -122,16 +117,6 @@ enum { KON_PROTEIN_DECAY_INDEX = 0, KON_SALPHC_INDEX = 1 };
 enum { NUC_NO_PIC = 0,
        NO_NUC_NO_PIC =1,
        PIC_NO_NUC = 3,};
-       
-/*
- * enum for state_change_ids
- */
-//enum { ACETYLATION_STATE = 0, 
-//       DEACETYLATION_STATE = 1, 
-//       PICASSEMBLY_STATE = 2,
-//       TRANSCRIPTINIT_STATE = 3, 
-//       PICDISASSEMBLY_STATE = 4,
-//};
 
 /*
  * Rates for Gillespie algorithm
@@ -147,13 +132,10 @@ typedef struct GillespieRates GillespieRates;
 struct GillespieRates {
   float transport;         /* rates[1] */
   float transport_rate[NGENES];
-//  int transport_operations;
   float mRNAdecay;         /* rates[2] */
   float mRNAdecay_rate[NGENES];
-//  int mRNAdecay_operations;
   float pic_disassembly;    /* rates[3] */
-  float pic_disassembly_rate[NGENES];
-//  int pic_disassembly_operations;   
+  float pic_disassembly_rate[NGENES]; 
   float acetylation;
   float acetylation_rate[NGENES]; 
   float deacetylation;
@@ -270,10 +252,10 @@ struct CellState {
     FixedEvent *mRNA_transl_time_end_last;  
     FixedEvent *mRNA_transcr_time_end;  /* times when transcription is complete and an mRNA is available to move to cytoplasm */
     FixedEvent *mRNA_transcr_time_end_last;
-    FixedEvent *envA_time_end;          /* times when env=A ends. Note, this event is not gene- or copy-specific. I just use the structure of FixedEvent for convenience.*/
-    FixedEvent *envA_time_end_last;
-    FixedEvent *envB_time_end;
-    FixedEvent *envB_time_end_last; 
+    FixedEvent *signalB_starts_end;          /* times when env=A ends. Note, this event is not gene- or copy-specific. I just use the structure of FixedEvent for convenience.*/
+    FixedEvent *signalB_starts_end_last;   
+    FixedEvent *signalA_starts_end;          /* times when env=A ends. Note, this event is not gene- or copy-specific. I just use the structure of FixedEvent for convenience.*/
+    FixedEvent *signalA_starts_end_last; 
     FixedEvent *burn_in_growth_rate;
     FixedEvent *burn_in_growth_rate_last;  
     FixedEvent *sampling_point_end;
@@ -322,31 +304,16 @@ const int NMIN;
 const float KRNA;
 const float TTRANSLATION;
 const float TTRANSCRIPTION;
-//const float PROB_ACTIVATING;
 const float TRANSCRIPTINIT; 
 const float DEACETYLATE;
 const float ACETYLATE;
 const float PICASSEMBLY;
-//const float STARTNUCLEUS;
-const float KR;    
-//const float GASCONSTANT;
-//const float COOPERATIVITY;
-//const float COOPERATIVE_DISTANCE; 
-const float NUMSITESINGENOME ;
-const float mN ;   
+const float KR;
+const float NUMSITESINGENOME;
 
 /* see netsim.c for documentation for these global variables */
-float kon; 
-//float kon_after_burnin; 
-int burn_in;
-float tdevelopment;  
-float timemax;       
-int current_ploidy;  
-int output;
-long seed ;          
-int dummyrun;        
-int recompute_koff;  
-int recompute_kon;
+const float kon;
+float tdevelopment; 
 float growth_rate_scaling; 
 float Pp_a;
 float Pp_b;         
@@ -355,9 +322,21 @@ float gmax_a;
 float gmax_b;
 float protein_aging;
 float Koff[TF_ELEMENT_LEN-4+1];
-
-
-
+int current_ploidy;
+int init_TF_genes;
+float signal_strength;
+float env1_t_signalA;    
+float env1_t_signalB;     
+float env2_t_signalA;
+float env2_t_signalB;
+int env1_signalA_as_noise;    
+int env2_signalA_as_noise;
+int env1_signalA_mismatches; 
+int env2_signalA_mismatches;
+float cost_term;
+float penalty;
+int N_replicates;
+float duration_of_burn_in_growth_rate;
 /* file output parameters */
 char *output_directory ;
 int verbose ;
@@ -468,15 +447,7 @@ extern void initialize_cell(CellState *,
                             int [NPROTEINS][2][NGENES],
                             float [NGENES],
                             float [NGENES],
-                            float [NPROTEINS],
-                            long int *,
-                            float,
-                            float,
-                            char, 
-                            TimeCourse **,
-                            TimeCourse **,
-                            TimeCourse **,
-                            TimeCourse **,       
+                            float [NPROTEINS],                                                            
                             int,
                             RngStream);
 
@@ -574,7 +545,9 @@ extern void do_single_timestep( Genotype *,
                                 int,                                                             
                                 char *,
                                 float,
-                                float,                                
+                                float,  
+                                int,
+                                int,
                                 RngStream,
 				char *,
                                 char *,
@@ -591,6 +564,8 @@ extern void do_single_timestep_plotting(    Genotype *,
                                             char *,
                                             float,
                                             float,
+                                            int,
+                                            int,
                                             float (*)[120],
                                             float [120],                                           
                                             int,
@@ -644,6 +619,8 @@ extern void do_fixed_event(Genotype *,
                             float ,
                             float,
                             char *,
+                            int,
+                            int,
                             int *,
                             char *,
                             int,
@@ -656,8 +633,10 @@ extern void do_fixed_event_plotting(Genotype *,
                                     float ,
                                     int , 
                                     float ,
-                                    float,
+                                    float,        
                                     char *,
+                                    int,
+                                    int,
                                     int *,
                                     char *,
                                     int,
