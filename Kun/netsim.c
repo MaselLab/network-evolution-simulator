@@ -85,6 +85,8 @@ int recalc_new_fitness; /*calculate the growth rate of the new genotype four mor
 int init_TF_genes=6;
 int init_N_act=3;
 int init_N_rep=3;
+int min_act_to_transcr_A=2;
+int min_act_to_transcr_B=1;
 float penalty_of_extra_copies=2.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
                                             * copy is this number times gmax_a (defined in initialized_growth_rate_parameters).
@@ -185,6 +187,7 @@ void initialize_genotype_fixed( Genotype *genotype,
      * They have no promoter, no mRNA, no cost of expression, but constant protein conc*/
     for (i=2; i < genotype->ngenes; i++) 
     {
+        genotype->min_act_to_transc[i]=1;
         genotype->mRNAdecay[i] = exp(0.4909*gasdev(RS)-3.20304);
         while (genotype->mRNAdecay[i]<0.0)
             genotype->mRNAdecay[i] = exp(0.4909*gasdev(RS)-3.20304);
@@ -256,6 +259,8 @@ void initialize_genotype_fixed( Genotype *genotype,
     genotype->pic_disassembly[1]=0.0; 
     genotype->activating[1]=1; /*make this signal an activator*/
     genotype->N_act++;
+    genotype->min_act_to_transc[genotype->ngenes-2]=min_act_to_transcr_A; 
+    genotype->min_act_to_transc[genotype->ngenes-1]=min_act_to_transcr_B; 
 }
 
 /*
@@ -846,7 +851,8 @@ float calc_TF_dist_from_all_BS(AllTFBindingSites *BS_info,
                                             int N_rep_BS, 
                                             int activating[NPROTEINS],
                                             int approximation,
-                                            float protein_number[NGENES])
+                                            float protein_number[NGENES],
+                                            int min_act_to_transcr)
 {
     double ratio_matrices[max_N_hindered_BS+1][approximation][approximation];   
     double transition_matrix[approximation][approximation];
@@ -998,8 +1004,8 @@ float calc_TF_dist_from_all_BS(AllTFBindingSites *BS_info,
 
     for(i=0;i<approximation;i++)
     {
-        j=round(fabs((i-0.31)/0.33)); // need at least one act to transcribe    
-        
+//        j=round(fabs((i-0.31)/0.33)); // need at least one act to transcribe    
+        j=min_act_to_transcr;
         for(;j<approximation;j++)
         {
             prob_act_over_rep+=ratio_matrices[pos_next_record][i][j];
@@ -1410,7 +1416,8 @@ void calc_all_rates(Genotype *genotype,
                                                             genotype->N_rep_BS[i],
                                                             genotype->activating, 
                                                             MAX_MODE,
-                                                            state->protein_number);                   
+                                                            state->protein_number,
+                                                            genotype->min_act_to_transc[i]);                   
             else
                 state->Pact[i]=0.0;
         }
@@ -2334,7 +2341,10 @@ void clone_cell_forward(Genotype *genotype_orig,
     if(clone_type!=MUT_CISSEQ) /* no change in gene numbers*/
     {
         for(i=0;i<genotype_clone->ngenes;i++)
+        {
             genotype_clone->which_protein[i]=-1;
+            genotype_clone->min_act_to_transc[i]=MAX_MODE+1;
+        }
         
         for(i=0; i < genotype_orig->ngenes; i++) 
         {              
@@ -2343,6 +2353,7 @@ void clone_cell_forward(Genotype *genotype_orig,
             genotype_clone->translation[i]=genotype_orig->translation[i];            
             genotype_clone->pic_disassembly[i]=genotype_orig->pic_disassembly[i];
             genotype_clone->which_protein[i]=genotype_orig->which_protein[i];
+            genotype_clone->min_act_to_transc[i]=genotype_orig->min_act_to_transc[i];
         }
         
         for(i=0;i<genotype_clone->nproteins;i++)
@@ -3899,7 +3910,8 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
         /*overwrite pos_g with the info of puppet_gene*/
         for(j=0;j<CISREG_LEN;j++)        
             genotype->cisreg_seq[pos_g][j]=genotype->cisreg_seq[puppet_gene][j];
-        genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[puppet_gene];             /* shift elements in the array*/
+        genotype->min_act_to_transc[pos_g]=genotype->min_act_to_transc[puppet_gene];  /* shift elements in the array*/
+        genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[puppet_gene];           
         genotype->mRNAdecay[pos_g]=genotype->mRNAdecay[puppet_gene];
         genotype->proteindecay[pos_g]=genotype->proteindecay[puppet_gene];
         genotype->translation[pos_g]=genotype->translation[puppet_gene];         
@@ -3946,6 +3958,7 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
     /* remove it from PIC_assembly, mRNAdecay, proteinDecay, translation and re_calc*/
     for(i=pos_g;i<genotype->ngenes;i++)
     {
+        genotype->min_act_to_transc[i]=genotype->min_act_to_transc[i+1];
         genotype->pic_disassembly[i]=genotype->pic_disassembly[i+1];             /* shift elements in the array*/
         genotype->mRNAdecay[i]=genotype->mRNAdecay[i+1];
         genotype->proteindecay[i]=genotype->proteindecay[i+1];
@@ -4048,7 +4061,8 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
         /*overwrite pos_g with the rest info of puppy_gene*/
         for(j=0;j<CISREG_LEN;j++)        
             genotype->cisreg_seq[pos_g][j]=genotype->cisreg_seq[puppet_gene][j];
-        genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[puppet_gene];             /* shift elements in the array*/
+        genotype->min_act_to_transc[pos_g]=genotype->min_act_to_transc[puppet_gene]; /* shift elements in the array*/
+        genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[puppet_gene];            
         genotype->mRNAdecay[pos_g]=genotype->mRNAdecay[puppet_gene];
         genotype->proteindecay[pos_g]=genotype->proteindecay[puppet_gene];
         genotype->translation[pos_g]=genotype->translation[puppet_gene];         
@@ -4094,6 +4108,7 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
     /* remove it from PIC_assembly, mRNAdecay, proteinDecay, translation*/
     for(i=pos_g;i<genotype->ngenes;i++)
     {
+        genotype->min_act_to_transc[i]=genotype->min_act_to_transc[i+1];
         genotype->pic_disassembly[i]=genotype->pic_disassembly[i+1];             /* shift elements in the array*/
         genotype->mRNAdecay[i]=genotype->mRNAdecay[i+1];
         genotype->proteindecay[i]=genotype->proteindecay[i+1];
@@ -4187,12 +4202,13 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS) //a
     /* add it to PIC_assembly, mRNAdecay, proteinDecay, translation, and which_protein*/
     for(i=genotype->ngenes;i>genotype->ngenes-2;i--)
     {
+        genotype->min_act_to_transc[i]=genotype->min_act_to_transc[i-1];
         genotype->pic_disassembly[i]=genotype->pic_disassembly[i-1]; /* shift the selection genes to make a slot*/
         genotype->mRNAdecay[i]=genotype->mRNAdecay[i-1];
         genotype->proteindecay[i]=genotype->proteindecay[i-1];
         genotype->translation[i]=genotype->translation[i-1];
         genotype->clone_info[i]=1;
-        genotype->recalc_TFBS[i]=1;        
+        genotype->recalc_TFBS[i]=1;           
         /*******************************************************************************************************/  
         /****In the box are the codes for shifting the info about BS. BS info of the duplicated ****************/
         /****can then be copied and pasted in to the slot created from shifting. It may avoid ******************/
@@ -4222,6 +4238,7 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS) //a
         /********************************************************************************************************/        
     }    
     /* copy and paste info to the slot*/
+    genotype->min_act_to_transc[genotype->ngenes-2]=genotype->min_act_to_transc[pos_g_copy];
     genotype->pic_disassembly[genotype->ngenes-2]=genotype->pic_disassembly[pos_g_copy];
     genotype->mRNAdecay[genotype->ngenes-2]=genotype->mRNAdecay[pos_g_copy];
     genotype->proteindecay[genotype->ngenes-2]=genotype->proteindecay[pos_g_copy];
@@ -4314,6 +4331,7 @@ void reproduce_gene_duplication(Genotype *genotype, Mutation *mut_record) //any 
     /* add it to PIC_assembly, mRNAdecay, proteinDecay, translation, and which_protein*/
     for(i=genotype->ngenes;i>genotype->ngenes-2;i--)
     {
+        genotype->min_act_to_transc[i]=genotype->min_act_to_transc[i-1];
         genotype->pic_disassembly[i]=genotype->pic_disassembly[i-1]; /* shift the selection genes to make a slot*/
         genotype->mRNAdecay[i]=genotype->mRNAdecay[i-1];
         genotype->proteindecay[i]=genotype->proteindecay[i-1];
@@ -4322,6 +4340,7 @@ void reproduce_gene_duplication(Genotype *genotype, Mutation *mut_record) //any 
         genotype->recalc_TFBS[i]=1;
     }
     
+    genotype->min_act_to_transc[genotype->ngenes-2]=genotype->min_act_to_transc[pos_g_copy];
     genotype->pic_disassembly[genotype->ngenes-2]=genotype->pic_disassembly[pos_g_copy];
     genotype->mRNAdecay[genotype->ngenes-2]=genotype->mRNAdecay[pos_g_copy];
     genotype->proteindecay[genotype->ngenes-2]=genotype->proteindecay[pos_g_copy];
@@ -5134,6 +5153,7 @@ void initialize_cache(Genotype *genotype)
         genotype->recalc_TFBS[j]=1;
         genotype->which_cluster[j]=-1;  
         genotype->which_tf[j]=-1;
+        genotype->min_act_to_transc[j]=MAX_MODE+1; /* by default a gene cannot be turned on*/
         for(k=0;k<NGENES;k++)        
             genotype->cisreg_cluster[j][k]=-1;
     }    

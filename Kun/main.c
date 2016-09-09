@@ -64,7 +64,9 @@ int main()
         }
         fprintf(fp,"max gene number=%d, max tf gene number=%d,max protein number=%d\n",NGENES,TFGENES,NPROTEINS);            
         fprintf(fp,"cost_term=%f, penalty=%f\n",cost_term,penalty);
-        fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);         
+        fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);  
+        fprintf(fp,"minimal activators to transcribe selection gene A: %d\n",min_act_to_transcr_A);
+        fprintf(fp,"minimal activators to transcribe selection gene B: %d\n",min_act_to_transcr_B);
         fclose(fp);
         
         init_run_pop(kdis,RuntimeSumm,filename1,filename2,filename3,filename4,filename5,filename6,seed);

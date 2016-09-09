@@ -200,6 +200,7 @@ struct Genotype {
  /* binding sites related data*/
     
     /* For genes having the same cis-reg, tf distribution can be shared*/
+    int min_act_to_transc[NGENES];                        /* 1 for OR GATE, at leat 2 FOR AND GATE */  
     int cisreg_cluster[NGENES][NGENES];                   /* genes having the same cis-reg are clustered.
                                                            * 1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
                                                            * cisreg_cluster works with which_cluster*/
@@ -344,6 +345,8 @@ int init_N_rep;
 int recalc_new_fitness;
 char init_env1;
 char init_env2;
+int min_act_to_transcr_A;
+int min_act_to_transcr_B;
 float cost_term;
 float penalty;
 int N_replicates;
@@ -424,7 +427,8 @@ extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int , 
                                         int [NPROTEINS],                                    
                                         int ,
-                                        float [NGENES]);
+                                        float [NGENES],
+                                        int );
 
 extern int add_fixed_event(int,                           
                            float,
