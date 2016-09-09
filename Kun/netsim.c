@@ -124,7 +124,7 @@ int verbose = 0;                     /* don't log verbosely by default */
 /* initialize the growth rate parameters: 
  * do computations here so that we can easily change the scaling factor and Pp */
 void initialize_growth_rate_parameters() {
-  float hc, gpeak_a, gpeak_b, Ltf;
+  float hc, Ltf;
   gpeak_a = 0.005776*growth_rate_scaling;  /* in min^-1 based on doubling time of 120 min: ln(2)/(120 min)=0.005776 */
   gpeak_b = 0.005776*growth_rate_scaling;
   Pp_a = 20000;
@@ -5209,7 +5209,7 @@ void try_fixation(Genotype *genotype_ori, Genotype *genotype_offspring, int *fix
 
 int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filename1, char *filename2, char *filename3, char *filename4, char *filename5, char *filename6, unsigned long int seeds[6])
 {  
-    int i,j;
+    int i,j,ready_to_evolve,burn_in;
     int fixation = 0;    
     float avg_GR1_copy,avg_GR2_copy,var_GR1_copy,var_GR2_copy;     
     int maxbound2, maxbound3; 
@@ -5262,7 +5262,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_3.txt","r");    
+    MUT=fopen("MUT_xx.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
@@ -5338,22 +5338,23 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     }    
     else
     { 	
-        tdevelopment = 90.0;
+        tdevelopment = 120.0;
         duration_of_burn_in_growth_rate = 30.0; 
         init_env1='A';
         init_env2='B';
         env1_t_signalA=150.0;    
         env1_t_signalB=0.0;     
-        env2_t_signalA=0.0;
-        env2_t_signalB=150.0;
+        env2_t_signalA=10.0;
+        env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
         env2_signalA_as_noise=0;
         env1_signalA_mismatches=0;   
-        env2_signalA_mismatches=0;
+        env2_signalA_mismatches=1;
         N_replicates=600;
         recalc_new_fitness=0;
-        env1_occurence=0.5;
-        env2_occurence=0.5;
+        env1_occurence=0.2;
+        env2_occurence=0.8;
+	ready_to_evolve=0;
         
         fp=fopen(RuntimeSumm,"a+");
         fprintf(fp,"**********Burn-in conditions**********\n");
@@ -5484,7 +5485,22 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
             
 //            if(i%100==0) /*output genotype every 100 steps*/
                 output_genotype(filename1,filename4,filename5,filename6,&genotype_ori,i);
+		if(genotype_ori.avg_GR1>0.5*gpeak_a && genotype_ori.avg_GR2>0.5*gpeak_b)
+			ready_to_evolve++;
+		else
+			ready_to_evolve=0;
+		if(ready_to_evolve>=10)
+		{
+			burn_in=i;
+			break;
+		}
+
         }
+
+	fp=fopen(RuntimeSumm,"a");
+	fprintf(fp,"Burn_in finished after %dth step\n",i);
+	fclose(fp);
+
         summarize_binding_sites(&genotype_ori,1); /*snapshot of the final (1) distribution binding sites */
         
         DUPLICATION=1.5e-6*0.33;                 /* per gene per cell division (using 120min), excluding chromosome duplication. Lynch 2008*/
@@ -5503,8 +5519,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_mismatches=1;  
         N_replicates=1200;
         recalc_new_fitness=2;
-        env1_occurence=0.9;
-        env2_occurence=0.1;
+        env1_occurence=0.2;
+        env2_occurence=0.8;
         
         fp=fopen(RuntimeSumm,"a");
         fprintf(fp,"**********second phase conditions**********\n");
