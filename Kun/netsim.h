@@ -60,6 +60,7 @@
 
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
+#define NMIN 6
 #define NUM_K_DISASSEMBLY 133 /* number of differents for PIC disassembly from data file  */
 
 #ifndef HIND_LENGTH
@@ -67,7 +68,7 @@
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
 #endif
 
-#define MAX_MODE 4
+#define MAX_MODE 8
 #define MAX_BS_IN_CLUSTER 100
 /* 
  * define macros for logging output and warning/errors 
@@ -262,8 +263,10 @@ struct CellState {
     FixedEvent *sampling_point_end_last; 
 
     float Pact[NGENES];
-    float protein_conc[NPROTEINS];     /* pooled protein concentration from gene_specific_protein_conc */
-    float gene_specific_protein_conc[NGENES]; /* stores the "protein" concentration for each gene.
+//    float equilibrium_tf_conc[NPROTEINS]; /* this is the nuclear concentration of free tf when binding/unbinding to non-specific sites reach equilibrium */  
+//    float protein_conc[NPROTEINS];        /* this is the concentration of proteins in cell. For tf, this stores the nuclear concentration, for selection proteins, this is cytosol concentration*/
+    float protein_number[NPROTEINS];     /* pooled protein number from gene_specific_protein_conc */
+    float gene_specific_protein_number[NGENES]; /* stores the "protein" number for each gene.
                                                * can be considered temporary data. Make muation easier to
                                                * deal with. */
     float konvalues[NGENES][2];        /* moved from KonState*/  
@@ -300,7 +303,6 @@ struct Mutation
 /* see netsim.c for documentation for these global constant variables */
 int MAXELEMENTS; 
 const int MAXBOUND;
-const int NMIN;
 const float KRNA;
 const float TTRANSLATION;
 const float TTRANSCRIPTION;
@@ -312,7 +314,7 @@ const float KR;
 const float NUMSITESINGENOME;
 
 /* see netsim.c for documentation for these global variables */
-const float kon;
+//float lumped_kon;
 float tdevelopment; 
 float growth_rate_scaling; 
 float Pp_a;
@@ -322,7 +324,6 @@ float h_extra_copy;
 float gmax_a;
 float gmax_b;
 float protein_aging;
-float Koff[TF_ELEMENT_LEN-4+1];
 int current_ploidy;
 int init_TF_genes;
 float penalty_of_extra_copies;

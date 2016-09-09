@@ -35,9 +35,8 @@ int MAXELEMENTS=100;
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
 const int MAXBOUND=500;
 const int MAXALLOC=10;
-const int NMIN=6;
 const float KRNA=618.0;
-const float TTRANSLATION=1.0; /*adding a small fraction to avoid two fixed events happen at exactly the same time*/
+const float TTRANSLATION=1.0; 
 const float TTRANSCRIPTION=1.0;
 const float PROB_ACTIVATING=0.62;
 const float TRANSCRIPTINIT=8.5; /* replace betaon and betaoff */
@@ -45,13 +44,15 @@ const float DEACETYLATE=0.667;
 const float ACETYLATE=0.167;
 const float PICASSEMBLY=0.04; //revised from 0.0277
 const float STARTNUCLEUS=0.1;
-const float KR=10.0;                  /* don't put this less than 1, weird things happen to koff calculation */
-const float GASCONSTANT=8.31447;
-const float NUMSITESINGENOME = 1.3e+6; /* updated from 1.8e+6 */
-const float kon=1e-7;       /* actual value should be kon=0.2225 is
-                                based on 1 molecule taking
-                                240seconds=4 minutes and 89% of the
-                                proteins being in the nucleus*/
+const float KR=10.0;        /*this is the ratio of the affinity of a perfect binding site to that of a non-specific site*/
+                            /*It controls the reduction in affinity per mismatch*/
+const float lumped_kon=1.0e-2*0.9/6.02e23*1.0e6/3.0e-15;   /* use molecules of a tf to calculate on rate*/ 
+                                                            /* kon=1.0e-2 uM^-1*s^-1 */
+                                                            /* vol_nuc = 3.0e-15 l^3 */
+                                                            /* NA = 6.02e23/1.0e6 convert number of molecules to umol*/
+                                                            /* assuming 90% of tf molecules are translocated to nuclear */ 
+const float koff=1.0e-2;
+float Koff[TF_ELEMENT_LEN-NMIN+1];
 /* protein aging term: used when c=c'+g=0, set to 1e-4 < mean-3*sd of
    Belle et al. (2006) and small with respect to most growth rates  */
 float protein_aging = 1e-4;
@@ -70,19 +71,19 @@ float max_inset=3.0;
 float max_delet=3.0;
 
 /*Cell growth and development*/
-int avg_protein_conc = 12000;
+int avg_protein_number = 12000;
 float penalty = 1.0e-5;
 float Pact_scaling = 1.0;
 float tdevelopment;/* default  development time: can be changed at runtime */
 float duration_of_burn_in_growth_rate; /* allow cells to reach (possiblly) steady growth*/
 float growth_rate_scaling = 1.0; /* set default growth rate scaling factor */
-int N_replicates=1200;
-int recalc_new_fitness=4; /*calculate the growth rate of the new genotype four more times to increase accuracy*/
+int N_replicates;
+int recalc_new_fitness; /*calculate the growth rate of the new genotype four more times to increase accuracy*/
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  float cost_term=1.0e-4;      /* this determined the cost of translation */
 
 /*initial conditions*/
-int init_TF_genes=10;
-int init_N_act=6;
+int init_TF_genes=8;
+int init_N_act=4;
 int init_N_rep=4;
 float penalty_of_extra_copies=1.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
@@ -94,7 +95,7 @@ float reduction_in_P_dup=100.0;     /* this is another way to restrict copy numb
                                              * new genotype*/
 
 /*Environments*/
-float signal_strength=120000.0; /* number of molecules of each signal protein */
+float signal_strength=120000.0; /* number of each signal protein */
 float env1_t_signalA;           /* duration of sigal A in environment 1 */
 float env1_t_signalB;           /* duration of sigal B in environment 1 */
 float env2_t_signalA;
@@ -125,7 +126,7 @@ void initialize_growth_rate_parameters() {
   Pp_a = 20000;
   Pp_b = 20000;              /* mean gene expression of all proteins is 12064.28 */
   Ltf= 1418;               /* mean gene expression of only TFs is 1418 */
-  hc = (gpeak_a/avg_protein_conc)*(1-(log(2-2*cost_term)/log(2)));      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) 
+  hc = (gpeak_a/avg_protein_number)*(1-(log(2-2*cost_term)/log(2)));      /* in min^-1 cost of doubling gene expression, based on Wagner (2005) 
   * using {s=0.2, N=500} matches {s=10^-5, N=10^7} combination (both Ns=100). Geiler-Samerotte (2011) reported that 47,000 YFP 
   * molecules at equilibrium reduces yeast growth by 1.4%. Assuming the half-life of YFP equals to the doubling time of yeast (120 min), 
   * then the expression rate of YFP is about 268 molecules/min. This means when translation increases by 1 molecule/min, growth rate is 
@@ -136,7 +137,8 @@ void initialize_growth_rate_parameters() {
                                             * generate an interesting question: what is the ratio of protein content (or investment) 
                                             * between regulatory proteins and proteins that directly promote growth.*/
   h_extra_copy = gmax_a*penalty_of_extra_copies; /* this is the reduction in GR per extra copy of gene*/
-}
+  
+ }
 
 char set_base_pair(float x) {
   char base;
@@ -659,23 +661,23 @@ int mod(int a, int b) // b is the base
 //                                            int max_N_hindered_BS,
 //                                            int N_BS,                                           
 //                                            int activating[NPROTEINS],
-//                                            float protein_conc[NGENES])
+//                                            float protein_number[NGENES])
 //{
 //    double ratio_matrices[max_N_hindered_BS+1][MAX_MODE][MAX_MODE];   
 //    double transition_matrix[MAX_MODE][MAX_MODE];
 //    double sum,prob_act_over_rep=0.0;    
 //    double product_of_freq;    
-//    float protein_conc_power[ntfgenes][MAX_MODE];
+//    float protein_number_power[ntfgenes][MAX_MODE];
 //    int pos_of_last_record;    
 //    int pos_next_record;
 //    int i,j,k,m,n;
 //    /*calc nth power of TF concentration*/
 //    for(i=0;i<ntfgenes;i++)
 //    {
-//        protein_conc_power[i][0]=1.0;
-//        protein_conc_power[i][1]=protein_conc[i];
+//        protein_number_power[i][0]=1.0;
+//        protein_number_power[i][1]=protein_number[i];
 //        for(j=2;j<MAX_MODE;j++)
-//            protein_conc_power[i][j]=protein_conc_power[i][j-1]*protein_conc[i];
+//            protein_number_power[i][j]=protein_number_power[i][j-1]*protein_number[i];
 //    }
 //    /* initializing matrices to all zeros */
 //    for(i=0;i<max_N_hindered_BS+1;i++)
@@ -699,12 +701,12 @@ int mod(int a, int b) // b is the base
 //    if(activating[BS_info[0].tf_id]==1) // if a activator binds to this BS
 //    {
 //        for(i=1;i<MAX_MODE;i++)
-//            ratio_matrices[pos_next_record][0][i]=BS_info[0].coeff_on_flux[i]*protein_conc_power[BS_info[0].tf_id][i];
+//            ratio_matrices[pos_next_record][0][i]=BS_info[0].coeff_on_flux[i]*protein_number_power[BS_info[0].tf_id][i];
 //    }
 //    else
 //    {
 //        for(i=1;i<MAX_MODE;i++)
-//            ratio_matrices[pos_next_record][i][0]=BS_info[0].coeff_on_flux[i]*protein_conc_power[BS_info[0].tf_id][i];
+//            ratio_matrices[pos_next_record][i][0]=BS_info[0].coeff_on_flux[i]*protein_number_power[BS_info[0].tf_id][i];
 //    }    
 //    
 //    for(m=1;m<N_BS;m++)
@@ -740,7 +742,7 @@ int mod(int a, int b) // b is the base
 //                            for(k=0;k<MAX_MODE;k++)
 //                                transition_matrix[i][j]+=ratio_matrices[pos_of_last_record][i][j-k]*
 //                                                         BS_info[m].coeff_on_flux[k]*
-//                                                         protein_conc_power[BS_info[m].tf_id][k];
+//                                                         protein_number_power[BS_info[m].tf_id][k];
 //                        }
 //                    }
 //                }
@@ -753,7 +755,7 @@ int mod(int a, int b) // b is the base
 //                    }
 //                    for(j=1;j<MAX_MODE;j++)
 //                    {                       
-//                        transition_matrix[0][j]=BS_info[m].coeff_on_flux[j]*protein_conc_power[BS_info[m].tf_id][j];
+//                        transition_matrix[0][j]=BS_info[m].coeff_on_flux[j]*protein_number_power[BS_info[m].tf_id][j];
 //                    }
 //                }
 //                    
@@ -783,7 +785,7 @@ int mod(int a, int b) // b is the base
 //                            for(k=0;k<MAX_MODE;k++)
 //                                transition_matrix[i][j]+=ratio_matrices[pos_of_last_record][i-k][j]*
 //                                                         BS_info[m].coeff_on_flux[k]*
-//                                                         protein_conc_power[BS_info[m].tf_id][k];
+//                                                         protein_number_power[BS_info[m].tf_id][k];
 //                        }
 //                    }
 //                }
@@ -796,7 +798,7 @@ int mod(int a, int b) // b is the base
 //                    }
 //                    for(i=1;i<MAX_MODE;i++)
 //                    {                        
-//                        transition_matrix[i][0]=BS_info[m].coeff_on_flux[i]*protein_conc_power[BS_info[m].tf_id][i];
+//                        transition_matrix[i][0]=BS_info[m].coeff_on_flux[i]*protein_number_power[BS_info[m].tf_id][i];
 //                    }
 //                }                    
 //                pos_of_last_record=mod(pos_next_record-1,max_N_hindered_BS+1);
@@ -842,7 +844,7 @@ float calc_TF_dist_from_all_BS(AllTFBindingSites *BS_info,
                                             int N_rep_BS, 
                                             int activating[NPROTEINS],
                                             int approximation,
-                                            float protein_conc[NGENES])
+                                            float protein_number[NGENES])
 {
     double ratio_matrices[max_N_hindered_BS+1][approximation][approximation];   
     double transition_matrix[approximation][approximation];
@@ -858,7 +860,7 @@ float calc_TF_dist_from_all_BS(AllTFBindingSites *BS_info,
     
     /*calc Kon based on TF concentration*/
     for(i=0;i<ntfgenes;i++)    
-        Kon[i]=kon*protein_conc[i];
+        Kon[i]=lumped_kon*protein_number[i];
     
     /* initializing matrices to all zeros */
     for(i=0;i<max_N_hindered_BS+1;i++)
@@ -1194,7 +1196,7 @@ void initialize_cell(   CellState *state,
                         int protein_pool[NPROTEINS][2][NGENES], 
                         float mRNAdecay[NGENES],
                         float meanmRNA[NGENES],
-                        float init_protein_conc[NPROTEINS],                       
+                        float init_protein_number[NPROTEINS],                       
                         int plotting,
                         RngStream RS)
 {
@@ -1248,27 +1250,30 @@ void initialize_cell(   CellState *state,
        
     /* initiate protein concentration*/
     for (i=2; i < ngenes; i++) 
-            state->gene_specific_protein_conc[i] = init_protein_conc[i];
+            state->gene_specific_protein_number[i] = init_protein_number[i];
     
     for(i=2;i<nproteins;i++)
     {
-        state->protein_conc[i]=0.0;
+        state->protein_number[i]=0.0;
         
         for(j=0;j<protein_pool[i][0][0];j++)
-            state->protein_conc[i]+=state->gene_specific_protein_conc[protein_pool[i][1][j]];
+            state->protein_number[i]+=state->gene_specific_protein_number[protein_pool[i][1][j]];
+//        state->protein_conc[i]=state->protein_number[i]/NA/vol_nuc;
     }
+//    state->protein_conc[nproteins-2]=state->protein_number[nproteins-2]/NA/(vol_cell-vol_nuc);
+//    state->protein_conc[nproteins-1]=state->protein_number[nproteins-1]/NA/(vol_cell-vol_nuc);
     
     /* deal with the signal--the fake tf*/
     state->mRNA_cyto_num[0]=0;
     state->mRNA_nuclear_num[0]=0;
     state->mRNA_transcr_num[0]=0;
     state->mRNA_transl_cyto_num[0]=0;
-    state->gene_specific_protein_conc[0]=0.0; 
+    state->gene_specific_protein_number[0]=0.0; 
     state->mRNA_cyto_num[1]=0;
     state->mRNA_nuclear_num[1]=0;
     state->mRNA_transcr_num[1]=0;
     state->mRNA_transl_cyto_num[1]=0;
-    state->gene_specific_protein_conc[1]=0.0; 
+    state->gene_specific_protein_number[1]=0.0; 
     
     /*mark when to start calculating average growth rate*/
     add_fixed_event(-1,duration_of_burn_in_growth_rate,&(state->burn_in_growth_rate),&(state->burn_in_growth_rate_last)); 
@@ -1292,13 +1297,13 @@ void set_env(CellState *state, char env, float duration_signalA, float duration_
     
     if(env=='A')
     {               
-        state->protein_conc[0]=signal_strength;
-        state->protein_conc[1]=0.0;	
+        state->protein_number[0]=signal_strength;
+        state->protein_number[1]=0.0;	
     }
     else
     {        
-        state->protein_conc[0]=0.0;
-        state->protein_conc[1]=signal_strength;	
+        state->protein_number[0]=0.0;
+        state->protein_number[1]=signal_strength;	
     } 
     while(t<tdevelopment)
     {
@@ -1318,7 +1323,7 @@ void set_env(CellState *state, char env, float duration_signalA, float duration_
 }
 /* 
  * change in the number of mRNAs in the cytoplasm affects the kon
- * rates, note we must have already updated protein_conc first
+ * rates, note we must have already updated protein_number first
  */
 void change_mRNA_cytoplasm(int i,
                            Genotype *genotype,
@@ -1338,9 +1343,9 @@ void calc_all_rates(Genotype *genotype,
 {
     int i,cluster_id;
     float salphc; 
-    float protein_decay;    
+    float protein_decay;
     
-    if(UPDATE_KONVALUES) /*Since these values are also updated in update_protein_conc_cell_size, this is only used in initilization*/
+    if(UPDATE_KONVALUES) /*Since these values are also updated in update_protein_number_cell_size, this is only used in initilization*/
     {
         for (i=2; i < genotype->ngenes; i++) 
         {
@@ -1403,7 +1408,7 @@ void calc_all_rates(Genotype *genotype,
                                                             genotype->N_rep_BS[i],
                                                             genotype->activating, 
                                                             MAX_MODE,
-                                                            state->protein_conc);                   
+                                                            state->protein_number);                   
             else
                 state->Pact[i]=0.0;
         }
@@ -1626,8 +1631,8 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
     int gene_B;
     int mRNA_A=0;
     int mRNA_B=0;    
-    float P_next_a=state->protein_conc[protein_A];
-    float P_next_b=state->protein_conc[protein_B];  
+    float P_next_a=state->protein_number[protein_A];
+    float P_next_b=state->protein_number[protein_B];  
     gene_A=genotype->protein_pool[protein_A][1][0];
     gene_B=genotype->protein_pool[protein_B][1][0];    
     /* calculate total mRNAs that are actively tranlating*/
@@ -1844,7 +1849,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
  * false attractor if time steps are small and rising tide keeps
  * getting rounded down
  */
-void update_protein_conc_cell_size( Genotype *genotype,
+void update_protein_number_cell_size( Genotype *genotype,
                                     CellState *state,                                   
                                     GillespieRates *rates,
                                     float dt,                                                                      
@@ -1857,30 +1862,26 @@ void update_protein_conc_cell_size( Genotype *genotype,
 {
     int i,j;
     float ct, ect, ect1,ect1_a,ect1_b;
-    float L_a, L_b;
+    float conc_a, conc_b;
     float instantaneous_growth_rate = 0.0;
     float integrated_growth_rate = 0.0;
     float adjusted_decay;
     FILE *fp;
     
     /* store the concentration of the selection genes before updating*/
-    L_a=0.0;    
-    for(j=0;j<genotype->protein_pool[genotype->nproteins-2][0][0];j++)
-        L_a+=state->gene_specific_protein_conc[genotype->protein_pool[genotype->nproteins-2][1][j]];    
-    L_b=0.0;
-    for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)
-        L_b+=state->gene_specific_protein_conc[genotype->protein_pool[genotype->nproteins-1][1][j]];    
+    conc_a=state->protein_number[genotype->nproteins-2];
+    conc_b=state->protein_number[genotype->nproteins-1];
     for (i=2; i < genotype->ngenes; i++) 
     {
-        /* update protein decay rates due to dilution caused by growth */
-        adjusted_decay = genotype->proteindecay[i] + state->growth_rate;
-        /* if this results in a very small or zero decay rate, use protein aging term */
-        /* NOTE: we need to update this for every gene that encodes this protein*/
-        if (adjusted_decay > protein_aging)
-            state->konvalues[i][KON_PROTEIN_DECAY_INDEX] = adjusted_decay;
-        else 
-            state->konvalues[i][KON_PROTEIN_DECAY_INDEX] = protein_aging;
-      
+//        /* update protein decay rates due to dilution caused by growth */
+//        adjusted_decay = genotype->proteindecay[i] + state->growth_rate;
+//        /* if this results in a very small or zero decay rate, use protein aging term */
+//        /* NOTE: we need to update this for every gene that encodes this protein*/
+//        if (adjusted_decay > protein_aging)
+//            state->konvalues[i][KON_PROTEIN_DECAY_INDEX] = adjusted_decay;
+//        else 
+//            state->konvalues[i][KON_PROTEIN_DECAY_INDEX] = protein_aging;
+//      
         ct = state->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
         ect = exp(-ct);
         if (fabs(ct)<EPSILON) ect1=ct;
@@ -1889,21 +1890,28 @@ void update_protein_conc_cell_size( Genotype *genotype,
         if (i == genotype->ngenes-2) ect1_a=ect1;		
         if (i == genotype->ngenes-1) ect1_b=ect1;
         /* get the new protein concentration for this gene */
-        state->gene_specific_protein_conc[i]=ect*state->gene_specific_protein_conc[i]+state->konvalues[i][KON_SALPHC_INDEX]*ect1 ;        
+        state->gene_specific_protein_number[i]=ect*state->gene_specific_protein_number[i]+state->konvalues[i][KON_SALPHC_INDEX]*ect1 ;        
     }    
-    /* now, use protein_pool to pool gene specific concentration*/
+    /* now, use protein_pool to pool gene specific protein number*/
     for(i=2;i<genotype->nproteins;i++)
     {
-        state->protein_conc[i]=0.0;        
+        state->protein_number[i]=0.0;        
         for(j=0;j<genotype->protein_pool[i][0][0];j++)
-            state->protein_conc[i]+=state->gene_specific_protein_conc[genotype->protein_pool[i][1][j]];
-    }    
+            state->protein_number[i]+=state->gene_specific_protein_number[genotype->protein_pool[i][1][j]];
+    }  
+    /* convert protein number to concentration */
+//    for(i=2;i<genotype->nproteins-2;i++)
+//        state->protein_conc[i]=state->protein_number[i]*prop_nuc_tf/NA/vol_nuc;
+//    
+//    state->protein_conc[genotype->nproteins-2]=state->protein_conc[genotype->nproteins-2]/NA/(vol_cell-vol_nuc); /*ignore the changes in cell volumn*/
+//    state->protein_conc[genotype->nproteins-1]=state->protein_conc[genotype->nproteins-1]/NA/(vol_cell-vol_nuc);
+//    
     /* now find out the protein concentration at end of dt interval and compute growth rate */   
     instantaneous_growth_rate = compute_growth_rate_dimer(&integrated_growth_rate, 
                                                             genotype, 
                                                             state, 
-                                                            L_a, 
-                                                            L_b, 
+                                                            conc_a, 
+                                                            conc_b, 
                                                             t, 
                                                             dt, 
                                                             ect1_a,
@@ -2459,7 +2467,7 @@ void do_single_timestep(Genotype *genotype,
                         end_state, error, mut_step, mut_record);
         if(*end_state==0)
             return; 
-        update_protein_conc_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);  
+        update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);  
 #if CAUTIOUS
         if(event==5)
         {
@@ -2469,14 +2477,15 @@ void do_single_timestep(Genotype *genotype,
 #endif
         if(*end_state==0)
             return;         
-        fixed_time=*t+dt;        
+        fixed_time=*t+dt;
+        
+#if CAUTIOUS        
         event2=does_fixed_event_end(state->mRNA_transl_init_time_end,
                                  state->mRNA_transcr_time_end,
                                  state->signalB_starts_end,
                                  state->signalA_starts_end,
 				 state->burn_in_growth_rate,
                                  fixed_time); 
-#if CAUTIOUS
         if(event2!=0)
         {
             fp=fopen(error,"a+");
@@ -2557,7 +2566,7 @@ void do_single_timestep(Genotype *genotype,
         do_Gillespie_event(genotype, state, rates, dt, *t, RS, end_state, error, mut_step, mut_record);
         if(*end_state==0)
             return; 
-        update_protein_conc_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);        
+        update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);        
         if(*end_state==0)
             return; 
         calc_all_rates(genotype,state,rates,NO_KON_UPDATE);
@@ -2569,7 +2578,7 @@ void do_single_timestep(Genotype *genotype,
         /* do remaining dt */
         dt = tdevelopment - *t;
         /* final update of protein concentration */
-        update_protein_conc_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record); 
+        update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record); 
         if(*end_state==0)
             return;         
         /* advance to end of development (this exits the outer while loop) */
@@ -2606,8 +2615,8 @@ void do_fixed_event(Genotype *genotype,
         case 3:     /* signal B starts*/ 
             *dt = state->signalB_starts_end->time - t;            
             delete_fixed_event_start(&(state->signalB_starts_end),&(state->signalB_starts_end_last));
-            state->protein_conc[0]=0.0;
-            state->protein_conc[1]=signal_strength;
+            state->protein_number[0]=0.0;
+            state->protein_number[1]=signal_strength;
             *env='B';
             break;
         case 4:     /*signal A starts. See "Environments" for detail*/
@@ -2615,18 +2624,18 @@ void do_fixed_event(Genotype *genotype,
             delete_fixed_event_start(&(state->signalA_starts_end),&(state->signalA_starts_end_last));
             if(!signalA_as_noise && !signalA_mismatches)
             {
-                state->protein_conc[0]=signal_strength;
-                state->protein_conc[1]=0.0;
+                state->protein_number[0]=signal_strength;
+                state->protein_number[1]=0.0;
                 *env='A';
             }
             else
             {
                 if(signalA_as_noise)
-                    state->protein_conc[0]=signal_strength;
+                    state->protein_number[0]=signal_strength;
                 else
                 {
-                    state->protein_conc[0]=signal_strength;
-                    state->protein_conc[1]=0.0;
+                    state->protein_number[0]=signal_strength;
+                    state->protein_number[1]=0.0;
                 }
             }
             break;	
@@ -2807,7 +2816,7 @@ void free_fixedevent(CellState *state)
 
 void calc_avg_growth_rate(Genotype *genotype,
                             float init_mRNA[NGENES],
-                            float init_protein_conc[NGENES],
+                            float init_protein_number[NGENES],
                             float maxbound2,
                             float maxbound3,
                             RngStream RS_parallel[N_THREADS],
@@ -2837,7 +2846,7 @@ void calc_avg_growth_rate(Genotype *genotype,
         CellState state_offspring;
         GillespieRates rate_offspring;
         float init_mRNA_offspring[NGENES]; 
-        float init_protein_conc_offspring[NGENES];
+        float init_protein_number_offspring[NGENES];
         float gr1[N_replicates_per_thread],gr2[N_replicates_per_thread];        
         float t;
         float mRNA[genotype->ngenes],protein[genotype->ngenes];       
@@ -2859,7 +2868,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             for(j=0; j < NGENES; j++) 
             {  
                 init_mRNA_offspring[j] = init_mRNA[j];
-                init_protein_conc_offspring[j] = init_protein_conc[j];
+                init_protein_number_offspring[j] = init_protein_number[j];
             }
         }        
         calc_all_binding_sites(&genotype_offspring); 
@@ -2874,7 +2883,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             for(j=2; j < genotype_offspring.ngenes; j++) 
             { 
                 mRNA[j] = init_mRNA_offspring[j];        
-                protein[j] = init_protein_conc_offspring[j];
+                protein[j] = init_protein_number_offspring[j];
             }
             for(j=0;j<genotype_offspring.protein_pool[genotype_offspring.nproteins-2][0][0];j++)
             {
@@ -2952,7 +2961,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             for(j=2; j < genotype_offspring.ngenes; j++) 
             { 
                 mRNA[j] = init_mRNA_offspring[j];        
-                protein[j] = init_protein_conc_offspring[j];
+                protein[j] = init_protein_number_offspring[j];
             }
             for(j=0;j<genotype_offspring.protein_pool[genotype_offspring.nproteins-2][0][0];j++)
             {
@@ -3018,7 +3027,8 @@ void calc_avg_growth_rate(Genotype *genotype,
 	    }
             
             free_fixedevent(&state_offspring);            
-        }         
+        }    
+        
         for(j=0;j<NGENES;j++)
             free(genotype_offspring.all_binding_sites[j]);
         #pragma omp critical
@@ -3160,8 +3170,8 @@ void do_fixed_event_plotting(   Genotype *genotype,
         case 3:     /* signal B starts*/ 
             *dt = state->signalB_starts_end->time - t;            
             delete_fixed_event_start(&(state->signalB_starts_end),&(state->signalB_starts_end_last));
-            state->protein_conc[0]=0.0;
-            state->protein_conc[1]=signal_strength;
+            state->protein_number[0]=0.0;
+            state->protein_number[1]=signal_strength;
             *env='B';
             break;
         case 4:     /*signal A starts. See "Environments" for detail*/
@@ -3169,18 +3179,18 @@ void do_fixed_event_plotting(   Genotype *genotype,
             delete_fixed_event_start(&(state->signalA_starts_end),&(state->signalA_starts_end_last));
             if(!signalA_as_noise && !signalA_mismatches)
             {
-                state->protein_conc[0]=signal_strength;
-                state->protein_conc[1]=0.0;
+                state->protein_number[0]=signal_strength;
+                state->protein_number[1]=0.0;
                 *env='A';
             }
             else
             {
                 if(signalA_as_noise)
-                    state->protein_conc[0]=signal_strength;
+                    state->protein_number[0]=signal_strength;
                 else
                 {
-                    state->protein_conc[0]=signal_strength;
-                    state->protein_conc[1]=0.0;
+                    state->protein_number[0]=signal_strength;
+                    state->protein_number[1]=0.0;
                 }
             }
             break;		
@@ -3249,12 +3259,12 @@ void do_single_timestep_plotting(   Genotype *genotype,
                                 end_state, error, mut_step, mut_record);
         if(*end_state==0)
             return; 
-        update_protein_conc_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);
+        update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);
         
         if(event==6)
         {    
             for(i=0;i<genotype->ngenes;i++)
-                phenotype[i][*timepoint]=state->protein_conc[i];
+                phenotype[i][*timepoint]=state->protein_number[i];
             
             fitness[*timepoint]=state->growth_rate;          
             (*timepoint)++;    
@@ -3294,7 +3304,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
         do_Gillespie_event(genotype, state, rates, dt, *t, RS, end_state, error, mut_step, mut_record);
         if(*end_state==0)
             return; 
-        update_protein_conc_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);  
+        update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);  
         
         if(*end_state==0)
             return; 
@@ -3308,7 +3318,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
         /* do remaining dt */
         dt = tdevelopment - *t;
         /* final update of protein concentration */
-        update_protein_conc_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record); 
+        update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record); 
        
         if(*end_state==0)
             return;         
@@ -3319,7 +3329,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
 
 void calc_avg_growth_rate_plotting(Genotype *genotype,
                                     float init_mRNA[NGENES],
-                                    float init_protein_conc[NGENES],
+                                    float init_protein_number[NGENES],
                                     float maxbound2,
                                     float maxbound3,
                                     RngStream RS[N_THREADS],
@@ -3371,7 +3381,7 @@ void calc_avg_growth_rate_plotting(Genotype *genotype,
         CellState state_offspring;
         GillespieRates rate_offspring;
         float init_mRNA_offspring[NGENES]; 
-        float init_protein_conc_offspring[NGENES];
+        float init_protein_number_offspring[NGENES];
         float t;
         float mRNA[genotype->ngenes],protein[genotype->ngenes];       
 
@@ -3387,7 +3397,7 @@ void calc_avg_growth_rate_plotting(Genotype *genotype,
             for(j=0; j < NGENES; j++) 
             {  
                 init_mRNA_offspring[j] = init_mRNA[j];
-                init_protein_conc_offspring[j] = init_protein_conc[j];
+                init_protein_number_offspring[j] = init_protein_number[j];
             }
         }        
         calc_all_binding_sites(&genotype_offspring);       
@@ -3400,7 +3410,7 @@ void calc_avg_growth_rate_plotting(Genotype *genotype,
             for(j=2; j < genotype_offspring.ngenes; j++) 
             { 
                 mRNA[j] = init_mRNA_offspring[j];        
-                protein[j] = init_protein_conc_offspring[j];
+                protein[j] = init_protein_number_offspring[j];
             }
             for(j=0;j<genotype_offspring.protein_pool[genotype_offspring.nproteins-2][0][0];j++)
             {
@@ -3457,7 +3467,7 @@ void calc_avg_growth_rate_plotting(Genotype *genotype,
             for(j=2; j < genotype_offspring.ngenes; j++) 
             { 
                 mRNA[j] = init_mRNA_offspring[j];        
-                protein[j] = init_protein_conc_offspring[j];
+                protein[j] = init_protein_number_offspring[j];
             }
             for(j=0;j<genotype_offspring.protein_pool[genotype_offspring.nproteins-2][0][0];j++)
             {
@@ -5157,7 +5167,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     Genotype genotype_ori;
     Genotype genotype_ori_copy;    
     float init_mRNA[NGENES]; 
-    float init_protein_conc[NGENES];   
+    float init_protein_number[NGENES];   
     maxbound2 = MAXBOUND;
     maxbound3 = 10*MAXBOUND;    
     int N_trials, N_tot_trials;
@@ -5177,13 +5187,13 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     {   
 //        random=gasdev(&master_seed);
 //        init_mRNA[i] = exp(0.91966*random-0.465902);
-//        init_protein_conc[i] = exp(1.25759*random+7.25669);
+//        init_protein_number[i] = exp(1.25759*random+7.25669);
         init_mRNA[i]=0.0;
-        init_protein_conc[i]=10.0;
+        init_protein_number[i]=10.0;
     }
 
     for(i=0;i<TF_ELEMENT_LEN-NMIN+1;i++)          
-        Koff[i]=NUMSITESINGENOME*kon*0.25/pow(KR,(float)i/3.0-1.0);
+        Koff[i]=koff*pow(KR,(float)i/3.0);
     
     initialize_cache(&genotype_ori);
     initialize_cache(&genotype_ori_copy);    
@@ -5226,7 +5236,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         calc_all_binding_sites(&genotype_ori);
         summarize_binding_sites(&genotype_ori,1);
 #if PLOTTING
-        calc_avg_growth_rate_plotting(&genotype_ori, init_mRNA, init_protein_conc, maxbound2, maxbound3, RS_parallel,filename1,filename3,0,NULL);      
+        calc_avg_growth_rate_plotting(&genotype_ori, init_mRNA, init_protein_number, maxbound2, maxbound3, RS_parallel,filename1,filename3,0,NULL);      
 #endif        
     }    
     else
@@ -5243,8 +5253,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_as_noise=0;
         env1_signalA_mismatches=0;   
         env2_signalA_mismatches=0;
-        N_replicates=1200;
-        recalc_new_fitness=2;
+        N_replicates=600;
+        recalc_new_fitness=0;
         
         fp=fopen(RuntimeSumm,"a+");
         fprintf(fp,"**********Burn-in conditions**********\n");
@@ -5259,7 +5269,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         
         calc_avg_growth_rate(   &genotype_ori, 
                                 init_mRNA,
-                                init_protein_conc,
+                                init_protein_number,
                                 maxbound2,
                                 maxbound3,
                                 RS_parallel,
@@ -5320,7 +5330,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 calc_all_binding_sites(&genotype_ori_copy);
                 calc_avg_growth_rate(&genotype_ori_copy,
                                         init_mRNA,
-                                        init_protein_conc,
+                                        init_protein_number,
                                         maxbound2,  
                                         maxbound3,
                                         RS_parallel,
@@ -5358,7 +5368,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 var_GR2_copy=genotype_ori.var_GR2;
                 calc_avg_growth_rate(   &genotype_ori, 
                                         init_mRNA,
-                                        init_protein_conc,
+                                        init_protein_number,
                                         maxbound2,
                                         maxbound3,
                                         RS_parallel,
@@ -5458,7 +5468,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 calc_all_binding_sites(&genotype_ori_copy);
                 calc_avg_growth_rate(&genotype_ori_copy,
                                         init_mRNA,
-                                        init_protein_conc,
+                                        init_protein_number,
                                         maxbound2,  
                                         maxbound3,
                                         RS_parallel,
@@ -5496,7 +5506,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 var_GR2_copy=genotype_ori.var_GR2;
                 calc_avg_growth_rate(   &genotype_ori, 
                                         init_mRNA,
-                                        init_protein_conc,
+                                        init_protein_number,
                                         maxbound2,
                                         maxbound3,
                                         RS_parallel,
@@ -6079,7 +6089,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 //                           int max_N_rep_bound,
 //                           int max_N_act_bound,
 //                           int *N_act_bound,
-//                           float protein_conc[NGENES])
+//                           float protein_number[NGENES])
 //{
 //    double ratio_matrices[max_N_hindered_BS+1][max_N_rep_bound+1][max_N_act_bound+1];   
 //    double transition_matrix[max_N_rep_bound+1][max_N_act_bound+1];
@@ -6097,7 +6107,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 //    /*calc Kon based on TF concentration*/
 //    for(i=0;i<ntfgenes;i++)
 //    {
-//        Kon[i]=kon*protein_conc[i];
+//        Kon[i]=kon*protein_number[i];
 //    }
 //    
 //    /* initializing matrices to all zeros */
@@ -6296,7 +6306,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 //                           int max_N_rep_bound,
 //                           int max_N_act_bound, 
 //                           int *N_act_bound,
-//                           float protein_conc[NGENES])
+//                           float protein_number[NGENES])
 //{
 //    double ratio_matrices[max_N_hindered_BS+1][max_N_rep_bound+1][max_N_act_bound+1];   
 //    double transition_matrix[max_N_rep_bound+1][max_N_act_bound+1];
@@ -6314,7 +6324,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 //    /*calc Kon based on TF concentration*/
 //    for(i=0;i<ntfgenes;i++)
 //    {
-//        Kon[i]=kon*protein_conc[i];
+//        Kon[i]=kon*protein_number[i];
 //    }
 //    
 //    /* initializing matrices to all zeros */
@@ -6514,7 +6524,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 //                           int activating[NGENES],
 //                           int max_N_rep_bound,
 //                           int *N_act_bound,
-//                           float protein_conc[NGENES])
+//                           float protein_number[NGENES])
 //{
 //    double ratio_matrices[max_N_hindered_BS+1][N_rep_BS+1][N_act_BS+1];   
 //    double transition_matrix[N_rep_BS+1][N_act_BS+1];
@@ -6531,7 +6541,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 //    /*calc Kon based on TF concentration*/
 //    for(i=0;i<ntfgenes;i++)
 //    {
-//        Kon[i]=kon*protein_conc[i];
+//        Kon[i]=kon*protein_number[i];
 //    }
 //    
 //    /* initializing matrices to all zeros */
