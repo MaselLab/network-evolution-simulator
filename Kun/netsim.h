@@ -68,7 +68,7 @@
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
 #endif
 
-#define MAX_MODE 8
+#define MAX_MODE 8 /*this is the max number of tf molecules that can bind to a promoter*/
 #define MAX_BS_IN_CLUSTER 100
 /* 
  * define macros for logging output and warning/errors 
