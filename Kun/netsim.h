@@ -15,12 +15,12 @@
 #endif
 
 #ifndef BURN_IN
-#define BURN_IN 0
+#define BURN_IN 1000
 #endif
 
 #define RdcPdup 1
 
-#define N_THREADS 12
+#define N_THREADS 1
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -762,5 +762,7 @@ extern void output_genotype(char *, char *, char *, char *, Genotype *, int);
 extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THREADS]);
 
 extern void calc_fx_dfx(float, int, float*, float*, float*, float*, float*);
+
+extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
 
 #endif /* !FILE_NETSIM_SEEN */

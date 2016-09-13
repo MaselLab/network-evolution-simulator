@@ -26,9 +26,9 @@
 #define UPDATE_ALL 1
 #define NO_KON_UPDATE 0
 #define CAUTIOUS 0
-#define SET_BS_MANUALLY 1
-#define NO_REGULATION_COST 1
-#define UNLIMITED_MUTATION 0
+#define SET_BS_MANUALLY 0
+#define NO_REGULATION_COST 0
+#define UNLIMITED_MUTATION 1
 
 const float alpha=1.0e-3;
 
@@ -100,10 +100,10 @@ int recalc_new_fitness; /*calculate the growth rate of the new genotype four mor
 float cost_term=1.0e-4;      /* this determined the cost of translation */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
 
 /*initial conditions*/
-int init_TF_genes=1;
-int init_N_act=0;
-int init_N_rep=1;
-int min_act_to_transcr_A=1;
+int init_TF_genes=6;
+int init_N_act=3;
+int init_N_rep=3;
+int min_act_to_transcr_A=2;
 int min_act_to_transcr_B=1;
 float penalty_of_extra_copies=2.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
@@ -211,7 +211,7 @@ void initialize_genotype_fixed( Genotype *genotype,
         while (genotype->mRNAdecay[i]<0.0)
             genotype->mRNAdecay[i] = exp(0.4909*gasdev(RS)-3.20304);
     /************************************************************************************/
-//        genotype->mRNAdecay[i]=0.1386; //half life is about 5min
+        genotype->mRNAdecay[i]=0.1386; //half life is about 5min
     /************************************************************************************/    
         genotype->proteindecay[i]=-1.0;
         while (genotype->proteindecay[i] < 0.0) 
@@ -222,14 +222,14 @@ void initialize_genotype_fixed( Genotype *genotype,
                 genotype->proteindecay[i] = exp(0.7874*gasdev(RS)-3.7665);
         }
     /************************************************************************************/    
-//        genotype->proteindecay[i]=0.1386; 
+        genotype->proteindecay[i]=0.1386; 
     /************************************************************************************/
         /* dilution no longer done here, because it is now variable (function of instantaneous growth rate) */
         genotype->translation[i] = exp(0.7406*gasdev(RS)+4.56);
         while (genotype->translation[i] < 0.0)
             genotype->translation[i] = exp(0.7406*gasdev(RS)+4.56);
     /************************************************************************************/    
-//        genotype->translation[i]=360; // 1 protein per 6s
+        genotype->translation[i]=360; // 1 protein per 6s
     /************************************************************************************/
         j = RngStream_RandInt(RS,0,NUM_K_DISASSEMBLY-1);
         genotype->pic_disassembly[i] = kdis[j];
@@ -433,7 +433,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                     }                        
                 }                
                 genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;
-                genotype->all_binding_sites[gene_id][N_binding_sites].Koff = genotype->koff[gene_id]*pow(KR,(float)((TF_ELEMENT_LEN-match)/(TF_ELEMENT_LEN-NMIN+1)));                
+                genotype->all_binding_sites[gene_id][N_binding_sites].Koff = genotype->koff[genotype->which_protein[gene_id]]*pow(KR,(float)((TF_ELEMENT_LEN-match)/(TF_ELEMENT_LEN-NMIN+1)));                
                 genotype->all_binding_sites[gene_id][N_binding_sites].BS_pos = i ;  
 //                genotype->all_binding_sites[gene_id][N_binding_sites].compressed = 0;
                 
@@ -480,7 +480,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                     }
                     /************************************************************************************************************/
                     genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;
-                    genotype->all_binding_sites[gene_id][N_binding_sites].Koff = genotype->koff[gene_id]*pow(KR,(float)((TF_ELEMENT_LEN-match_rc)/(TF_ELEMENT_LEN-NMIN+1)));                   
+                    genotype->all_binding_sites[gene_id][N_binding_sites].Koff = genotype->koff[genotype->which_protein[gene_id]]*pow(KR,(float)((TF_ELEMENT_LEN-match_rc)/(TF_ELEMENT_LEN-NMIN+1)));                   
                     genotype->all_binding_sites[gene_id][N_binding_sites].BS_pos = i;
 //                    genotype->all_binding_sites[gene_id][N_binding_sites].compressed = 0;
                    
@@ -3186,6 +3186,10 @@ void calc_avg_growth_rate(Genotype *genotype,
     avg_GR2=avg_GR2/N_replicates;
     var_GR1=(var_GR1/N_replicates-avg_GR1*avg_GR1)/(N_replicates-1);
     var_GR2=(var_GR2/N_replicates-avg_GR2*avg_GR2)/(N_replicates-1); 
+	if((isnan(var_GR1)||isinf(var_GR1))||var_GR1<0.0)
+		var_GR1=0.0;
+if((isnan(var_GR2)||isinf(var_GR2))||var_GR2<0.0)
+		var_GR2=0.0;
     genotype->avg_GR1=avg_GR1;
     genotype->avg_GR2=avg_GR2;
     genotype->var_GR1=var_GR1;
@@ -4567,7 +4571,7 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
         genotype->pic_disassembly[pos_g]=kdis[RngStream_RandInt(RS,0,NUM_K_DISASSEMBLY-1)];
 #else
         genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);  
-        if(genotype->pic_disassembly[pos_g]<MIN_PICDISASSEMBLE || genotype->pic_disassembly[pos_g]>MAX_PICDISASSEMBLE)
+        while(genotype->pic_disassembly[pos_g]<MIN_PICDISASSEMBLE || genotype->pic_disassembly[pos_g]>MAX_PICDISASSEMBLE)
             genotype->pic_disassembly[pos_g]=genotype->pic_disassembly[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);
 #endif        
         /*record mutation info*/
@@ -4577,10 +4581,13 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
     else if(random1<=0.4) /* 30% mut mRNAdecay */
     {
 #if UNLIMITED_MUTATION
-        random2 = exp(0.4909*gasdev(RS)-3.20304);
+	random2 = exp(0.4909*gasdev(RS)-3.20304);
+	while(random2<MIN_mRNA_decay)
+        	random2 = exp(0.4909*gasdev(RS)-3.20304);
+	genotype->mRNAdecay[pos_g]=random2;
 #else
         genotype->mRNAdecay[pos_g]=genotype->mRNAdecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut); 
-        if(genotype->mRNAdecay[pos_g]>MAX_mRNA_decay || genotype->mRNAdecay[pos_g]<MIN_mRNA_decay)
+        while(genotype->mRNAdecay[pos_g]>MAX_mRNA_decay || genotype->mRNAdecay[pos_g]<MIN_mRNA_decay)
             genotype->mRNAdecay[pos_g]=genotype->mRNAdecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);
 #endif
         /*record mutation info*/
@@ -4591,9 +4598,12 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
     {
 #if UNLIMITED_MUTATION
         random2= exp(0.7406*gasdev(RS)+4.56);
+	while(random2>MAX_TRANSLATION)
+		random2=exp(0.7406*gasdev(RS)+4.56);
+	genotype->translation[pos_g]=random2;
 #else
         genotype->translation[pos_g]=genotype->translation[pos_g]*exp(sd_mut_effect*gasdev(RS)-bias_in_mut);
-        if(genotype->translation[pos_g]>MAX_TRANSLATION || genotype->translation[pos_g]< MIN_TRANSLATION)
+        while(genotype->translation[pos_g]>MAX_TRANSLATION || genotype->translation[pos_g]< MIN_TRANSLATION)
             genotype->translation[pos_g]=genotype->translation[pos_g]*exp(sd_mut_effect*gasdev(RS)-bias_in_mut);
 #endif
         mut_record->kinetic_type=2;
@@ -4609,9 +4619,10 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
                 random2 = (float)EPSILON;
             else random2 = exp(0.7874*gasdev(RS)-3.7665);
         }
+	genotype->proteindecay[pos_g]=random2;
 #else
         genotype->proteindecay[pos_g]=genotype->proteindecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);  
-        if(genotype->proteindecay[pos_g]>MAX_protein_decay || genotype->proteindecay[pos_g]<MIN_protein_decay)
+        while(genotype->proteindecay[pos_g]>MAX_protein_decay || genotype->proteindecay[pos_g]<MIN_protein_decay)
             genotype->proteindecay[pos_g]=genotype->proteindecay[pos_g]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut); 
 #endif
         mut_record->kinetic_type=3;
@@ -4644,10 +4655,16 @@ void reproduce_mut_kinetic_constant(Genotype *genotype, Mutation *mut_record)
 
 void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
-    int tf_id,protein_id,i;
+    int tf_id,protein_id,i;    
     
-    tf_id = RngStream_RandInt(RS,2,genotype->ntfgenes-1);
+    tf_id = RngStream_RandInt(RS,2,genotype->ngenes-1);
     protein_id=genotype->which_protein[tf_id];
+    
+    while(protein_id >=genotype->nproteins-2)
+    {
+        tf_id = RngStream_RandInt(RS,2,genotype->ngenes-1);
+        protein_id=genotype->which_protein[tf_id];
+    }
     
     mut_record->kinetic_type='e';
     mut_record->pos_g=tf_id;
@@ -4656,7 +4673,8 @@ void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->protein_pool[protein_id][0][0]!=1)
     {
         update_protein_pool(genotype,protein_id,tf_id,'e');  
-        genotype->activating[genotype->nproteins-3]=(genotype->activating[genotype->nproteins-3]==1)?0:1;  /* the new protein will always be at nproteins-3*/        
+        genotype->activating[genotype->nproteins-3]=(genotype->activating[genotype->nproteins-3]==1)?0:1;  /* the new protein will always be at nproteins-3.
+                                                                                                            * Note that N_act and N_rep is updated in update_protein_pool*/        
     }
     else
     {
@@ -4718,17 +4736,39 @@ void reproduce_mut_identity(Genotype *genotype, Mutation *mut_record)
 void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
     int i,j;
-    float new_koff;
-    int tf_id;
+    float new_koff,old_koff;
+    int tf_id,protein_id;
 
-    tf_id=RngStream_RandInt(RS,0,genotype->ntfgenes-1);
+    tf_id=RngStream_RandInt(RS,0,genotype->ngenes-1);
+    protein_id=genotype->which_protein[tf_id];
+    while(protein_id>=genotype->nproteins-2)
+    {
+        tf_id=RngStream_RandInt(RS,0,genotype->ngenes-1);
+        protein_id=genotype->which_protein[tf_id];
+    }       
+
+    /*generate a new koff */    
+    old_koff=genotype->koff[protein_id];
+    
 #if UNLIMITED_MUTATION
-    genotype->koff[tf_id]=RngStream_RandU01(RS);
+    new_koff=RngStream_RandU01(RS);
+    while(new_koff<MIN_koff || new_koff>MAX_koff)
+ 	new_koff=RngStream_RandU01(RS);
 #else
-    genotype->koff[tf_id]=genotype->koff[tf_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
-    if(genotype->koff[tf_id]<MIN_koff || genotype->koff[tf_id]>MAX_koff)
-        genotype->koff[tf_id]=genotype->koff[tf_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
+    new_koff=old_koff*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
+    while(new_koff=<MIN_koff || new_koff=>MAX_koff)
+        new_koff=old_koff*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
 #endif
+    
+    /*update protein_pool and koff*/    
+    if(genotype->protein_pool[protein_id][0][0]!=1)
+    {    
+        update_protein_pool(genotype,protein_id,tf_id,'f');  
+        genotype->koff[genotype->nproteins-3]=new_koff; /*activating, N_act, and N_rep are updated in update_protein_pool*/
+    }    
+    else
+        genotype->koff[protein_id]=new_koff;       
+
     
 #if SET_BS_MANUALLY    
     for(i=2;i<genotype->ngenes-1;i++)
@@ -4923,24 +4963,32 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
 //        }
 //    }
 //    tot_mut_rate+=tot_dup_rate;   
-    
-#if RdcPdup    /* the method of reducing probability*/    
-    tot_dup_rate=0.0;
-    for(i=2;i<genotype->nproteins;i++)
+    if(genotype->ngenes<NGENES)
     {
-        if(genotype->protein_pool[i][0][0]<=MAX_COPIES)
-            genotype->P_dup_per_protein[i]=genotype->protein_pool[i][0][0]*DUPLICATION;
-        else
-            genotype->P_dup_per_protein[i]=genotype->protein_pool[i][0][0]*DUPLICATION/reduction_in_P_dup;
-        tot_dup_rate+=genotype->P_dup_per_protein[i];        
+    #if RdcPdup    /* the method of reducing probability*/    
+        tot_dup_rate=0.0;
+        for(i=2;i<genotype->nproteins;i++)
+        {
+            if(genotype->protein_pool[i][0][0]<=MAX_COPIES)
+                genotype->P_dup_per_protein[i]=genotype->protein_pool[i][0][0]*DUPLICATION;
+            else
+                genotype->P_dup_per_protein[i]=genotype->protein_pool[i][0][0]*DUPLICATION/reduction_in_P_dup;
+            tot_dup_rate+=genotype->P_dup_per_protein[i];        
+        }
+        for(i=2;i<genotype->nproteins;i++)
+            genotype->P_dup_per_protein[i]/=tot_dup_rate;
+        tot_mut_rate+=tot_dup_rate;    
+    #else    /* the method of increaing penalty*/    
+        tot_dup_rate=(genotype->ngenes-2)*DUPLICATION;
+        tot_mut_rate+=tot_dup_rate;
+    #endif
     }
-    for(i=2;i<genotype->nproteins;i++)
-        genotype->P_dup_per_protein[i]/=tot_dup_rate;
-    tot_mut_rate+=tot_dup_rate;    
-#else    /* the method of increaing penalty*/    
-    tot_dup_rate=(genotype->ngenes-2)*DUPLICATION;
-    tot_mut_rate+=tot_dup_rate;
-#endif
+    else
+    {
+        for(i=2;i<genotype->nproteins;i++)
+            genotype->P_dup_per_protein[i]=0.0;
+        tot_dup_rate=0.0;
+    }
     
     /* silencing rate*/
     tot_sil_rate=(float)(genotype->ngenes-4)*SILENCING; /* two signaling genes and two copies of selection genes cannot be deleted */
@@ -5031,19 +5079,20 @@ void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char m
                         genotype->N_act--;
                     if(!genotype->activating[protein_id] && (genotype->N_rep!=0))
                         genotype->N_rep--;
-                    /* also remove it from activating */
+                    /* also remove it from activating and koff */
                     protein_id_copy=protein_id;
                     for(i=0;i<genotype->nproteins-protein_id-2;i++)
                     {
                         genotype->activating[protein_id_copy]=genotype->activating[protein_id_copy+1];
+                        genotype->koff[protein_id_copy]=genotype->koff[protein_id_copy+1];
                         protein_id_copy++;
-                    }
+                    }                   
                     /* in the case, all genes need to recalc binding sites*/
                     for(i=2;i<gene_id;i++)
                     {
                         genotype->recalc_TFBS[i]=1; /* recalc BS */
                         genotype->clone_info[i]=1; /* copy back the original BS in clone_cell*/
-                    }
+                    }                    
                 }                
                 /* update protein_id for gene<gene_id in which_protein*/
                 for(i=2;i<gene_id;i++)
@@ -5124,14 +5173,15 @@ void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char m
             genotype->which_protein[gene_id]=genotype->nproteins-2; /*put the new protein to the pos of the first selection gene*/
             genotype->protein_pool[genotype->nproteins-2][0][0]=1;
             genotype->protein_pool[genotype->nproteins-2][1][0]=gene_id;
-            /* update acitivating*/
+            /* update activating*/
             if(genotype->activating[protein_id]) /* increase the number of activator */
                 genotype->N_act++;
             else
                 genotype->N_rep++;
 
             genotype->activating[genotype->nproteins-2]=genotype->activating[protein_id];
-
+            /* update koff*/
+            genotype->koff[genotype->nproteins-2]=genotype->koff[protein_id];
             /* finally, update protein numbers*/
             genotype->nproteins++;
             /* NOTE: this mutation does not change the number of genes*/
@@ -5161,14 +5211,51 @@ void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char m
             genotype->which_protein[gene_id]=genotype->nproteins-2; /*put the new protein to the pos of the first selection gene*/
             genotype->protein_pool[genotype->nproteins-2][0][0]=1;
             genotype->protein_pool[genotype->nproteins-2][1][0]=gene_id;
-            /* update acitivating*/
+            /* update activating*/
             if(genotype->activating[protein_id]) 
                 genotype->N_rep++;  /* an activator turns into a repressor */
             else
                 genotype->N_act++;
 
             genotype->activating[genotype->nproteins-2]=genotype->activating[protein_id];
+            /* update koff*/
+            genotype->koff[genotype->nproteins-2]=genotype->koff[protein_id];
+            /* finally, update protein numbers*/
+            genotype->nproteins++;
+            /* NOTE: this mutation does not change the number of genes*/
+            break;
+            
+        case 'f': /*mutation in tf koff constant*/
+            /* remove this copy of gene from the original protein pool*/
+            i=0;
+            while(genotype->protein_pool[protein_id][1][i]!=gene_id) i++;
+            for(;i<genotype->protein_pool[protein_id][0][0];i++) 
+            {
+                genotype->protein_pool[protein_id][1][i]= genotype->protein_pool[protein_id][1][i+1]; /* rearrange data array */
+            }
+            genotype->protein_pool[protein_id][0][0]--;
+            /* increase the protein id of selection proteins*/               
+            for(i=1;i<=2;i++)
+            {
+                genotype->protein_pool[genotype->nproteins-i+1][0][0]=genotype->protein_pool[genotype->nproteins-i][0][0];
+                for(j=0;j<genotype->protein_pool[genotype->nproteins-i][0][0];j++)                
+                {
+                    genotype->protein_pool[genotype->nproteins-i+1][1][j]=genotype->protein_pool[genotype->nproteins-i][1][j];
+                    genotype->which_protein[genotype->protein_pool[genotype->nproteins-i][1][j]]++;
+                    genotype->protein_pool[genotype->nproteins-i][1][j]=-1;
+                }
+            }            
+            /* create a new protein and link it to this gene*/
+            genotype->which_protein[gene_id]=genotype->nproteins-2; /*put the new protein to the pos of the first selection gene*/
+            genotype->protein_pool[genotype->nproteins-2][0][0]=1;
+            genotype->protein_pool[genotype->nproteins-2][1][0]=gene_id;            
+            /* update activating*/
+            if(genotype->activating[protein_id]) 
+                genotype->N_act++;  
+            else
+                genotype->N_rep++;
 
+            genotype->activating[genotype->nproteins-2]=genotype->activating[protein_id];  
             /* finally, update protein numbers*/
             genotype->nproteins++;
             /* NOTE: this mutation does not change the number of genes*/
@@ -5352,6 +5439,7 @@ void initialize_cache(Genotype *genotype)
         genotype->which_cluster[j]=-1;  
         genotype->which_tf[j]=-1;
         genotype->min_act_to_transc[j]=MAX_MODE+1; /* by default a gene cannot be turned on*/
+        genotype->koff[j]=-1.0;
         for(k=0;k<NGENES;k++)        
             genotype->cisreg_cluster[j][k]=-1;
     }    
@@ -5445,16 +5533,16 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     /*manually input binding sites info below*/
 #if SET_BS_MANUALLY 
 // this is a FFL
-//    int N_BS_per_gene[3]={2,2,2};
-//    int tf_id_per_site[3][3]={{0,0,-1},{0,2,2},{1,1,-1}};
-//    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
-//    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};    
+    int N_BS_per_gene[3]={2,2,2};
+    int tf_id_per_site[3][3]={{0,0,-1},{0,2,2},{1,1,-1}};
+    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
+    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};    
 
 // this is a BRA    
-    int N_BS_per_gene[3]={2,3,2};
-    int tf_id_per_site[3][3]={{1,1,-1},{0,2,0},{1,1,-1}};
-    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
-    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};
+//    int N_BS_per_gene[3]={2,3,2};
+//    int tf_id_per_site[3][3]={{1,1,-1},{0,2,0},{1,1,-1}};
+//    int hindrance_per_site[3][3]={{0,0,0},{0,0,0},{0,0,0}};
+//    float koff_per_site[3][3]={{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]},{Koff[0],Koff[0],Koff[0]}};
     
 #endif    
     
@@ -5481,12 +5569,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_1.txt","r");    
+    MUT=fopen("MUT_15.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
-        for(i=0;i<10000;i++)
+        for(i=0;i<1187;i++)
         {
             clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
             fscanf(MUT,"%c %d %d %s %d %f\n",
@@ -5509,7 +5597,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         init_env1='B';
         init_env2='B';
         tdevelopment = 119.9;
-        duration_of_burn_in_growth_rate = 50.0; 
+        duration_of_burn_in_growth_rate = 30.0; 
         env1_t_signalA=60.0;    
         env1_t_signalB=60.0;     
         env2_t_signalA=10.0;
@@ -5560,24 +5648,24 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     }    
     else
     { 	
-        tdevelopment = 119.9;
-        duration_of_burn_in_growth_rate = 50.0; 
-        init_env1='B';
+        tdevelopment = 60.5;
+        duration_of_burn_in_growth_rate = 0.5; 
+        init_env1='A';
         init_env2='B';
-        env1_t_signalA=60.0;    
-        env1_t_signalB=60.0;     
-        env2_t_signalA=10.0;
-        env2_t_signalB=60.0;
+        env1_t_signalA=150.0;    
+        env1_t_signalB=0.0;     
+        env2_t_signalA=0.0;
+        env2_t_signalB=150.0;
         env1_signalA_as_noise=0;    
         env2_signalA_as_noise=0;
         env1_signalA_mismatches=0;   
         env2_signalA_mismatches=1;
-        N_replicates=1200;
-        recalc_new_fitness=2;
+        N_replicates=600;
+        recalc_new_fitness=0;
         env1_occurence=0.5;
         env2_occurence=0.5;
 	ready_to_evolve=0;
-        burn_in=1;
+        burn_in=BURN_IN;
         
         fp=fopen(RuntimeSumm,"a+");
         fprintf(fp,"**********Burn-in conditions**********\n");
@@ -5625,15 +5713,15 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 	    
             while(1)
             {
-		if(N_trials==100) /*if no fixation after 100 trials, we declare that a local optimal is found*/
-                {
-                    OUTPUT=fopen(filename1,"a+");
-                    fprintf(OUTPUT,"%d an optimal genotype is found\n",i);
-                    fclose(OUTPUT);
-                    summarize_binding_sites(&genotype_ori,1);
-                    release_memory(&genotype_ori,&genotype_ori_copy,&RS_main,RS_parallel);
-                    return 0;
-                }
+	//	if(N_trials==100) /*if no fixation after 100 trials, we declare that a local optimal is found*/
+          //      {
+            //        OUTPUT=fopen(filename1,"a+");
+            //        fprintf(OUTPUT,"%d an optimal genotype is found\n",i);
+            //        fclose(OUTPUT);
+            //        summarize_binding_sites(&genotype_ori,i);
+            //        release_memory(&genotype_ori,&genotype_ori_copy,&RS_main,RS_parallel);
+            //        return 0;
+            //    }
                 N_trials++;
                 N_tot_trials++;
 //                clone_cell_forward(&genotype_ori,&genotype_ori_copy,clone_type);
@@ -5710,34 +5798,35 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 genotype_ori.fitness=(genotype_ori.avg_GR1*env1_occurence+genotype_ori.avg_GR2*env2_occurence)/(env1_occurence+env2_occurence);
             }            
             
-//            if(i%100==0) /*output genotype every 100 steps*/
-                output_genotype(filename1,filename4,filename5,filename6,&genotype_ori,i);
-		if(genotype_ori.avg_GR1>0.5*gpeak_a && genotype_ori.avg_GR2>0.5*gpeak_b)
-			ready_to_evolve++;
-		else
-			ready_to_evolve=0;
-		if(ready_to_evolve>=10)
-		{
-			burn_in=i;
-			break;
-		}
-
+            if(i%100==0 && i!=0) /*output genotype every 100 steps*/
+                summarize_binding_sites(&genotype_ori,i);
+            
+            output_genotype(filename1,filename4,filename5,filename6,&genotype_ori,i);
+            if(genotype_ori.avg_GR1>0.5*gpeak_a && genotype_ori.avg_GR2>0.5*gpeak_b)
+                ready_to_evolve++;
+            else
+                ready_to_evolve=0;
+            if(ready_to_evolve>=10)
+            {
+                burn_in=i+1;
+                break;
+            }
         }
 
 	fp=fopen(RuntimeSumm,"a");
 	fprintf(fp,"Burn_in finished after %dth step\n",i);
 	fclose(fp);
 
-        summarize_binding_sites(&genotype_ori,1); /*snapshot of the final (1) distribution binding sites */
+        summarize_binding_sites(&genotype_ori,i); /*snapshot of the final (1) distribution binding sites */
         
         DUPLICATION=1.5e-6*0.33;                 /* per gene per cell division (using 120min), excluding chromosome duplication. Lynch 2008*/
         SILENCING = 1.3e-6*0.33;          /* per gene per cell division (120min), excluding chromosome deletion.Lynch 2008*/
         tdevelopment=119.9;
-        duration_of_burn_in_growth_rate =50.0;
+        duration_of_burn_in_growth_rate =30.1;
         init_env1='B';
         init_env2='B';        
-        env1_t_signalA=60.0;     
-        env1_t_signalB=60.0;     
+        env1_t_signalA=150.0;     
+        env1_t_signalB=20.0;     
         env2_t_signalA=10.0;
         env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
@@ -5746,8 +5835,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_mismatches=1;  
         N_replicates=1200;
         recalc_new_fitness=2;
-        env1_occurence=0.5;
-        env2_occurence=0.5;
+        env1_occurence=0.8;
+        env2_occurence=0.2;
         
         fp=fopen(RuntimeSumm,"a");
         fprintf(fp,"**********second phase conditions**********\n");
@@ -5760,14 +5849,14 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d, occurence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_signalA_mismatches,env2_occurence);        
         fclose(fp);
         
-        for(i=burn_in-1;i<MAX_MUT_STEP;i++)
+        for(i=burn_in;i<MAX_MUT_STEP;i++)
         {   
             if(genotype_ori.ntfgenes==2)
             { 
                 OUTPUT=fopen(filename1,"a+");                              
                 fprintf(OUTPUT,"ntfgenes critical!\n");
                 fclose(OUTPUT);  
-                summarize_binding_sites(&genotype_ori,1);
+                summarize_binding_sites(&genotype_ori,i);
                 release_memory(&genotype_ori,&genotype_ori_copy,&RS_main, RS_parallel);
                 return 0;
             }
@@ -5784,12 +5873,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 	    
             while(1)
             {
-		if(N_trials==100) /*if no fixation after 100 trials, we declare that a local optimal is found*/
+		if(N_trials==500) /*if no fixation after 500 trials, we declare that a local optimal is found*/
                 {
                     OUTPUT=fopen(filename1,"a+");
                     fprintf(OUTPUT,"%d an optimal genotype is found\n",i);
                     fclose(OUTPUT);
-                    summarize_binding_sites(&genotype_ori,1);
+                    summarize_binding_sites(&genotype_ori,i);
                     release_memory(&genotype_ori,&genotype_ori_copy,&RS_main,RS_parallel);
                     return 0;
                 }
@@ -5869,11 +5958,13 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 genotype_ori.fitness=(genotype_ori.avg_GR1*env1_occurence+genotype_ori.avg_GR2*env2_occurence)/(env1_occurence+env2_occurence);
             }            
             
-//            if(i%100==0) /*output genotype every 100 steps*/
-                output_genotype(filename1,filename4,filename5,filename6,&genotype_ori,i);
+            if(i%100==0) /*output genotype every 100 steps*/
+                summarize_binding_sites(&genotype_ori,i);
+            
+            output_genotype(filename1,filename4,filename5,filename6,&genotype_ori,i);
         }
     }
-    summarize_binding_sites(&genotype_ori,2); /*snapshot of the final (1) distribution binding sites */
+    summarize_binding_sites(&genotype_ori,i); /*snapshot of the final (1) distribution binding sites */
     /*release memory*/
     release_memory(&genotype_ori,&genotype_ori_copy,&RS_main, RS_parallel);
     return 1;	
@@ -6000,73 +6091,133 @@ void print_all_protein_time_courses(int nprotein, TimeCourse **timecoursestart, 
     fclose(fp);
 }
 
-void summarize_binding_sites(Genotype *genotype,int init_or_end)
+void summarize_binding_sites(Genotype *genotype,int step_i)
 {
-    FILE *OUTPUT;
+    FILE *OUTPUT1;
     int i,j;
     int table[NGENES][NGENES];
+    int table_reduced_sites[NGENES][NGENES];
         
     for(i=0;i<genotype->ngenes;i++)
     {
         for(j=0;j<genotype->ngenes;j++)
         {
-            table[i][j]=0;            
+            table[i][j]=0; 
+            table_reduced_sites[i][j]=0;
         }
     }
     
     for(i=2;i<genotype->ngenes;i++)        
     {
-        print_binding_sites_distribution(genotype,i,init_or_end);
+        //print_binding_sites_distribution(genotype,i,step_i);
+        resolve_overlapping_sites(genotype,i,table_reduced_sites[i]);
         for(j=0;j<genotype->binding_sites_num[i];j++)
-        {
+        {            
             table[i][genotype->all_binding_sites[i][j].tf_id]++; /*the numbers of the binding sites of each tf on promoter i*/
         }    
     }
-       
-    OUTPUT=fopen("summary_BS","a+");
-    fprintf(OUTPUT,"Promoter");
+    
+    /*Output all binding sites*/ 
+    OUTPUT1=fopen("summary_BS","a+");
+    fprintf(OUTPUT1,"step %d\n",step_i);
+    fprintf(OUTPUT1,"Promoter");
     for(i=0;i<genotype->ntfgenes;i++)
-        fprintf(OUTPUT," TF%d",i);
-    fprintf(OUTPUT,"\n");
+        fprintf(OUTPUT1," TF%d",i);
+    fprintf(OUTPUT1,"\n");
     for(i=2;i<genotype->ngenes;i++)
     {
-        fprintf(OUTPUT,"%d        ",i+1);
+        if(i<9)
+            fprintf(OUTPUT1,"%d        ",i+1);
+        else
+            fprintf(OUTPUT1,"%d       ",i+1);
+        
         for(j=0;j<genotype->ntfgenes;j++)
         {
             if(table[i][j]<10)
-                fprintf(OUTPUT," %d  ",table[i][j]);
+                fprintf(OUTPUT1," %d  ",table[i][j]);
             else
-                fprintf(OUTPUT," %d ",table[i][j]);
+                fprintf(OUTPUT1," %d ",table[i][j]);
         }
         if(genotype->which_protein[i]==genotype->nproteins-2)
         {
-            fprintf(OUTPUT,"A");
+            fprintf(OUTPUT1,"A");
         }
         else
         {
             if(genotype->which_protein[i]==genotype->nproteins-1)
-                fprintf(OUTPUT,"B");
+                fprintf(OUTPUT1,"B");
             else
-                fprintf(OUTPUT,"%d",genotype->which_protein[i]);
+                fprintf(OUTPUT1,"%d",genotype->which_protein[i]);
         }
-        fprintf(OUTPUT,"\n");
+        fprintf(OUTPUT1,"\n");
     }
-    fprintf(OUTPUT,"         ");
+    fprintf(OUTPUT1,"         ");
     for(i=0;i<genotype->ngenes;i++)
     {        
         if(genotype->activating[genotype->which_protein[i]]==1)
-            fprintf(OUTPUT," A  ");
+            fprintf(OUTPUT1," A  ");
         if(genotype->activating[genotype->which_protein[i]]==0)
-            fprintf(OUTPUT," R  ");
+            fprintf(OUTPUT1," R  ");
     }
-    fprintf(OUTPUT,"\n");
-    fprintf(OUTPUT,"         ");
+    fprintf(OUTPUT1,"\n");
+    fprintf(OUTPUT1,"         ");
     for(i=0;i<genotype->ngenes;i++)
         if(genotype->activating[genotype->which_protein[i]]!=-1)
-            fprintf(OUTPUT," %d  ",genotype->which_protein[i]);
-    fprintf(OUTPUT,"\n"); 
-    fprintf(OUTPUT,"\n"); 
-    fclose(OUTPUT);
+            fprintf(OUTPUT1," %d  ",genotype->which_protein[i]);
+    fprintf(OUTPUT1,"\n"); 
+    fprintf(OUTPUT1,"\n"); 
+    fclose(OUTPUT1);
+    
+    /*Output non-overlapping sites*/
+    OUTPUT1=fopen("summary_non_overlapping_BS","a+");
+    fprintf(OUTPUT1,"step %d\n",step_i);
+    fprintf(OUTPUT1,"Promoter");
+    for(i=0;i<genotype->ntfgenes;i++)
+        fprintf(OUTPUT1," TF%d",i);
+    fprintf(OUTPUT1,"\n");
+    for(i=2;i<genotype->ngenes;i++)
+    {
+        if(i<9)
+            fprintf(OUTPUT1,"%d        ",i+1);
+        else
+            fprintf(OUTPUT1,"%d       ",i+1);
+        
+        for(j=0;j<genotype->ntfgenes;j++)
+        {
+            if(table_reduced_sites[i][j]==0)
+                fprintf(OUTPUT1," -  ");
+            else
+                fprintf(OUTPUT1," %d  ",table_reduced_sites[i][j]);
+        }
+        if(genotype->which_protein[i]==genotype->nproteins-2)
+        {
+            fprintf(OUTPUT1,"A");
+        }
+        else
+        {
+            if(genotype->which_protein[i]==genotype->nproteins-1)
+                fprintf(OUTPUT1,"B");
+            else
+                fprintf(OUTPUT1,"%d",genotype->which_protein[i]);
+        }
+        fprintf(OUTPUT1,"\n");
+    }
+    fprintf(OUTPUT1,"         ");
+    for(i=0;i<genotype->ngenes;i++)
+    {        
+        if(genotype->activating[genotype->which_protein[i]]==1)
+            fprintf(OUTPUT1," A  ");
+        if(genotype->activating[genotype->which_protein[i]]==0)
+            fprintf(OUTPUT1," R  ");
+    }
+    fprintf(OUTPUT1,"\n");
+    fprintf(OUTPUT1,"         ");
+    for(i=0;i<genotype->ngenes;i++)
+        if(genotype->activating[genotype->which_protein[i]]!=-1)
+            fprintf(OUTPUT1," %d  ",genotype->which_protein[i]);
+    fprintf(OUTPUT1,"\n"); 
+    fprintf(OUTPUT1,"\n"); 
+    fclose(OUTPUT1);
 }
 
 void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_or_end)
@@ -6084,6 +6235,45 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
     fclose(fp);   
 }
 
+void resolve_overlapping_sites(Genotype *genotype, int gene_id, int N_non_overlapping_sites[NGENES])
+{
+    int i,head,tail,k;
+    int temp[NGENES][100]; // assuming there are at most 100 BS of the same TF on a promoter.
+    int temp2[NGENES];
+    
+    for(i=0;i<genotype->ngenes-2;i++)
+        temp2[i]=0;
+    
+    for(i=0;i<genotype->binding_sites_num[gene_id];i++)
+    {
+        temp[genotype->all_binding_sites[gene_id][i].tf_id][temp2[genotype->all_binding_sites[gene_id][i].tf_id]]=i;
+        temp2[genotype->all_binding_sites[gene_id][i].tf_id]++;
+    }  
+    
+    for(i=0;i<genotype->ntfgenes;i++)
+    {
+        if(temp2[i]>1)
+        { 
+            head=0;
+            tail=1;
+            N_non_overlapping_sites[gene_id]=1;
+            while(tail<temp2[i])
+            {
+                if(genotype->all_binding_sites[gene_id][temp[i][tail]].BS_pos-genotype->all_binding_sites[gene_id][temp[i][head]].BS_pos-1<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                    tail++;                
+                else
+                {
+                    head=tail;
+                    tail++;
+                    N_non_overlapping_sites[gene_id]++;
+                }
+            } 
+        }
+        else
+            N_non_overlapping_sites[i]=temp2[i];
+    }
+    
+}
 
 //void whole_gene_deletion(Genotype *genotype,long int *seed) // only tf genes get deleted. Haven't been debugged
 //{
