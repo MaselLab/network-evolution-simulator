@@ -5842,9 +5842,9 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         tdevelopment=119.9;
         duration_of_burn_in_growth_rate =30.1;
         init_env1='B';
-        init_env2='B';        
+        init_env2='B'; 
         env1_t_signalA=150.0;     
-        env1_t_signalB=20.0;     
+        env1_t_signalB=20.0;
         env2_t_signalA=10.0;
         env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
