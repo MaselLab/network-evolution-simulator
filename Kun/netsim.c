@@ -29,6 +29,7 @@
 #define SET_BS_MANUALLY 0
 #define NO_REGULATION_COST 0
 #define UNLIMITED_MUTATION 1
+#define USE_PREVIOUS 1
 
 const float alpha=1.0e-3;
 
@@ -105,10 +106,13 @@ int init_N_act=3;
 int init_N_rep=3;
 int min_act_to_transcr_A=2;
 int min_act_to_transcr_B=1;
-float penalty_of_extra_copies=2.0e-1;       /* this is the penalty for having more copies than the MAX_COPIES.
+float penalty_of_extra_copies=1.0e-3 ;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
-                                            * copy is this number times gmax_a (defined in initialized_growth_rate_parameters).
-                                            * we use this penalty as a soft restriction to copy numbers.*/
+                                            * copy is this number times gpeak (defined in initialized_growth_rate_parameters).
+                                            * we use this penalty as a soft restriction to copy numbers. Note that if  
+					    * the value of this term is similar to that of cost_term, then the reduction
+                                            * in growth rate by an extra copy is numerically the same as the cost of expressing
+                                            * the extra copy with a expression level of avg_protein_number*/
 float reduction_in_P_dup=100.0;     /* this is another way to restrict copy numbers, by reducing the probabity
                                              * of duplication of a gene x folds, once its copy number exceed the upperlim.
                                              * reducing the probabity prevents even calculating the growth rate of the
@@ -5039,7 +5043,8 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                 *mut_type='c';                          /* mut binding seq*/
             else
             {
-                if(random2<=proportion_mut_koff+proportion_mut_binding_seq)
+                random2-=proportion_mut_binding_seq;
+                if(random2<=proportion_mut_koff)
                     *mut_type='f';                      /* mut koff*/
                 else
                     *mut_type='k';                          /* mut kinetic const*/
@@ -5587,7 +5592,7 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_15.txt","r");    
+    MUT=fopen("MUT_xx.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
@@ -5694,8 +5699,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);        
         fprintf(fp,"Environment 1: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d, occurence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_signalA_mismatches,env1_occurence);
         fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d, occurence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_signalA_mismatches,env2_occurence);
-        fclose(fp);
-        
+        fclose(fp);        
+
         calc_avg_growth_rate(   &genotype_ori, 
                                 init_mRNA,
                                 init_protein_number,
@@ -5720,9 +5725,55 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 genotype_ori.N_act,
                 genotype_ori.N_rep);
 	fprintf(OUTPUT,"step N_tot_mut_tried N_mut_tried_this_step fixed_mutation Pfix avg_GR1 avg_GR2 cv_GR1 cv_GR2 N_genes N_proteins N_activator N_repressor \n");	
-	
-        fclose(OUTPUT);	
-	
+	fclose(OUTPUT);	
+
+#if USE_PREVIOUS   /*** Start with the genotype at the end of the burn_in in previous simulations*/
+        MUT=fopen("previous_record.txt","r"); 
+        if(MUT!=NULL)
+        {
+            fp=fopen(RuntimeSumm,"a+");
+            fprintf(fp,"LOAD MUTATION RECORD SUCCESSFUL!\n");
+            Mutation mut_record;
+            for(i=0;i<BURN_IN;i++)
+            {
+                clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
+                fscanf(MUT,"%c %d %d %s %d %f\n",
+                        &(mut_record.mut_type),
+                        &(mut_record.pos_g),
+                        &(mut_record.pos_n),
+                        mut_record.nuc_diff,
+                        &(mut_record.kinetic_type),
+                        &(mut_record.kinetic_diff));
+                reproduce_mutate(&genotype_ori_copy,&mut_record);            
+                clone_cell_forward(&genotype_ori_copy,&genotype_ori,COPY_ALL);                
+            }        
+            fclose(MUT);            
+        }
+        else
+        {
+            fp=fopen(RuntimeSumm,"a+");
+            fprintf(fp,"Cannot find previous Burn_in file...\n");
+            return 0;
+        } 
+        
+        calc_all_binding_sites(&genotype_ori);
+        calc_avg_growth_rate(   &genotype_ori, 
+                                init_mRNA,
+                                init_protein_number,
+                                maxbound2,
+                                maxbound3,
+                                RS_parallel,
+                                filename1,
+                                filename3,
+                                0,
+                                &mut_record);
+        fp=fopen(filename1,"a+");
+        fprintf(fp,"after burn_in: ");
+        fclose(fp);
+        output_genotype(filename1,filename4,filename5,filename6,&genotype_ori,BURN_IN-1); 
+        i=BURN_IN-1;
+#else /*** Start a completely new simulation**/	
+        
         for(i=0;i<BURN_IN;i++)
         {             
             fixation=0;
@@ -5830,12 +5881,15 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
                 break;
             }
         }
-
+#endif
+/***********************************************************************/
+/************************* End of Burn-in ******************************/
+/***********************************************************************/
+        
+        summarize_binding_sites(&genotype_ori,i); /*snapshot of binding sites after Burn_in */
 	fp=fopen(RuntimeSumm,"a");
 	fprintf(fp,"Burn_in finished after %dth step\n",i);
-	fclose(fp);
-
-        summarize_binding_sites(&genotype_ori,i); /*snapshot of the final (1) distribution binding sites */
+        fclose(fp);        
         
         DUPLICATION=1.5e-6*0.33;                 /* per gene per cell division (using 120min), excluding chromosome duplication. Lynch 2008*/
         SILENCING = 1.3e-6*0.33;          /* per gene per cell division (120min), excluding chromosome deletion.Lynch 2008*/
@@ -5853,8 +5907,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_signalA_mismatches=1;  
         N_replicates=1200;
         recalc_new_fitness=2;
-        env1_occurence=0.8;
-        env2_occurence=0.2;
+        env1_occurence=0.9;
+        env2_occurence=0.1;
         
         fp=fopen(RuntimeSumm,"a");
         fprintf(fp,"**********second phase conditions**********\n");
@@ -6255,7 +6309,7 @@ void print_binding_sites_distribution(Genotype *genotype, int gene_id, int init_
 
 void resolve_overlapping_sites(Genotype *genotype, int gene_id, int N_non_overlapping_sites[NGENES])
 {
-    int i,head,tail,k;
+    int i,head,tail;
     int temp[NGENES][100]; // assuming there are at most 100 BS of the same TF on a promoter.
     int temp2[NGENES];
     
@@ -6274,7 +6328,7 @@ void resolve_overlapping_sites(Genotype *genotype, int gene_id, int N_non_overla
         { 
             head=0;
             tail=1;
-            N_non_overlapping_sites[gene_id]=1;
+            N_non_overlapping_sites[i]=1;
             while(tail<temp2[i])
             {
                 if(genotype->all_binding_sites[gene_id][temp[i][tail]].BS_pos-genotype->all_binding_sites[gene_id][temp[i][head]].BS_pos-1<TF_ELEMENT_LEN+2*HIND_LENGTH)
@@ -6283,7 +6337,7 @@ void resolve_overlapping_sites(Genotype *genotype, int gene_id, int N_non_overla
                 {
                     head=tail;
                     tail++;
-                    N_non_overlapping_sites[gene_id]++;
+                    N_non_overlapping_sites[i]++;
                 }
             } 
         }
