@@ -20,7 +20,7 @@
 
 #define RdcPdup 1
 
-#define N_THREADS 1
+#define N_THREADS 12
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -319,14 +319,12 @@ const float NUMSITESINGENOME;
 //float lumped_kon;
 float tdevelopment; 
 float growth_rate_scaling; 
-float Pp_a;
-float Pp_b;         
+float Pp_s;       
 float h;
 float h_extra_copy;
 float gmax_a;
 float gmax_b;
-float gpeak_a;
-float gpeak_b;
+float gpeak;
 float protein_aging;
 int current_ploidy;
 int init_TF_genes;
@@ -521,17 +519,14 @@ extern void revise_activity_state(int,
                                   CellState *,
                                   GillespieRates *);
 
-extern float compute_tprime(Genotype*, CellState*, char, float*, float*, float);
+extern float compute_tprime(Genotype*, CellState*, float*, float);
 
-//extern float compute_integral(float, float, float, float, float, float, float, float);
-extern float compute_integral(Genotype *, CellState *, float *, float, float, char);
+extern float compute_integral(Genotype *, CellState *, float *, float, float);
 
 extern float compute_growth_rate_dimer( float *,
                                         Genotype *,
                                         CellState *,
                                         float*,
-                                        float*,
-                                        float, 
                                         float,
                                         float,
                                         float,
