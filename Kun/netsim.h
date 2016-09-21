@@ -18,7 +18,7 @@
 #define BURN_IN 1000
 #endif
 
-#define RdcPdup 1
+#define RdcPdup 0
 
 #define N_THREADS 12
 
@@ -528,8 +528,7 @@ extern float compute_growth_rate_dimer( float *,
                                         CellState *,
                                         float*,
                                         float,
-                                        float,
-                                        float,
+                                        float,                                       
                                         char,
                                         int *,
                                         char *,

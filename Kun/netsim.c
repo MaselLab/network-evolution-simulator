@@ -118,7 +118,7 @@ int init_N_rep=3;
 int min_act_to_transcr_selection_protein=2;
 
 /*Environments*/
-float signal_strength=120000.0; /* number of each signal protein */
+float signal_strength=12000.0; /* number of each signal protein */
 float env1_t_signalA;           /* duration of signal A in environment 1 */
 float env1_t_signalB;           /* duration of signal B in environment 1 */
 float env2_t_signalA;
@@ -1690,8 +1690,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
                                 CellState *state,
                                 float* number_of_selection_protein,                               
                                 float t, 
-                                float dt,                 
-                                float ect1_s,
+                                float dt,
 				char env,
                                 int *end_state,
                                 char *error,
@@ -1766,7 +1765,7 @@ float compute_growth_rate_dimer(float *integrated_growth_rate,
             break;
     
         case 'B': /* protein b is necessary! */            
-            *integrated_growth_rate -= gmax_b*dt-penalty*compute_integral(genotype, state, number_of_selection_protein, dt, 1.0);	
+            *integrated_growth_rate = gmax_b*dt-penalty*compute_integral(genotype, state, number_of_selection_protein, dt, 1.0);	
             instantaneous_growth_rate = gmax_b - penalty*P_next_s;            
             break;
     }
@@ -1828,7 +1827,7 @@ void update_protein_number_cell_size( Genotype *genotype,
                                     Mutation *mut_record)
 {
     int i,j;
-    float ct, ect, ect1,ect1_s;
+    float ct, ect, ect1;
     float number_of_selection_protein[genotype->protein_pool[genotype->nproteins-1][0][0]];
     float instantaneous_growth_rate = 0.0;
     float integrated_growth_rate = 0.0;
@@ -1853,9 +1852,7 @@ void update_protein_number_cell_size( Genotype *genotype,
         ct = state->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
         ect = exp(-ct);
         if (fabs(ct)<EPSILON) ect1=ct;
-        else ect1 = 1-ect;
-        /* record the ect for the selection genes*/       		
-        if (i == genotype->ngenes-1) ect1_s=ect1;
+        else ect1 = 1-ect;      
         /* get the new protein concentration for this gene */
         state->gene_specific_protein_number[i]=ect*state->gene_specific_protein_number[i]+state->konvalues[i][KON_SALPHAC_INDEX]*ect1 ;        
     }    
@@ -1879,8 +1876,7 @@ void update_protein_number_cell_size( Genotype *genotype,
                                                             state, 
                                                             number_of_selection_protein,                                                             
                                                             t, 
-                                                            dt, 
-                                                            ect1_s,                                                           
+                                                            dt,                                                                                                                     
                                                             env,
                                                             end_state,
                                                             error,
@@ -1929,7 +1925,7 @@ void transport_event(   Genotype *genotype,
     while(1)
     {
         x=RngStream_RandU01(RS)*rates->transport; 
-        gene_id=1;
+        gene_id=0;
         /* choose gene product (mRNA) that gets transported to cytoplasm
            based on weighting in transport[] array */
         while (gene_id < genotype->ngenes-1 && x > 0.0) 
@@ -1974,7 +1970,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
     while(1)/*in case of numerical error*/    
     {           
         x=RngStream_RandU01(RS)*rates->mRNAdecay;   
-        gene_id=1;
+        gene_id=0;
         /* loop through mRNA products, to choose the mRNA with the
         proportionally higher decay rate */
         while (gene_id < genotype->ngenes-1 && x > 0.0) 
@@ -2018,7 +2014,7 @@ void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype
     while(1)
     {
         x= RngStream_RandU01(RS)*rates->acetylation;
-        gene_id=1;
+        gene_id=0;
         while(gene_id<genotype->ngenes-1 && x>0.0)
         {
             gene_id++;
@@ -2038,7 +2034,7 @@ void histone_deacteylation_event(GillespieRates *rates, CellState *state, Genoty
     while(1)
     {    
         x= RngStream_RandU01(RS)*rates->deacetylation;
-        gene_id=1;
+        gene_id=0;
         /* choose a particular gene and copy to change state */
         while(gene_id<genotype->ngenes-1 && x>0.0)
         {
@@ -2059,7 +2055,7 @@ void assemble_PIC_event(GillespieRates *rates, CellState *state, Genotype *genot
     while(1)
     {    
         x= RngStream_RandU01(RS)*rates->pic_assembly;
-        gene_id=1;
+        gene_id=0;
         /* choose a particular gene and copy to change state */
         while(gene_id<genotype->ngenes-1 && x>0.0)
         {
@@ -2080,7 +2076,7 @@ void disassemble_PIC_event(Genotype *genotype, CellState *state,GillespieRates *
     while(1)
     {
         x=RngStream_RandU01(RS)*rates->pic_disassembly;   
-        gene_id=1;
+        gene_id=0;
         /* choose an appropriate gene copy to disassemble the PIC from */
         while(gene_id < genotype->ngenes-1 && x>0.0) 
         {
@@ -2095,7 +2091,7 @@ void disassemble_PIC_event(Genotype *genotype, CellState *state,GillespieRates *
 
 void transcription_init_event(GillespieRates *rates, CellState *state, Genotype *genotype, float dt, float t, RngStream RS)
 {
-    int gene_id=1;  
+    int gene_id=0;  
     int x;
     float candidate_t;
     int concurrent;
@@ -2741,11 +2737,11 @@ void calc_avg_growth_rate(Genotype *genotype,
         genotype->ncopies_under_penalty+=(genotype->protein_pool[k][0][0]<=MAX_COPIES)?0:(genotype->protein_pool[k][0][0]-MAX_COPIES);   
 #endif    
         
-    omp_set_num_threads(N_THREADS);
-    #pragma omp parallel
+//    omp_set_num_threads(N_THREADS);
+//    #pragma omp parallel
     {
-        int ID=omp_get_thread_num();
-//        int ID=0;
+//        int ID=omp_get_thread_num();
+        int ID=0;
         int i,j;
         int N_replicates_per_thread=N_replicates/N_THREADS;
         int end_state;
@@ -2767,7 +2763,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             gr1[i]=0.0;
             gr2[i]=0.0;
         }
-        #pragma omp critical
+//        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -2951,7 +2947,7 @@ void calc_avg_growth_rate(Genotype *genotype,
         
         for(j=0;j<NGENES;j++)
             free(genotype_offspring.all_binding_sites[j]);
-        #pragma omp critical
+//        #pragma omp critical
         {
             j=0;
             for(i=ID*N_replicates_per_thread;i<(ID+1)*N_replicates_per_thread;i++)
@@ -3993,10 +3989,10 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS) //a
 {
     int pos_g, pos_g_copy, pos_tf, i, protein_id;
     char *temp1, *temp2;  
-    float random1;
-    int random2,tag; 
     
 #if RdcPdup     /* the method of reducing probability*/ 
+    float random1;
+    int random2,tag; 
     tag=0;
     while(tag==0)
     {
@@ -4015,7 +4011,7 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS) //a
         }
     }
 #else       /* the method of reducing growth rate */
-    pos_g=RngStream_RandInt(RS,2,genotype->ngenes-1);     
+    pos_g=RngStream_RandInt(RS,1,genotype->ngenes-1);     
 #endif     
     
     if(pos_g==genotype->ngenes-1)
@@ -4065,7 +4061,7 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS) //a
     genotype->pic_disassembly[genotype->ngenes]=genotype->pic_disassembly[genotype->ngenes-1]; 
     genotype->mRNAdecay[genotype->ngenes]=genotype->mRNAdecay[genotype->ngenes-1];
     genotype->proteindecay[genotype->ngenes]=genotype->proteindecay[genotype->ngenes-1];
-    genotype->translation[genotype->ngenes]=genotype->translation[i-1];
+    genotype->translation[genotype->ngenes]=genotype->translation[genotype->ngenes-1];
     genotype->clone_info[genotype->ngenes]=1;
     genotype->recalc_TFBS[genotype->ngenes]=1;           
     /*******************************************************************************************************/  
@@ -4737,7 +4733,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     {
     #if RdcPdup    /* the method of reducing probability*/    
         tot_dup_rate=0.0;
-        for(i=2;i<genotype->nproteins;i++)
+        for(i=1;i<genotype->nproteins;i++)
         {
             if(genotype->protein_pool[i][0][0]<=MAX_COPIES)
                 genotype->P_dup_per_protein[i]=genotype->protein_pool[i][0][0]*DUPLICATION;
@@ -4745,35 +4741,35 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                 genotype->P_dup_per_protein[i]=genotype->protein_pool[i][0][0]*DUPLICATION/reduction_in_P_dup;
             tot_dup_rate+=genotype->P_dup_per_protein[i];        
         }
-        for(i=2;i<genotype->nproteins;i++)
+        for(i=1;i<genotype->nproteins;i++)
             genotype->P_dup_per_protein[i]/=tot_dup_rate;
         tot_mut_rate+=tot_dup_rate;    
     #else    /* the method of increaing penalty*/    
-        tot_dup_rate=(genotype->ngenes-2)*DUPLICATION;
+        tot_dup_rate=(genotype->ngenes-1)*DUPLICATION;
         tot_mut_rate+=tot_dup_rate;
     #endif
     }
     else
     {
-        for(i=2;i<genotype->nproteins;i++)
+        for(i=1;i<genotype->nproteins;i++)
             genotype->P_dup_per_protein[i]=0.0;
         tot_dup_rate=0.0;
     }
     
     /* silencing rate*/
-    tot_sil_rate=(float)(genotype->ngenes-4)*SILENCING; /* two signaling genes and two copies of selection genes cannot be deleted */
+    tot_sil_rate=(float)(genotype->ngenes-2)*SILENCING; /* two signaling genes and two copies of selection genes cannot be deleted */
     tot_mut_rate+=tot_sil_rate;
     
     /* calc total susbtitution rate*/
-    tot_subs_rate=(float)(genotype->ngenes-2)*CISREG_LEN*SUBSTITUTION;
+    tot_subs_rate=(float)(genotype->ngenes-1)*CISREG_LEN*SUBSTITUTION;
     tot_mut_rate+=tot_subs_rate;
     
     /* indel rate*/
-    tot_indel_rate=(float)(genotype->ngenes-2)*CISREG_LEN*INDEL;
+    tot_indel_rate=(float)(genotype->ngenes-1)*CISREG_LEN*INDEL;
     tot_mut_rate+=tot_indel_rate;
     
     /* mut in kinetic constants and binding seq */
-    tot_kin_rate=(float)(genotype->ngenes-2)*MUTKINETIC; 
+    tot_kin_rate=(float)(genotype->ngenes)*MUTKINETIC; 
     tot_mut_rate+=tot_kin_rate;
     
     random=RngStream_RandU01(RS);
@@ -5303,12 +5299,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_xx.txt","r");    
+    MUT=fopen("MUT_14.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
-        for(i=0;i<1187;i++)
+        for(i=0;i<96;i++)
         {
             clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
             fscanf(MUT,"%c %d %d %s %d %f\n",
@@ -5328,29 +5324,33 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
 #endif
         summarize_binding_sites(&genotype_ori,1);
 #if PLOTTING
-        init_env1='B';
-        init_env2='B';
-        tdevelopment = 119.9;
-        duration_of_burn_in_growth_rate = 30.0; 
-        env1_t_signalA=60.0;    
-        env1_t_signalB=60.0;     
+        init_env1='A';
+        init_env2='A';
+        tdevelopment = 149.9;
+        duration_of_burn_in_growth_rate = 5.0; 
+        env1_t_signalA=180.0;    
+        env1_t_signalB=0.0;     
         env2_t_signalA=10.0;
-        env2_t_signalB=60.0;
+        env2_t_signalB=40.0;
         env1_signalA_as_noise=0;    
-        env2_signalA_as_noise=0;     
+        env2_signalA_as_noise=1;     
         N_replicates=1200;
-        calc_avg_growth_rate_plotting(&genotype_ori, init_mRNA, init_protein_number, maxbound2, maxbound3, RS_parallel,filename1,filename3,0,NULL); 
+        env1_occurence=0.5;
+        env2_occurence=0.5;
+      
         
-//        calc_avg_growth_rate(   &genotype_ori, 
-//                                init_mRNA,
-//                                init_protein_number,
-//                                maxbound2,
-//                                maxbound3,
-//                                RS_parallel,
-//                                filename1,
-//                                filename3,
-//                                0,
-//                                &mut_record);
+//        calc_avg_growth_rate_plotting(&genotype_ori, init_mRNA, init_protein_number, maxbound2, maxbound3, RS_parallel,filename1,filename3,0,NULL); 
+        
+        calc_avg_growth_rate(   &genotype_ori, 
+                                init_mRNA,
+                                init_protein_number,
+                                maxbound2,
+                                maxbound3,
+                                RS_parallel,
+                                filename1,
+                                filename3,
+                                0,
+                                &mut_record);
 //        printf("%f %f\n",genotype_ori.avg_GR1,genotype_ori.avg_GR2);
 //        recalc_new_fitness=2;
 //        for(j=1;j<=recalc_new_fitness;j++)
@@ -5384,8 +5384,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         duration_of_burn_in_growth_rate = 5.0; 
         init_env1='A';
         init_env2='A';
-        env1_t_signalA=40.0;    
-        env1_t_signalB=10.0;     
+        env1_t_signalA=180.0;    
+        env1_t_signalB=0.0;     
         env2_t_signalA=10.0;
         env2_t_signalB=40.0;
         env1_signalA_as_noise=0;    
@@ -5603,10 +5603,10 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         duration_of_burn_in_growth_rate =5.0;
         init_env1='A';
         init_env2='A'; 
-        env1_t_signalA=30.0;     
-        env1_t_signalB=10.0;
+        env1_t_signalA=180.0;     
+        env1_t_signalB=0.0;
         env2_t_signalA=10.0;
-        env2_t_signalB=30.0;
+        env2_t_signalB=40.0;
         env1_signalA_as_noise=0;    
         env2_signalA_as_noise=1;      
         N_replicates=1200;
