@@ -1,7 +1,7 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
+ * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe, Kun Xiong
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
@@ -4219,16 +4219,21 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     char n;      
     char *tf_seq, *tf_seq_rc; 
     
-    tf_seq=&genotype->tf_seq[0][0];
-    tf_seq_rc=&genotype->tf_seq_rc[0][0];
+    pos_g=RngStream_RandInt(RS,0,genotype->ngenes-2);
+    while(genotype->which_tf[pos_g]>=genotype->ntfgenes-1 || genotype->which_tf[pos_g]==-1)
+        pos_g=RngStream_RandInt(RS,0,genotype->ngenes-2);
+        
+    tf_seq=&genotype->tf_seq[genotype->which_tf[pos_g]][0];
+    tf_seq_rc=&genotype->tf_seq_rc[genotype->which_tf[pos_g]][0];
     
-    pos_n=RngStream_RandInt(RS,0,genotype->ntfgenes*TF_ELEMENT_LEN-1);
+    pos_n=RngStream_RandInt(RS,0,TF_ELEMENT_LEN-1);
     n=set_base_pair(RngStream_RandU01(RS));
         
     while (n == tf_seq[pos_n])
         n=set_base_pair(RngStream_RandU01(RS));
     tf_seq[pos_n]=n;    
     /*record mutation info*/
+    mut_record->pos_g=pos_g;
     mut_record->pos_n=pos_n;
     mut_record->nuc_diff[0]=n;    
     /* update the complement sequence*/
@@ -4243,8 +4248,7 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
         case 't':
             tf_seq_rc[pos_n]='a'; break;
     }    
-    /* if this tf gene has more than one copies, the mutation inreases nproteins*/
-    pos_g=pos_n/TF_ELEMENT_LEN;    
+    /* if this tf gene has more than one copies, the mutation inreases nproteins*/     
     protein_id=genotype->which_protein[pos_g];   
    
     if(genotype->protein_pool[protein_id][0][0]!=1)
@@ -4261,9 +4265,11 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
 {    
     int pos_g, pos_n, protein_id, i;
     
-    char *tf_seq, *tf_seq_rc;    
-    tf_seq=&genotype->tf_seq[0][0];
-    tf_seq_rc=&genotype->tf_seq_rc[0][0];
+    char *tf_seq, *tf_seq_rc; 
+    
+    pos_g=mut_record->pos_g;
+    tf_seq=&genotype->tf_seq[genotype->which_tf[pos_g]][0];
+    tf_seq_rc=&genotype->tf_seq_rc[genotype->which_tf[pos_g]][0];
         			
     pos_n=mut_record->pos_n;
         
@@ -4282,8 +4288,7 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
             tf_seq_rc[pos_n]='a'; break;
     }
     
-    /* if this tf gene has more than one copies, the mutation increases nproteins*/
-    pos_g=pos_n/TF_ELEMENT_LEN;     
+    /* if this tf gene has more than one copies, the mutation increases nproteins*/    
     protein_id=genotype->which_protein[pos_g];   
    
     if(genotype->protein_pool[protein_id][0][0]!=1)
@@ -4405,15 +4410,13 @@ void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
     int tf_id,protein_id,i;    
     
     tf_id = RngStream_RandInt(RS,1,genotype->ngenes-1);
-    protein_id=genotype->which_protein[tf_id];
-    
+    protein_id=genotype->which_protein[tf_id];    
     while(protein_id==genotype->nproteins-1)
     {
         tf_id = RngStream_RandInt(RS,1,genotype->ngenes-1);
         protein_id=genotype->which_protein[tf_id];
-    }
+    }    
     
-    mut_record->kinetic_type='e';
     mut_record->pos_g=tf_id;
        
     /* if this tf gene has more than one copies, the mutation inreases nproteins*/
@@ -4528,9 +4531,8 @@ void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
                         pow(KR,(float)genotype->all_binding_sites[i][j].mis_match/3.0);
         }
     }
-#endif
-    
-    mut_record->kinetic_type='f';
+#endif    
+
     mut_record->pos_g=tf_id;
     mut_record->kinetic_diff=genotype->koff[tf_id]; 
     
@@ -4574,7 +4576,7 @@ void reproduce_mut_koff(Genotype *genotype, Mutation *mut_record)
 int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],RngStream RS, Mutation *mut_record)
 {
     int i;
-    int return_val;
+    int return_val=0;
     
 #if !SET_BS_MANUALLY    
     draw_mutation(genotype, &(mut_record->mut_type),RS);
@@ -4643,7 +4645,7 @@ int mutate(Genotype *genotype, float kdis[NUM_K_DISASSEMBLY],RngStream RS, Mutat
 /* this function perform mutation indicated by input. Used to reproduce the genotype following a serial of mutations*/
 int reproduce_mutate(Genotype *genotype, Mutation *mut_record)
 {    
-    int return_val;
+    int return_val=0;
     switch (mut_record->mut_type)
     {
         case 's': //substitution        		
@@ -4699,36 +4701,14 @@ int reproduce_mutate(Genotype *genotype, Mutation *mut_record)
  */
 void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
 {
-    float random,random2;
+    float random;
     float tot_mut_rate=0.0;
-    float tot_subs_rate, tot_indel_rate, tot_dup_rate, tot_sil_rate, tot_kin_rate; 
-    int i;
-    
+    float tot_subs_rate, tot_indel_rate, tot_dup_rate, tot_sil_rate, tot_mut_kin_rate, tot_mut_identity_rate, tot_mut_binding_seq_rate, tot_mut_koff_rate; 
+    int i;    
     
     /* duplication rate*/
-//    /* To restrict the duplication of selection genes, we allow each 
-//       selection gene to have at most 2 copies. Under this rule, there are  
-//       two signal genes and at most four copies of selection genes. These genes
-//       have limited influence on the topology of the network. We want the 
-//       topology of the network to evolve relatively extensively, but we also 
-//       don't want the genome to grow too big to slow down simulation. We 
-//       therefore allow at most 10 additional transcription factors genes in the 
-//       simulation, which means the upper bound of genes (NGENES) is 16.*/
-//    if(ngenes==NGENES) 
-//        tot_dup_rate=0.0;
-//    else
-//    {    
-//        if(ngenes-ntfgenes==4)        
-//            tot_dup_rate=(float)(ngenes-4)*DUPLICATION; /*the two signaling genes and the two extra copies of selection genes are not subject to duplication*/
-//        else
-//        {
-//            if(ngenes-ntfgenes==3)
-//                tot_dup_rate=(float)(ngenes-3)*DUPLICATION; /* signaling genes plus one extra copy of selection genes*/
-//            else
-//                tot_dup_rate=(float)(ngenes-2)*DUPLICATION; 
-//        }
-//    }
-//    tot_mut_rate+=tot_dup_rate;   
+    /* To restrict the duplication of selection genes, we allow each 
+       selection gene to have at most 2 copies.*/  
     if(genotype->ngenes<NGENES)
     {
     #if RdcPdup    /* the method of reducing probability*/    
@@ -4757,64 +4737,76 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     }
     
     /* silencing rate*/
-    tot_sil_rate=(float)(genotype->ngenes-2)*SILENCING; /* two signaling genes and two copies of selection genes cannot be deleted */
+    tot_sil_rate=(float)(genotype->ngenes-2)*SILENCING; /* the signaling gene and one copy of the selection gene cannot be deleted */
     tot_mut_rate+=tot_sil_rate;
     
     /* calc total susbtitution rate*/
-    tot_subs_rate=(float)(genotype->ngenes-1)*CISREG_LEN*SUBSTITUTION;
+    tot_subs_rate=(float)(genotype->ngenes-1)*CISREG_LEN*SUBSTITUTION; /* NA to the signal gene*/
     tot_mut_rate+=tot_subs_rate;
     
     /* indel rate*/
-    tot_indel_rate=(float)(genotype->ngenes-1)*CISREG_LEN*INDEL;
+    tot_indel_rate=(float)(genotype->ngenes-1)*CISREG_LEN*INDEL;    /* NA to the signal gene*/
     tot_mut_rate+=tot_indel_rate;
     
-    /* mut in kinetic constants and binding seq */
-    tot_kin_rate=(float)(genotype->ngenes)*MUTKINETIC; 
-    tot_mut_rate+=tot_kin_rate;
+    /* mut in kinetic constants */
+    tot_mut_kin_rate=(float)(genotype->ngenes-1)*MUTKINETIC*(1.0-proportion_mut_binding_seq-proportion_mut_identity-proportion_mut_koff); /* NA to the signal gene*/
+    tot_mut_rate+=tot_mut_kin_rate;
+    
+    /* mut in binding seq*/
+    tot_mut_binding_seq_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_binding_seq; /* NA to the selection genes*/
+    tot_mut_rate+=tot_mut_binding_seq_rate;
+    
+    /* mut in identity*/
+    tot_mut_identity_rate=(float)(genotype->ntfgenes-1)*MUTKINETIC*proportion_mut_identity; /* NA to the signal gene and the selection genes*/
+    tot_mut_rate+=tot_mut_identity_rate;
+    
+    /* mut in koff*/
+    tot_mut_koff_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_identity;   /* NA to the selection gene*/
+    tot_mut_rate+=tot_mut_koff_rate;
+    
     
     random=RngStream_RandU01(RS);
     
-    if(random<=tot_kin_rate/tot_mut_rate)
-    {
-        random2=RngStream_RandU01(RS);
-        
-        if(random2<=proportion_mut_identity)
-            *mut_type='e';                              /* mut identity of a TF */
-        else
-        {
-            random2-=proportion_mut_identity;
-            if(random2<=proportion_mut_binding_seq)
-                *mut_type='c';                          /* mut binding seq*/
-            else
-            {
-                random2-=proportion_mut_binding_seq;
-                if(random2<=proportion_mut_koff)
-                    *mut_type='f';                      /* mut koff*/
-                else
-                    *mut_type='k';                          /* mut kinetic const*/
-            }
-        }
-    }
+    if(random<=tot_subs_rate/tot_mut_rate)    
+        *mut_type='s';                      /* substituion*/
     else
-    {
-        random-=tot_kin_rate/tot_mut_rate;        
-        if(random<=tot_sil_rate/tot_mut_rate)
-            *mut_type='w';                              /* gene deletion*/        
+    {   
+        random-=tot_subs_rate/tot_mut_rate;
+        if(random<= tot_dup_rate/tot_mut_rate)
+            *mut_type='d';                          /* gene duplication */
         else
         {
-            random -= tot_sil_rate/tot_mut_rate;            
-            if(random<= tot_dup_rate/tot_mut_rate)
-                *mut_type='d';                          /* gene duplication */
+            random-=tot_dup_rate/tot_mut_rate;
+            if(random<=tot_sil_rate/tot_mut_rate)
+                *mut_type='w';                              /* gene deletion*/  
             else
             {
-                random-=tot_dup_rate/tot_mut_rate;                
+                random-=tot_sil_rate/tot_mut_rate;
                 if(random<=tot_indel_rate/tot_mut_rate)
                     *mut_type='i';                      /* indel*/
                 else
-                    *mut_type='s';                      /* substituion*/
-            }                
+                {
+                    random-=tot_indel_rate/tot_mut_rate;
+                    if(random<=tot_mut_kin_rate/tot_mut_rate)
+                        *mut_type='k';                  /* mut kinetic const*/
+                    else
+                    {
+                        random-=tot_mut_kin_rate/tot_mut_rate;
+                        if(random<=tot_mut_binding_seq_rate/tot_mut_rate)
+                            *mut_type='c';              /* mut binding seq*/
+                        else
+                        {
+                            random-=tot_mut_binding_seq_rate/tot_mut_rate;
+                            if(random<=tot_mut_koff_rate/tot_mut_rate)
+                                *mut_type='f';          /* mut koff*/
+                            else
+                                *mut_type='e';           /* mut identity of a TF */
+                        }
+                    }
+                }
+            }
         }
-    }    
+    }  
 }
 
 void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char mut_type)
@@ -4925,7 +4917,7 @@ void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char m
             genotype->protein_pool[protein_id][0][0]--;
             /* increase the protein id of selection protein*/ 
             genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
-            for(j=0;j<genotype->protein_pool[genotype->nproteins-i][0][0];j++)                
+            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
             {
                 genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
                 genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
@@ -4960,7 +4952,7 @@ void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char m
             genotype->protein_pool[protein_id][0][0]--;
             /* increase the protein id of selection proteins*/               
             genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
-            for(j=0;j<genotype->protein_pool[genotype->nproteins-i][0][0];j++)                
+            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
             {
                 genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
                 genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
@@ -4995,7 +4987,7 @@ void update_protein_pool(Genotype *genotype, int protein_id, int gene_id, char m
             genotype->protein_pool[protein_id][0][0]--;
             /* increase the protein id of selection proteins*/               
             genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
-            for(j=0;j<genotype->protein_pool[genotype->nproteins-i][0][0];j++)                
+            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
             {
                 genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
                 genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
