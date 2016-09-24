@@ -4423,7 +4423,8 @@ void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->protein_pool[protein_id][0][0]!=1)
     {
         update_protein_pool(genotype,protein_id,tf_id,'e');  
-        genotype->activating[genotype->nproteins-3]=(genotype->activating[genotype->nproteins-3]==1)?0:1;  /* the new protein will always be at nproteins-3.
+        genotype->activating[genotype->nproteins-2]=(genotype->activating[genotype->nproteins-2]==1)?0:1;  /* update_protein_pool increases nprotein, 
+                                                                                                            * so the new protein will always be at nproteins-2.
                                                                                                             * Note that N_act and N_rep is updated in update_protein_pool*/        
     }
     else
@@ -4514,7 +4515,8 @@ void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->protein_pool[protein_id][0][0]!=1)
     {    
         update_protein_pool(genotype,protein_id,tf_id,'f');  
-        genotype->koff[genotype->nproteins-3]=new_koff; /*activating, N_act, and N_rep are updated in update_protein_pool*/
+        genotype->koff[genotype->nproteins-2]=new_koff;  /* update_protein_pool increases nprotein, 
+                                                          * so the new protein will always be at nproteins-2.*/
     }    
     else
         genotype->koff[protein_id]=new_koff;       
