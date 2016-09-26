@@ -99,7 +99,7 @@ float growth_rate_scaling = 1.0; /* set default growth rate scaling factor */
 int N_replicates;
 int recalc_new_fitness; /*calculate the growth rate of the new genotype four more times to increase accuracy*/
 float cost_term=1.0e-4;      /* this determined the cost of translation */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
-float penalty_of_extra_copies=1.0e-3 ;       /* this is the penalty for having more copies than the MAX_COPIES.
+float penalty_of_extra_copies=1.0e-4 ;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
                                             * copy is this number times gpeak (defined in initialized_growth_rate_parameters).
                                             * we use this penalty as a soft restriction to copy numbers. Note that if  
@@ -2737,11 +2737,11 @@ void calc_avg_growth_rate(Genotype *genotype,
         genotype->ncopies_under_penalty+=(genotype->protein_pool[k][0][0]<=MAX_COPIES)?0:(genotype->protein_pool[k][0][0]-MAX_COPIES);   
 #endif    
         
-//    omp_set_num_threads(N_THREADS);
-//    #pragma omp parallel
+    omp_set_num_threads(N_THREADS);
+    #pragma omp parallel
     {
-//        int ID=omp_get_thread_num();
-        int ID=0;
+        int ID=omp_get_thread_num();
+//        int ID=0;
         int i,j;
         int N_replicates_per_thread=N_replicates/N_THREADS;
         int end_state;
@@ -2763,7 +2763,7 @@ void calc_avg_growth_rate(Genotype *genotype,
             gr1[i]=0.0;
             gr2[i]=0.0;
         }
-//        #pragma omp critical
+        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -2947,7 +2947,7 @@ void calc_avg_growth_rate(Genotype *genotype,
         
         for(j=0;j<NGENES;j++)
             free(genotype_offspring.all_binding_sites[j]);
-//        #pragma omp critical
+        #pragma omp critical
         {
             j=0;
             for(i=ID*N_replicates_per_thread;i<(ID+1)*N_replicates_per_thread;i++)
@@ -5293,12 +5293,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_14.txt","r");    
+    MUT=fopen("MUT_2.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
-        for(i=0;i<96;i++)
+        for(i=0;i<601;i++)
         {
             clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
             fscanf(MUT,"%c %d %d %s %d %f\n",
@@ -5890,9 +5890,20 @@ void summarize_binding_sites(Genotype *genotype,int step_i)
     /*Output all binding sites*/ 
     OUTPUT1=fopen("summary_BS","a+");
     fprintf(OUTPUT1,"step %d\n",step_i);
-    fprintf(OUTPUT1,"Promoter");
-    for(i=0;i<genotype->ntfgenes;i++)
-        fprintf(OUTPUT1," TF%d",i);
+    fprintf(OUTPUT1,"Promoter ");    
+    for(i=0;i<genotype->nproteins-1;i++)
+    {
+        if(genotype->activating[i]==1)
+        {
+            fprintf(OUTPUT1," A%d ",i);
+//            N_act++;
+        }
+        if(genotype->activating[i]==0)
+        {
+            fprintf(OUTPUT1," R%d ",i);
+//            N_rep++;
+        }
+    }
     fprintf(OUTPUT1,"\n");
     for(i=1;i<genotype->ngenes;i++)
     {
@@ -5901,7 +5912,7 @@ void summarize_binding_sites(Genotype *genotype,int step_i)
         else
             fprintf(OUTPUT1,"%d       ",i+1);
         
-        for(j=0;j<genotype->ntfgenes;j++)
+        for(j=0;j<genotype->nproteins-1;j++)
         {
             if(table[i][j]<10)
                 fprintf(OUTPUT1," %d  ",table[i][j]);
@@ -5911,22 +5922,29 @@ void summarize_binding_sites(Genotype *genotype,int step_i)
         if(genotype->which_protein[i]==genotype->nproteins-1)
             fprintf(OUTPUT1,"S");
         else
-            fprintf(OUTPUT1,"%d",genotype->which_protein[i]);        
+        {
+            if(genotype->activating[genotype->which_protein[i]]==1)
+                fprintf(OUTPUT1,"A%d",genotype->which_protein[i]); 
+            if(genotype->activating[genotype->which_protein[i]]==0)
+                fprintf(OUTPUT1,"R%d",genotype->which_protein[i]);
+        }
         fprintf(OUTPUT1,"\n");
     }
-    fprintf(OUTPUT1,"         ");
-    for(i=0;i<genotype->ngenes;i++)
-    {        
-        if(genotype->activating[genotype->which_protein[i]]==1)
-            fprintf(OUTPUT1," A  ");
-        if(genotype->activating[genotype->which_protein[i]]==0)
-            fprintf(OUTPUT1," R  ");
-    }
-    fprintf(OUTPUT1,"\n");
-    fprintf(OUTPUT1,"         ");
-    for(i=0;i<genotype->ngenes;i++)
-        if(genotype->activating[genotype->which_protein[i]]!=-1)
-            fprintf(OUTPUT1," %d  ",genotype->which_protein[i]);
+//    fprintf(OUTPUT1,"         ");
+//    for(i=0;i<genotype->ntfgenes;i++)
+//    {        
+//        j=0;
+//        while(genotype->which_tf[j]!=i)j++;
+//        if(genotype->activating[genotype->which_protein[j]]==1)
+//            fprintf(OUTPUT1," A  ");
+//        if(genotype->activating[genotype->which_protein[j]]==0)
+//            fprintf(OUTPUT1," R  ");
+//    }
+//    fprintf(OUTPUT1,"\n");
+//    fprintf(OUTPUT1,"         ");
+//    for(i=0;i<genotype->ngenes;i++)
+//        if(genotype->activating[genotype->which_protein[i]]!=-1)
+//            fprintf(OUTPUT1," %d  ",genotype->which_protein[i]);
     fprintf(OUTPUT1,"\n"); 
     fprintf(OUTPUT1,"\n"); 
     fclose(OUTPUT1);
@@ -5934,9 +5952,20 @@ void summarize_binding_sites(Genotype *genotype,int step_i)
     /*Output non-overlapping sites*/
     OUTPUT1=fopen("summary_non_overlapping_BS","a+");
     fprintf(OUTPUT1,"step %d\n",step_i);
-    fprintf(OUTPUT1,"Promoter");
-    for(i=0;i<genotype->ntfgenes;i++)
-        fprintf(OUTPUT1," TF%d",i);
+    fprintf(OUTPUT1,"Promoter ");
+    for(i=0;i<genotype->nproteins-1;i++)
+    {
+        if(genotype->activating[i]==1)
+        {
+            fprintf(OUTPUT1," A%d ",i);
+//            N_act++;
+        }
+        if(genotype->activating[i]==0)
+        {
+            fprintf(OUTPUT1," R%d ",i);
+//            N_rep++;
+        }
+    }
     fprintf(OUTPUT1,"\n");
     for(i=1;i<genotype->ngenes;i++)
     {
@@ -5945,33 +5974,39 @@ void summarize_binding_sites(Genotype *genotype,int step_i)
         else
             fprintf(OUTPUT1,"%d       ",i+1);
         
-        for(j=0;j<genotype->ntfgenes;j++)
+        for(j=0;j<genotype->nproteins-1;j++)
         {
-            if(table_reduced_sites[i][j]==0)
-                fprintf(OUTPUT1," -  ");
+            if(table[i][j]<10)
+                fprintf(OUTPUT1," %d  ",table[i][j]);
             else
-                fprintf(OUTPUT1," %d  ",table_reduced_sites[i][j]);
-        }        
+                fprintf(OUTPUT1," %d ",table[i][j]);
+        }
         if(genotype->which_protein[i]==genotype->nproteins-1)
             fprintf(OUTPUT1,"S");
         else
-            fprintf(OUTPUT1,"%d",genotype->which_protein[i]);
-        
+        {
+            if(genotype->activating[genotype->which_protein[i]]==1)
+                fprintf(OUTPUT1,"A%d",genotype->which_protein[i]); 
+            if(genotype->activating[genotype->which_protein[i]]==0)
+                fprintf(OUTPUT1,"R%d",genotype->which_protein[i]);
+        }
         fprintf(OUTPUT1,"\n");
     }
-    fprintf(OUTPUT1,"         ");
-    for(i=0;i<genotype->ngenes;i++)
-    {        
-        if(genotype->activating[genotype->which_protein[i]]==1)
-            fprintf(OUTPUT1," A  ");
-        if(genotype->activating[genotype->which_protein[i]]==0)
-            fprintf(OUTPUT1," R  ");
-    }
-    fprintf(OUTPUT1,"\n");
-    fprintf(OUTPUT1,"         ");
-    for(i=0;i<genotype->ngenes;i++)
-        if(genotype->activating[genotype->which_protein[i]]!=-1)
-            fprintf(OUTPUT1," %d  ",genotype->which_protein[i]);
+//    fprintf(OUTPUT1,"         ");
+//    for(i=0;i<genotype->ntfgenes;i++)
+//    {       
+//        j=0;
+//        while(genotype->which_tf[j]!=i)j++;
+//        if(genotype->activating[genotype->which_protein[i]]==1)
+//            fprintf(OUTPUT1," A  ");
+//        if(genotype->activating[genotype->which_protein[i]]==0)
+//            fprintf(OUTPUT1," R  ");
+//    }
+//    fprintf(OUTPUT1,"\n");
+//    fprintf(OUTPUT1,"         ");
+//    for(i=0;i<genotype->ngenes;i++)
+//        if(genotype->activating[genotype->which_protein[i]]!=-1)
+//            fprintf(OUTPUT1," %d  ",genotype->which_protein[i]);
     fprintf(OUTPUT1,"\n"); 
     fprintf(OUTPUT1,"\n"); 
     fclose(OUTPUT1);

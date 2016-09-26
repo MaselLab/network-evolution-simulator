@@ -34,8 +34,8 @@ int main()
     /* get the kdis.txt values */
     read_kdisassembly(kdis);
     /* now create and run the population of cells */
-    for(i=8;i<=8;i++)
-    {
+
+i=2;
         for(j=0;j<6;j++)
             seed[j]=i;
 
@@ -70,6 +70,6 @@ int main()
         fclose(fp);
         
         init_run_pop(kdis,RuntimeSumm,filename1,filename2,filename3,filename4,filename5,filename6,seed);
-    }
+    
     return 0;
 }
