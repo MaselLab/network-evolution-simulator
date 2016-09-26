@@ -13,13 +13,14 @@
 #ifndef MAX_MUT_STEP         
 #define MAX_MUT_STEP 10000    
 #endif
-
 #ifndef BURN_IN
 #define BURN_IN 1000
 #endif
-
 #define RdcPdup 0
-
+#define N_SIGNAL_TF 1
+#define CAUTIOUS 0
+#define NO_REGULATION_COST 0
+#define UNLIMITED_MUTATION 1
 #define N_THREADS 12
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */

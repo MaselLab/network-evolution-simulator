@@ -34,8 +34,7 @@ int main()
     /* get the kdis.txt values */
     read_kdisassembly(kdis);
     /* now create and run the population of cells */
-
-i=2;
+    i=1;
         for(j=0;j<6;j++)
             seed[j]=i;
 
@@ -62,7 +61,7 @@ i=2;
             fprintf(fp,"Reducing growth rate once copy number exceeds upper limit!\n");
             fprintf(fp,"penalty per copies=%f(percentage of maximal growth rate)\n",penalty_of_extra_copies);
         }
-        fprintf(fp,"max gene number=%d, max tf gene number=%d,max protein number=%d\n",NGENES,TFGENES,NPROTEINS);            
+        fprintf(fp,"signal tf number=%d max gene number=%d, max tf gene number=%d,max protein number=%d\n",N_SIGNAL_TF,NGENES,TFGENES,NPROTEINS);            
         fprintf(fp,"cost_term=%f, penalty=%f\n",cost_term,penalty);
         fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);  
         fprintf(fp,"minimal activators to transcribe selection gene A: %d\n",min_act_to_transcr_A);
