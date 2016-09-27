@@ -96,7 +96,7 @@ float growth_rate_scaling = 1.0; /* set default growth rate scaling factor */
 int N_replicates;
 int recalc_new_fitness; /*calculate the growth rate of the new genotype four more times to increase accuracy*/
 float cost_term=1.0e-4;      /* this determined the cost of translation */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
-float penalty_of_extra_copies=1.0e-3 ;       /* this is the penalty for having more copies than the MAX_COPIES.
+float penalty_of_extra_copies=1.0e-4 ;       /* this is the penalty for having more copies than the MAX_COPIES.
                                             * extra copies reduce growth rate. The amount of reducation per extra
                                             * copy is this number times gpeak (defined in initialized_growth_rate_parameters).
                                             * we use this penalty as a soft restriction to copy numbers. Note that if  
@@ -232,7 +232,7 @@ void initialize_genotype_fixed( Genotype *genotype,
     genotype->N_rep=0;
     if(init_N_rep==-1 && init_N_act==-1) /*randomly generate activators and repressors*/
     {
-        for(i=1;i<genotype->ntfgenes;i++)
+        for(i=N_SIGNAL_TF;i<genotype->ntfgenes;i++)
         {   
                 if (RngStream_RandU01(RS)<PROB_ACTIVATING) 
                 {
@@ -246,14 +246,14 @@ void initialize_genotype_fixed( Genotype *genotype,
                 }
         }
     }
-     else
+    else
     {
 	genotype->N_act=init_N_act;
         genotype->N_rep=init_N_rep;
-        for(i=1;i<1+init_N_act;i++)            
+        for(i=N_SIGNAL_TF;i<N_SIGNAL_TF+init_N_act;i++)            
             genotype->activating[i]=1;
             
-        for(i=1+init_N_act;i<genotype->ntfgenes;i++)
+        for(i=N_SIGNAL_TF+init_N_act;i<genotype->ntfgenes;i++)
             genotype->activating[i]=0;
     }
     for(i=0;i<N_SIGNAL_TF;i++)
@@ -4487,12 +4487,19 @@ void reproduce_mut_kinetic_constant(Genotype *genotype, Mutation *mut_record)
 void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
     int tf_id,protein_id,i;    
-    
-    tf_id = RngStream_RandInt(RS,1,genotype->ngenes-1); // allow the additional signal (if there's any) to change its identity
+#if N_SIGNAL_TF==1    
+    tf_id = RngStream_RandInt(RS,1,genotype->ngenes-1); // the signal tf must be an activator, therefore is not subject to mutation
+#else
+    tf_id = RngStream_RandInt(RS,0,genotype->ngenes-1);
+#endif
     protein_id=genotype->which_protein[tf_id];    
     while(protein_id==genotype->nproteins-1)
     {
-        tf_id = RngStream_RandInt(RS,1,genotype->ngenes-1);
+#if N_SIGNAL_TF==1    
+        tf_id = RngStream_RandInt(RS,1,genotype->ngenes-1); // the signal tf must be an activator, therefore is not subject to mutation
+#else
+        tf_id = RngStream_RandInt(RS,0,genotype->ngenes-1);
+#endif
         protein_id=genotype->which_protein[tf_id];
     }    
     
@@ -4519,8 +4526,7 @@ void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
             genotype->N_rep++;
             genotype->N_act--;
         }
-    }
-    
+    }    
     for(i=0;i<genotype->ngenes;i++) 
     {
         genotype->recalc_TFBS[i]=1;   /* recalculate binding sites on every promoter */
@@ -4838,11 +4844,15 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     tot_mut_rate+=tot_mut_binding_seq_rate;
     
     /* mut in identity*/
-    tot_mut_identity_rate=(float)(genotype->ntfgenes-N_SIGNAL_TF)*MUTKINETIC*proportion_mut_identity; /* NA to the signal gene and the selection genes*/
+#if N_SIGNAL_TF==2
+    tot_mut_identity_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_identity; 
+#else
+    tot_mut_identity_rate=(float)(genotype->ntfgenes-1)*MUTKINETIC*proportion_mut_identity; /* if there's only one signal tf, then this tf must be an activator*/
+#endif
     tot_mut_rate+=tot_mut_identity_rate;
     
     /* mut in koff*/
-    tot_mut_koff_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_identity;   /* NA to the selection gene*/
+    tot_mut_koff_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_koff;  
     tot_mut_rate+=tot_mut_koff_rate;
     
     
@@ -5372,12 +5382,12 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
     mut_record.pos_g=-1;
     mut_record.pos_n=-1;
     
-    MUT=fopen("MUT_2.txt","r");    
+    MUT=fopen("MUT_5.txt","r");    
     if(MUT!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
         Mutation mut_record;
-        for(i=0;i<601;i++)
+        for(i=0;i<58;i++)
         {
             clone_cell_forward(&genotype_ori,&genotype_ori_copy,COPY_ALL);
             fscanf(MUT,"%c %d %d %s %d %f\n",
@@ -5462,9 +5472,9 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_t_signalA=10.0;
         env2_t_signalB=40.0;
         env1_signalA_as_noise=0;    
-        env2_signalA_as_noise=1;  
+        env2_signalA_as_noise=0;  
         env1_signalA_mismatch=0;    
-        env2_signalA_mismatch=0; 
+        env2_signalA_mismatch=1; 
         N_replicates=600;
         recalc_new_fitness=0;
         env1_occurence=0.5;
@@ -5478,8 +5488,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
         fprintf(fp,"T-development=%f\n",tdevelopment);
         fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);        
-        fprintf(fp,"Environment 1: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_occurence);
-        fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_occurence);
+        fprintf(fp,"Environment 1: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatch=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_signalA_mismatch,env1_occurence);
+        fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatch=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env2_signalA_as_noise, env2_signalA_mismatch,env2_occurence);
         fclose(fp);        
 
         calc_avg_growth_rate(   &genotype_ori, 
@@ -5683,7 +5693,9 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         env2_t_signalA=10.0;
         env2_t_signalB=40.0;
         env1_signalA_as_noise=0;    
-        env2_signalA_as_noise=1;      
+        env2_signalA_as_noise=0;
+	env1_signalA_mismatch=0;
+	env2_signalA_mismatch=1;      
         N_replicates=1200;
         recalc_new_fitness=2;
         env1_occurence=0.5;
@@ -5696,8 +5708,8 @@ int init_run_pop(float kdis[NUM_K_DISASSEMBLY], char *RuntimeSumm, char *filenam
         fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
         fprintf(fp,"T-development=%f\n",tdevelopment);
         fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);         
-        fprintf(fp,"Environment 1: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_occurence);
-        fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env1_signalA_as_noise, env2_occurence);        
+        fprintf(fp,"Environment 1: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_signalA_mismatches, env1_occurence);
+        fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, signalA mismatches=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env2_signalA_as_noise, env2_signalA_mismatches, env2_occurence);        
         fclose(fp);
         
         for(i=burn_in;i<MAX_MUT_STEP;i++)
