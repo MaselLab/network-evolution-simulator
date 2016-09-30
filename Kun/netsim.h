@@ -11,13 +11,15 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 10000    
+#define MAX_MUT_STEP 5000    
 #endif
 #ifndef BURN_IN
-#define BURN_IN 1000
+#define BURN_IN 100
 #endif
+
+#define RANDOM_INIT_CELL 0
 #define RdcPdup 0
-#define N_SIGNAL_TF 1
+#define N_SIGNAL_TF 2
 #define CAUTIOUS 0
 #define NO_REGULATION_COST 0
 #define UNLIMITED_MUTATION 1
@@ -49,13 +51,13 @@
   #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 24          /* the initial value is set in initiate_genotype*/
+  #define TFGENES 25         /* the initial value is set in initiate_genotype*/
   #endif
   #ifndef NGENES
   #define NGENES 26  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
   #endif
   #ifndef NPROTEINS           
-  #define NPROTEINS 24
+  #define NPROTEINS 26
   #endif
 #endif
 
@@ -176,34 +178,37 @@ typedef struct CompressedBindingSites CompressedBindingSites;
 
 typedef struct Genotype Genotype;
 struct Genotype {
-/* directly subjected to mutation*/
-    int ngenes;                                             /* the number of actual loci */
-    int ntfgenes;                                           /* the number of actual tf loci */
+
+    int ngenes;                                             /* the number of loci */
+    int ntfgenes;                                           /* the number of tf loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
-                                                               from the number of genes. This nprotein is the number of elements in protein_pool*/
-    int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */
-    float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
-    int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein, 
-                                                               ele 2 stores which genes/mRNAs*/
+                                                               from the number of loci. nprotein is the number of elements in protein_pool*/
+    int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */    
+                                                               
     int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
     int which_tf[NGENES];                                   /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
     char cisreg_seq[NGENES][CISREG_LEN];
     char tf_seq[TFGENES][TF_ELEMENT_LEN];
     char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
-    int N_act;                                              /* number of activating TF*/
-    int N_rep;                                              /* number of repressing TF*/
+    
+    /*these apply to protein, not loci*/
+    int N_act;                                              /* number of activators*/
+    int N_rep;                                              /* number of repressors*/    
     int activating[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
-
+    float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
+    int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
+    float koff[NGENES];                                     /* kinetic rates*/ 
+    
+    /*these apply to loci*/
     float mRNAdecay[NGENES];                                /* kinetic rates*/
     float proteindecay[NGENES];                             /* kinetic rates*/
     float translation[NGENES];                              /* kinetic rates*/   
-    float pic_disassembly[NGENES];                          /* kinetic rates*/
-    float koff[NGENES];                                     /* kinetic rates*/                        
- /* binding sites related data*/
-    
-    /* For genes having the same cis-reg, tf distribution can be shared*/
-    int min_act_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */  
-    int cisreg_cluster[NGENES][NGENES];                     /* genes having the same cis-reg are clustered.
+    float pic_disassembly[NGENES];                          /* kinetic rates*/    
+    int min_act_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
+ 
+    /* binding sites related data, applying to loci*/   
+    int cisreg_cluster[NGENES][NGENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
+                                                             * Genes having the same cis-reg are clustered.
                                                                1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
                                                                cisreg_cluster works with which_cluster*/
     int which_cluster[NGENES];                              /* which_cluster stores the cluster id of a gene*/                                                           
@@ -332,6 +337,7 @@ int init_TF_genes;
 float penalty_of_extra_copies;
 float reduction_in_P_dup;
 float signal_strength;
+float basal_signal_strength;
 float env1_t_signalA;    
 float env1_t_signalB;     
 float env2_t_signalA;
