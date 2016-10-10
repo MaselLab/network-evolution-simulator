@@ -14,16 +14,17 @@
 #define MAX_MUT_STEP 5000    
 #endif
 #ifndef BURN_IN
-#define BURN_IN 100
+#define BURN_IN 0
 #endif
 
 #define RANDOM_INIT_CELL 0
 #define RdcPdup 0
-#define N_SIGNAL_TF 2
+#define N_SIGNAL_TF 1
 #define CAUTIOUS 0
 #define NO_REGULATION_COST 0
 #define UNLIMITED_MUTATION 1
-#define N_THREADS 12
+#define N_THREADS 1
+#define NEUTRAL 0
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -57,7 +58,7 @@
   #define NGENES 26  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
   #endif
   #ifndef NPROTEINS           
-  #define NPROTEINS 26
+  #define NPROTEINS 24
   #endif
 #endif
 
@@ -185,16 +186,15 @@ struct Genotype {
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
     int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */    
                                                                
-    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */
-    int which_tf[NGENES];                                   /* given a id in cisreg_seq, tell the tf id in tf_seq and tf_seq_rc*/
-    char cisreg_seq[NGENES][CISREG_LEN];
-    char tf_seq[TFGENES][TF_ELEMENT_LEN];
-    char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */   
+    char cisreg_seq[NGENES][CISREG_LEN];    
     
     /*these apply to protein, not loci*/
     int N_act;                                              /* number of activators*/
     int N_rep;                                              /* number of repressors*/    
     int activating[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
+    char tf_seq[TFGENES][TF_ELEMENT_LEN];
+    char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
     float koff[NGENES];                                     /* kinetic rates*/ 
@@ -590,8 +590,8 @@ extern void do_single_timestep_plotting(    Genotype *,
                                             float,
                                             int,
                                             int,
-                                            float (*)[119],
-                                            float [119],                                           
+                                            float (*)[149],
+                                            float [149],                                           
                                             int,
                                             RngStream,
                                             char *,
@@ -727,8 +727,6 @@ extern void update_protein_pool(Genotype *, int, int, char);
 
 extern void update_cisreg_cluster(Genotype *, int, char);
 
-extern void update_which_tf(Genotype *, int, int, char);
-
 extern void clone_cell_forward(Genotype *, Genotype *, int);
 
 extern void clone_cell_backward(Genotype *, Genotype *, int);
@@ -765,5 +763,7 @@ extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THRE
 extern void calc_fx_dfx(float, int, float*, float*, float*, float*, float*);
 
 extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
+
+
 
 #endif /* !FILE_NETSIM_SEEN */
