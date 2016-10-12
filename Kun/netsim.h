@@ -19,12 +19,13 @@
 
 #define RANDOM_INIT_CELL 0
 #define RdcPdup 0
-#define N_SIGNAL_TF 1
+#define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. Planning on adding a 3rd tf as another signal TF. 
 #define CAUTIOUS 0
 #define NO_REGULATION_COST 0
 #define UNLIMITED_MUTATION 1
-#define N_THREADS 1
+#define N_THREADS 12
 #define NEUTRAL 0
+#define IGNORE_BS_OVERLAPPING 0
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -55,10 +56,10 @@
   #define TFGENES 25         /* the initial value is set in initiate_genotype*/
   #endif
   #ifndef NGENES
-  #define NGENES 26  /* total number of genes: add the extra (non-TF) selection gene to the total (default case) */
+  #define NGENES 26  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
   #endif
   #ifndef NPROTEINS           
-  #define NPROTEINS 24
+  #define NPROTEINS 26
   #endif
 #endif
 
@@ -137,8 +138,8 @@ enum { NUC_NO_PIC = 0,
  */
 typedef struct GillespieRates GillespieRates;
 struct GillespieRates {
-  float transport;         /* rates[1] */
-  float transport_rate[NGENES];
+//  float transport;         /* rates[1] */
+//  float transport_rate[NGENES];
   float mRNAdecay;         /* rates[2] */
   float mRNAdecay_rate[NGENES];
   float pic_disassembly;    /* rates[3] */
@@ -150,9 +151,8 @@ struct GillespieRates {
   float pic_assembly;
   float pic_assembly_rate[NGENES];  
   int transcript_init; 
-  int transcript_init_rate[NGENES];    
-
-  /* subtotal, including above, but not including konrate */
+  int transcript_init_rate[NGENES]; 
+  float rate_update_Pact; 
   float subtotal;
 };
 
@@ -184,7 +184,7 @@ struct Genotype {
     int ntfgenes;                                           /* the number of tf loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
-    int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */    
+    int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */  
                                                                
     int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */   
     char cisreg_seq[NGENES][CISREG_LEN];    
@@ -193,11 +193,11 @@ struct Genotype {
     int N_act;                                              /* number of activators*/
     int N_rep;                                              /* number of repressors*/    
     int activating[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
-    char tf_seq[TFGENES][TF_ELEMENT_LEN];
-    char tf_seq_rc[TFGENES][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+    char tf_seq[NPROTEINS][TF_ELEMENT_LEN];
+    char tf_seq_rc[NPROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
-    float koff[NGENES];                                     /* kinetic rates*/ 
+    float koff[NPROTEINS];                                     /* kinetic rates*/ 
     
     /*these apply to loci*/
     float mRNAdecay[NGENES];                                /* kinetic rates*/
@@ -271,6 +271,7 @@ struct CellState {
     FixedEvent *sampling_point_end_last; 
 
     float Pact[NGENES];
+    float last_Pact[NGENES];
 //    float equilibrium_tf_conc[NPROTEINS]; /* this is the nuclear concentration of free tf when binding/unbinding to non-specific sites reach equilibrium */  
 //    float protein_conc[NPROTEINS];        /* this is the concentration of proteins in cell. For tf, this stores the nuclear concentration, for selection proteins, this is cytosol concentration*/
     float protein_number[NPROTEINS];     /* pooled protein number from gene_specific_protein_conc */
@@ -439,6 +440,13 @@ extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
                                         float [NGENES],
                                         int );
+
+extern float calc_TF_dist_from_all_BS_simple(   AllTFBindingSites *,
+                                                int,
+                                                int,
+                                                int [NPROTEINS],                                    
+                                                float [NGENES],                                               
+                                                int);
 
 extern int add_fixed_event(int,                           
                            float,
@@ -643,7 +651,7 @@ extern void end_translation_init(   Genotype *,
                                     Mutation *,
                                     char *);
 
-extern void do_fixed_event(Genotype *, 
+extern int do_fixed_event(Genotype *, 
                             CellState *, 
                             GillespieRates *, 
                             float *,
@@ -659,7 +667,7 @@ extern void do_fixed_event(Genotype *,
                             int,
                             Mutation *);
 
-extern void do_fixed_event_plotting(Genotype *, 
+extern int do_fixed_event_plotting(Genotype *, 
                                     CellState *, 
                                     GillespieRates *, 
                                     float *,
@@ -675,7 +683,7 @@ extern void do_fixed_event_plotting(Genotype *,
                                     int,
                                     Mutation *);
 
-extern void do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
+extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
 
 extern void calc_configurations(Genotype *, int);
 
