@@ -11,21 +11,26 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 5000    
+#define MAX_MUT_STEP 10000    
 #endif
 #ifndef BURN_IN
 #define BURN_IN 0
 #endif
 
-#define RANDOM_INIT_CELL 0
+#define RANDOM_INIT_KINETIC_CONST 1
 #define RdcPdup 0
 #define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. Planning on adding a 3rd tf as another signal TF. 
 #define CAUTIOUS 0
 #define NO_REGULATION_COST 0
-#define UNLIMITED_MUTATION 1
+#define UNLIMITED_MUTATION 0
 #define N_THREADS 12
 #define NEUTRAL 0
 #define IGNORE_BS_OVERLAPPING 0
+#define SIMPLE_SUBSTITUTION 1
+#define RANDOMIZE_SIGNAL2 0
+#define SET_BS_MANUALLY 0
+#define SUDO_REPLICATES 0
+#define PLOTTING 0
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -253,7 +258,7 @@ struct CellState {
     float cell_size_after_burn_in;          
     float growth_rate;                  /* total growth rate in the previous deltat */   
     int mRNA_cyto_num[NGENES];          /* mRNAs in cytoplasm */
-    int mRNA_nuclear_num[NGENES];       /* mRNAs in nucleus */
+//    int mRNA_nuclear_num[NGENES];       /* mRNAs in nucleus */
     int mRNA_transl_cyto_num[NGENES];   /* mRNAs are in the cytoplasm, but only recently */
     int mRNA_transcr_num[NGENES];       /* mRNAs which haven't finished transcription yet */
 
@@ -476,7 +481,7 @@ extern void initialize_cell(CellState *,
                             int,  
                             int [NPROTEINS][2][NGENES],
                             float [NGENES],
-                            float [NGENES],
+                            int [NGENES],
                             float [NPROTEINS],                                                            
                             int,
                             RngStream);
@@ -596,23 +601,18 @@ extern void do_single_timestep_plotting(    Genotype *,
                                             char *,
                                             float,
                                             float,
-                                            int,
-                                            int,
+                                            int,                                           
                                             float (*)[149],
-                                            float [149],                                           
-                                            int,
-                                            RngStream,
-                                            char *,
-                                            char *,
+                                            float [149],
+                                            RngStream,                              
                                             int *,
-                                            Mutation *,
-                                            int *,int *,int *) ;
+                                            int *) ;
 							   
 extern void free_fixedevent(CellState *);
  
-extern void calc_avg_growth_rate(Genotype *,                                    
-                                    float [NGENES],
-                                    float [NGENES],
+extern void calc_avg_growth_rate(   Genotype *,                                    
+                                    int [NGENES],
+                                    float [NPROTEINS],
                                     float ,
                                     float ,
                                     RngStream [N_THREADS],
@@ -660,14 +660,13 @@ extern int do_fixed_event(Genotype *,
                             float ,
                             float,
                             char *,
-                            int,
-                            int,
+                            int,                         
                             int *,
                             char *,
                             int,
                             Mutation *);
 
-extern int do_fixed_event_plotting(Genotype *, 
+extern int do_fixed_event_plotting( Genotype *, 
                                     CellState *, 
                                     GillespieRates *, 
                                     float *,
@@ -675,13 +674,9 @@ extern int do_fixed_event_plotting(Genotype *,
                                     int , 
                                     float ,
                                     float,        
-                                    char *,
-                                    int,
-                                    int,
-                                    int *,
-                                    char *,
-                                    int,
-                                    Mutation *);
+                                    char *,                                    
+                                    int ,                                    
+                                    int *);
 
 extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
 
@@ -741,16 +736,13 @@ extern void clone_cell_backward(Genotype *, Genotype *, int);
 
 extern void try_fixation(Genotype *, Genotype *, int *, float *, RngStream);
 
-extern void calc_avg_growth_rate_plotting(Genotype *,                               
-                                            float [NGENES],
-                                            float [NGENES],                                    
+extern void calc_avg_growth_rate_plotting(  Genotype *,                               
+                                            int [NGENES],
+                                            float [NPROTEINS],                                    
                                             float ,
                                             float ,
-                                            RngStream [N_THREADS],
-                                            char *,
-                                            char *,
-                                            int,
-                                            Mutation *); 
+                                            RngStream [N_THREADS]); 
+
 extern void summarize_binding_sites(Genotype *,int);
 
 extern void print_binding_sites_distribution(Genotype *,int, int);
@@ -772,6 +764,39 @@ extern void calc_fx_dfx(float, int, float*, float*, float*, float*, float*);
 
 extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
 
+extern int evolve_N_steps(  Genotype *, 
+                            Genotype *,
+                            int, 
+                            int, 
+                            int *,
+                            int, 
+                            int,
+                            int,
+                            char *,
+                            char *,
+                            char *,
+                            char *, 
+                            char *, 
+                            char *, 
+                            float [NPROTEINS],
+                            int [NGENES],
+                            float [NUM_K_DISASSEMBLY],
+                            Mutation *, 
+                            RngStream,
+                            RngStream [N_THREADS],
+                            int );
+
+extern void evolve_neutrally(   Genotype *,
+                                Genotype *,
+                                char *,
+                                Mutation *,
+                                RngStream);
+
+extern void replay_mutations(   Genotype *,
+                                Genotype *,
+                                FILE *,
+                                Mutation *,
+                                int);
 
 
 #endif /* !FILE_NETSIM_SEEN */
