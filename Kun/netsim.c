@@ -3106,14 +3106,18 @@ void calc_avg_growth_rate(  Genotype *genotype,
     for(i=0;i<N_replicates;i++)
     {
         avg_GR1+=GR1[i];
-        avg_GR2+=GR2[i];
-        var_GR1+=GR1[i]*GR1[i];
-        var_GR2+=GR2[i]*GR2[i];
+        avg_GR2+=GR2[i];        
     }    
-    avg_GR1=avg_GR1/N_replicates;
-    avg_GR2=avg_GR2/N_replicates;
-    var_GR1=(var_GR1/N_replicates-avg_GR1*avg_GR1)/(N_replicates-1);
-    var_GR2=(var_GR2/N_replicates-avg_GR2*avg_GR2)/(N_replicates-1);     
+    avg_GR1=avg_GR1/(float)N_replicates;
+    avg_GR2=avg_GR2/(float)N_replicates;
+    
+    for(i=0;i<N_replicates;i++)
+    {
+        var_GR1+=pow(GR1[i]-avg_GR1,2.0);
+        var_GR2+=pow(GR2[i]-avg_GR2,2.0);
+    }
+    var_GR1=var_GR1/(float)(N_replicates*(N_replicates-1));
+    var_GR2=var_GR2/(float)(N_replicates*(N_replicates-1));     
     genotype->avg_GR1=avg_GR1;
     genotype->avg_GR2=avg_GR2;
     genotype->var_GR1=var_GR1;
@@ -5620,11 +5624,11 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
         init_env2='B'; 
         env1_t_signalA=180.0;     
         env1_t_signalB=0.0;
-        env2_t_signalA=10.0;
-        env2_t_signalB=40.0;
+        env2_t_signalA=0.0;
+        env2_t_signalB=180.0;
         env1_signalA_as_noise=0;    
         env2_signalA_as_noise=1;     
-        N_replicates=1200;
+        N_replicates=120;
         recalc_new_fitness=1;
         env1_occurence=0.5;
         env2_occurence=0.5;
@@ -5681,8 +5685,8 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
         fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
         fprintf(fp,"T-development=%f\n",tdevelopment);
         fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);        
-        fprintf(fp,"Environment 1: initial signal=%c, duration=%f min, signalA as noise=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_signalA_as_noise, env1_occurence);
-        fprintf(fp,"Environment 2: initial signal=%c, duration=%f min, signalA as noise=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_signalA_as_noise, env2_occurence);
+        fprintf(fp,"Test 1: initial signal=%c, Env1 duration=%f min, Env2 duration=%f min, signalA as noise=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB=0.0, env1_signalA_as_noise, env1_occurence);
+        fprintf(fp,"Test 2: initial signal=%c, Env1 duration=%f min, Env2 duration=%f min, signalA as noise=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB=0.0, env2_signalA_as_noise, env2_occurence);
         fclose(fp); 
         
         /* run burn_in */        
@@ -5761,11 +5765,11 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
     init_env2='B'; 
     env1_t_signalA=180.0;     
     env1_t_signalB=0.0;
-    env2_t_signalA=10.0;
-    env2_t_signalB=40.0;
+    env2_t_signalA=0.0;
+    env2_t_signalB=180.0;
     env1_signalA_as_noise=0;    
     env2_signalA_as_noise=1;     
-    N_replicates=1200;
+    N_replicates=120;
     recalc_new_fitness=1;
     env1_occurence=0.5;
     env2_occurence=0.5;
@@ -5778,8 +5782,8 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
         fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
         fprintf(fp,"T-development=%f\n",tdevelopment);
         fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);         
-        fprintf(fp,"Environment 1: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_occurence);
-        fprintf(fp,"Environment 2: initial signal=%c, T-signalA=%f min, T-signalB=%f min, signalA as noise=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env2_signalA_as_noise, env2_occurence);        
+        fprintf(fp,"Test 1: initial signal=%c, Env1 duration=%f min, Env2 duration=%f min, signalA as noise=%d, occurrence=%f\n",init_env1,env1_t_signalA, env1_t_signalB, env1_signalA_as_noise, env1_occurence);
+        fprintf(fp,"Test 2: initial signal=%c, Env1 duration=%f min, Env2 duration=%f min, signalA as noise=%d, occurrence=%f\n",init_env2,env2_t_signalA, env2_t_signalB, env2_signalA_as_noise, env2_occurence);        
         fclose(fp); 
         
         init_step=evolve_N_steps(   &genotype_ori, 
