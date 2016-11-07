@@ -11,7 +11,7 @@
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 10000    
+#define MAX_MUT_STEP 5000   
 #endif
 #ifndef BURN_IN
 #define BURN_IN 0
@@ -156,8 +156,7 @@ struct GillespieRates {
   float pic_assembly;
   float pic_assembly_rate[NGENES];  
   int transcript_init; 
-  int transcript_init_rate[NGENES]; 
-  float rate_update_Pact; 
+  int transcript_init_rate[NGENES];   
   float subtotal;
 };
 
@@ -234,10 +233,10 @@ struct Genotype {
 
     float avg_GR1;
     float avg_GR2;
-    float var_GR1;
-    float var_GR2;
+    float sq_SE_GR1;
+    float sq_SE_GR2;
     float fitness;
-//    float var_fitness;
+    float sq_SE_fitness;
 };
 
 /* 
@@ -275,6 +274,8 @@ struct CellState {
     FixedEvent *sampling_point_end;
     FixedEvent *sampling_point_end_last; 
 
+    float t_to_update_Pact;
+    float interval_to_update_Pact; 
     float Pact[NGENES];
     float last_Pact[NGENES];
 //    float equilibrium_tf_conc[NPROTEINS]; /* this is the nuclear concentration of free tf when binding/unbinding to non-specific sites reach equilibrium */  
@@ -344,6 +345,7 @@ float penalty_of_extra_copies;
 float reduction_in_P_dup;
 float signal_strength;
 float basal_signal_strength;
+float background_signal_strength;
 float env1_t_signalA;    
 float env1_t_signalB;     
 float env2_t_signalA;
@@ -359,8 +361,7 @@ int init_N_rep;
 int recalc_new_fitness;
 char init_env1;
 char init_env2;
-int min_act_to_transcr_A;
-int min_act_to_transcr_B;
+int min_act_to_transcr_selection_protein;
 float cost_term;
 float penalty;
 int N_replicates;
@@ -496,6 +497,7 @@ extern int does_fixed_event_end(FixedEvent *,
                                 FixedEvent *,
                                 FixedEvent *,
 				FixedEvent *,
+                                float,
                                 float);
 
 extern int does_fixed_event_end_plotting(   FixedEvent *,
@@ -562,7 +564,7 @@ extern void transport_event(Genotype *,
                             float,
                             RngStream);
 
-extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, RngStream);
+extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, RngStream);
 
 extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, RngStream);
 
@@ -619,6 +621,8 @@ extern void calc_avg_growth_rate(   Genotype *,
 				    char *,
                                     char *,
                                     int,
+                                    float *,
+                                    float *,
                                     Mutation *); 
   
 extern int init_run_pop(float [NUM_K_DISASSEMBLY], char*, char *, char *, char *, char *, char *, char *, unsigned long int [6]);
@@ -637,7 +641,8 @@ extern int mod(int, int);
 
 extern void calc_all_rates(Genotype *,
                             CellState *,
-                            GillespieRates *,                     
+                            GillespieRates *, 
+                            float,
                             int);
 
 extern void end_translation_init(   Genotype *, 
@@ -752,7 +757,8 @@ extern int check_concurrence(  float ,
                                 FixedEvent *, 
                                 FixedEvent *, 
                                 FixedEvent *,
-                                FixedEvent *);
+                                FixedEvent *,
+                                float);
 
 extern void set_env(CellState *, char, float, float);
 

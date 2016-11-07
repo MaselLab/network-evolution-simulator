@@ -15,13 +15,20 @@
 //#define EPS 1.2e-7
 //#define RNMX (1.0-EPS)
 #define PI 3.141592654
-#define SQRT2PI 2.506628275
-#define P 0.2316419
-#define B1 0.319381530
-#define B2 -0.356563782
-#define B3 1.781477937
-#define B4 -1.821255978
-#define B5 1.330274429
+//#define SQRT2PI 2.506628275
+//#define P 0.2316419
+//#define B1 0.319381530
+//#define B2 -0.356563782
+//#define B3 1.781477937
+//#define B4 -1.821255978
+//#define B5 1.330274429
+#define d1 0.0498673470
+#define d2 0.0211410061
+#define d3 0.0032776263
+#define d4 0.0000380036
+#define d5 0.0000488906
+#define d6 0.0000053830
+
 
 //float ran1(long *seed)
 //{
@@ -197,23 +204,35 @@ answer to n minus itself; we�ll remember to do this below.*/
 
 
 /* returns the cumulative probability of standard normal distribution*/
-/* based on Abramowitz & Stegun 1974 algorithm 26.2.17*/
-float qz(float m1, float v1, float m2, float v2)
+/* based on Abramowitz & Stegun 1974 algorithm 26.2.19*/
+float pnorm(float q) // q>=0
 {
-    float x, t, zx;
-    
-    if (m1>=m2)
-    {
-        x=(m1-m2)/sqrt(v1+v2);
-        t= 1.0/(1.0+P*x);
-        zx=exp(-0.5*x*x)/SQRT2PI;
-        return 1.0-zx*(B1*t+B2*t*t+B3*pow(t,3.0)+B4*pow(t,4.0)+B5*pow(t,5.0));
-    }
-    else
-    {
-        x=(m2-m1)/sqrt(v1+v2);
-        t=1.0/(1.0+P*x);
-        zx=exp(-0.5*x*x)/SQRT2PI;
-        return zx*(B1*t+B2*t*t+B3*pow(t,3.0)+B4*pow(t,4.0)+B5*pow(t,5.0));        
-    }   
+    float sum;
+    sum=1.0+d1*q;
+    sum+=d2*pow(q,2.0);
+    sum+=d3*pow(q,3.0);
+    sum+=d4*pow(q,4.0);
+    sum+=d5*pow(q,5.0);
+    sum+=d6*pow(q,6.0); 
+    return 1-0.5*pow(sum,-16.0);
 }
+/* based on Abramowitz & Stegun 1974 algorithm 26.2.17*/
+//float qz(float m1, float v1, float m2, float v2)
+//{
+//    float x, t, zx;
+//    
+//    if (m1>=m2)
+//    {
+//        x=(m1-m2)/sqrt(v1+v2);
+//        t= 1.0/(1.0+P*x);
+//        zx=exp(-0.5*x*x)/SQRT2PI;
+//        return 1.0-x*(B1*t+B2*t*t+B3*pow(t,3.0)+B4*pow(t,4.0)+B5*pow(t,5.0));
+//    }
+//    else
+//    {
+//        x=(m2-m1)/sqrt(v1+v2);
+//        t=1.0/(1.0+P*x);
+//        zx=exp(-0.5*x*x)/SQRT2PI;
+//        return x*(B1*t+B2*t*t+B3*pow(t,3.0)+B4*pow(t,4.0)+B5*pow(t,5.0));        
+//    }   
+//}

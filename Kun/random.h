@@ -10,5 +10,6 @@ extern float expdev(RngStream);
 // binomially distributed
 extern float bnldev(float pp, int n, RngStream);
 /* quantile function of normal distribution*/
-extern float qz(float, float, float, float);
+extern float pnorm(float);
+//extern float qz(float, float, float, float);
 
