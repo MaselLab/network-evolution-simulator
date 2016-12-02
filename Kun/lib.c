@@ -5,7 +5,7 @@
  * lib.c
  * 
  * This file mainly contains helper/support functions which aren't
- * necessarily specific to the model, such as numerical routines,
+ * necessarily specific to the model, such as
  * maintaining the linked list data structures or file I/O
  *
  * Authors: Joanna Masel, Alex Lancaster
@@ -16,6 +16,7 @@
 #include <sys/stat.h>   /* for file/directory permissions used by mkdir() */
 #include <errno.h>      /* for error codes */
 #include "lib.h"
+
 
 // System panics need to be handled better, but this will do for the moment.
 // --blr
@@ -62,89 +63,6 @@ panic(char *file, int line, char *msg){
 
 	// Bye!
 	abort();
-}
-
-
-
-
-
-/* 
- * Newton-Raphson root-finding method with bisection steps, out of
- * Numerical Recipes function bracketed by x1 and x2. Returns root
- * within accuracy +/-xacc funcd is function of interest, returning
- * both function value and first deriv.x  
- */
-float rtsafe(void (*funcd)(float, int, float*, float*, float*, float*, float*), 
-             int n_copies, float *p_i, float *as_i, float *c_i, float x1, float x2, float xacc)
-{
-    int j,done;
-    float df,dx,dxold,f,fh,fl;
-    float temp,xh,xl,rts;
-
-    (*funcd)(x1, n_copies, p_i,as_i, c_i, &fl, &df);
-    (*funcd)(x2, n_copies, p_i,as_i, c_i, &fh, &df); /* note df isn't used here */
-    if (fabs(fl) < 1e-9) return x1;
-    if (fabs(fh) < 1e-9) return x2;
-    
-    if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0))
-    {
-//        if (verbose) fprintf(fperrors,"warning in rtsafe: root should be bracketed\n");
-//        if (fabs(fl) < fabs(fh)) return x1; else return x2;
-    }
-    
-    if (fl < 0.0) 
-    {
-        xl=x1;
-        xh=x2;
-    } 
-    else 
-    {
-        xh=x1;
-        xl=x2;
-    }
-    
-    rts=0.5*(x1+x2);
-    dxold=fabs(x2-x1);
-    dx=dxold;    
-    (*funcd)(rts, n_copies, p_i,as_i, c_i, &f, &df);
-
-//    done = 0;
-    
-    for (j=1;j<=MAXIT;j++)
-    {
-        if ((((rts-xh)*df-f)*((rts-xl)*df-f) > 0.0) || (fabs(2.0*f) > fabs(dxold*df))) 
-        {
-//            done = 1;// modified: otherwise this bisection can mean 2 identical function calls for j=1
-            dxold=dx;
-            dx=0.5*(xh-xl);
-            rts=xl+dx;      
-            if (xl == rts) return rts;
-        } 
-        else 
-        {
-            dxold=dx;
-            dx=f/df;
-            temp=rts;
-            rts -= dx;
-            if (temp == rts) return rts;
-        }
-        if (fabs(dx) < xacc) return rts;
-        
-//        if (rts==0.0)
-//        {
-//            if (x1<x2) rts = fminf(2.0*x1,(xl+xh)/2.0);
-//            else rts = fminf(2.0*x2,(xl+xh)/2.0);
-//            fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
-//        }        
-//        if (j>1 || done==0) 
-            (*funcd)(rts, n_copies, p_i,as_i, c_i, &f, &df);
-        if (f < 0.0) 
-            xl=rts;
-        else 
-            xh=rts;   
-    }
-//    fprintf(fperrors,"error in rtsafe: too many iterations\n");
-    return 0.0;
 }
 
 void delete_queues(CellState *state) {
@@ -292,63 +210,63 @@ void display(FixedEvent *start)
   }
 }
 
-void remove_from_array(int toberemoved,
-                       int type,
-                       int a[],
-                       int *len,
-                       int force)
-{
-  int i;
-  i = 0;
+//void remove_from_array(int toberemoved,
+//                       int type,
+//                       int a[],
+//                       int *len,
+//                       int force)
+//{
+//  int i;
+//  i = 0;
+//
+//  /* check the range of i first so we don't access an uninitialized
+//     array position in 'a'  */
+//  while ((i < *len) && !(a[i]==toberemoved)) { 
+//    i++;
+//  }
+//  if (i < *len) {  
+//    (*len)--;
+//    a[i]=a[*len];
+//  }
+//  else 
+//    if (force)  {
+//      /* don't always print because with a 4->3 transition PIC assembly is not there to be removed */
+//      LOG_ERROR_NOCELLID("error removing %d from array of length %d, type=%d\n", toberemoved, *len, type);
+//    }
+//}
 
-  /* check the range of i first so we don't access an uninitialized
-     array position in 'a'  */
-  while ((i < *len) && !(a[i]==toberemoved)) { 
-    i++;
-  }
-  if (i < *len) {  
-    (*len)--;
-    a[i]=a[*len];
-  }
-  else 
-    if (force)  {
-      /* don't always print because with a 4->3 transition PIC assembly is not there to be removed */
-      LOG_ERROR_NOCELLID("error removing %d from array of length %d, type=%d\n", toberemoved, *len, type);
-    }
-}
+//void create_output_directory(char *output_directory) {
+//  int directory_success;
+//
+//  /* create output directory if needed */
+//#ifdef __unix__
+//  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
+//#else 
+//#ifdef __WIN32__
+//  directory_success = mkdir(output_directory);
+//#endif
+//#endif
+//
+//  if (directory_success==-1) {
+//    if (errno == EEXIST) {
+//      fprintf(stderr, "directory '%s' already exists\n", output_directory);
+//    } else {
+//      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
+//      exit(-1);
+//    }
+//  }
+//
+//}
 
-void create_output_directory(char *output_directory) {
-  int directory_success;
-
-  /* create output directory if needed */
-#ifdef __unix__
-  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
-#else 
-#ifdef __WIN32__
-  directory_success = mkdir(output_directory);
-#endif
-#endif
-
-  if (directory_success==-1) {
-    if (errno == EEXIST) {
-      fprintf(stderr, "directory '%s' already exists\n", output_directory);
-    } else {
-      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
-      exit(-1);
-    }
-  }
-
-}
-
-void create_output_file(char prefix[80], char *output_directory, FILE **fp, int index) {
-  char file_name[80];
-  if (index != -1) 
-    sprintf(file_name, "%s/%s-%03d.dat", output_directory, prefix, index);
-  else    /* if index is -1, use prefix as name of file, unadorned with .dat */
-    sprintf(file_name, "%s/%s", output_directory, prefix);
-  if ((*fp = fopen(file_name,"w"))==NULL)
-    fprintf(fperrors,"error: Can't open %s file\n", file_name);
-}
+//void create_output_file(char prefix[80], char *output_directory, FILE **fp, int index) {
+//  char file_name[80];
+//  if (index != -1) 
+//    sprintf(file_name, "%s/%s-%03d.dat", output_directory, prefix, index);
+//  else    /* if index is -1, use prefix as name of file, unadorned with .dat */
+//    sprintf(file_name, "%s/%s", output_directory, prefix);
+//  if ((*fp = fopen(file_name,"w"))==NULL)
+//    fprintf(fperrors,"error: Can't open %s file\n", file_name);
+//}
 
 void read_kdisassembly(float kdis[NUM_K_DISASSEMBLY]) {
   int j;
@@ -362,3 +280,4 @@ void read_kdisassembly(float kdis[NUM_K_DISASSEMBLY]) {
   }
   fclose(fpkdis);
 }
+

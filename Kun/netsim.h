@@ -6,24 +6,24 @@
  */
 #ifndef FILE_NETSIM_SEEN
 #define FILE_NETSIM_SEEN
+#endif
 
 #include <stdio.h>
 #include "RngStream.h"
 
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 5000   
-#endif
+#define MAX_MUT_STEP 1000
 #ifndef BURN_IN
-#define BURN_IN 0
+#define BURN_IN 2
 #endif
 
-#define RANDOM_INIT_KINETIC_CONST 1
+#define RANDOM_INIT_KINETIC_CONST 0
 #define RdcPdup 0
 #define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. Planning on adding a 3rd tf as another signal TF. 
 #define CAUTIOUS 0
 #define NO_REGULATION_COST 0
 #define UNLIMITED_MUTATION 0
-#define N_THREADS 12
+#define N_THREADS 4
 #define NEUTRAL 0
 #define IGNORE_BS_OVERLAPPING 0
 #define SIMPLE_SUBSTITUTION 1
@@ -31,11 +31,13 @@
 #define SET_BS_MANUALLY 0
 #define SUDO_REPLICATES 0
 #define PLOTTING 0
-
+#define ALPHA 0.2
+#define N_REPLICATES 200
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
 #define TIME_INFINITY 9.99e10
+#define RULE_OF_REPLACEMENT 2 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes */
 
 #ifndef MAX_COPIES
 #define MAX_COPIES 2       /* each gene can have at most two copies*/
@@ -209,6 +211,8 @@ struct Genotype {
     float translation[NGENES];                              /* kinetic rates*/   
     float pic_disassembly[NGENES];                          /* kinetic rates*/    
     int min_act_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
+//    int N_failed_dup_and_del[NGENES];                       /* If too many mutations has been wasted on the gene, */
+                                                            /* reduce the rate of dup and del on this gene by 10 fold*/
  
     /* binding sites related data, applying to loci*/   
     int cisreg_cluster[NGENES][NGENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
@@ -237,6 +241,7 @@ struct Genotype {
     float sq_SE_GR2;
     float fitness;
     float sq_SE_fitness;
+    float fitness_measurement[5*N_REPLICATES];
 };
 
 /* 
@@ -492,12 +497,7 @@ extern void change_mRNA_cytoplasm(int,
                                   CellState *,
                                   GillespieRates *);
 
-extern int does_fixed_event_end(FixedEvent *,
-                                FixedEvent *,
-                                FixedEvent *,
-                                FixedEvent *,
-				FixedEvent *,
-                                float,
+extern int does_fixed_event_end(CellState*,
                                 float);
 
 extern int does_fixed_event_end_plotting(   FixedEvent *,
@@ -506,6 +506,7 @@ extern int does_fixed_event_end_plotting(   FixedEvent *,
                                             FixedEvent *,
                                             FixedEvent *,
                                             FixedEvent *,
+                                            float,
                                             float);
 
 extern void update_protein_number_cell_size(Genotype *,
@@ -695,9 +696,9 @@ extern void mut_insertion(Genotype *,Mutation *, RngStream);
 
 extern void mut_partial_deletion(Genotype *,Mutation *, RngStream);
 
-extern void mut_whole_gene_deletion(Genotype *,Mutation *, RngStream);
+extern int mut_whole_gene_deletion(Genotype *,Mutation *, RngStream);
 
-extern void mut_duplicaton(Genotype *,Mutation *, RngStream);
+extern int mut_duplicaton(Genotype *,Mutation *, RngStream);
 
 extern void mut_binding_sequence(Genotype *,Mutation *, RngStream);
 
@@ -739,7 +740,7 @@ extern void clone_cell_forward(Genotype *, Genotype *, int);
 
 extern void clone_cell_backward(Genotype *, Genotype *, int);
 
-extern void try_fixation(Genotype *, Genotype *, int *, float *, RngStream);
+extern float try_fixation(Genotype *, Genotype *, int, int, int *, RngStream);
 
 extern void calc_avg_growth_rate_plotting(  Genotype *,                               
                                             int [NGENES],

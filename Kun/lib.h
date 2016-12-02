@@ -8,8 +8,7 @@
 #include <stdio.h>
 #include "netsim.h" 
 
-extern float rtsafe(void (*funcd)(float, int, float*, float*, float*, float*, float*), 
-		    int, float *, float*, float*, float x1, float x2, float xacc);
+
 extern void delete_queues(CellState *state);
 extern void free_mem_CellState(CellState *state);
 extern int sls_store(FixedEvent *i, 
@@ -32,4 +31,3 @@ extern void remove_from_array(int,
 extern void create_output_directory(char *);
 extern void create_output_file(char [80], char *, FILE **, int);
 extern void read_kdisassembly(float [NUM_K_DISASSEMBLY]);
-
