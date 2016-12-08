@@ -95,7 +95,7 @@ float bias_in_mut=0.0; /*mutations to kinetic constants are x*e^N(bias_in_mut,sd
 
 /*Cell growth and development*/
 int avg_protein_number = 12000;
-float penalty = 2.89e-7; /*was 1.e-5. Now 0.01% of gpeak */
+float penalty = 2.89e-6; /*was 1.e-5. Now 0.01% of gpeak */
 float Pact_scaling = 1.0;
 float tdevelopment;/* default  development time: can be changed at runtime */
 float duration_of_burn_in_growth_rate; /* allow cells to reach (possiblly) steady growth*/
@@ -4459,17 +4459,18 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
 {
     float random1,temp;    
     int pos_kdis, pos_g;
+    float total_mut_flux=proportion_mut_binding_seq+proportion_mut_identity+proportion_mut_koff+proportion_mut_kdis+proportion_mut_mRNA_decay+proportion_mut_protein_decay+proportion_mut_translation_rate;
 #if UNLIMITED_MUTATION
     float random2;
 #endif
       
-    random1=RngStream_RandU01(RS)-proportion_mut_identity-proportion_mut_koff-proportion_mut_binding_seq;
+    random1=RngStream_RandU01(RS)-(proportion_mut_identity+proportion_mut_koff+proportion_mut_binding_seq)/total_mut_flux;
     pos_g=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);
     
     /*record mutation info*/
     mut_record->pos_g=pos_g;
     
-    if(random1<=proportion_mut_kdis) /* mut kdis */
+    if(random1<=proportion_mut_kdis/total_mut_flux) /* mut kdis */
     {   
         pos_kdis=RngStream_RandInt(RS,0,NUM_K_DISASSEMBLY-1);      
     #if UNLIMITED_MUTATION
@@ -4486,8 +4487,8 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
     }
     else 
     {
-        random1-=proportion_mut_kdis;
-        if(random1<=proportion_mut_mRNA_decay) /* mut mRNAdecay */
+        random1-=proportion_mut_kdis/total_mut_flux;
+        if(random1<=proportion_mut_mRNA_decay/total_mut_flux) /* mut mRNAdecay */
         {
         #if UNLIMITED_MUTATION
             random2 = exp(0.4909*gasdev(RS)-3.20304);
@@ -4506,8 +4507,8 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, float kdis[N
         }
         else 
         {
-            random1-=proportion_mut_mRNA_decay;
-            if(random1<=proportion_mut_translation_rate) /* mut translation */
+            random1-=proportion_mut_mRNA_decay/total_mut_flux;
+            if(random1<=proportion_mut_translation_rate/total_mut_flux) /* mut translation */
             {
         #if UNLIMITED_MUTATION
                 random2= exp(0.7406*gasdev(RS)+4.56);
@@ -4927,7 +4928,8 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     float random;
     float tot_mut_rate=0.0;
     float tot_subs_rate, tot_indel_rate, tot_dup_rate, tot_sil_rate, tot_mut_kin_rate, tot_mut_identity_rate, tot_mut_binding_seq_rate, tot_mut_koff_rate; 
-    int i;    
+    int i; 
+    float total_mut_flux=proportion_mut_binding_seq+proportion_mut_identity+proportion_mut_koff+proportion_mut_kdis+proportion_mut_mRNA_decay+proportion_mut_protein_decay+proportion_mut_translation_rate;
     
     /* duplication rate*/
     /* To restrict the duplication of selection genes, we allow each 
@@ -4972,20 +4974,20 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     tot_mut_rate+=tot_indel_rate;
     
     /* mut in kinetic constants */
-    tot_mut_kin_rate=(float)(genotype->ngenes-N_SIGNAL_TF)*MUTKINETIC*(1.0-proportion_mut_binding_seq-proportion_mut_identity-proportion_mut_koff); /* NA to the signal gene*/
+    tot_mut_kin_rate=(float)(genotype->ngenes-N_SIGNAL_TF)*MUTKINETIC*(total_mut_flux-proportion_mut_binding_seq-proportion_mut_identity-proportion_mut_koff)/total_mut_flux; /* NA to the signal gene*/
     tot_mut_rate+=tot_mut_kin_rate;
     
     /* mut in binding seq*/
-    tot_mut_binding_seq_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_binding_seq; /* NA to the selection genes*/
+    tot_mut_binding_seq_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_binding_seq/total_mut_flux; /* NA to the selection genes*/
     tot_mut_rate+=tot_mut_binding_seq_rate;
     
     /* mut in identity*/
-    tot_mut_identity_rate=(float)(genotype->ntfgenes-2)*MUTKINETIC*proportion_mut_identity; /* if there's only one signal tf, then this tf must be an activator*/
+    tot_mut_identity_rate=(float)(genotype->ntfgenes-2)*MUTKINETIC*proportion_mut_identity/total_mut_flux; /* if there's only one signal tf, then this tf must be an activator*/
 
     tot_mut_rate+=tot_mut_identity_rate;
     
     /* mut in koff*/
-    tot_mut_koff_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_koff;  
+    tot_mut_koff_rate=(float)(genotype->ntfgenes)*MUTKINETIC*proportion_mut_koff/total_mut_flux;  
     tot_mut_rate+=tot_mut_koff_rate;
     
     
@@ -5419,19 +5421,19 @@ float try_fixation(Genotype *resident, Genotype *mutant, int N_measurement_resid
     float z_score;
 #if RULE_OF_REPLACEMENT==0
     float ref,p;
-    z_score=(mutant->fitness-resident->fitness)/sqrt(resident->sq_SE_fitness*resident->sq_SE_fitness+mutant->sq_SE_fitness*mutant->sq_SE_fitness);
+    z_score=(mutant->fitness-resident->fitness)/sqrt(resident->sq_SE_fitness+mutant->sq_SE_fitness);
     p=pnorm(z_score);
     ref=RngStream_RandU01(RS);
-    if(ref>p)
+    if(ref<p)
         *fixation=1;
     else
         *fixation=0;
 #elif RULE_OF_REPLACEMENT==1
-    float p,mean_ranksum_resident,mean_ranksum_mutant;    
+    float p,mean_rank_resident,mean_rank_mutant;    
     p=Wilcoxon_test(resident, mutant, N_measurement_resident, N_measurement_mutant,&z_score,&mean_rank_resident,&mean_rank_mutant);    
     if(p<ALPHA)
     {
-        if(mean_rank_resident <= mean_rank_mutant)
+        if(mean_rank_resident < mean_rank_mutant)
             *fixation=1;
         else
             *fixation=0;   
@@ -5456,10 +5458,10 @@ float try_fixation(Genotype *resident, Genotype *mutant, int N_measurement_resid
             *fixation=0;
     }
     z_score=-1.0;
-#else
-    float sd,margin;
-    sd=sqrt(resident->sq_SE_fitness*resident->sq_SE_fitness+mutant->sq_SE_fitness*mutant->sq_SE_fitness);
-    margin=qnorm7(0.05,sd);
+#elif RULE_OF_REPLACEMENT==3
+    float sd,margin,ref;
+    sd=sqrt(resident->sq_SE_fitness+mutant->sq_SE_fitness);
+    margin=qnorm7(1-ALPHA/2.0,sd);
     if(resident->fitness+margin < mutant->fitness)
         *fixation=1;
     else
@@ -5472,6 +5474,25 @@ float try_fixation(Genotype *resident, Genotype *mutant, int N_measurement_resid
             else
                 *fixation=0;
         } 
+        else
+            *fixation=0;
+    }
+    z_score=-1.0;
+#else
+    float s, ref;
+    s=mutant->fitness/resident->fitness-1.0;
+    if(s>0.01)
+        *fixation=1;
+    else
+    {
+        if(s==0)
+        {    
+            ref=RngStream_RandU01(RS);
+            if(ref>0.5)
+                *fixation=1;
+            else
+                *fixation=0;
+        }
         else
             *fixation=0;
     }
@@ -5850,12 +5871,12 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
     
     /* plot the phenotype and fitness of a genotype */
     #if PLOTTING        
-        fp=fopen("MUT_3.txt","r");    
+        fp=fopen("MUT_1.txt","r");    
         if(fp!=NULL)
         {
             int replay_N_steps;
             printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
-            replay_N_steps=882;
+            replay_N_steps=1000;
             replay_mutations(&genotype_ori, &genotype_ori_copy, fp, &mut_record, replay_N_steps);       
             fclose(fp);   
             calc_all_binding_sites(&genotype_ori);        
@@ -5863,15 +5884,15 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
             
             /* conditions under which the phenotype and fitness is measured */
             init_env1='A';
-            init_env2='A'; 
+            init_env2='B'; 
             tdevelopment = 149.9;
             duration_of_burn_in_growth_rate = 5.0; 
             env1_t_signalA=180.0;     
             env1_t_signalB=0.0;
-            env2_t_signalA=180.0;
-            env2_t_signalB=0.0;
+            env2_t_signalA=10.0;
+            env2_t_signalB=40.0;
             env1_signalA_as_noise=0;    
-            env2_signalA_as_noise=0;       
+            env2_signalA_as_noise=1;       
             N_replicates=200;
             env1_occurence=0.5;
             env2_occurence=0.5;
@@ -6250,7 +6271,7 @@ void output_genotype(char *file_overview, char *file_act_BS, char *file_rep_BS, 
 //            genotype->N_rep_BS[5],
 //            genotype->N_rep_BS[6],
 //            genotype->N_rep_BS[7],
-//            genotype->N_rep_BS[8],
+//            genotype->N_rep_BS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 [8],
 //            genotype->N_rep_BS[9]);
 //    fclose(OUTPUT);
 //    OUTPUT=fopen(file_all_BS,"a+");

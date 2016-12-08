@@ -14,7 +14,7 @@
 #ifndef MAX_MUT_STEP         
 #define MAX_MUT_STEP 1000
 #ifndef BURN_IN
-#define BURN_IN 2
+#define BURN_IN 0
 #endif
 
 #define RANDOM_INIT_KINETIC_CONST 0
@@ -30,14 +30,14 @@
 #define RANDOMIZE_SIGNAL2 0
 #define SET_BS_MANUALLY 0
 #define SUDO_REPLICATES 0
-#define PLOTTING 0
+#define PLOTTING 1
 #define ALPHA 0.2
 #define N_REPLICATES 200
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
 #define TIME_INFINITY 9.99e10
-#define RULE_OF_REPLACEMENT 2 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes */
+#define RULE_OF_REPLACEMENT 2 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>0.01 */
 
 #ifndef MAX_COPIES
 #define MAX_COPIES 2       /* each gene can have at most two copies*/
@@ -657,7 +657,7 @@ extern void end_translation_init(   Genotype *,
                                     Mutation *,
                                     char *);
 
-extern int do_fixed_event(Genotype *, 
+extern int do_fixed_event(  Genotype *, 
                             CellState *, 
                             GillespieRates *, 
                             float *,
@@ -753,7 +753,7 @@ extern void summarize_binding_sites(Genotype *,int);
 
 extern void print_binding_sites_distribution(Genotype *,int, int);
 
-extern int check_concurrence(  float , 
+extern int check_concurrence(   float , 
                                 FixedEvent *, 
                                 FixedEvent *, 
                                 FixedEvent *, 

@@ -532,7 +532,7 @@ float Wilcoxon_test(Genotype *resident, Genotype *mutant, int n1, int n2, float 
     
     *z_score=ts;
    
-    return pnorm(ts);
+    return 1.0-pnorm(ts);
 }
 
 
