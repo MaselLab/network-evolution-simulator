@@ -429,7 +429,7 @@ float Wilcoxon_test(Genotype *resident, Genotype *mutant, int n1, int n2, float 
     float rank_of_observation[n1+n2];
     float N_tied_observations[n1+n2];
     int i, j, start_of_tie, tie_resolved, mutant_in_tie, resident_in_tie, tie_across_groups,N_ties;    
-    float summed_rank_of_tie, rank, summed_rank_of_mutant,W,ts,Tj,fn1,fn2,N,sum;
+    float summed_rank_of_tie, rank, summed_rank_of_mutant,W,ts,Tj,fn1,fn2,N;
     
     for(i=0;i<n1;i++)
     {
