@@ -17,17 +17,18 @@
 #define NEUTRAL 0
 #define RUN_FULL_SIMULATION 1
 #define SKIP_INITIAL_GENOTYPE 0
-#define SET_BS_MANUALLY 1
+#define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
 
 /*Runtime control*/
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 0
+#define MAX_MUT_STEP 5000
 #ifndef BURN_IN
-#define BURN_IN 50000
+#define BURN_IN 0
 #endif
-#define N_THREADS 4
+#define N_THREADS 10
 #define N_REPLICATES 200
+#define OUTPUT_INTERVAL 10
 
 /*Miscellaneous settings*/
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -38,18 +39,27 @@
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define RANDOM_INIT_KINETIC_CONST 0
+#define DIRECT_REG 1
+#define RANDOM_INIT_KINETIC_CONST 1
+#define RANDOM_COOPERATION_LOGIC 0
 #define RdcPdup 0
 #define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. Planning on adding a 3rd tf as another signal TF. 
 #define NO_REGULATION_COST 0
+#define NO_REGULATION 1 // this locks the state of transcription factors to NUC_NO_PIC
+#define ADJUST_FITNESS 0 // allows manually adjust the fitness of a phenotype
+#if ADJUST_FITNESS
+#define ADJUST_FITNESS_CONDITION 3 // more or less than 3 copies of regular transcription factor genes receives penaly in fitness
+#define ADJUSTMENT 1.0e-3 //selection coefficient
+#endif
 #define UNLIMITED_MUTATION 0
 #define IGNORE_BS_OVERLAPPING 0
 #define SIMPLE_SUBSTITUTION 1
 #define RANDOMIZE_SIGNAL2 0
 #define ALPHA 0.2
-#define RULE_OF_REPLACEMENT 4 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>0.01 */
+#define MAX_RECALC_FITNESS 10
+#define RULE_OF_REPLACEMENT 4 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>minimal_selection_coefficient */
 #if RULE_OF_REPLACEMENT==4
-#define minimal_selection_coefficient 1.0e-6
+#define minimal_selection_coefficient 1.0e-8
 #endif
 #ifndef MAX_COPIES
 #define MAX_COPIES 2       /* each gene can have at most two copies*/
@@ -67,17 +77,15 @@
   #ifndef NPROTEINS
   #define NPROTEINS TFGENES   /* total number of types of proteins, may be >#GENES if extracellular signals */
   #endif
-  #define SELECTION_GENE_A (TFGENES-2)    /* index of selection gene */
-  #define SELECTION_GENE_B (TFGENES-1)
 #else                       /* otherwise, by default assuming selection gene is not a TF */
   #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 25         /* the initial value is set in initiate_genotype*/
+  #define TFGENES 29         /* the initial value is set in initiate_genotype*/
   #endif
   #ifndef NGENES
-  #define NGENES 26  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+  #define NGENES 30  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
   #endif
   #ifndef NPROTEINS           
-  #define NPROTEINS 26
+  #define NPROTEINS 30
   #endif
 #endif
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
@@ -251,7 +259,11 @@ struct Genotype {
     float sq_SE_GR2;
     float fitness;
     float sq_SE_fitness;
-    float fitness_measurement[5*N_REPLICATES];
+    float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
+    int N_ffls[4];     
+    int N_non_ffl_motifs;
+    float proportion_c1ffls;  
+    int N_act_genes;   
 };
 
 /* 
@@ -852,5 +864,6 @@ extern void replay_mutations(   Genotype *,
                                 Mutation *,
                                 int);
 
+extern void find_ffl(Genotype *);
 
 #endif /* !FILE_NETSIM_SEEN */
