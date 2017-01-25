@@ -22,12 +22,12 @@
 
 /*Runtime control*/
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 5000
+#define MAX_MUT_STEP 10000
 #ifndef BURN_IN
 #define BURN_IN 0
 #endif
-#define N_THREADS 10
-#define N_REPLICATES 200
+#define N_THREADS 1
+#define N_REPLICATES 40
 #define OUTPUT_INTERVAL 10
 
 /*Miscellaneous settings*/
@@ -45,7 +45,7 @@
 #define RdcPdup 0
 #define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. Planning on adding a 3rd tf as another signal TF. 
 #define NO_REGULATION_COST 0
-#define NO_REGULATION 1 // this locks the state of transcription factors to NUC_NO_PIC
+#define NO_REGULATION 0 // this locks the state of transcription factors to NUC_NO_PIC
 #define ADJUST_FITNESS 0 // allows manually adjust the fitness of a phenotype
 #if ADJUST_FITNESS
 #define ADJUST_FITNESS_CONDITION 3 // more or less than 3 copies of regular transcription factor genes receives penaly in fitness
@@ -56,7 +56,7 @@
 #define SIMPLE_SUBSTITUTION 1
 #define RANDOMIZE_SIGNAL2 0
 #define ALPHA 0.2
-#define MAX_RECALC_FITNESS 10
+#define MAX_RECALC_FITNESS 5
 #define RULE_OF_REPLACEMENT 4 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>minimal_selection_coefficient */
 #if RULE_OF_REPLACEMENT==4
 #define minimal_selection_coefficient 1.0e-8
@@ -78,15 +78,18 @@
   #define NPROTEINS TFGENES   /* total number of types of proteins, may be >#GENES if extracellular signals */
   #endif
 #else                       /* otherwise, by default assuming selection gene is not a TF */
-  #ifndef TFGENES             /* number of genes encoding TFs */
-  #define TFGENES 29         /* the initial value is set in initiate_genotype*/
-  #endif
-  #ifndef NGENES
-  #define NGENES 30  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
-  #endif
-  #ifndef NPROTEINS           
-  #define NPROTEINS 30
-  #endif
+    #ifndef TFGENES             /* number of genes encoding TFs */
+    #define TFGENES 20         /* the initial value is set in initiate_genotype*/
+    #endif
+    #ifndef NGENES
+    #define NGENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+    #endif
+    #ifndef NPROTEINS           
+    #define NPROTEINS 25
+    #endif
+    #ifndef EFFECTOR_GENES
+    #define EFFECTOR_GENES 5  /* this is the upper limit of effector gene copies*/
+    #endif
 #endif
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
@@ -219,7 +222,7 @@ struct Genotype {
     int activating[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
     char tf_seq[NPROTEINS][TF_ELEMENT_LEN];
     char tf_seq_rc[NPROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
-    float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
+//    float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
     float koff[NPROTEINS];                                     /* kinetic rates*/ 
     
@@ -352,7 +355,7 @@ const float TRANSCRIPTINIT;
 const float DEACETYLATE;
 const float ACETYLATE;
 const float PICASSEMBLY;
-const float KR;
+//const float KR;
 const float NUMSITESINGENOME;
 
 /* see netsim.c for documentation for these global variables */
@@ -586,7 +589,7 @@ extern void transport_event(Genotype *,
                             float,
                             RngStream);
 
-extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, RngStream);
+extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, float, RngStream);
 
 extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, RngStream);
 
@@ -622,8 +625,8 @@ extern void do_single_timestep_plotting(    Genotype *,
                                             float,
                                             float,
                                             int,                                           
-                                            float (*)[149],
-                                            float [149],
+                                            float (*)[159],
+                                            float [159],
                                             RngStream,                              
                                             int *,
                                             int *) ;
@@ -699,7 +702,7 @@ extern int do_fixed_event_plotting( Genotype *,
                                     int ,                                    
                                     int *);
 
-extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
+extern void do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
 
 extern void calc_configurations(Genotype *, int);
 
@@ -723,7 +726,7 @@ extern void mut_identity(Genotype *, Mutation *, RngStream);
 
 extern void mut_koff(Genotype *, Mutation *, RngStream);
 
-extern int reproduce_mutate(Genotype *, Mutation *);
+extern int reproduce_mutate(Genotype *, Mutation *,RngStream);
 
 extern void reproduce_susbtitution(Genotype *, Mutation *);
 
@@ -862,7 +865,8 @@ extern void replay_mutations(   Genotype *,
                                 Genotype *,
                                 FILE *,
                                 Mutation *,
-                                int);
+                                int,
+                                RngStream);
 
 extern void find_ffl(Genotype *);
 
