@@ -22,12 +22,14 @@
 
 /*Runtime control*/
 #ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 10000
+#define MAX_MUT_STEP 5000
 #ifndef BURN_IN
 #define BURN_IN 0
 #endif
+#define MAX_MUTATIONS 100000
+#define MAX_TRIALS 5000
 #define N_THREADS 1
-#define N_REPLICATES 40
+#define N_REPLICATES 20
 #define OUTPUT_INTERVAL 10
 
 /*Miscellaneous settings*/
@@ -56,7 +58,7 @@
 #define SIMPLE_SUBSTITUTION 1
 #define RANDOMIZE_SIGNAL2 0
 #define ALPHA 0.2
-#define MAX_RECALC_FITNESS 5
+#define MAX_RECALC_FITNESS 10
 #define RULE_OF_REPLACEMENT 4 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>minimal_selection_coefficient */
 #if RULE_OF_REPLACEMENT==4
 #define minimal_selection_coefficient 1.0e-8
@@ -305,9 +307,10 @@ struct CellState {
     FixedEvent *sampling_point_end_last; 
 
     float t_to_update_Pact;
-    float interval_to_update_Pact; 
+//    float interval_to_update_Pact; 
     float Pact[NGENES];
     float last_Pact[NGENES];
+    float last_event_t;
 //    float equilibrium_tf_conc[NPROTEINS]; /* this is the nuclear concentration of free tf when binding/unbinding to non-specific sites reach equilibrium */  
 //    float protein_conc[NPROTEINS];        /* this is the concentration of proteins in cell. For tf, this stores the nuclear concentration, for selection proteins, this is cytosol concentration*/
     float protein_number[NPROTEINS];     /* pooled protein number from gene_specific_protein_conc */
@@ -589,7 +592,7 @@ extern void transport_event(Genotype *,
                             float,
                             RngStream);
 
-extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, float, RngStream);
+extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, RngStream);
 
 extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, RngStream);
 
@@ -702,7 +705,7 @@ extern int do_fixed_event_plotting( Genotype *,
                                     int ,                                    
                                     int *);
 
-extern void do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
+extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, char *, int, Mutation *);
 
 extern void calc_configurations(Genotype *, int);
 

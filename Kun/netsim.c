@@ -29,7 +29,7 @@ int MAXELEMENTS=100;
 /* start by allocating maxelements when initializing a genotype, double as needed, reduce at end */
 const int MAXBOUND=500;
 const int MAXALLOC=10;
-const float KRNA=618.0;
+//const float KRNA=618.0;
 const float TTRANSLATION=1.0; 
 const float TTRANSCRIPTION=1.0;
 const float PROB_ACTIVATING=0.62;
@@ -48,7 +48,8 @@ const float MAX_protein_decay = 0.069;  /* Wang, 2002 PNAS 99:5860 */
 const float MIN_protein_decay = 4.6e-3; 
 //const float KR=10.0;        /*this is the ratio of the affinity of a perfect binding site to that of a non-specific site*/
                             /*It controls the reduction in affinity per mismatch*/
-const float lumped_kon=1.0e-2/6.02e23*1.0e6/3.0e-15;   /* use molecules of a tf to calculate on rate*/ 
+const float lumped_kon=5.0e-6; 
+//                            1.0e-2/6.02e23*1.0e6/3.0e-15;   /* use molecules of a tf to calculate on rate*/ 
                                                             /* kon=1.0e-2 uM^-1*s^-1 */
                                                             /* vol_nuc = 3.0e-15 l^3 */
                                                             /* NA = 6.02e23/1.0e6 convert number of molecules to umol*/                                                            
@@ -1357,7 +1358,8 @@ void initialize_cell(   CellState *state,
     state->burn_in_growth_rate_last=NULL;
     state->sampling_point_end=NULL;
     state->sampling_point_end_last=NULL;
-    state->t_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+//    state->t_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+    state->last_event_t=0.0;
     
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
     {
@@ -1393,8 +1395,11 @@ void initialize_cell(   CellState *state,
     }    
     
     /*mark when to start calculating average growth rate*/
-    add_fixed_event(-1,duration_of_burn_in_growth_rate,&(state->burn_in_growth_rate),&(state->burn_in_growth_rate_last)); 
-    
+    if(duration_of_burn_in_growth_rate!=0.0)
+        add_fixed_event(-1,duration_of_burn_in_growth_rate,&(state->burn_in_growth_rate),&(state->burn_in_growth_rate_last)); 
+    else
+        add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate),&(state->burn_in_growth_rate_last));
+                
     /*plot protein concentration and fitness vs time*/
     #if JUST_PLOTTING 
         float t;
@@ -1460,7 +1465,7 @@ void calc_all_rates(Genotype *genotype,
     float salphc; 
 //    float protein_decay;
     int concurrent;
-    float t_to_update_Pact;
+    float t_to_update_Pact,interval_to_update_Pact;
     
     if(UPDATE_WHAT==UPDATE_PACT || UPDATE_WHAT==INITIALIZATION) /*Since these values are also updated in update_protein_number_cell_size, this is only used in initilization*/
     {
@@ -1619,7 +1624,7 @@ void calc_all_rates(Genotype *genotype,
     rates->subtotal+=rates->pic_disassembly;
     rates->subtotal+=(float)rates->transcript_init*TRANSCRIPTINIT;
     
-    if(UPDATE_WHAT==UPDATE_PACT)
+    if(UPDATE_WHAT!=UPDATE_PACT || UPDATE_WHAT==INITIALIZATION)
     {
         too_much_error=0;        
         for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
@@ -1644,39 +1649,42 @@ void calc_all_rates(Genotype *genotype,
                 break;
             }
         }
-        if(!too_much_error)        
-            state->interval_to_update_Pact*=2.0;
-        else
-        {
-            state->interval_to_update_Pact*=0.67;
-            if(state->interval_to_update_Pact<MIN_INTERVAL_TO_UPDATE_PACT)
-                state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
-        }
+        if(!too_much_error)
+            interval_to_update_Pact=(t-state->last_event_t)*2.0;        
+        else        
+            interval_to_update_Pact=(t-state->last_event_t)*0.67;  
         
-        t_to_update_Pact=t+state->interval_to_update_Pact;
+        if(interval_to_update_Pact<MIN_INTERVAL_TO_UPDATE_PACT)
+            interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+    }
+    else
+        interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;   
+    
+    t_to_update_Pact=t+interval_to_update_Pact;
+    concurrent=check_concurrence(   t_to_update_Pact,
+                                    state->mRNA_transl_init_time_end,
+                                    state->mRNA_transcr_time_end,
+                                    state->signalB_starts_end,
+                                    state->signalA_starts_end,
+                                    state->burn_in_growth_rate,
+                                    state->t_to_update_Pact);
+    while(concurrent)
+    {
+        t_to_update_Pact+=0.0001;
         concurrent=check_concurrence(   t_to_update_Pact,
                                         state->mRNA_transl_init_time_end,
                                         state->mRNA_transcr_time_end,
                                         state->signalB_starts_end,
                                         state->signalA_starts_end,
                                         state->burn_in_growth_rate,
-                                        state->t_to_update_Pact);
-        while(concurrent)
-        {
-            t_to_update_Pact+=0.0001;
-            concurrent=check_concurrence(   t_to_update_Pact,
-                                            state->mRNA_transl_init_time_end,
-                                            state->mRNA_transcr_time_end,
-                                            state->signalB_starts_end,
-                                            state->signalA_starts_end,
-                                            state->burn_in_growth_rate,
-                                            state->t_to_update_Pact);        
-        }
-        state->t_to_update_Pact=t_to_update_Pact;
-    
-        for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
-            state->last_Pact[i]=state->Pact[i];  
+                                        state->t_to_update_Pact);        
     }
+    state->t_to_update_Pact=t_to_update_Pact;
+    
+    for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
+        state->last_Pact[i]=state->Pact[i];  
+        
+    state->last_event_t=t;    
 }
 
 /* 
@@ -1851,30 +1859,30 @@ void end_translation_init(  Genotype *genotype,
 //    change_mRNA_cytoplasm(state->mRNA_transl_init_time_end->gene_id, genotype, state, rates);
     
     /* set rate of updating Pact to maximal*/
-    state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
-    t_to_update_Pact=t+*dt+state->interval_to_update_Pact;
-    if(state->t_to_update_Pact>t_to_update_Pact)    // if the scheduled update is too late, we need a new schedule. 
-    {
-        concurrent=check_concurrence(   t_to_update_Pact,
-                                        state->mRNA_transl_init_time_end,
-                                        state->mRNA_transcr_time_end,
-                                        state->signalB_starts_end,
-                                        state->signalA_starts_end,
-                                        state->burn_in_growth_rate,
-                                        state->t_to_update_Pact);
-        while(concurrent)
-        {
-            t_to_update_Pact+=0.0001;
-            concurrent=check_concurrence(   t_to_update_Pact,
-                                            state->mRNA_transl_init_time_end,
-                                            state->mRNA_transcr_time_end,
-                                            state->signalB_starts_end,
-                                            state->signalA_starts_end,
-                                            state->burn_in_growth_rate,
-                                            state->t_to_update_Pact);        
-        }
-        state->t_to_update_Pact=t_to_update_Pact;
-    }
+//    state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+//    t_to_update_Pact=t+*dt+state->interval_to_update_Pact;
+//    if(state->t_to_update_Pact>t_to_update_Pact)    // if the scheduled update is too late, we need a new schedule. 
+//    {
+//        concurrent=check_concurrence(   t_to_update_Pact,
+//                                        state->mRNA_transl_init_time_end,
+//                                        state->mRNA_transcr_time_end,
+//                                        state->signalB_starts_end,
+//                                        state->signalA_starts_end,
+//                                        state->burn_in_growth_rate,
+//                                        state->t_to_update_Pact);
+//        while(concurrent)
+//        {
+//            t_to_update_Pact+=0.0001;
+//            concurrent=check_concurrence(   t_to_update_Pact,
+//                                            state->mRNA_transl_init_time_end,
+//                                            state->mRNA_transcr_time_end,
+//                                            state->signalB_starts_end,
+//                                            state->signalA_starts_end,
+//                                            state->burn_in_growth_rate,
+//                                            state->t_to_update_Pact);        
+//        }
+//        state->t_to_update_Pact=t_to_update_Pact;
+//    }
 }
 
 /*
@@ -2209,7 +2217,7 @@ void transport_event(   Genotype *genotype,
 //    add_fixed_event(gene_id, endtime, &(state->mRNA_transl_init_time_end), &(state->mRNA_transl_init_time_end_last));    
 }
 
-void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotype, float t, float dt, RngStream RS)
+void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotype, float t, RngStream RS)
 {
     int gene_id;
     float x;
@@ -2260,31 +2268,31 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
         (state->mRNA_transl_cyto_num[gene_id])--; 
     }
     
-    /* set the rate of updating pact to max*/
-    state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
-    t_to_update_Pact=t+dt+state->interval_to_update_Pact;
-    if(state->t_to_update_Pact>t_to_update_Pact) // if the scheduled time to update is too late, we need a new schedule.
-    {
-        concurrent=check_concurrence(   t_to_update_Pact,
-                                        state->mRNA_transl_init_time_end,
-                                        state->mRNA_transcr_time_end,
-                                        state->signalB_starts_end,
-                                        state->signalA_starts_end,
-                                        state->burn_in_growth_rate,
-                                        state->t_to_update_Pact);
-        while(concurrent)
-        {
-            t_to_update_Pact+=0.0001;
-            concurrent=check_concurrence(   t_to_update_Pact,
-                                            state->mRNA_transl_init_time_end,
-                                            state->mRNA_transcr_time_end,
-                                            state->signalB_starts_end,
-                                            state->signalA_starts_end,
-                                            state->burn_in_growth_rate,
-                                            state->t_to_update_Pact);       
-        }
-        state->t_to_update_Pact=t_to_update_Pact;
-    }
+//    /* set the rate of updating pact to max*/
+//    state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+//    t_to_update_Pact=t+dt+state->interval_to_update_Pact;
+//    if(state->t_to_update_Pact>t_to_update_Pact) // if the scheduled time to update is too late, we need a new schedule.
+//    {
+//        concurrent=check_concurrence(   t_to_update_Pact,
+//                                        state->mRNA_transl_init_time_end,
+//                                        state->mRNA_transcr_time_end,
+//                                        state->signalB_starts_end,
+//                                        state->signalA_starts_end,
+//                                        state->burn_in_growth_rate,
+//                                        state->t_to_update_Pact);
+//        while(concurrent)
+//        {
+//            t_to_update_Pact+=0.0001;
+//            concurrent=check_concurrence(   t_to_update_Pact,
+//                                            state->mRNA_transl_init_time_end,
+//                                            state->mRNA_transcr_time_end,
+//                                            state->signalB_starts_end,
+//                                            state->signalA_starts_end,
+//                                            state->burn_in_growth_rate,
+//                                            state->t_to_update_Pact);       
+//        }
+//        state->t_to_update_Pact=t_to_update_Pact;
+//    }
 }
 
 void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
@@ -2662,6 +2670,7 @@ void do_single_timestep(Genotype *genotype,
         if(*end_state==0) 
             return; 
         *t += dt;  /* advance time by the dt */
+        
 #if CAUTIOUS
    float dt_copy,x_copy,rate_subtotal_copy,t_copy;  
    int event2;
@@ -2755,12 +2764,12 @@ void do_single_timestep(Genotype *genotype,
         update_protein_number_cell_size(genotype, state, rates, dt, *t, *env, end_state, error, mut_step, mut_record);        
         if(*end_state==0)
             return; 
-        do_Gillespie_event(genotype, state, rates, dt, *t, RS, end_state, error, mut_step, mut_record);
+        UPDATE_WHAT=do_Gillespie_event(genotype, state, rates, dt, *t, RS, end_state, error, mut_step, mut_record);
         if(*end_state==0)
-            return;               
-        calc_all_rates(genotype,state,rates,*t,UPDATE_WHAT);
+            return;  
         /* Gillespie step: advance time to next event at dt */
         *t += dt;
+        calc_all_rates(genotype,state,rates,*t,UPDATE_WHAT);        
     } 
     else 
     { 
@@ -2796,11 +2805,13 @@ int do_fixed_event(Genotype *genotype,
     switch (event) 
     {
         case 1:     /* a transcription event ends */
-            end_transcription(dt, t, state, rates, genotype,end_state,error,mut_step,mut_record,env);  
+            end_transcription(dt, t, state, rates, genotype,end_state,error,mut_step,mut_record,env);
+            return_value=UPDATE_PACT;
             /* update_protein_number_cell_size is called within end_transcription*/
             break;
         case 2:     /* a translation initialization event ends */ 
             end_translation_init(genotype, state, rates, dt, t,end_state,error,mut_step,mut_record,env);  
+            
             /* update_protein_number_cell_size is called within end_translation_init*/
             break;
         case 3:     /* environment B starts*/ 
@@ -2830,8 +2841,7 @@ int do_fixed_event(Genotype *genotype,
             break;
         case 6: /* update force to update Pact*/
             *dt=state->t_to_update_Pact-t;
-            update_protein_number_cell_size(genotype, state, rates, *dt, t, *env, end_state, error, mut_step, mut_record);
-            return_value=UPDATE_PACT;            
+            update_protein_number_cell_size(genotype, state, rates, *dt, t, *env, end_state, error, mut_step, mut_record);          
             break;
 #if CAUTIOUS
         FILE *fp;
@@ -2846,7 +2856,7 @@ int do_fixed_event(Genotype *genotype,
     return return_value;
 }
 
-void do_Gillespie_event(Genotype *genotype,
+int do_Gillespie_event(Genotype *genotype,
                         CellState *state,
                         GillespieRates *rates,
                         float dt,
@@ -2857,7 +2867,9 @@ void do_Gillespie_event(Genotype *genotype,
                         int mut_step,
                         Mutation *mut_record)
 {
-    float x;    
+    float x; 
+    int return_value;
+    return_value=0;
 //    FILE *fp;  
     
     while(1)
@@ -2873,7 +2885,8 @@ void do_Gillespie_event(Genotype *genotype,
 //            x -= rates->transport;           
             if (x <= rates->mRNAdecay)  /*STOCHASTIC EVENT: an mRNA decay event */
             {    
-                mRNA_decay_event(rates, state, genotype, t, dt, RS);              
+                mRNA_decay_event(rates, state, genotype, t, RS); 
+                return_value=UPDATE_PACT;
                 break;
             } 
             else 
@@ -2955,6 +2968,7 @@ void do_Gillespie_event(Genotype *genotype,
             }
 //        }
     }
+    return return_value;
 }
 
 void free_fixedevent(CellState *state)
@@ -3026,10 +3040,10 @@ void calc_avg_growth_rate(  Genotype *genotype,
         genotype->ncopies_under_penalty+=(genotype->protein_pool[k][0][0]<=MAX_COPIES)?0:(genotype->protein_pool[k][0][0]-MAX_COPIES);   
 #endif  
 
-//    #pragma omp parallel num_threads(N_THREADS)
+   #pragma omp parallel num_threads(N_THREADS)
     {
-//        int ID=omp_get_thread_num();
-        int ID=0;
+        int ID=omp_get_thread_num();
+//         int ID=0;
         int i,j,k;
         int N_replicates_per_thread=N_REPLICATES/N_THREADS;
         int end_state;
@@ -3052,7 +3066,7 @@ void calc_avg_growth_rate(  Genotype *genotype,
             gr1[i]=0.0;
             gr2[i]=0.0;
         }
-//        #pragma omp critical
+        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -3097,8 +3111,7 @@ void calc_avg_growth_rate(  Genotype *genotype,
             }
             initialize_cell(&state_offspring, genotype_offspring.ngenes, genotype_offspring.nproteins,
                             genotype_offspring.protein_pool,genotype_offspring.mRNAdecay, mRNA, protein, RS_parallel[ID]);
-            set_env(&state_offspring,env,env1_t_signalA,env1_t_signalB);
-            state_offspring.interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+            set_env(&state_offspring,env,env1_t_signalA,env1_t_signalB);         
             t = 0.0;
             calc_all_rates(&genotype_offspring, &state_offspring, &rate_offspring, t, INITIALIZATION); 
             while(t<tdevelopment && end_state==1)
@@ -3169,7 +3182,6 @@ void calc_avg_growth_rate(  Genotype *genotype,
             initialize_cell(&state_offspring, genotype_offspring.ngenes, genotype_offspring.nproteins,
                             genotype_offspring.protein_pool,genotype_offspring.mRNAdecay, mRNA, protein, RS_parallel[ID]);
             set_env(&state_offspring,env,env2_t_signalA,env2_t_signalB); 
-            state_offspring.interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
             t = 0.0;
             calc_all_rates(&genotype_offspring, &state_offspring, &rate_offspring, t, INITIALIZATION);	
             while(t<tdevelopment && end_state==1)
@@ -3224,7 +3236,7 @@ void calc_avg_growth_rate(  Genotype *genotype,
         
         for(j=0;j<NGENES;j++)
             free(genotype_offspring.all_binding_sites[j]);
-//        #pragma omp critical
+        #pragma omp critical
         {
             j=0;
             for(i=ID*N_replicates_per_thread;i<(ID+1)*N_replicates_per_thread;i++)
@@ -3495,7 +3507,7 @@ void calc_avg_growth_rate_plotting( Genotype *genotype,
     {
         for(m=0;m<genotype->ngenes;m++)
         {
-            for(n=0;n<149;n++)
+            for(n=0;n<159;n++)
             {
                 phenotypeA[l][m][n]=0.0;
                 phenotypeB[l][m][n]=0.0;               
@@ -3511,10 +3523,10 @@ void calc_avg_growth_rate_plotting( Genotype *genotype,
             }        
     }
    
-    #pragma omp parallel num_threads(N_THREADS)
+//    #pragma omp parallel num_threads(N_THREADS)
     {
-        int ID=omp_get_thread_num();
-//        int ID=0;
+//        int ID=omp_get_thread_num();
+        int ID=0;
         int i,j,timepoint,k;    
         int end_state;  
         int N_replicates_per_thread=N_REPLICATES/N_THREADS;
@@ -3532,7 +3544,7 @@ void calc_avg_growth_rate_plotting( Genotype *genotype,
         initialize_cache(&genotype_offspring); 
         clone_cell_forward(genotype, &genotype_offspring, COPY_ALL);
         
-        #pragma omp critical
+//        #pragma omp critical
         {            
             genotype_offspring.ngenes=genotype->ngenes;
             genotype_offspring.ntfgenes=genotype->ntfgenes;
@@ -3577,7 +3589,7 @@ void calc_avg_growth_rate_plotting( Genotype *genotype,
             initialize_cell(&state_offspring, genotype_offspring.ngenes, genotype_offspring.nproteins,
                             genotype_offspring.protein_pool,genotype_offspring.mRNAdecay, mRNA, protein, RS[ID]);
             set_env(&state_offspring,env,env1_t_signalA,env1_t_signalB);
-            state_offspring.interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+//            state_offspring.interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
             t = 0.0;
             calc_all_rates(&genotype_offspring, &state_offspring, &rate_offspring, t, INITIALIZATION);           
             
@@ -3618,7 +3630,7 @@ void calc_avg_growth_rate_plotting( Genotype *genotype,
             initialize_cell(&state_offspring, genotype_offspring.ngenes, genotype_offspring.nproteins,
                             genotype_offspring.protein_pool,genotype_offspring.mRNAdecay, mRNA, protein, RS[ID]);
             set_env(&state_offspring,env,env2_t_signalA,env2_t_signalB); 
-            state_offspring.interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
+//            state_offspring.interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
             t = 0.0;
             calc_all_rates(&genotype_offspring, &state_offspring, &rate_offspring, t, INITIALIZATION);           
             end_state=1;           
@@ -5743,14 +5755,14 @@ void run_simulation(    Genotype *genotype_ori,
     init_step=1;
     N_tot_trials=0;    
     max_mut_steps=BURN_IN;    
-    tdevelopment=149.9;                 // global variable
+    tdevelopment=159.9;                 // global variable
     duration_of_burn_in_growth_rate=0.0;// global variable
     init_env1='A';                      // global variable
     init_env2='A';                      // global variable
     env1_t_signalA=180.0;               // global variable 
     env1_t_signalB=0.0;                 // global variable
-    env2_t_signalA=10.0;               // global variable
-    env2_t_signalB=40.0;                 // global variable 
+    env2_t_signalA=20.0;               // global variable
+    env2_t_signalB=60.0;                 // global variable 
     env1_signalA_as_noise=0;            // global variable
     env2_signalA_as_noise=1;            // global variable
     recalc_new_fitness=5;               // global variable, make sure its value is smaller than MAX_RECALC_FITNESS
@@ -5791,14 +5803,14 @@ void run_simulation(    Genotype *genotype_ori,
     /* post-burn-in simulations*/
     run_burn_in=0;
     max_mut_steps=MAX_MUT_STEP;    
-    tdevelopment=149.9;                     // global variable
+    tdevelopment=159.9;                     // global variable
     duration_of_burn_in_growth_rate=0.0;    // global variable    
     init_env1='A';                          // global variable
     init_env2='A';                          // global variable
     env1_t_signalA=180.0;                   // global variable
     env1_t_signalB=0.0;                     // global variable
-    env2_t_signalA=10.0;                   // global variable
-    env2_t_signalB=40.0;                     // global variable
+    env2_t_signalA=20.0;                   // global variable
+    env2_t_signalB=60.0;                     // global variable
     env1_signalA_as_noise=0;                // global variable
     env2_signalA_as_noise=1;                // global variable
     recalc_new_fitness=5;                   // global variable, make sure its value is smaller than MAX_RECALC_FITNESS        
@@ -6019,7 +6031,7 @@ void evolve_N_steps(Genotype *genotype_ori,
         fixation=0;      
         N_trials=0;
        
-        if(*N_tot_trials>50000)
+        if(*N_tot_trials>MAX_MUTATIONS)
         {
             *init_step=i;
             return ;
@@ -6035,7 +6047,7 @@ void evolve_N_steps(Genotype *genotype_ori,
         {	
             N_trials++;
             (*N_tot_trials)++;
-            if(N_trials>500)
+            if(N_trials>MAX_TRIALS)
             {
                 fp=fopen(file_genotype_summary,"a+");                              
                 fprintf(fp,"Tried 5000 mutations, yet none could fix\n");
@@ -6258,13 +6270,13 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
     
     /* record the initial network topology*/
     summarize_binding_sites(&genotype_ori,init_step); /*snapshot of the initial (0) distribution binding sites */   
-//    find_ffl(&genotype_ori); 
-//    fp=fopen("proportion_c1ffl","a+");
-//    fprintf(fp,"%f %d %d %d\n",genotype_ori.proportion_c1ffls,
-//                                genotype_ori.N_ffls[0],
-//                                genotype_ori.N_act_genes,
-//                                genotype_ori.protein_pool[genotype_ori.nproteins-1][0][0]);
-//    fclose(fp);
+   find_ffl(&genotype_ori); 
+   fp=fopen("proportion_c1ffl","a+");
+   fprintf(fp,"%f %d %d %d\n",genotype_ori.proportion_c1ffls,
+                               genotype_ori.N_ffls[0],
+                               genotype_ori.N_act_genes,
+                               genotype_ori.protein_pool[genotype_ori.nproteins-1][0][0]);
+   fclose(fp);
     
     /* initialize mut_record */
     mut_record.kinetic_diff=0.0;
@@ -6277,7 +6289,7 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
     mut_record.pos_n=-1;
 
 #if JUST_PLOTTING 
-    fp=fopen("MUT_9.txt","r");    
+    fp=fopen("MUT_3.txt","r");    
     if(fp!=NULL)
     {
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
@@ -6288,20 +6300,20 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
                         RS_parallel,
                         &mut_record,                                
                         fp,
-                       10000);
+                       0);
         fclose(fp);
     } 
 #else    
     if(!SKIP_INITIAL_GENOTYPE)/* get the fitness of the initial genotype */ 
     {                     
-        tdevelopment=149.9;
-        duration_of_burn_in_growth_rate=0.0;
+        tdevelopment=159.9;
+        duration_of_burn_in_growth_rate=0.1;
         init_env1='A';
         init_env2='A'; 
         env1_t_signalA=180.0;     
         env1_t_signalB=0.0;
-        env2_t_signalA=10.0;
-        env2_t_signalB=40.0;
+        env2_t_signalA=20.0;
+        env2_t_signalB=60.0;
         env1_signalA_as_noise=0;    
         env2_signalA_as_noise=1; 
         recalc_new_fitness=5; // make sure its value is smaller than MAX_RECALC_FITNESS
