@@ -21,15 +21,15 @@
 #define QUICK_BURN_IN 0
 
 /*Runtime control*/
-#ifndef MAX_MUT_STEP         
-#define MAX_MUT_STEP 5000
+#ifndef MAX_MUT_STEP 5000   
+#define MAX_MUT_STEP 0
 #ifndef BURN_IN
 #define BURN_IN 0
 #endif
 #define MAX_MUTATIONS 100000
 #define MAX_TRIALS 5000
-#define N_THREADS 4
-#define N_REPLICATES 80
+#define N_THREADS 10
+#define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
 
 /*Miscellaneous settings*/
@@ -58,7 +58,7 @@
 #define SIMPLE_SUBSTITUTION 1
 #define RANDOMIZE_SIGNAL2 0
 #define ALPHA 0.2
-#define MAX_RECALC_FITNESS 5
+#define MAX_RECALC_FITNESS 200
 #define RULE_OF_REPLACEMENT 4 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>minimal_selection_coefficient */
 #if RULE_OF_REPLACEMENT==4
 #define minimal_selection_coefficient 1.0e-8
@@ -96,7 +96,7 @@
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
 #define NMIN 6
-#define NUM_K_DISASSEMBLY 4524 /* number of differents for PIC disassembly from data file  */
+#define NUM_K_DISASSEMBLY 131 /* number of differents for PIC disassembly from data file  */
 #ifndef HIND_LENGTH
 #define HIND_LENGTH 6         /* default length of hindrance on each side of the binding site (original was 6) */
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
@@ -592,7 +592,7 @@ extern void transport_event(Genotype *,
                             float,
                             RngStream);
 
-extern void mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, RngStream);
+extern int mRNA_decay_event(GillespieRates *, CellState *, Genotype *, float, RngStream);
 
 extern void histone_acteylation_event(GillespieRates *, CellState *, Genotype *, RngStream);
 
@@ -667,7 +667,7 @@ extern void calc_all_rates(Genotype *,
                             float,
                             int);
 
-extern void end_translation_init(   Genotype *, 
+extern int end_translation_init(   Genotype *, 
                                     CellState *,    
                                     GillespieRates *, 
                                     float *, 

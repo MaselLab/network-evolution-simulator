@@ -34,12 +34,12 @@ const float TTRANSLATION=1.0;
 const float TTRANSCRIPTION=1.0;
 const float PROB_ACTIVATING=0.62;
 const float TRANSCRIPTINIT=5.0; /* replace betaon and betaoff */
-const float DEACETYLATE=0.7;
-const float ACETYLATE=0.2;
-const float PICASSEMBLY=0.2; //revised from 0.0277
+const float DEACETYLATE=0.667;
+const float ACETYLATE=0.167;
+const float PICASSEMBLY=0.05; //revised from 0.0277
 const float STARTNUCLEUS=0.1;
-const float MIN_PICDISASSEMBLE = 0.1;
-const float MAX_PICDISASSEMBLE = 50.0;
+const float MIN_PICDISASSEMBLE = 0.2;
+const float MAX_PICDISASSEMBLE = 20.0;
 const float MAX_TRANSLATION = 600.0;   /* molecules per min. Based on 3 codons/s, 30 codons apart*/
 const float MIN_TRANSLATION = 60.0 ;
 const float MAX_mRNA_decay = 0.69;          /* 1 min half-life */
@@ -1826,7 +1826,7 @@ void end_transcription(float *dt,
     add_fixed_event(i, endtime, &(state->mRNA_transl_init_time_end), &(state->mRNA_transl_init_time_end_last));
 }
 
-void end_translation_init(  Genotype *genotype, 
+int end_translation_init(  Genotype *genotype, 
                             CellState *state, 
                             GillespieRates *rates, 
                             float *dt,
@@ -1837,52 +1837,29 @@ void end_translation_init(  Genotype *genotype,
                             Mutation *mut_record,
                             char *env)
 {
-    int i;   
+    int gene_id;   
     float salphc;
-//    float t_to_update_Pact;
-//    int concurrent;
     
     *dt = state->mRNA_transl_init_time_end->time - t;         /* make dt window smaller */
     update_protein_number_cell_size(genotype, state, rates, *dt, t, *env, end_state, error, mut_step, mut_record);
     /* get identity of gene that has just finished translating */
-    i=state->mRNA_transl_init_time_end->gene_id;   
+    gene_id=state->mRNA_transl_init_time_end->gene_id;   
 
     /* there is one less mRNA that is initializing translation */
-    (state->mRNA_transl_cyto_num[i])--;  
+    (state->mRNA_transl_cyto_num[gene_id])--;  
     /* delete the event that just happened */
     delete_fixed_event_start(&(state->mRNA_transl_init_time_end), &(state->mRNA_transl_init_time_end_last));
     
     /* there is one more mRNA that is now in cytoplasm */
-    (state->mRNA_cyto_num[i])++;
-    salphc = state->mRNA_cyto_num[i] * genotype->translation[i] / state->konvalues[i][KON_PROTEIN_DECAY_INDEX];
-    state->konvalues[i][KON_SALPHAC_INDEX] = salphc;
+    (state->mRNA_cyto_num[gene_id])++;
+    salphc = state->mRNA_cyto_num[gene_id] * genotype->translation[gene_id] / state->konvalues[gene_id][KON_PROTEIN_DECAY_INDEX];
+    state->konvalues[gene_id][KON_SALPHAC_INDEX] = salphc;
 //    change_mRNA_cytoplasm(state->mRNA_transl_init_time_end->gene_id, genotype, state, rates);
     
-    /* set rate of updating Pact to maximal*/
-//    state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
-//    t_to_update_Pact=t+*dt+state->interval_to_update_Pact;
-//    if(state->t_to_update_Pact>t_to_update_Pact)    // if the scheduled update is too late, we need a new schedule. 
-//    {
-//        concurrent=check_concurrence(   t_to_update_Pact,
-//                                        state->mRNA_transl_init_time_end,
-//                                        state->mRNA_transcr_time_end,
-//                                        state->signalB_starts_end,
-//                                        state->signalA_starts_end,
-//                                        state->burn_in_growth_rate,
-//                                        state->t_to_update_Pact);
-//        while(concurrent)
-//        {
-//            t_to_update_Pact+=0.0001;
-//            concurrent=check_concurrence(   t_to_update_Pact,
-//                                            state->mRNA_transl_init_time_end,
-//                                            state->mRNA_transcr_time_end,
-//                                            state->signalB_starts_end,
-//                                            state->signalA_starts_end,
-//                                            state->burn_in_growth_rate,
-//                                            state->t_to_update_Pact);        
-//        }
-//        state->t_to_update_Pact=t_to_update_Pact;
-//    }
+    if(genotype->which_protein[gene_id]==genotype->nproteins-1)
+        return 0;
+    else
+        return UPDATE_PACT;
 }
 
 /*
@@ -2217,7 +2194,7 @@ void transport_event(   Genotype *genotype,
 //    add_fixed_event(gene_id, endtime, &(state->mRNA_transl_init_time_end), &(state->mRNA_transl_init_time_end_last));    
 }
 
-void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotype, float t, RngStream RS)
+int mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotype, float t, RngStream RS)
 {
     int gene_id;
     float x;
@@ -2245,7 +2222,7 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
             break;
     } 
     
-    /* assume mRNA cytoplasm transport events equally likely */
+    /* assume mRNAs are equally likely to be degraded */
     x = RngStream_RandInt(RS,1,state->mRNA_cyto_num[gene_id] + state->mRNA_transl_cyto_num[gene_id]);
     
     /* decay mRNA in cytoplasm */
@@ -2268,31 +2245,10 @@ void mRNA_decay_event(GillespieRates *rates, CellState *state, Genotype *genotyp
         (state->mRNA_transl_cyto_num[gene_id])--; 
     }
     
-//    /* set the rate of updating pact to max*/
-//    state->interval_to_update_Pact=MIN_INTERVAL_TO_UPDATE_PACT;
-//    t_to_update_Pact=t+dt+state->interval_to_update_Pact;
-//    if(state->t_to_update_Pact>t_to_update_Pact) // if the scheduled time to update is too late, we need a new schedule.
-//    {
-//        concurrent=check_concurrence(   t_to_update_Pact,
-//                                        state->mRNA_transl_init_time_end,
-//                                        state->mRNA_transcr_time_end,
-//                                        state->signalB_starts_end,
-//                                        state->signalA_starts_end,
-//                                        state->burn_in_growth_rate,
-//                                        state->t_to_update_Pact);
-//        while(concurrent)
-//        {
-//            t_to_update_Pact+=0.0001;
-//            concurrent=check_concurrence(   t_to_update_Pact,
-//                                            state->mRNA_transl_init_time_end,
-//                                            state->mRNA_transcr_time_end,
-//                                            state->signalB_starts_end,
-//                                            state->signalA_starts_end,
-//                                            state->burn_in_growth_rate,
-//                                            state->t_to_update_Pact);       
-//        }
-//        state->t_to_update_Pact=t_to_update_Pact;
-//    }
+    if(genotype->which_protein[gene_id]==genotype->nproteins-1)
+        return 0;
+    else // an mRNA of transcription factor is degraded, which can cause fluctuation in transcription factor concentrations.
+        return UPDATE_PACT;
 }
 
 void histone_acteylation_event(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
@@ -2805,14 +2761,10 @@ int do_fixed_event(Genotype *genotype,
     switch (event) 
     {
         case 1:     /* a transcription event ends */
-            end_transcription(dt, t, state, rates, genotype,end_state,error,mut_step,mut_record,env);
-            return_value=UPDATE_PACT;
-            /* update_protein_number_cell_size is called within end_transcription*/
+            end_transcription(dt, t, state, rates, genotype,end_state,error,mut_step,mut_record,env); 
             break;
         case 2:     /* a translation initialization event ends */ 
-            end_translation_init(genotype, state, rates, dt, t,end_state,error,mut_step,mut_record,env);  
-            
-            /* update_protein_number_cell_size is called within end_translation_init*/
+            return_value=end_translation_init(genotype, state, rates, dt, t,end_state,error,mut_step,mut_record,env);
             break;
         case 3:     /* environment B starts*/ 
             *dt = state->signalB_starts_end->time - t;     
@@ -2885,8 +2837,7 @@ int do_Gillespie_event(Genotype *genotype,
 //            x -= rates->transport;           
             if (x <= rates->mRNAdecay)  /*STOCHASTIC EVENT: an mRNA decay event */
             {    
-                mRNA_decay_event(rates, state, genotype, t, RS); 
-                return_value=UPDATE_PACT;
+                return_value=mRNA_decay_event(rates, state, genotype, t, RS);                
                 break;
             } 
             else 
@@ -5772,7 +5723,7 @@ void run_simulation(    Genotype *genotype_ori,
         recalc_new_fitness=5;               // global variable, make sure its value is smaller than MAX_RECALC_FITNESS
         env1_occurence=0.5;                 // global variable
         env2_occurence=0.5;                 // global variable
-        if(init_step<BURN_IN)
+        if(init_step<BURN_IN)init_run_pop
         {
             fp=fopen(RuntimeSumm,"a+");
             fprintf(fp,"**********Burn-in conditions**********\n");
@@ -6411,7 +6362,7 @@ int init_run_pop(   float kdis[NUM_K_DISASSEMBLY],
             env2_t_signalB=60.0;
             env1_signalA_as_noise=0;    
             env2_signalA_as_noise=1; 
-            recalc_new_fitness=5; // make sure its value is smaller than MAX_RECALC_FITNESS
+            recalc_new_fitness=200; // make sure its value is smaller than MAX_RECALC_FITNESS
             env1_occurence=0.5;
             env2_occurence=0.5;    
             float GR1[recalc_new_fitness][N_REPLICATES],GR2[recalc_new_fitness][N_REPLICATES];
