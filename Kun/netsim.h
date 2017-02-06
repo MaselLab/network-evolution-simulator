@@ -21,8 +21,8 @@
 #define QUICK_BURN_IN 0
 
 /*Runtime control*/
-#ifndef MAX_MUT_STEP 5000   
-#define MAX_MUT_STEP 0
+#ifndef MAX_MUT_STEP    
+#define MAX_MUT_STEP 5000
 #ifndef BURN_IN
 #define BURN_IN 0
 #endif
@@ -36,16 +36,15 @@
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
-#define OUTPUT_RNG_SEEDS 1
+#define OUTPUT_RNG_SEEDS 0
 #define TIME_INFINITY 9.99e10
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define DIRECT_REG 1
+#define DIRECT_REG 0
 #define RANDOM_INIT_KINETIC_CONST 1
 #define RANDOM_COOPERATION_LOGIC 0
-#define RdcPdup 0
-#define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. Planning on adding a 3rd tf as another signal TF. 
+#define N_SIGNAL_TF 1 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
 #define NO_REGULATION_COST 0
 #define NO_REGULATION 0 // this locks the state of transcription factors to NUC_NO_PIC
 #define ADJUST_FITNESS 0 // allows manually adjust the fitness of a phenotype
@@ -98,7 +97,7 @@
 #define NMIN 6
 #define NUM_K_DISASSEMBLY 131 /* number of differents for PIC disassembly from data file  */
 #ifndef HIND_LENGTH
-#define HIND_LENGTH 6         /* default length of hindrance on each side of the binding site (original was 6) */
+#define HIND_LENGTH 6         /* default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH */
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
 #endif
 #define MAX_MODE 8  /* MAX_MODE is the max number of tf that can bind to a promoter plus 1*/
@@ -213,8 +212,6 @@ struct Genotype {
     int ntfgenes;                                           /* the number of tf loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
-    int ncopies_under_penalty;                              /* this is the number of gene copies that exceed the MAX_COPIES */  
-                                                               
     int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */   
     char cisreg_seq[NGENES][CISREG_LEN];    
     
@@ -224,7 +221,6 @@ struct Genotype {
     int activating[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
     char tf_seq[NPROTEINS][TF_ELEMENT_LEN];
     char tf_seq_rc[NPROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
-//    float P_dup_per_protein[NPROTEINS];                     /* probability of duplication of the copies for each protein */
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
     float koff[NPROTEINS];                                     /* kinetic rates*/ 
     
@@ -234,8 +230,6 @@ struct Genotype {
     float translation[NGENES];                              /* kinetic rates*/   
     float pic_disassembly[NGENES];                          /* kinetic rates*/    
     int min_act_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
-//    int N_failed_dup_and_del[NGENES];                       /* If too many mutations has been wasted on the gene, */
-                                                            /* reduce the rate of dup and del on this gene by 10 fold*/
  
     /* binding sites related data, applying to loci*/   
     int cisreg_cluster[NGENES][NGENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
@@ -265,10 +259,11 @@ struct Genotype {
     float fitness;
     float sq_SE_fitness;
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
-    int N_ffls[4];     
-    int N_non_ffl_motifs;
-    float proportion_c1ffls;  
-    int N_act_genes;   
+    int N_motifs[6];    
+    float proportion_motifs[6];  
+    int N_act_genes; 
+    int N_act_genes_reg_by_env;
+    int N_act_genes_not_reg_by_env;
 };
 
 /* 
