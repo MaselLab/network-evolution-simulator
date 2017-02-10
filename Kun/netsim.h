@@ -13,7 +13,6 @@
 
 /*Simulation mode*/
 #define JUST_PLOTTING 0
-//#define CONTINUE 1
 #define NEUTRAL 0
 #define RUN_FULL_SIMULATION 1
 #define SKIP_INITIAL_GENOTYPE 0
@@ -27,7 +26,7 @@
 #define BURN_IN 0
 #endif
 #define MAX_MUTATIONS 100000
-#define MAX_TRIALS 5000
+#define MAX_TRIALS 500
 #define N_THREADS 10
 #define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
@@ -36,15 +35,15 @@
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
 #define RT_SAFE_EPSILON 1e-6
-#define OUTPUT_RNG_SEEDS 0
+#define OUTPUT_RNG_SEEDS 1
 #define TIME_INFINITY 9.99e10
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define DIRECT_REG 0
+#define DIRECT_REG 1
 #define RANDOM_INIT_KINETIC_CONST 1
 #define RANDOM_COOPERATION_LOGIC 0
-#define N_SIGNAL_TF 1 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
+#define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
 #define NO_REGULATION_COST 0
 #define NO_REGULATION 0 // this locks the state of transcription factors to NUC_NO_PIC
 #define ADJUST_FITNESS 0 // allows manually adjust the fitness of a phenotype
@@ -57,7 +56,7 @@
 #define SIMPLE_SUBSTITUTION 1
 #define RANDOMIZE_SIGNAL2 0
 #define ALPHA 0.2
-#define MAX_RECALC_FITNESS 200
+#define MAX_RECALC_FITNESS 10
 #define RULE_OF_REPLACEMENT 4 /* 0 for z-score, 1 for Wilcoxon, 2 for larger-fitness-fixes, 3 for larger-than-epsilon-fixes, 4 for s>minimal_selection_coefficient */
 #if RULE_OF_REPLACEMENT==4
 #define minimal_selection_coefficient 1.0e-8
@@ -240,8 +239,9 @@ struct Genotype {
     int recalc_TFBS[NGENES];                                /* whether to recalc the TFBS*/
     int clone_info[NGENES];                                 /* whether to copy info back to this gene in clone_cell*/    
     int binding_sites_num[NGENES];                          /* total number of binding sites */
+    int max_unhindered_sites[NGENES][3];                    /* maximal number of binding sites that do not hinder each other. 0 for activator BS, 1 for repressor BS*/  
     int max_hindered_sites[NGENES];                         /* maximal number of BSs a BS can hinder*/ 
-    int max_hindered_clusters[NGENES];                      /* maximal number of clusters a cluster can hinder*/   
+//    int max_hindered_clusters[NGENES];                      /* maximal number of clusters a cluster can hinder*/   
 //    int cluster_num[NGENES];                              /* number of clusters of compressed binding sites */
     int N_act_BS[NGENES];                                   /* total number of binding sites of activating TF */
     int N_rep_BS[NGENES];                                   /* total number of binding sites of repressing TF */
@@ -259,8 +259,8 @@ struct Genotype {
     float fitness;
     float sq_SE_fitness;
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
-    int N_motifs[6];    
-    float proportion_motifs[6];  
+    int N_motifs[8];    
+    float proportion_motifs[8];  
     int N_act_genes; 
     int N_act_genes_reg_by_env;
     int N_act_genes_not_reg_by_env;
@@ -471,9 +471,9 @@ extern float calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
                                         int , 
                                         int [NPROTEINS],                                    
-                                        int ,
+                                        int [3],
                                         float [NGENES],
-                                        int );
+                                        int,int );
 
 extern float calc_TF_dist_from_all_BS_simple(   AllTFBindingSites *,
                                                 int,
@@ -613,7 +613,7 @@ extern void do_single_timestep( Genotype *,
                                 char *,
                                 int,
                                 Mutation *,
-                                int *,int*) ;
+                                int *,int*,int) ;
 
 extern void do_single_timestep_plotting(    Genotype *, 
                                             CellState *,
@@ -660,7 +660,7 @@ extern void calc_all_rates(Genotype *,
                             CellState *,
                             GillespieRates *, 
                             float,
-                            int);
+                            int,int);
 
 extern int end_translation_init(   Genotype *, 
                                     CellState *,    
@@ -750,7 +750,7 @@ extern void initialize_cache(Genotype *);
 
 extern void update_protein_pool(Genotype *, int, int, char);
 
-extern void update_cisreg_cluster(Genotype *, int, char);
+extern void update_cisreg_cluster(Genotype *, int, char, int [NGENES][NGENES], int, int);
 
 extern void clone_cell_forward(Genotype *, Genotype *, int);
 

@@ -34,7 +34,7 @@ int main()
     /* get the kdis.txt values */
     read_kdisassembly(kdis);
     /* now create and run the population of cells */
-	i=6;
+    i=2;
     
     for(j=0;j<6;j++)
         seed[j]=i;
@@ -46,17 +46,15 @@ int main()
     snprintf(filename5,sizeof(char)*32,"N_rep_BS_%i.txt",i);
     snprintf(filename6,sizeof(char)*32,"N_BS_%i.txt",i);
     snprintf(RuntimeSumm,sizeof(char)*32,"RuntimeSummary_%i.txt",i);
-
     chdir("result"); 
     fp=fopen("saving_point","r");
     if(fp==NULL)
     {
         fp=fopen(RuntimeSumm,"w");
-        fprintf(fp,"MAX_MODE=%d\n",MAX_MODE);
-        fprintf(fp,"MAX gene copies per protein=%d\n",MAX_COPIES);
-        fprintf(fp,"penalty per copies=%f\n",penalty_of_extra_copies); 
-        fprintf(fp,"max gene number=%d, max tf gene number=%d,max protein number=%d\n",NGENES,TFGENES,NPROTEINS);            
-        fprintf(fp,"cost_term=%f, penalty=%f\n",cost_term,penalty);
+        fprintf(fp,"Max simulation steps=%d, max trials=%d\n",MAX_MUT_STEP,MAX_TRIALS);
+        fprintf(fp,"TF_ELEMENT_LEN=%d, NMIN=%d, HIND_LENGTH=%d, MAX_MODE=%d\n",TF_ELEMENT_LEN,NMIN,HIND_LENGTH,MAX_MODE);
+        fprintf(fp,"max effector gene number=%d, max tf gene number=%d\n",EFFECTOR_GENES,TFGENES);            
+        fprintf(fp,"cost of expression=%f, penalty=%f\n",h,penalty);
         fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);  
         fprintf(fp,"minimal activators to transcribe selection gene: %d\n",min_act_to_transcr_selection_protein);  
         init_run_pop(kdis,RuntimeSumm,filename1,filename2,filename3,filename4,filename5,filename6,seed,0);
@@ -65,9 +63,9 @@ int main()
     {
         fclose(fp);
         init_run_pop(kdis,RuntimeSumm,filename1,filename2,filename3,filename4,filename5,filename6,seed,1);
-    } 
-    
+    }    
     return 0;
 }
+
 
 
