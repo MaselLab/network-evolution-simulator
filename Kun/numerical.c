@@ -96,86 +96,86 @@
 
 float gasdev(RngStream RS)
 {
-   static int iset=0;
-   static float gset;
+//   static int iset=0;
+//   static float gset;
    float fac,r,v1,v2;
 
-   if (iset == 0) {
+//   if (iset == 0) {
       do {
          v1=2.0*RngStream_RandU01(RS)-1.0;
          v2=2.0*RngStream_RandU01(RS)-1.0;
          r=v1*v1+v2*v2;
       } while (r >= 1.0);
       fac=sqrt(-2.0*log(r)/r);
-      gset=v1*fac;
-      iset=1;
+//      gset=v1*fac;
+//      iset=1;
       return v2*fac;
-   } else {
-      iset=0;
-      return gset;
-   }
+//   } else {
+//      iset=0;
+//      return gset;
+//   }
 }
 
-float gammln(float xx)
-/*Returns the value ln[�(xx)] for xx > 0.*/
-{
-/*Internal arithmetic will be done in double precision, a nicety that you can omit if five-figure
-accuracy is good enough.*/
-    double x,y,tmp,ser;
-    static double cof[6]={76.18009172947146,-86.50532032941677,
-        24.01409824083091,-1.231739572450155,
-        0.1208650973866179e-2,-0.5395239384953e-5};
-    int j;
+//float gammln(float xx)
+///*Returns the value ln[�(xx)] for xx > 0.*/
+//{
+///*Internal arithmetic will be done in double precision, a nicety that you can omit if five-figure
+//accuracy is good enough.*/
+//    double x,y,tmp,ser;
+//    static double cof[6]={76.18009172947146,-86.50532032941677,
+//        24.01409824083091,-1.231739572450155,
+//        0.1208650973866179e-2,-0.5395239384953e-5};
+//    int j;
+//
+//    y=x=xx;
+//    tmp=x+5.5;
+//    tmp -= (x+0.5)*log(tmp);
+//    ser=1.000000000190015;
+//    for (j=0;j<=5;j++) ser += cof[j]/++y;
+//    return -tmp+log(2.5066282746310005*ser/x);
+//}
 
-    y=x=xx;
-    tmp=x+5.5;
-    tmp -= (x+0.5)*log(tmp);
-    ser=1.000000000190015;
-    for (j=0;j<=5;j++) ser += cof[j]/++y;
-    return -tmp+log(2.5066282746310005*ser/x);
-}
-
-float poidev(float xm, RngStream RS)
-{    
-    float gammln(float xx);
-    //float ran1(long *seed);
-    static float sq,alxm,g,oldm=(-1.0);  /*oldm is a flag for whether xm has changed*/
-    float em,t,y;                       /*since last call. */
-
-    if (xm < 12.0) {                       /*Use direct method.*/
-        if (xm != oldm) {
-        oldm=xm;
-        g=exp(-xm);                     /*If xm is new, compute the exponential.*/
-    }
-    em = -1;
-    t=1.0;
-    do {                        /*Instead of adding exponential deviates it is equivalent*/
-        ++em;                        /*to multiply uniform deviates. We never*/
-        t *= RngStream_RandU01(RS);                      /*actually have to take the log, merely compare*/
-    } while (t > g);                        /*to the pre-computed exponential.*/
-
-    } else {                 /*Use rejection method.*/
-        if (xm != oldm) {               /*If xm has changed since the last call, then precompute*/
-          oldm=xm;                               /*some functions that occur below. */
-          sq=sqrt(2.0*xm);
-          alxm=log(xm);
-          g=xm*alxm-gammln(xm+1.0);
-                            /*The function gammln is the natural log of the gamma function, as given in �6.1.*/
-        }
-        do {
-            do {                          /*y is a deviate from a Lorentzian comparison function.*/
-               y=tan(PI*RngStream_RandU01(RS));
-               em=sq*y+xm;                     /*em is y, shifted and scaled.*/
-            } while (em < 0.0);             /*Reject if in regime of zero probability.*/
-            em=floor(em);                   /*The trick for integer-valued distributions.*/
-            t=0.9*(1.0+y*y)*exp(em*alxm-gammln(em+1.0)-g);
-/*The ratio of the desired distribution to the comparison function; we accept or
-reject by comparing it to another uniform deviate. The factor 0.9 is chosen so
-that t never exceeds 1.*/
-    } while (RngStream_RandU01(RS) > t);
-  }
-  return em;
-}
+//float poidev(float xm, RngStream RS)
+//{    
+//    float gammln(float xx);
+//    //float ran1(long *seed);
+//    static float sq,alxm,g,oldm=(-1.0);  /*oldm is a flag for whether xm has changed*/
+//    float em,t,y;                       /*since last call. */
+//
+//    if (xm < 12.0) {                       /*Use direct method.*/
+//        if (xm != oldm) {
+//        oldm=xm;
+//        g=exp(-xm);                     /*If xm is new, compute the exponential.*/
+//    }
+//    em = -1;
+//    t=1.0;
+//    do {                        /*Instead of adding exponential deviates it is equivalent*/
+//        ++em;                        /*to multiply uniform deviates. We never*/
+//        t *= RngStream_RandU01(RS);                      /*actually have to take the log, merely compare*/
+//    } while (t > g);                        /*to the pre-computed exponential.*/
+//
+//    } else {                 /*Use rejection method.*/
+//        if (xm != oldm) {               /*If xm has changed since the last call, then precompute*/
+//          oldm=xm;                               /*some functions that occur below. */
+//          sq=sqrt(2.0*xm);
+//          alxm=log(xm);
+//          g=xm*alxm-gammln(xm+1.0);
+//                            /*The function gammln is the natural log of the gamma function, as given in �6.1.*/
+//        }
+//        do {
+//            do {                          /*y is a deviate from a Lorentzian comparison function.*/
+//               y=tan(PI*RngStream_RandU01(RS));
+//               em=sq*y+xm;                     /*em is y, shifted and scaled.*/
+//            } while (em < 0.0);             /*Reject if in regime of zero probability.*/
+//            em=floor(em);                   /*The trick for integer-valued distributions.*/
+//            t=0.9*(1.0+y*y)*exp(em*alxm-gammln(em+1.0)-g);
+///*The ratio of the desired distribution to the comparison function; we accept or
+//reject by comparing it to another uniform deviate. The factor 0.9 is chosen so
+//that t never exceeds 1.*/
+//    } while (RngStream_RandU01(RS) > t);
+//  }
+//  return em;
+//}
 
 float expdev(RngStream RS)
 {
@@ -185,57 +185,57 @@ float expdev(RngStream RS)
   return -log(dum);
 }
 
-float bnldev(float pp, int n, RngStream RS)
-{
-    float gammln(float xx);
-    //float ran1(long *seed);
-    int j;
-    static int nold=(-1);
-    float am,em,g,angle,p,bnl,sq,t,y;
-    static float pold=(-1.0),pc,plog,pclog,en,oldg;
-    p=(pp <= 0.5 ? pp : 1.0-pp);
-/*The binomial distribution is invariant under changing pp to 1-pp, if we also change the
-answer to n minus itself; we�ll remember to do this below.*/
-    am=n*p;         /*This is the mean of the deviate to be produced.*/
-    if (n < 25) {   /*Use the direct method while n is not too large.*/
-         bnl=0.0;                   /*This can require up to 25 calls to ran1. */
-         for (j=1;j<=n;j++)
-             if (RngStream_RandU01(RS) < p) ++bnl;
-         } else if (am < 1.0) {    /*If fewer than one event is expected out of 25*/
-               g=exp(-am);          /*or more trials, then the distribution is quite*/
-               t=1.0;               /*accurately Poisson. Use direct Poisson method.*/
-               for (j=0;j<=n;j++) {
-                    t *= RngStream_RandU01(RS);
-                    if (t < g) break;
-              }
-              bnl=(j <= n ? j : n);
-         } else {    /*Use the rejection method.*/
-         if (n != nold) {    /*If n has changed, then compute useful quantities.*/
-             en=n;
-             oldg=gammln(en+1.0);
-             nold=n;
-         } if (p != pold) { /*If p has changed, then compute useful quantities.*/
-             pc=1.0-p;
-             plog=log(p);
-             pclog=log(pc);
-             pold=p;
-         }
-         sq=sqrt(2.0*am*pc);  /* The following code should by now seem familiar:*/
-         do {                      /* rejection method with a Lorentzian comparison*/
-            do {                   /*function.*/
-               angle=PI*RngStream_RandU01(RS);
-               y=tan(angle);
-               em=sq*y+am;
-            } while (em < 0.0 || em >= (en+1.0));  /*Reject.*/
-            em=floor(em);     /*Trick for integer-valued distribution.*/
-            t=1.2*sq*(1.0+y*y)*exp(oldg-gammln(em+1.0)
-                        -gammln(en-em+1.0)+em*plog+(en-em)*pclog);
-         } while (RngStream_RandU01(RS) > t);  /*Reject. This happens about 1.5 times per deviate,*/
-         bnl=em;
-    }                           /*on average. */
-    if (p != pp) bnl=n-bnl;  /*Remember to undo the symmetry transformation.*/
-    return bnl;
-}
+//float bnldev(float pp, int n, RngStream RS)
+//{
+//    float gammln(float xx);
+//    //float ran1(long *seed);
+//    int j;
+//    static int nold=(-1);
+//    float am,em,g,angle,p,bnl,sq,t,y;
+//    static float pold=(-1.0),pc,plog,pclog,en,oldg;
+//    p=(pp <= 0.5 ? pp : 1.0-pp);
+///*The binomial distribution is invariant under changing pp to 1-pp, if we also change the
+//answer to n minus itself; we�ll remember to do this below.*/
+//    am=n*p;         /*This is the mean of the deviate to be produced.*/
+//    if (n < 25) {   /*Use the direct method while n is not too large.*/
+//         bnl=0.0;                   /*This can require up to 25 calls to ran1. */
+//         for (j=1;j<=n;j++)
+//             if (RngStream_RandU01(RS) < p) ++bnl;
+//         } else if (am < 1.0) {    /*If fewer than one event is expected out of 25*/
+//               g=exp(-am);          /*or more trials, then the distribution is quite*/
+//               t=1.0;               /*accurately Poisson. Use direct Poisson method.*/
+//               for (j=0;j<=n;j++) {
+//                    t *= RngStream_RandU01(RS);
+//                    if (t < g) break;
+//              }
+//              bnl=(j <= n ? j : n);
+//         } else {    /*Use the rejection method.*/
+//         if (n != nold) {    /*If n has changed, then compute useful quantities.*/
+//             en=n;
+//             oldg=gammln(en+1.0);
+//             nold=n;
+//         } if (p != pold) { /*If p has changed, then compute useful quantities.*/
+//             pc=1.0-p;
+//             plog=log(p);
+//             pclog=log(pc);
+//             pold=p;
+//         }
+//         sq=sqrt(2.0*am*pc);  /* The following code should by now seem familiar:*/
+//         do {                      /* rejection method with a Lorentzian comparison*/
+//            do {                   /*function.*/
+//               angle=PI*RngStream_RandU01(RS);
+//               y=tan(angle);
+//               em=sq*y+am;
+//            } while (em < 0.0 || em >= (en+1.0));  /*Reject.*/
+//            em=floor(em);     /*Trick for integer-valued distribution.*/
+//            t=1.2*sq*(1.0+y*y)*exp(oldg-gammln(em+1.0)
+//                        -gammln(en-em+1.0)+em*plog+(en-em)*pclog);
+//         } while (RngStream_RandU01(RS) > t);  /*Reject. This happens about 1.5 times per deviate,*/
+//         bnl=em;
+//    }                           /*on average. */
+//    if (p != pp) bnl=n-bnl;  /*Remember to undo the symmetry transformation.*/
+//    return bnl;
+//}
 
 
 /* returns the cumulative probability of standard normal distribution*/

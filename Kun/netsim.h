@@ -21,13 +21,13 @@
 
 /*Runtime control*/
 #ifndef MAX_MUT_STEP    
-#define MAX_MUT_STEP 5000
+#define MAX_MUT_STEP 0
 #ifndef BURN_IN
 #define BURN_IN 0
 #endif
 #define MAX_MUTATIONS 100000
 #define MAX_TRIALS 500
-#define N_THREADS 10
+#define N_THREADS 4
 #define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
 
@@ -37,13 +37,14 @@
 #define RT_SAFE_EPSILON 1e-6
 #define OUTPUT_RNG_SEEDS 1
 #define TIME_INFINITY 9.99e10
+#define TIME_OFFSET 0.01
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
 #define DIRECT_REG 1
 #define RANDOM_INIT_KINETIC_CONST 1
 #define RANDOM_COOPERATION_LOGIC 0
-#define N_SIGNAL_TF 2 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
+#define N_SIGNAL_TF 1 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
 #define NO_REGULATION_COST 0
 #define NO_REGULATION 0 // this locks the state of transcription factors to NUC_NO_PIC
 #define ADJUST_FITNESS 0 // allows manually adjust the fitness of a phenotype
@@ -627,7 +628,8 @@ extern void do_single_timestep_plotting(    Genotype *,
                                             float [159],
                                             RngStream,                              
                                             int *,
-                                            int *) ;
+                                            int *,
+                                            int) ;
 							   
 extern void free_fixedevent(CellState *);
  
