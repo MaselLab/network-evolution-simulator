@@ -30,11 +30,11 @@ const float TRANSLATION_TIME=1.0;
 const float TRANSCRIPTION_TIME=1.0;
 const float PROB_ACTIVATING=0.62;
 const float TRANSCRIPTINIT=6.75; 
-const float NUC_DISASSEMBLY=1.55;
+const float MAX_NUC_DISASSEMBLY=1.7;
 const float BASE_NUC_DISASSEMBLY=0.15;
-const float NUC_ASSEMBLY=6.03;
+const float MAX_NUC_ASSEMBLY=6.7;
 const float BASE_NUC_ASSEMBLY=0.67;
-const float PIC_ASSEMBLY=3.275; 
+const float MAX_PIC_ASSEMBLY=3.3; 
 const float BASE_PIC_ASSEMBLY=0.025;
 const float MEAN_PROTEIN_DECAY_RATE=-4.58;
 const float SD_PROTEIN_DECAY_RATE=0.67;
@@ -595,7 +595,8 @@ void calc_TF_dist_from_all_BS( AllTFBindingSites *BS_info,
                                 int min_act_to_transcr,
                                 float *Pact,
                                 float *Prep,
-								float *PaNr)
+								float *PaNr,
+                                float *Pno_TF)
 {
     int max_N_binding_act=max_unhindered_sites[1]+1; //Binding configurations can contain at most x activators, plus 1 type of configurations that don't have activators at all. 
     int max_N_binding_rep=max_unhindered_sites[2]+1; //Binding configurations can contain at most y repressors, plus 1 type of configurations that don't have repressors at all. 
@@ -735,6 +736,8 @@ void calc_TF_dist_from_all_BS( AllTFBindingSites *BS_info,
 	for(j=min_act_to_transcr;j<max_N_binding_act;j++)
 		temp+=ratio_matrices[pos_next_record][0][j];
 	*PaNr = (float)(temp / sum);
+    
+    *Pno_TF=(float)(ratio_matrices[pos_next_record][0][0]/sum);
     // end of the forward algorithm   
 }
 
@@ -1065,6 +1068,7 @@ void calc_all_rates(Genotype *genotype,
         state->Pact[i]=0.0;
         state->Prep[i]=0.0;
         state->Pact_No_rep[i]=0.0;
+        state->Pno_TF[i]=0.0;
     } 
     /* update mRNA decay rates*/
     for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
@@ -1085,6 +1089,7 @@ void calc_all_rates(Genotype *genotype,
                     state->Pact[i]=state->Pact[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
                     state->Prep[i]=state->Prep[genotype->cisreg_cluster[cluster_id][0]];
                     state->Pact_No_rep[i]=state->Pact_No_rep[genotype->cisreg_cluster[cluster_id][0]];
+                    state->Pno_TF[i]=state->Pno_TF[genotype->cisreg_cluster[cluster_id][0]];
                 }
                 else /* otherwise, we need to calc the ratio*/
                 {
@@ -1099,12 +1104,14 @@ void calc_all_rates(Genotype *genotype,
                                                     genotype->min_act_to_transc[i],
                                                     &(state->Pact[i]),
                                                     &(state->Prep[i]),
-													&(state->Pact_No_rep[i]));
+													&(state->Pact_No_rep[i]),
+                                                    &(state->Pno_TF[i]));
                     else
                     {
                         state->Pact[i]=0.0;     
                         state->Prep[i]=0.0;
 						state->Pact_No_rep[i] = 0.0;
+                        state->Pno_TF[i]=0.0;
                     }
                 }
             }
@@ -1113,6 +1120,7 @@ void calc_all_rates(Genotype *genotype,
                state->Pact[i]=0.0; 
                state->Prep[i]=0.0;
 			   state->Pact_No_rep[i] = 0.0;
+               state->Pno_TF[i]=0.0;
             }
         #else
             cluster_id=genotype->which_cluster[i];        
@@ -1121,6 +1129,7 @@ void calc_all_rates(Genotype *genotype,
                 state->Pact[i]=state->Pact[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
                 state->Prep[i]=state->Prep[genotype->cisreg_cluster[cluster_id][0]];
                 state->Pact_No_rep[i]=state->Pact_No_rep[genotype->cisreg_cluster[cluster_id][0]];
+                state->Pno_TF[i]=state->Pno_TF[genotype->cisreg_cluster[cluster_id][0]];
             }
             else /* otherwise, we need to calc the ratio*/
             {
@@ -1135,12 +1144,14 @@ void calc_all_rates(Genotype *genotype,
                                                 genotype->min_act_to_transc[i],
                                                 &(state->Pact[i]),
                                                 &(state->Prep[i]),
-												&(state->Pact_No_rep[i]));
+												&(state->Pact_No_rep[i]),
+                                                &(state->Pno_TF[i]));
                 else
                 {
                     state->Pact[i]=0.0;     
                     state->Prep[i]=0.0;
 					state->Pact_No_rep[i] = 0.0;
+                    state->Pno_TF[i]=0.0;
                 }
             }
         #endif
@@ -1148,16 +1159,16 @@ void calc_all_rates(Genotype *genotype,
         switch (state->active[i])
         {
             case NUC_NO_PIC:
-                rates->nuc_disassembly_rate[i]=state->Pact[i]*NUC_DISASSEMBLY+BASE_NUC_DISASSEMBLY;             
+                rates->nuc_disassembly_rate[i]=state->Pact[i]*(MAX_NUC_DISASSEMBLY-BASE_NUC_DISASSEMBLY)+BASE_NUC_DISASSEMBLY;             
                 rates->nuc_disassembly+=rates->nuc_disassembly_rate[i];
                 rates->nuc_assembly_rate[i]=0.0;
                 rates->pic_assembly_rate[i]=0.0;
                 rates->pic_disassembly_rate[i]=0.0;
                 break;                
             case NO_NUC_NO_PIC:
-                rates->nuc_assembly_rate[i]=state->Prep[i]*NUC_ASSEMBLY+BASE_NUC_ASSEMBLY;
+                rates->nuc_assembly_rate[i]=state->Prep[i]*(MAX_NUC_ASSEMBLY-BASE_NUC_ASSEMBLY)+BASE_NUC_ASSEMBLY;
                 rates->nuc_assembly+=rates->nuc_assembly_rate[i];
-                rates->pic_assembly_rate[i]=(PIC_ASSEMBLY*state->Pact_No_rep[i]+BASE_PIC_ASSEMBLY)*(1.0-state->Prep[i]);
+                rates->pic_assembly_rate[i]=MAX_PIC_ASSEMBLY*state->Pact_No_rep[i]+BASE_PIC_ASSEMBLY*state->Pno_TF[i];
                 rates->pic_assembly+=rates->pic_assembly_rate[i]; 
                 rates->pic_disassembly_rate[i]=0.0;
                 rates->nuc_disassembly_rate[i]=0.0;
@@ -1229,6 +1240,19 @@ void calc_all_rates(Genotype *genotype,
 					too_much_error = 1;
 					break;
 				}
+                if (state->last_Pno_TF[i] != 0.0)
+				{
+					if (fabs(state->Pno_TF[i] - state->last_Pno_TF[i]) / state->last_Pno_TF[i]>MAX_CHANGE_IN_Pact_or_Prep)
+					{
+						too_much_error = 1;
+						break;
+					}
+				}
+				if (state->last_Pno_TF[i] == 0.0 && state->Pno_TF[i] != 0.0)
+				{
+					too_much_error = 1;
+					break;
+				}
             }
             if(!too_much_error)
                 interval_to_update_Pact_or_Prep=(t-state->last_event_t)*2.0;//the change in Pact is moderate, double the update interval     
@@ -1267,6 +1291,7 @@ void calc_all_rates(Genotype *genotype,
         state->last_Pact[i]=state->Pact[i];     
         state->last_Prep[i]=state->Prep[i];
         state->last_Pact_No_rep[i] = state->Pact_No_rep[i];
+        state->last_Pno_TF[i]=state->Pno_TF[i];
     }
     state->last_event_t=t;  
 }

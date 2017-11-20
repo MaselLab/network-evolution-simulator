@@ -257,10 +257,12 @@ struct CellState {
 
     float Pact[NGENES];
     float Prep[NGENES];
-	float Pact_No_rep[NGENES];
+    float Pact_No_rep[NGENES];
+    float Pno_TF[NGENES];
     float last_Prep[NGENES];
     float last_Pact[NGENES];
-	float last_Pact_No_rep[NGENES];
+    float last_Pact_No_rep[NGENES];
+    float last_Pno_TF[NGENES];
     float last_event_t;
 
     float protein_number[NPROTEINS];     /* pooled protein number from gene_specific_protein_conc */
@@ -419,7 +421,8 @@ extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int,
                                         float *,
                                         float *,
-										float *);
+					float *,
+                                        float *);
 
 extern int add_fixed_event(int,                           
                            float,
