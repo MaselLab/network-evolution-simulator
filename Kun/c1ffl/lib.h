@@ -30,4 +30,3 @@ extern void remove_from_array(int,
                               int );
 extern void create_output_directory(char *);
 extern void create_output_file(char [80], char *, FILE **, int);
-extern void read_kdisassembly(float [NUM_K_DISASSEMBLY]);

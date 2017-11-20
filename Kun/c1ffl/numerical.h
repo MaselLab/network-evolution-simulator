@@ -25,8 +25,8 @@ extern float qnorm7(float, float);
 //extern float qnorm4(float, float);
 
 /*Newton-Raphson root-finding method*/
-extern float rtsafe(void (*funcd)(float, int, float*, float*, float*, float*, float*), 
-		    int, float *, float*, float*, float x1, float x2, float xacc);
+extern float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*), 
+		    int, float, float *, float*, float*, float x1, float x2, float xacc);
 
 /*Wilcoxon two-sample test*/
 extern float Wilcoxon_test(Genotype*, Genotype*, int, int, float *, float *, float *);

@@ -65,53 +65,6 @@ panic(char *file, int line, char *msg){
 	abort();
 }
 
-void delete_queues(CellState *state) {
-
- FixedEvent *start, *info;
-
-  start = state->mRNA_transl_init_time_end;  
-  while (start) {
-    info = start;
-    start = start->next;
-    free(info);
-  }
-
-  /* start = state->mRNA_transl_time_end_last;  
-  while (start) {
-    info = start;
-    start = start->next;
-    free(info);  
-    } */
-
-  start = state->mRNA_transcr_time_end;  
-  while (start) {
-    info = start;
-    start = start->next;
-    free(info);
-  }
-
-  /* start = state->mRNA_transcr_time_end_last;  
-  while (start){
-    info = start;
-    start = start->next;
-    free(info);  
-    } */
-
-//  start = state->replication_time_end;  
-//  while (start) {
-//    info = start;
-//    start = start->next;
-//    free(info);
-//  }
-}
-
-//void free_mem_CellState(CellState *state)
-//{
-//  delete_queues(state);
-//  if (state->tf_bound_indexes) free(state->tf_bound_indexes);
-//  if (state->tf_hindered_indexes) free(state->tf_hindered_indexes);
-//}
-
 // TODO: remove, keep track of comparisons only for debugging
 int sls_store(FixedEvent *i, 
 	      FixedEvent **start, 
@@ -205,79 +158,7 @@ void display(FixedEvent *start)
 
   info = start;
   while (info){
-    fprintf(fperrors,"gene %d time %f\n",info->gene_id,info->time);
+    fprintf(fperrors,"gene %d time %f\n",info->event_id,info->time);
     info = info->next;
   }
 }
-
-//void remove_from_array(int toberemoved,
-//                       int type,
-//                       int a[],
-//                       int *len,
-//                       int force)
-//{
-//  int i;
-//  i = 0;
-//
-//  /* check the range of i first so we don't access an uninitialized
-//     array position in 'a'  */
-//  while ((i < *len) && !(a[i]==toberemoved)) { 
-//    i++;
-//  }
-//  if (i < *len) {  
-//    (*len)--;
-//    a[i]=a[*len];
-//  }
-//  else 
-//    if (force)  {
-//      /* don't always print because with a 4->3 transition PIC assembly is not there to be removed */
-//      LOG_ERROR_NOCELLID("error removing %d from array of length %d, type=%d\n", toberemoved, *len, type);
-//    }
-//}
-
-//void create_output_directory(char *output_directory) {
-//  int directory_success;
-//
-//  /* create output directory if needed */
-//#ifdef __unix__
-//  directory_success = mkdir(output_directory, S_IRUSR|S_IWUSR|S_IXUSR);
-//#else 
-//#ifdef __WIN32__
-//  directory_success = mkdir(output_directory);
-//#endif
-//#endif
-//
-//  if (directory_success==-1) {
-//    if (errno == EEXIST) {
-//      fprintf(stderr, "directory '%s' already exists\n", output_directory);
-//    } else {
-//      fprintf(stderr, "directory '%s' cannot be created\n", output_directory);
-//      exit(-1);
-//    }
-//  }
-//
-//}
-
-//void create_output_file(char prefix[80], char *output_directory, FILE **fp, int index) {
-//  char file_name[80];
-//  if (index != -1) 
-//    sprintf(file_name, "%s/%s-%03d.dat", output_directory, prefix, index);
-//  else    /* if index is -1, use prefix as name of file, unadorned with .dat */
-//    sprintf(file_name, "%s/%s", output_directory, prefix);
-//  if ((*fp = fopen(file_name,"w"))==NULL)
-//    fprintf(fperrors,"error: Can't open %s file\n", file_name);
-//}
-
-void read_kdisassembly(float kdis[NUM_K_DISASSEMBLY]) {
-  int j;
-  FILE *fpkdis;
-  /* get the kdis.txt values */
-  if ((fpkdis = fopen("kdis.txt","r"))==NULL){
-    panic(__FILE__, __LINE__, "Can't open kdis.txt.");	// Does not return.
-  }
-  for (j = 0; j < NUM_K_DISASSEMBLY; j++) {
-    fscanf(fpkdis, "%f", &kdis[j]);
-  }
-  fclose(fpkdis);
-}
-
