@@ -28,6 +28,9 @@ extern float qnorm7(float, float);
 extern float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*), 
 		    int, float, float *, float*, float*, float x1, float x2, float xacc);
 
+/*find max or min*/
+extern void find_max(float*, int, int, float*, int*);
+extern void find_x(float*, int, int, float, float*, int);
 /*Wilcoxon two-sample test*/
 extern float Wilcoxon_test(Genotype*, Genotype*, int, int, float *, float *, float *);
 

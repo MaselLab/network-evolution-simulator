@@ -367,6 +367,63 @@ float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, fl
     return 0.0;
 }
 
+void find_max(float *data, int start, int end, float *max, int *id_max)
+{
+    int i;    
+    *max=data[start];
+    *id_max=start;
+    for(i=0;i<end-start;i++)
+    {
+        if(*max<data[i])
+        {
+            *max=data[i];
+            *id_max=start+i;
+        }            
+    }      
+}
+
+void find_x(float *data, int start, int end, float x, float *id_x, int find_x_near_start)
+{
+    int i;  
+    
+    if(find_x_near_start)        
+    {
+        i=start;
+        while(i<end-1)
+        {
+            if(data[i]>=x)
+            {
+                if(data[i+1]<=x)
+                {
+                    *id_x=(x-data[i+1])/(data[i]-data[i+1])+(float)(i);
+                    break;
+                }
+                else
+                    i++;
+            }
+        }
+        *id_x=(x-data[end])/(data[end]-data[end-1])+(float)(end);
+    }
+    else
+    {
+        i=end;
+        while(i>start)
+        {
+            if(data[i]>=x)
+            {
+                if(data[i-1]<=x)
+                {
+                    *id_x=(x-data[i-1])/(data[i]-data[i-1])+(float)(i-1);
+                    break;
+                }
+                else
+                    i--;
+            }
+        }
+        *id_x=0.0;
+    }
+}
+
 void quick_sort(float *data, int *group, int n)
 {
     int i,j;

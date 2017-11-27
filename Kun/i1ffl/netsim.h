@@ -29,6 +29,7 @@
 #define N_THREADS 5
 #define N_REPLICATES 100
 #define OUTPUT_INTERVAL 10
+#define N_TIMEPOINTS 90 // for plotting
 
 /*Miscellaneous settings*/
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -41,7 +42,9 @@
 
 /*Biology and evolution settings*/
 #define SELECT_SENSITIVITY_AND_PRECISION 0
-#define SELECT_ON_DURATION 1
+#define SELECT_ON_DURATION 0
+#define REALLY_COMPLETECATE 0
+#define PEAK_SEARCH 1
 #define ROUND_UP_NEGATIVE_FITNESS 0
 #define DIRECT_REG 1
 #define NO_PENALTY 0
@@ -231,10 +234,10 @@ struct FixedEvent {
 
 typedef struct CellState CellState;
 struct CellState {   
-	float t;
-    //float cumulative_fitness;                    /* size of cell */
-  //  float cumulative_fitness_after_burn_in;          
-  //  float instantaneous_fitness;                  /* total growth rate in the previous deltat */   
+    float t;
+    float cumulative_fitness;                    /* size of cell */
+    float cumulative_fitness_after_burn_in;          
+    float instantaneous_fitness;                  /* total growth rate in the previous deltat */   
     int mRNA_aft_transl_delay_num[NGENES];          /* mRNAs that have finished the translational delay */
 
     int mRNA_under_transl_delay_num[NGENES];   /* mRNAs that are still under the translational delay (they do not contribute to protein 
@@ -272,10 +275,15 @@ struct CellState {
     float T_pulse_on;
     float T_pulse_off;
     int first_pulse;
-    int Pulse_is_on;
-    float sensitivity[3]; /* element 1 is a running record, 2 is the sensitivity for singal change 1, 3 is the sensitivity for signal change 2*/
-    float precision[3];
+    int Pulse_is_on; 
+    float *sampled_response;
+    int N_samples;
+    float cumulative_basal_benefit;
+    float cumulative_advanced_benefit;
+    float cumulative_damage;
     float cumulative_cost;
+    float sensitivity[3]; /* element 1 is a running record, 2 is the sensitivity for singal change 1, 3 is the sensitivity for signal change 2*/
+    float precision[3];   
     float protein_number[NPROTEINS];     /* pooled protein number from gene_specific_protein_conc */
     float gene_specific_protein_number[NGENES]; /* stores the "protein" number for each gene.
                                                * can be considered temporary data. Make muation easier to
@@ -286,6 +294,13 @@ struct CellState {
                                           *  NO_NUC_NO_PIC =1,
                                           *  PIC_NO_NUC = 3,
                                           */ 
+};
+
+typedef struct Selection Selection;
+struct Selection
+{
+    float T_beneficial;
+    float Saturate_cumulative_response;
 };
 
 typedef struct TimeCourse TimeCourse;
@@ -551,15 +566,15 @@ extern void do_single_timestep( Genotype *,
 
 extern void do_single_timestep_plotting(    Genotype *, 
                                             CellState *,
-                                            GillespieRates *,                              
-                                            float *,                                                  
-                                            char *,                                            
+                                            GillespieRates *,                                
+                                            char *,
+                                            float,
                                             float,
                                             float,
                                             int,   
                                             char,
-                                            float (*)[90],
-                                            float [90],
+                                            float (*)[N_TIMEPOINTS],
+                                            float [N_TIMEPOINTS],
                                             RngStream,                              
                                             int *,
                                             int *,
@@ -630,6 +645,7 @@ extern int do_fixed_event_plotting( Genotype *,
                                     float *,
                                     float ,
                                     int , 
+                                    float,
                                     float ,
                                     float,        
                                     char *,  
@@ -801,4 +817,6 @@ extern void tidy_output_files(char*, char*);
 extern void print_core_c1ffls(Genotype *);
 
 extern void initialization_add_regulation(Genotype *, RngStream);
+
+extern float calc_replicate_fitness(CellState *, int, float);
 #endif /* !FILE_NETSIM_SEEN */
