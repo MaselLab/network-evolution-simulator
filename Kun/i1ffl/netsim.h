@@ -345,7 +345,7 @@ char RuntimeSumm[32];
 char output_file[32];
 
 /* see netsim.c for documentation for these global variables */
-float tdevelopment; 
+//float tdevelopment; 
 float growth_rate_scaling; 
 float Ne_saturate;
 float c_transl;

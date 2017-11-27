@@ -1357,31 +1357,31 @@ int does_fixed_event_end(CellState *state, float t)
     t6 = state->t_to_update_Pact_or_Prep;
     t7= state->change_signal_strength_head ? state->change_signal_strength_head->time : TIME_INFINITY;
     t8=state->sampling_point_end_head?state->sampling_point_end_head->time:TIME_INFINITY;
-    if((t1 <= t2) && (t1 <= t) && (t1 <= t3) && (t1 <= t4) && (t1<=t5) &&(t1<=t6) && (t1<=t7)&&(t<=t8))
+    if((t1 <= t2) && (t1 <= t) && (t1 <= t3) && (t1 <= t4) && (t1<=t5) &&(t1<=t6) && (t1<=t7)&&(t1<=t8))
     {
         retval = 1;	
     }
-    else if ((t2 <= t1) && (t2 <= t) && (t2 <= t3) && (t2 <= t4) && (t2<=t5)&&(t2<=t6)&&(t2<=t7)&&(t<=t8))
+    else if ((t2 <= t1) && (t2 <= t) && (t2 <= t3) && (t2 <= t4) && (t2<=t5)&&(t2<=t6)&&(t2<=t7)&&(t2<=t8))
     { 
         retval = 2;
     }  
-    else if ((t3 <= t1) && (t3 <= t) && (t3 <= t2) && (t3 <= t4) && (t3<=t5)&&(t3<=t6) &&(t3<=t7)&&(t<=t8)) 
+    else if ((t3 <= t1) && (t3 <= t) && (t3 <= t2) && (t3 <= t4) && (t3<=t5)&&(t3<=t6) &&(t3<=t7)&&(t3<=t8)) 
     {
         retval = 3;
     }
-    else if ((t4 <= t1) && (t4 <= t) && (t4 <= t2) && (t4 <= t3) && (t4<=t5)&&(t4<=t6)&&(t4<=t7)&&(t<=t8)) 
+    else if ((t4 <= t1) && (t4 <= t) && (t4 <= t2) && (t4 <= t3) && (t4<=t5)&&(t4<=t6)&&(t4<=t7)&&(t4<=t8)) 
     {
         retval = 4;
     }               
-    else if((t5 <= t1) && (t5 <= t) && (t5 <= t2) && (t5 <= t3) && (t5<=t4)&&(t5<=t6)&&(t5<=t7)&&(t<=t8))
+    else if((t5 <= t1) && (t5 <= t) && (t5 <= t2) && (t5 <= t3) && (t5<=t4)&&(t5<=t6)&&(t5<=t7)&&(t5<=t8))
     {
         retval = 5;
     }             
-    else if((t6 <= t1) && (t6 <= t) && (t6 <= t2) && (t6 <= t3) && (t6<=t4)&&(t6<=t5)&&(t6<=t7)&&(t<=t8))
+    else if((t6 <= t1) && (t6 <= t) && (t6 <= t2) && (t6 <= t3) && (t6<=t4)&&(t6<=t5)&&(t6<=t7)&&(t6<=t8))
     {
         retval=6;
     }
-    else if((t7 <= t1) && (t7 <= t) && (t7 <= t2) && (t7 <= t3) && (t7<=t4)&&(t7<=t5)&&(t7<=t6)&&(t<=t8))
+    else if((t7 <= t1) && (t7 <= t) && (t7 <= t2) && (t7 <= t3) && (t7<=t4)&&(t7<=t5)&&(t7<=t6)&&(t7<=t8))
     {
         retval=7;
     }
@@ -3007,14 +3007,29 @@ float calc_replicate_fitness(CellState *state, int which_env, float t_developmen
     fitness+=(state->cumulative_advanced_benefit<saturate_cumulative_response_from_pulse)?state->cumulative_advanced_benefit/saturate_cumulative_response_from_pulse*bmax:bmax;
     fitness-=0.5*bmax*state->cumulative_damage/saturate_cumulative_response_from_pulse;
 #elif PEAK_SEARCH
-    find_max(&(state->sampled_response[0]),0,state->N_samples,&max,&pos_max);
-    mid1=max/2.0;
-    mid2=max/2.0;   
-    find_x(&(state->sampled_response[0]),0,pos_max,mid1,&pos_mid1,0);
-    find_x(&(state->sampled_response[0]),pos_max,state->N_samples,mid2,&pos_mid2,1);    
-    fitness=(max>saturate_pulse_amplitude)?1.0:max/saturate_pulse_amplitude;
-    fitness+=(tdevelopment-pos_mid1)/t_development+exp(-pow((sampling_interval*(pos_mid2-pos_mid1)-opt_pulse_duration)/sd_opt_pulse_duration,2.0));
-    fitness=bmax/3.0*fitness-state->cumulative_cost/t_development;           
+    find_max(&(state->sampled_response[0]),0,state->N_samples-1,&max,&pos_max);
+    if(max==0.0)//no pulse
+    {
+        fitness=0.0-state->cumulative_cost/t_development;
+    }
+    else 
+    {
+        if(pos_max==state->N_samples-1)//monotonous increase
+        {           
+            pos_mid2=TIME_INFINITY;
+        }    
+        else //there is a pulse. Flat tail is taken care of by find_x, making pos_mid2=TIME_INFINITY
+        {           
+            mid2=max/2.0; 
+            find_x(&(state->sampled_response[0]),pos_max,state->N_samples-1,mid2,&pos_mid2,1); 
+        }
+        mid1=max/2.0;
+        find_x(&(state->sampled_response[0]),0,pos_max,mid1,&pos_mid1,0);  
+        fitness=(max>saturate_pulse_amplitude)?1.0:max/saturate_pulse_amplitude;
+        fitness+=(t_development-pos_mid1)/t_development;
+        fitness+=exp(-pow((sampling_interval*(pos_mid2-pos_mid1)-opt_pulse_duration)/sd_opt_pulse_duration,2.0));
+        fitness=bmax/3.0*fitness-state->cumulative_cost/t_development;          
+    }             
 #else
     fitness=(state->cumulative_fitness-state->cumulative_fitness_after_burn_in)/(env2_t_development-duration_of_burn_in_growth_rate); 
 #endif

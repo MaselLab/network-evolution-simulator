@@ -401,12 +401,14 @@ void find_x(float *data, int start, int end, float x, float *id_x, int find_x_ne
                 else
                     i++;
             }
-        }
-        *id_x=(x-data[end])/(data[end]-data[end-1])+(float)(end);
+            *id_x=(x-data[end])/(data[end]-data[end-1])+(float)(end);
+        }  
+        if(isnan(*id_x))
+            *id_x=TIME_INFINITY;
     }
     else
     {
-        i=end;
+        i=end;        
         while(i>start)
         {
             if(data[i]>=x)
@@ -418,9 +420,8 @@ void find_x(float *data, int start, int end, float x, float *id_x, int find_x_ne
                 }
                 else
                     i--;
-            }
-        }
-        *id_x=0.0;
+            }            
+        }       
     }
 }
 
