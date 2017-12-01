@@ -38,13 +38,11 @@ int main()
     fp=fopen("saving_point.txt","r");
     if(fp==NULL)
     {
-        fp=fopen(RuntimeSumm,"w");
-        fprintf(fp,"Max simulation steps=%d, max trials=%d\n",MAX_MUT_STEP,MAX_TRIALS);
-        fprintf(fp,"TF_ELEMENT_LEN=%d, NMIN=%d, HIND_LENGTH=%d, MAX_MODE=%d\n",TF_ELEMENT_LEN,NMIN,HIND_LENGTH,MAX_BINDING);
-        fprintf(fp,"max effector gene number=%d, max tf gene number=%d\n",EFFECTOR_GENES,TFGENES);            
-        fprintf(fp,"c_transl=%f, penalty=%f\n",c_transl,penalty);
-        fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);  
-        fprintf(fp,"minimal activators to transcribe selection gene: %d\n",min_act_to_transcr_selection_protein);  
+//        fp=fopen(RuntimeSumm,"w");
+//        fprintf(fp,"Max simulation steps=%d, max trials=%d\n",MAX_MUT_STEP,MAX_TRIALS);
+//        fprintf(fp,"TF_ELEMENT_LEN=%d, NMIN=%d, HIND_LENGTH=%d, MAX_MODE=%d\n",TF_ELEMENT_LEN,NMIN,HIND_LENGTH,MAX_BINDING);
+//        fprintf(fp,"max effector gene number=%d, max tf gene number=%d\n",EFFECTOR_GENES,TFGENES);   
+//        fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);        
         init_run_pop(seeds,0);
     }
     else
