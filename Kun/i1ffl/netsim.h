@@ -11,10 +11,10 @@
 #include "RngStream.h"
 
 /*Simulation mode*/
-#define JUST_PLOTTING 0
+#define JUST_PLOTTING 1
 #define PLOT_ALTERNATIVE_FITNESS 0
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 1
+#define RUN_FULL_SIMULATION 0
 #define SKIP_INITIAL_GENOTYPE 0
 #define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
@@ -41,6 +41,7 @@
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
+#define POOL_EFFECTORS 1
 #define SELECT_SENSITIVITY_AND_PRECISION 0
 #define SELECT_ON_DURATION 0
 #define REALLY_COMPLETECATE 0
@@ -62,17 +63,23 @@
 #define minimal_selection_coefficient 1.0e-8
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
-#ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 100         /* the initial value is set in initiate_genotype*/
+#ifndef MAX_NON_OUTPUT_GENES             /* number of genes encoding TFs */
+#define MAX_NON_OUTPUT_GENES 90         /* the initial value is set in initiate_genotype*/
+#endif
+#ifndef MAX_NON_OUTPUT_PROTEINS
+#define MAX_NON_OUTPUT_PROTEINS 90
+#endif
+#ifndef MAX_OUTPUT_GENES
+#define MAX_OUTPUT_GENES 10  /* this is the upper limit of effector gene copies*/
+#endif
+#ifndef MAX_OUTPUT_PROTEINS
+#define MAX_OUTPUT_PROTEINS 10
 #endif
 #ifndef NGENES
-#define NGENES 110  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+#define NGENES MAX_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
 #endif
 #ifndef NPROTEINS           
-#define NPROTEINS 110
-#endif
-#ifndef EFFECTOR_GENES
-#define EFFECTOR_GENES 10  /* this is the upper limit of effector gene copies*/
+#define NPROTEINS MAX_NON_OUTPUT_PROTEINS+MAX_OUTPUT_PROTEINS+1
 #endif
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
@@ -145,16 +152,19 @@ struct AllTFBindingSites {
 typedef struct Genotype Genotype;
 struct Genotype {
     int ngenes;                                             /* the number of loci */
-    int ntfgenes;                                           /* the number of tf loci */
+//    int ntfgenes;                                           /* the number of tf loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
+    int n_output_genes;
+    int n_output_proteins;
     int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */   
     char cisreg_seq[NGENES][CISREG_LEN];    
     
     /*these apply to protein, not loci*/
     int N_act;                                              /* number of activators*/
     int N_rep;                                              /* number of repressors*/    
-    int protein_identity[NPROTEINS];                              /* 1 for activator, 0 for repressor, -1 for non-tf */ 
+    int protein_identity[NPROTEINS][2];                        /* 0 for non-output activator, -1 for non-ouput repressor */ 
+    int output_protein_id[MAX_OUTPUT_PROTEINS];
     char tf_binding_seq[NPROTEINS][TF_ELEMENT_LEN];
     char tf_binding_seq_rc[NPROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
@@ -214,9 +224,10 @@ struct FixedEvent {
 typedef struct CellState CellState;
 struct CellState {   
     float t;
-    float cumulative_fitness;                    
-    float cumulative_fitness_after_burn_in;          
-    float instantaneous_fitness;                   
+    float cumulative_fitness[MAX_OUTPUT_PROTEINS];                    
+    float cumulative_fitness_after_burn_in[MAX_OUTPUT_PROTEINS];          
+    float instantaneous_fitness[MAX_OUTPUT_PROTEINS];  
+    float cumulative_cost;
     int mRNA_aft_transl_delay_num[NGENES];          /* mRNAs that have finished the translational delay */
     int mRNA_under_transl_delay_num[NGENES];   /* mRNAs that are still under the translational delay (they do not contribute to protein 
                                                 * turnover, but contribute to the cost of translation)  */
@@ -268,8 +279,7 @@ struct CellState {
     int N_samples;
     float cumulative_basal_benefit;
     float cumulative_advanced_benefit;
-    float cumulative_damage;
-    float cumulative_cost;
+    float cumulative_damage;    
     float sensitivity[3]; /* element 1 is a running record, 2 is the sensitivity for singal change 1, 3 is the sensitivity for signal change 2*/
     float precision[3];  
 };
@@ -313,7 +323,7 @@ extern void print_genotype(Genotype *, int);
 extern void print_all_binding_sites(int [NGENES],
                                     AllTFBindingSites *, 
                                     int ,
-                                    char [TFGENES][TF_ELEMENT_LEN],
+                                    char [NGENES][TF_ELEMENT_LEN],
                                     char [NGENES][CISREG_LEN]
 //                                    int [NGENES][2]
 									);
@@ -352,7 +362,7 @@ extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
                                         int ,
                                         int ,                                         
-                                        int [NPROTEINS],                                    
+                                        int [NPROTEINS][2],                                    
                                         int [3],
                                         float [NGENES],
                                         int,
@@ -424,13 +434,14 @@ extern void fixed_event_end_transcription(  float *,
                                             int,
                                             Mutation *,
                                             char *);
-extern float calc_tprime(Genotype*, CellState*, float*, float, float);
+extern float calc_tprime(CellState*, float[MAX_OUTPUT_GENES], float, float,int[MAX_OUTPUT_GENES],int,int);
 
-extern float calc_integral(Genotype *, CellState *, float *, float, float);
+extern float calc_integral(CellState *, float[MAX_OUTPUT_GENES] , float, float, int[MAX_OUTPUT_GENES],int,int);
 
 extern void calc_instantaneous_fitness(   Genotype *,
                                         CellState *,
-                                        float*,                                       
+                                        float[MAX_OUTPUT_GENES],  
+                                        float[MAX_OUTPUT_GENES],
                                         float,
                                         float,
                                         char,
@@ -623,7 +634,7 @@ extern void output_genotype(Genotype *, int);
 
 extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THREADS]);
 
-extern void calc_fx_dfx(float, int, float, float*, float*, float*, float*, float*);
+extern void calc_fx_dfx(float, int, float, float*, float*, float*, float*, float*, int, int*);
 
 extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
 
