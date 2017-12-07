@@ -11,11 +11,11 @@
 #include "RngStream.h"
 
 /*Simulation mode*/
-#define JUST_PLOTTING 1
+#define JUST_PLOTTING 0
 #define PLOT_ALTERNATIVE_FITNESS 0
-#define NEUTRAL 0
+#define NEUTRAL 1
 #define RUN_FULL_SIMULATION 0
-#define SKIP_INITIAL_GENOTYPE 0
+#define SKIP_INITIAL_GENOTYPE 1
 #define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
 #define EXTERNAL_SIGNAL 0
@@ -568,6 +568,8 @@ extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, R
 
 extern void mutate(Genotype *, RngStream, Mutation *);
 
+extern void mut_effector2TF(Genotype *, Mutation *, RngStream);
+
 extern void mut_susbtitution(Genotype *, Mutation *, RngStream);
 
 extern void mut_whole_gene_deletion(Genotype *,Mutation *, RngStream);
@@ -585,6 +587,8 @@ extern void mut_identity(Genotype *, Mutation *, RngStream);
 extern void mut_koff(Genotype *, Mutation *, RngStream);
 
 extern void reproduce_mutate(Genotype *, Mutation *,RngStream);
+
+extern void reproduce_effector2TF(Genotype *, Mutation *);
 
 extern void reproduce_susbtitution(Genotype *, Mutation *);
 

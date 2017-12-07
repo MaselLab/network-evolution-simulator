@@ -67,6 +67,7 @@ float proportion_mut_mRNA_decay=1.0;
 float proportion_mut_protein_decay=1.0;
 float proportion_mut_translation_rate=1.0;
 float proportion_mut_cooperation=0.0;
+float proportion_effector2TF=1.0;
 //float max_inset=3.0;
 //float max_delet=3.0;
 const float sd_mutation_effect=1.78; 
@@ -237,7 +238,7 @@ void initialize_genotype_fixed(Genotype *genotype, RngStream RS)
         }
     }
     /*assign effectors*/
-    counter1=init_N_non_output_act+init_N_non_output_rep;
+    counter1=init_N_non_output_act+init_N_non_output_rep+N_SIGNAL_TF;
     counter2=init_N_output_act+init_N_output_rep;
     counter3=0;
     for(i=0;i<counter2;i++)
@@ -3369,6 +3370,31 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
 /*
  ************ begin of mutation functions **************
  */
+/*mutate an effector gene to normal tf gene*/
+void mut_effector2TF(Genotype *genotype, Mutation *mut_record, RngStream RS)
+{
+    int which_gene,protein_id;
+    while(1)
+    {
+        which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);
+        if(genotype->protein_identity[genotype->which_protein[which_gene]][1]!=-1)
+            break;
+    }
+    mut_record->which_gene=which_gene;
+    protein_id=genotype->which_protein[which_gene];
+    update_protein_pool(genotype,protein_id,which_gene,'t');
+    genotype->n_output_genes--;
+}
+
+void reproduce_effector2TF(Genotype *genotype, Mutation *mut_record)
+{
+    int which_gene, protein_id;
+    which_gene=mut_record->which_gene;
+    protein_id=genotype->which_protein[which_gene];
+    update_protein_pool(genotype,protein_id,which_gene,'t');
+    genotype->n_output_genes--;
+}
+
 /*single nucleic acid substitution in cis-reg*/
 void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
@@ -3633,7 +3659,7 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
         genotype->translation[i]=genotype->translation[i+1];         
         genotype->recalc_TFBS[i]=1;        
     }
-    /* if the to-be-deleted gene is a tf gene, change ntfgenes as well*/
+    /* if the to-be-deleted gene is an effector gene, change n_output_genes as well*/
     if(genotype->protein_identity[protein_id][1]!=-1)
         genotype->n_output_genes--;    
     /* now change protein_pool and cisreg_cluster*/   
@@ -4381,6 +4407,9 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
         case 'f': //mutations to the koff of a tf
             mut_koff(genotype,mut_record,RS);            
             break;
+        case 't': //effector to regular TF
+            mut_effector2TF(genotype,mut_record,RS);
+            break;
     }
 }
 
@@ -4420,7 +4449,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
 {
     float random;
     float tot_mut_rate=0.0;
-    float tot_subs_rate, tot_dup_rate, tot_sil_rate, tot_mut_kin_rate, tot_mut_identity_rate, tot_mut_binding_seq_rate, tot_mut_koff_rate; 
+    float tot_subs_rate, tot_dup_rate, tot_sil_rate, tot_mut_kin_rate, tot_mut_identity_rate, tot_mut_binding_seq_rate, tot_mut_koff_rate, tot_effector2TF; 
     int N_target_genes; 
     
     /* duplication rate*/    
@@ -4463,6 +4492,13 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     tot_mut_koff_rate=genotype->ngenes*MUTKINETIC*proportion_mut_koff;  
     tot_mut_rate+=tot_mut_koff_rate;  
     
+    /*effector to regular TF*/
+    if(genotype->n_output_genes>1)
+        tot_effector2TF=genotype->n_output_genes*MUTKINETIC*proportion_effector2TF;
+    else
+        tot_effector2TF=0.0;
+    tot_mut_rate+=tot_effector2TF;
+    
     /*Draw a mutation based on the above rates*/
     random=RngStream_RandU01(RS);    
     if(random<=tot_subs_rate/tot_mut_rate)    
@@ -4493,7 +4529,13 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                         if(random<=tot_mut_koff_rate/tot_mut_rate)
                             *mut_type='f';          /* mut koff*/
                         else
-                            *mut_type='e';           /* mut identity of a TF */
+                        {
+                            random-=tot_mut_koff_rate/tot_mut_rate;
+                            if(random<=tot_effector2TF/tot_mut_rate)
+                                *mut_type='t';       /* effector to regular TF*/
+                            else
+                                *mut_type='e';           /* mut identity of a TF */
+                        }    
                     }
                 }               
             }
@@ -4515,7 +4557,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
      *We need to update the ids of the remaining genes and proteins
      *For gene duplication, the new gene is always add to the end of the list of genes encoding a given protein.
      *A new protein is also add to the end of protein_pool
-     *which_protein can be updated easily. Changing which protein a gene encodes is always easy. For deletion, 
+     *which_protein can be updated easily; changing which protein a gene encodes is always easy. For deletion, 
      *we just shift the array to overwrite the to-be-deleted gene and update the ids of the remaining genes.*/ 
     switch (mut_type)
     {
@@ -4539,39 +4581,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
                         /*note that deletion changes the ids of the remaining genes!!! Any gene that is greater than which_gene is reduced by one*/
                         genotype->protein_pool[i][1][j]=(gene_id>which_gene)?gene_id-1:gene_id;
                     }   
-                }
-                /*if a tf PROTEIN is deleted, we need to change the number of TF proteins*/                  
-                /* reduce the number of activators or that of repressors */ 
-                if(genotype->protein_identity[which_protein][0]) 
-                    genotype->N_act--;
-                else
-                    genotype->N_rep--;
-                /*UPDATE output_protein_id*/
-                which_output=genotype->protein_identity[which_protein][1];
-                if(which_output!=-1)
-                {               
-                    for(i=which_output;i<genotype->n_output_proteins-1;i++)
-                        genotype->output_protein_id[i]=genotype->output_protein_id[i+1]-1; 
-                    /*update protein_identity*/
-                    for(i=which_protein;i<genotype->nproteins-1;i++)
-                        genotype->protein_identity[i][1]=(genotype->protein_identity[i+1][1]==-1)?-1:genotype->protein_identity[i+1][1]-1;
-                    genotype->n_output_proteins--;
-                }
-                else /*remove which_protein from protein_identity*/
-                {
-                    for(i=which_protein;i<genotype->nproteins-1;i++)
-                        genotype->protein_identity[i][1]=genotype->protein_identity[i+1][1];
-                }
-                /* remove which_protein from protein_identity and Kd */              
-                for(i=which_protein;i<genotype->nproteins-1;i++)
-                {
-                    genotype->protein_identity[i][0]=genotype->protein_identity[i+1][0];                    
-                    genotype->Kd[i]=genotype->Kd[i+1];                    
-                }                   
-                /* in the case, all genes need to recalc binding sites*/
-                for(i=N_SIGNAL_TF;i<which_gene;i++)                    
-                    genotype->recalc_TFBS[i]=1; /* recalc BS */                                  
-                  
+                } 
                 /*
                  * UPDATE which_protein
                  */
@@ -4581,9 +4591,48 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
                 /* shift and update which_protein for gene>=which_gene in which_protein*/                
                 for(i=which_gene;i<genotype->ngenes-1;i++)
                     genotype->which_protein[i]=(genotype->which_protein[i+1]>which_protein)?genotype->which_protein[i+1]-1:genotype->which_protein[i+1];  
-                
+                /*
+                 * UPDATE the number of activators or that of repressors
+                 */
+                if(genotype->protein_identity[which_protein][0]) 
+                    genotype->N_act--;
+                else
+                    genotype->N_rep--;
+                /* remove which_protein from protein_identity and Kd */              
+                for(i=which_protein;i<genotype->nproteins-1;i++)
+                {
+                    genotype->protein_identity[i][0]=genotype->protein_identity[i+1][0];                    
+                    genotype->Kd[i]=genotype->Kd[i+1];                    
+                }                 
+                /*
+                 * UPDATE output_protein_id
+                 */
+                which_output=genotype->protein_identity[which_protein][1];                
+                if(which_output!=-1)/*if which_protein is an effector protein*/
+                {         
+                    /*shift output_protein_id and update the id of proteins in output_protein_id*/
+                    for(i=which_output;i<genotype->n_output_proteins-1;i++)
+                        genotype->output_protein_id[i]=genotype->output_protein_id[i+1]-1; //output_protein_id is ordered ascendingly
+                    /*update protein_identity similarly*/
+                    for(i=which_protein;i<genotype->nproteins-1;i++)
+                        genotype->protein_identity[i][1]=(genotype->protein_identity[i+1][1]==-1)?-1:genotype->protein_identity[i+1][1]-1;                    
+                    genotype->n_output_proteins--;
+                }
+                else 
+                {
+                    /*just update the id of protein in output_protein_id*/
+                    for(i=0;i<genotype->n_output_proteins;i++)
+                        genotype->output_protein_id[i]=(genotype->output_protein_id[i]<which_protein)?genotype->output_protein_id[i]:genotype->output_protein_id[i]-1;
+                    /*remove which_protein from protein_identity*/
+                    for(i=which_protein;i<genotype->nproteins-1;i++)
+                        genotype->protein_identity[i][1]=genotype->protein_identity[i+1][1];
+                }                                                
+                  
                 /*one less protein*/
                 genotype->nproteins--;
+                /* in the case, all genes need to recalc binding sites*/
+                for(i=N_SIGNAL_TF;i<which_gene;i++)                    
+                    genotype->recalc_TFBS[i]=1; /* recalc BS */ 
             }  
             else /*if the protein has more than one genes*/
             {
@@ -4644,16 +4693,16 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             genotype->which_protein[which_gene]=genotype->nproteins; //put the new protein to the end
             genotype->protein_pool[genotype->nproteins][0][0]=1;
             genotype->protein_pool[genotype->nproteins][1][0]=which_gene;
+            /* make Kd for the new protein*/
+            genotype->Kd[genotype->nproteins]=genotype->Kd[which_protein];  
             /* update activator or repressor numbers, and protein_identity*/
             if(genotype->protein_identity[which_protein][0]) //mutation to binding seq does not change the identity of a tf
                 genotype->N_act++;
             else
                 genotype->N_rep++;
-            genotype->protein_identity[genotype->nproteins][0]=genotype->protein_identity[which_protein][0];
-            /* update Kd*/
-            genotype->Kd[genotype->nproteins]=genotype->Kd[which_protein];           
+            genotype->protein_identity[genotype->nproteins][0]=genotype->protein_identity[which_protein][0];  
             /* Does this gene encodes effector? */                      
-            if(genotype->protein_identity[which_protein][1]!=-1) //-1 for non-output proteins
+            if(genotype->protein_identity[which_protein][1]!=-1) /*Yes!.-1 for non-output proteins*/
             {
                 /*the new protein still encodes effector*/
                 genotype->protein_identity[genotype->nproteins][1]=genotype->n_output_proteins;
@@ -4681,14 +4730,14 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             genotype->which_protein[which_gene]=genotype->nproteins; 
             genotype->protein_pool[genotype->nproteins][0][0]=1;
             genotype->protein_pool[genotype->nproteins][1][0]=which_gene;
+            /* update Kd*/
+            genotype->Kd[genotype->nproteins]=genotype->Kd[which_protein];
             /* update protein_identity*/
             if(genotype->protein_identity[which_protein][0]) 
                 genotype->N_rep++;  /* an activator turns into a repressor */
             else
                 genotype->N_act++;
             genotype->protein_identity[genotype->nproteins][0]=genotype->protein_identity[which_protein][0];
-            /* update Kd*/
-            genotype->Kd[genotype->nproteins]=genotype->Kd[which_protein];
             /* Does this gene encodes effector? */                      
             if(genotype->protein_identity[which_protein][1]!=-1) //-1 for non-output proteins
             {
@@ -4741,6 +4790,38 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             /* finally, update protein numbers*/
             genotype->nproteins++;
             /* NOTE: this mutation does not change the number of genes*/
+            break;
+        case 't': /*an effector gene mutate into regular TF*/
+            if(genotype->protein_pool[which_protein][0][0]>1) /*if there are more than 1 gene encoding the TF*/
+            {
+                /*the mutation creates a new non-output protein*/
+                gene_id=0;
+                while(genotype->protein_pool[which_protein][1][gene_id]!=which_gene) gene_id++;
+                /*remove this gene from the original protein pool*/
+                for(i=gene_id;i<genotype->protein_pool[which_protein][0][0];i++)
+                    genotype->protein_pool[which_protein][1][i]=genotype->protein_pool[which_protein][1][i+1];
+                genotype->protein_pool[which_protein][0][0]--;
+                /*make a new protein*/
+                genotype->protein_pool[genotype->nproteins][0][0]=1;
+                genotype->protein_pool[genotype->nproteins][1][0]=which_gene;
+                genotype->which_protein[which_gene]=genotype->nproteins;
+                genotype->Kd[genotype->nproteins]=genotype->Kd[which_protein];
+                genotype->protein_identity[genotype->nproteins][0]=genotype->protein_identity[which_protein][0];
+                genotype->protein_identity[genotype->nproteins][1]=-1;                
+                genotype->nproteins++;
+            }
+            else /*just remove the gene from output_protein_id*/
+            {
+                which_output=genotype->protein_identity[which_protein][1];
+                for(i=0;i<genotype->n_output_proteins;i++)
+                    genotype->protein_identity[genotype->output_protein_id[i]][1]=(genotype->protein_identity[genotype->output_protein_id[i]][1]<which_output)?
+                                                                                    genotype->protein_identity[genotype->output_protein_id[i]][1]:genotype->protein_identity[genotype->output_protein_id[i]][1]-1;
+                for(i=which_output;i<genotype->n_output_proteins-1;i++)
+                    genotype->output_protein_id[i]=(genotype->output_protein_id[i+1]==-1)?-1:genotype->output_protein_id[i+1]-1;
+                
+                genotype->protein_identity[which_protein][1]=-1;
+                genotype->n_output_proteins--;
+            }            
             break;
     }
 }
@@ -5795,6 +5876,7 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     #endif 
     genotype_ori_copy.ngenes=genotype_ori.ngenes;   
     genotype_ori_copy.nproteins=genotype_ori.nproteins; 
+    
     /* initialize mut_record */
     mut_record.kinetic_diff=0.0;
     mut_record.kinetic_type=-1;
