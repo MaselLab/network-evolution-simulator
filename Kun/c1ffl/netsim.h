@@ -21,8 +21,8 @@
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 55000
-#define BURN_IN_I 5000
+#define MAX_MUT_STEP 50000
+#define BURN_IN_I 0
 #define BURN_IN_II 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
@@ -41,7 +41,7 @@
 
 /*Biology and evolution settings*/
 #define ROUND_UP_NEGATIVE_FITNESS 0
-#define DIRECT_REG 0
+#define DIRECT_REG 1
 #define NO_PENALTY 0
 #define ADD_2_PATHWAYS 0
 #define FORCE_OR_GATE 0
@@ -189,6 +189,7 @@ struct Genotype {
     int recalc_TFBS[NGENES];                                /* whether to recalc the TFBS*/
     
     int binding_sites_num[NGENES];                          /* total number of binding sites */
+    int N_allocated_elements;
     int max_unhindered_sites[NGENES][3];                    /* maximal number of binding sites that do not hinder each other. 0 for activator BS, 1 for repressor BS*/  
     int max_hindered_sites[NGENES];                        /* maximal number of BSs a BS can hinder*/ 
 

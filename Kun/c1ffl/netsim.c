@@ -406,17 +406,22 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                 if (cis_seq[j] == tf_seq[j-i]) match++; 
             if (match >= NMIN)
             {  
-                if (N_binding_sites + 1 >= MAXELEMENTS) 
-                {         
-                    MAXELEMENTS+=MAXELEMENTS;
-                    genotype->all_binding_sites[gene_id] = realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
-                    if (!genotype->all_binding_sites[gene_id]) 
+                if (N_binding_sites + 1 >= genotype->N_allocated_elements) 
+                {  
+                    while(genotype->N_allocated_elements<=N_binding_sites+1)
+                        genotype->N_allocated_elements+=100;
+                   
+                    for(j=0;j<NGENES;j++)
                     {
-                        fperror=fopen(error_file,"a+");
-                        LOG("error in calc_all_binding_sites_copy\n");
-                        fclose(fperror);
-                        exit(-1);                                       
-                    }                        
+                        genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
+                        if (!genotype->all_binding_sites[j]) 
+                        {
+                            fperror=fopen(error_file,"a+");
+                            LOG("error in calc_all_binding_sites_copy\n");
+                            fclose(fperror);
+                            exit(-1);                                       
+                        }     
+                    }                    
                 }                
                 genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                      
                 genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match)/(TF_ELEMENT_LEN-NMIN+1));
@@ -435,17 +440,22 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                 if (match_rc >= NMIN)
                 {
                     /**********************************************************************/     
-                    if (N_binding_sites + 1 >= MAXELEMENTS) 
-                    {   
-                        MAXELEMENTS+=MAXELEMENTS;
-                        genotype->all_binding_sites[gene_id] = realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
-                        if (!genotype->all_binding_sites[gene_id]) 
+                    if (N_binding_sites + 1 >= genotype->N_allocated_elements) 
+                    {  
+                        while(genotype->N_allocated_elements<=N_binding_sites+1)
+                            genotype->N_allocated_elements+=100;
+
+                        for(j=0;j<NGENES;j++)
                         {
-                            fperror=fopen(error_file,"a+");
-                            LOG("error in calc_all_binding_sites_copy\n");
-                            fclose(fperror);
-                            exit(-1);   
-                        }                           
+                            genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
+                            if (!genotype->all_binding_sites[j]) 
+                            {
+                                fperror=fopen(error_file,"a+");
+                                LOG("error in calc_all_binding_sites_copy\n");
+                                fclose(fperror);
+                                exit(-1);                                       
+                            }     
+                        }                    
                     }
                     /************************************************************************************************************/
                     genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                                     
@@ -566,6 +576,12 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
 void calc_all_binding_sites(Genotype *genotype)
 {    
     int gene_id;
+    if(genotype->N_allocated_elements<MAXELEMENTS)
+    {
+        for(gene_id=0;gene_id<NGENES;gene_id++)
+            genotype->all_binding_sites[gene_id]=realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
+        genotype->N_allocated_elements=MAXELEMENTS;
+    }
     for(gene_id=N_SIGNAL_TF;gene_id < genotype->ngenes;gene_id++)
     {        
         if(genotype->recalc_TFBS[gene_id]) /* do not calculate the binding sites if there's no mutation in the promoter or in TF binding seq*/
@@ -3230,8 +3246,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     AllTFBindingSites *container; // used to store binding sites before substitution
                                   // we compare whether substituion changes any binding sites,
                                   // in order to determine whether mutation creates a unique cis-reg     
-                                  // sequence whose binding configuration always needs computation 
-    container = malloc(MAXELEMENTS*sizeof(AllTFBindingSites)); 
+                                  // sequence whose binding configuration always needs computation     
     /*points to the current cis-reg*/
     Genome= &genotype->cisreg_seq[0][0]; 
     /*whether to simulate bias in the frequency of different substitutions*/
@@ -3255,6 +3270,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
         which_gene=which_nucleotide/CISREG_LEN;
         /*calculate and store the distribution of binding sites before mutation*/
         calc_all_binding_sites_copy(genotype,which_gene);
+        container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
         {
@@ -3318,6 +3334,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
         which_gene=which_nucleotide/CISREG_LEN;
         /*calculate and store the distribution of binding sites before mutation*/
         calc_all_binding_sites_copy(genotype,which_gene);
+        container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
         {
@@ -3370,12 +3387,12 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
 {    
     char *Genome;
     int i, N_BS_bf_mutation,which_gene,flag_difference;    
-    AllTFBindingSites *container;
-    container = malloc(MAXELEMENTS*sizeof(AllTFBindingSites));
+    AllTFBindingSites *container;   
     /*get the mutated gene from record*/
     which_gene=mut_record->which_gene;
     /*calculate and store the distribution of binding sites before mutation*/
-    calc_all_binding_sites_copy(genotype,which_gene); 
+    calc_all_binding_sites_copy(genotype,which_gene);
+    container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
     N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
     for(i=0;i<N_BS_bf_mutation;i++)
     {
@@ -4410,6 +4427,8 @@ void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
     /*generate a new koff */ 
 #if REGRESSIVE_MUTATION    
     new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,RS);  
+    while(new_Kd>NS_Kd)
+        new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,RS);
 #else 
     new_Kd=genotype->Kd[protein_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
     while(new_Kd<MIN_Kd || new_Kd>MAX_Kd || new_Kd==genotype->Kd[protein_id])
@@ -4598,10 +4617,14 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     tot_dup_rate=N_genes_to_be_duplicated*DUPLICATION;
     tot_mut_rate+=tot_dup_rate;   
     /* silencing rate*/ 
-    if(genotype->ntfgenes-N_SIGNAL_TF>1)//if there's more than one copy of non-sensor TF gene
-        tot_sil_rate=(genotype->ngenes-1-N_SIGNAL_TF)*SILENCING; // the signaling gene and one copy of the selection gene cannot be deleted    
+    if(genotype->ntfgenes-N_SIGNAL_TF>1)//if there are more than one copy of non-sensor TF gene
+        tot_sil_rate=(genotype->ntfgenes-N_SIGNAL_TF)*SILENCING;    
     else
-        tot_sil_rate=(genotype->ngenes-2-N_SIGNAL_TF)*SILENCING; // otherwise last copy of non-signal tf gene cannot be deleted either*/
+        tot_sil_rate=0.0; //the last non-sensor TF cannot be deleted
+    if(genotype->protein_pool[genotype->nproteins-1][0][0]>1)//if there are more than one effector gene
+        tot_sil_rate+=genotype->protein_pool[genotype->nproteins-1][0][0]*SILENCING;
+    else
+        tot_sil_rate+=0.0; // otherwise last copy effector gene cannot be deleted either*/
     tot_mut_rate+=tot_sil_rate;    
     /* calc total susbtitution rate*/
     tot_subs_rate=(genotype->ngenes-N_SIGNAL_TF)*CISREG_LEN*SUBSTITUTION; //NA to the sensor TF gene
@@ -5114,6 +5137,7 @@ void initialize_cache(Genotype *genotype)
         genotype->activating[j]=-1;
     }
     /* alloc space for binding sites*/
+    genotype->N_allocated_elements=MAXELEMENTS;
     for(j=0;j<NGENES;j++)
     {
         genotype->all_binding_sites[j] = malloc(MAXELEMENTS*sizeof(AllTFBindingSites));
@@ -5837,6 +5861,7 @@ int evolve_N_steps(Genotype *genotype_ori,
             #if !SET_BS_MANUALLY		
                 calc_all_binding_sites(genotype_ori_copy);
             #endif
+            MAXELEMENTS=genotype_ori_copy->N_allocated_elements;
             /*calculate the fitness of the mutant at low resolution*/
             calc_avg_growth_rate(   genotype_ori_copy,
                                     init_mRNA,
@@ -6129,8 +6154,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
             env1_fixed_effector_effect=0;    
             env2_fixed_effector_effect=1; 
             recalc_new_fitness=5; // make sure its value is smaller than MAX_RECALC_FITNESS
-            env1_occurence=0.67;
-            env2_occurence=0.33;    
+            env1_occurence=0.33;
+            env2_occurence=0.67;    
             float GR1[recalc_new_fitness][N_REPLICATES],GR2[recalc_new_fitness][N_REPLICATES];
             /*Load external signal profile if there is one*/
             fp=fopen("noisy_signal.txt","r");
