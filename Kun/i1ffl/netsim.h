@@ -64,10 +64,10 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef MAX_NON_OUTPUT_GENES             /* number of genes encoding TFs */
-#define MAX_NON_OUTPUT_GENES 90         /* the initial value is set in initiate_genotype*/
+#define MAX_NON_OUTPUT_GENES 100         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef MAX_NON_OUTPUT_PROTEINS
-#define MAX_NON_OUTPUT_PROTEINS 90
+#define MAX_NON_OUTPUT_PROTEINS 100
 #endif
 #ifndef MAX_OUTPUT_GENES
 #define MAX_OUTPUT_GENES 10  /* this is the upper limit of effector gene copies*/
@@ -183,8 +183,9 @@ struct Genotype {
                                                                1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
                                                                cisreg_cluster works with which_cluster*/
     int which_cluster[NGENES];                              /* which_cluster stores the cluster id of a gene*/                                                           
-    int recalc_TFBS[NGENES];                                /* whether to recalc the TFBS*/    
-    int binding_sites_num[NGENES];                          /* total number of binding sites */
+    int recalc_TFBS[NGENES];                                /* whether to recalc the TFBS*/       
+    int binding_sites_num[NGENES];                          /* total number of binding sites */ 
+    int N_allocated_elements;
     int max_unhindered_sites[NGENES][3];                    /* maximal number of binding sites that do not hinder each other. 0 for activator BS, 1 for repressor BS*/  
     int max_hindered_sites[NGENES];                        /* maximal number of BSs a BS can hinder*/ 
     int N_act_BS[NGENES];                                   /* total number of binding sites of activating TF */

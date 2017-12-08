@@ -403,17 +403,22 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                 if (cis_seq[j] == tf_binding_seq[j-i]) match++; 
             if (match >= NMIN)
             {  
-                if (N_binding_sites + 1 >= MAXELEMENTS) 
-                {         
-                    MAXELEMENTS+=MAXELEMENTS;
-                    genotype->all_binding_sites[gene_id] = realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
-                    if (!genotype->all_binding_sites[gene_id]) 
+                if (N_binding_sites + 1 >= genotype->N_allocated_elements) 
+                {  
+                    while(genotype->N_allocated_elements<=N_binding_sites+1)
+                        genotype->N_allocated_elements+=100;
+                   
+                    for(j=0;j<NGENES;j++)
                     {
-                        fperror=fopen(error_file,"a+");
-                        LOG("error in calc_all_binding_sites_copy\n");
-                        fclose(fperror);
-                        exit(-1);                                       
-                    }                        
+                        genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
+                        if (!genotype->all_binding_sites[j]) 
+                        {
+                            fperror=fopen(error_file,"a+");
+                            LOG("error in calc_all_binding_sites_copy\n");
+                            fclose(fperror);
+                            exit(-1);                                       
+                        }     
+                    }                    
                 }                
                 genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                      
                 genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match)/(TF_ELEMENT_LEN-NMIN+1));
@@ -432,18 +437,23 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                 if (match_rc >= NMIN)
                 {
                     /**********************************************************************/     
-                    if (N_binding_sites + 1 >= MAXELEMENTS) 
-                    {   
-                        MAXELEMENTS+=MAXELEMENTS;
-                        genotype->all_binding_sites[gene_id] = realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
-                        if (!genotype->all_binding_sites[gene_id]) 
+                    if (N_binding_sites + 1 >= genotype->N_allocated_elements) 
+                    {  
+                        while(genotype->N_allocated_elements<=N_binding_sites+1)
+                            genotype->N_allocated_elements+=100;
+
+                        for(j=0;j<NGENES;j++)
                         {
-                            fperror=fopen(error_file,"a+");
-                            LOG("error in calc_all_binding_sites_copy\n");
-                            fclose(fperror);
-                            exit(-1);   
-                        }                           
-                    }
+                            genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
+                            if (!genotype->all_binding_sites[j]) 
+                            {
+                                fperror=fopen(error_file,"a+");
+                                LOG("error in calc_all_binding_sites_copy\n");
+                                fclose(fperror);
+                                exit(-1);                                       
+                            }     
+                        }                    
+                    } 
                     /************************************************************************************************************/
                     genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                                     
                     genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match_rc)/(TF_ELEMENT_LEN-NMIN+1));
@@ -563,11 +573,18 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
 void calc_all_binding_sites(Genotype *genotype)
 {    
     int gene_id;
+    if(genotype->N_allocated_elements<MAXELEMENTS)
+    {
+        for(gene_id=0;gene_id<NGENES;gene_id++)
+            genotype->all_binding_sites[gene_id]=realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
+        genotype->N_allocated_elements=MAXELEMENTS;
+    }
+    
     for(gene_id=N_SIGNAL_TF;gene_id < genotype->ngenes;gene_id++)
     {        
         if(genotype->recalc_TFBS[gene_id]) /* do not calculate the binding sites if there's no mutation in the promoter or in TF binding seq*/
         {            
-            calc_all_binding_sites_copy(genotype,gene_id);
+            calc_all_binding_sites_copy(genotype,gene_id);          
             genotype->recalc_TFBS[gene_id]=0;
         }
     }
@@ -3403,8 +3420,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     AllTFBindingSites *container; // used to store binding sites before substitution
                                   // we compare whether substituion changes any binding sites,
                                   // in order to determine whether mutation creates a unique cis-reg     
-                                  // sequence whose binding configuration always needs computation 
-    container = malloc(MAXELEMENTS*sizeof(AllTFBindingSites)); 
+                                  // sequence whose binding configuration always needs computation    
     /*points to the current cis-reg*/
     Genome= &genotype->cisreg_seq[0][0]; 
     /*whether to simulate bias in the frequency of different substitutions*/
@@ -3428,6 +3444,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
         which_gene=which_nucleotide/CISREG_LEN;
         /*calculate and store the distribution of binding sites before mutation*/
         calc_all_binding_sites_copy(genotype,which_gene);
+        container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
         {
@@ -3491,6 +3508,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
         which_gene=which_nucleotide/CISREG_LEN;
         /*calculate and store the distribution of binding sites before mutation*/
         calc_all_binding_sites_copy(genotype,which_gene);
+        container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
         {
@@ -3543,12 +3561,12 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
 {    
     char *Genome;
     int i, N_BS_bf_mutation,which_gene,flag_difference;    
-    AllTFBindingSites *container;
-    container = malloc(MAXELEMENTS*sizeof(AllTFBindingSites));
+    AllTFBindingSites *container;    
     /*get the mutated gene from record*/
     which_gene=mut_record->which_gene;
     /*calculate and store the distribution of binding sites before mutation*/
     calc_all_binding_sites_copy(genotype,which_gene); 
+    container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
     N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
     for(i=0;i<N_BS_bf_mutation;i++)
     {
@@ -4438,7 +4456,10 @@ void reproduce_mutate(Genotype *genotype, Mutation *mut_record,RngStream RS)
             break;
         case 'f':
             reproduce_mut_koff(genotype,mut_record);
-            break;  
+            break; 
+        case 't': //effector to regular TF
+            reproduce_effector2TF(genotype,mut_record);
+            break;
     }   
 }
 
@@ -5031,9 +5052,10 @@ void initialize_cache(Genotype *genotype)
     for(j=0;j<MAX_OUTPUT_PROTEINS;j++)        
         genotype->output_protein_id[j]=-1;
     /* alloc space for binding sites*/
+    genotype->N_allocated_elements=MAXELEMENTS;
     for(j=0;j<NGENES;j++)
     {
-        genotype->all_binding_sites[j] = malloc(MAXELEMENTS*sizeof(AllTFBindingSites));
+        genotype->all_binding_sites[j] = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         if (!(genotype->all_binding_sites[j])) 
         {
             fperror=fopen(error_file,"a+");
@@ -5680,6 +5702,7 @@ int evolve_N_steps(Genotype *genotype_ori,
             #if !SET_BS_MANUALLY		
                 calc_all_binding_sites(genotype_ori_copy);
             #endif
+            MAXELEMENTS=genotype_ori_copy->N_allocated_elements;
             /*calculate the fitness of the mutant at low resolution*/
             calc_cellular_fitness(  genotype_ori_copy,
                                     init_mRNA,
