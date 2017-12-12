@@ -294,15 +294,15 @@ float qnorm7(float p,float sd)
  * within accuracy +/-xacc funcd is function of interest, returning
  * both function value and first deriv.x  
  */
-float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*, int), 
-             int n_copies, float RHS, float *p_i, float *as_i, float *c_i, float x1, float x2, float xacc, int start)
+float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*), 
+             int n_copies, float RHS, float *p_i, float *as_i, float *c_i, float x1, float x2, float xacc)
 {
     int j;
     float df,dx,dxold,f,fh,fl;
     float temp,xh,xl,rts;
 
-    (*funcd)(x1, n_copies, RHS,p_i,as_i, c_i, &fl, &df, start);
-    (*funcd)(x2, n_copies, RHS,p_i,as_i, c_i, &fh, &df, start); /* note df isn't used here */
+    (*funcd)(x1, n_copies, RHS,p_i,as_i, c_i, &fl, &df);
+    (*funcd)(x2, n_copies, RHS,p_i,as_i, c_i, &fh, &df); /* note df isn't used here */
     if (fabs(fl) < 1e-9) return x1;
     if (fabs(fh) < 1e-9) return x2;
     
@@ -326,7 +326,7 @@ float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, fl
     rts=0.5*(x1+x2);
     dxold=fabs(x2-x1);
     dx=dxold;    
-    (*funcd)(rts, n_copies, RHS, p_i,as_i, c_i, &f, &df, start);
+    (*funcd)(rts, n_copies, RHS, p_i,as_i, c_i, &f, &df);
 
 //    done = 0;
     
@@ -357,7 +357,7 @@ float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, fl
 //            fprintf(fperrors,"warning: dt=0 reset to %g\n",rts);
 //        }        
 //        if (j>1 || done==0) 
-            (*funcd)(rts, n_copies, RHS, p_i,as_i, c_i, &f, &df, start);
+            (*funcd)(rts, n_copies, RHS, p_i,as_i, c_i, &f, &df);
         if (f < 0.0) 
             xl=rts;
         else 

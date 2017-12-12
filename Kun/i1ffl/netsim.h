@@ -639,7 +639,7 @@ extern void output_genotype(Genotype *, int);
 
 extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THREADS]);
 
-extern void calc_fx_dfx(float, int, float, float*, float*, float*, float*, float*, int);
+extern void calc_fx_dfx(float, int, float, float*, float*, float*, float*, float*, int, int*);
 
 extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
 

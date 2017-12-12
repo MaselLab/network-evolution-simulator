@@ -1516,22 +1516,23 @@ float calc_tprime(CellState* state, float number_of_selection_protein_bf_dt[MAX_
                     0.0,
                     dt,
                     1.0/60.0,
-                    start); //rtsafe is in numerical.c
+                    start,
+                    gene_ids); //rtsafe is in numerical.c
 }
 
 /*
  * calculate f(x)-Pp_s and f'(x),
  * f(x) is the number of effector protein molecules at time x
  */
-void calc_fx_dfx(float x, int n_copies, float RHS, float *p, float *alpha_s, float *c,float *fx, float *dfx, int start)
+void calc_fx_dfx(float x, int n_copies, float RHS, float *p, float *alpha_s, float *c,float *fx, float *dfx, int start, int *gene_ids)
 {
     int i;    
     *fx=0;
     *dfx=0;    
     for(i=0;i<n_copies;i++)
     {
-        *fx+=(p[i+start]-alpha_s[i]/c[i])*exp(-c[i]*x)+alpha_s[i]/c[i];
-        *dfx+=(alpha_s[i]-c[i]*p[i+start])*exp(-c[i]*x);
+        *fx+=(p[gene_ids[i+start]]-alpha_s[i]/c[i])*exp(-c[i]*x)+alpha_s[i]/c[i];
+        *dfx+=(alpha_s[i]-c[i]*p[gene_ids[i+start]])*exp(-c[i]*x);
     }
     *fx-=RHS;    
 }
