@@ -25,8 +25,8 @@ extern float qnorm7(float, float);
 //extern float qnorm4(float, float);
 
 /*Newton-Raphson root-finding method*/
-extern float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*, int, int*), 
-		    int, float, float *, float*, float*, float x1, float x2, float xacc, int, int*);
+extern float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*, int), 
+		    int, float, float *, float*, float*, float x1, float x2, float xacc, int);
 
 /*find max or min*/
 extern void find_max(float*, int, int, float*, int*);
