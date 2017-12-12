@@ -938,6 +938,7 @@ void initialize_cell(   CellState *state,
     state->last_event_t=0.0;  
     state->change_signal_strength_head=NULL;
     state->change_signal_strength_tail=NULL;
+    state->t_to_update_Pact_or_Prep=0.0;
     /*initialize gene state, mRNA number*/
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
     {
@@ -947,6 +948,8 @@ void initialize_cell(   CellState *state,
         state->mRNA_under_transc_num[i]=0;
         state->last_Pact[i]=0.0;
         state->last_Prep[i]=0.0;
+        state->last_Pact_No_rep[i]=0.0;;
+        state->last_Pno_TF[i]=0.0;
     }       
     /* initiate protein concentration*/
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
@@ -1300,7 +1303,8 @@ void calc_all_rates(Genotype *genotype,
                                             state->change_signal_strength_head);        
         }
         state->t_to_update_Pact_or_Prep=t_to_update_Pact_or_Prep;
-    }
+    }    
+        
     /*Keep a copy of Pact and time for comparison at next time Pact is updated*/
     for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
     {
@@ -5226,12 +5230,12 @@ float try_fixation(Genotype *resident, Genotype *mutant, int N_measurement_resid
     score=-1.0;
 #else //RULE 4: s>minimal_selection_coefficient
     float s, ref;
-    s=mutant->fitness/resident->fitness-1.0;
+    s=(mutant->fitness-resident->fitness)/fabs(resident->fitness);
     if(s>=minimal_selection_coefficient)
         *fixation=1;
     else          
         *fixation=0;    
-    score=-1.0;
+    score=s;
 #endif
     return score;
 }
@@ -6154,8 +6158,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
             env1_fixed_effector_effect=0;    
             env2_fixed_effector_effect=1; 
             recalc_new_fitness=5; // make sure its value is smaller than MAX_RECALC_FITNESS
-            env1_occurence=0.33;
-            env2_occurence=0.67;    
+            env1_occurence=0.67;
+            env2_occurence=0.33;    
             float GR1[recalc_new_fitness][N_REPLICATES],GR2[recalc_new_fitness][N_REPLICATES];
             /*Load external signal profile if there is one*/
             fp=fopen("noisy_signal.txt","r");

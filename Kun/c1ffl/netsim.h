@@ -21,8 +21,8 @@
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 50000
-#define BURN_IN_I 0
+#define MAX_MUT_STEP 55000
+#define BURN_IN_I 5000
 #define BURN_IN_II 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
@@ -41,7 +41,7 @@
 
 /*Biology and evolution settings*/
 #define ROUND_UP_NEGATIVE_FITNESS 0
-#define DIRECT_REG 1
+#define DIRECT_REG 0
 #define NO_PENALTY 0
 #define ADD_2_PATHWAYS 0
 #define FORCE_OR_GATE 0
@@ -71,13 +71,13 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 20         /* the initial value is set in initiate_genotype*/
+#define TFGENES 21         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef NGENES
-#define NGENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+#define NGENES 26  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
 #endif
 #ifndef NPROTEINS           
-#define NPROTEINS 25
+#define NPROTEINS 26
 #endif
 #ifndef EFFECTOR_GENES
 #define EFFECTOR_GENES 5  /* this is the upper limit of effector gene copies*/
