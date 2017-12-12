@@ -13,9 +13,9 @@
 /*Simulation mode*/
 #define JUST_PLOTTING 0
 #define PLOT_ALTERNATIVE_FITNESS 0
-#define NEUTRAL 1
-#define RUN_FULL_SIMULATION 0
-#define SKIP_INITIAL_GENOTYPE 1
+#define NEUTRAL 0
+#define RUN_FULL_SIMULATION 1
+#define SKIP_INITIAL_GENOTYPE 0
 #define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
 #define EXTERNAL_SIGNAL 0
@@ -64,10 +64,10 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef MAX_NON_OUTPUT_GENES             /* number of genes encoding TFs */
-#define MAX_NON_OUTPUT_GENES 100         /* the initial value is set in initiate_genotype*/
+#define MAX_NON_OUTPUT_GENES 91         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef MAX_NON_OUTPUT_PROTEINS
-#define MAX_NON_OUTPUT_PROTEINS 100
+#define MAX_NON_OUTPUT_PROTEINS 91
 #endif
 #ifndef MAX_OUTPUT_GENES
 #define MAX_OUTPUT_GENES 10  /* this is the upper limit of effector gene copies*/
@@ -720,7 +720,7 @@ extern void print_core_i1ffls(Genotype *);
 
 extern void initialization_add_regulation(Genotype *, RngStream);
 
-extern float calc_replicate_fitness(CellState *, int, float);
+extern float calc_replicate_fitness(CellState *, int, float,int);
 
 
 #endif /* !FILE_NETSIM_SEEN */

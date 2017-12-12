@@ -749,12 +749,12 @@ void calc_TF_dist_from_all_BS( AllTFBindingSites *BS_info,
     temp=0.0;
 	for(j= min_act_to_transcr;j<max_N_binding_act;j++)
 		temp+=ratio_matrices[pos_next_record][0][j];   
-//    for(i=1;i<max_N_binding_rep;i++)
-//    {  
-//        for(j=2*i+1;j<max_N_binding_act;j++)
-////        for(;j<((max_N_binding_act<max_unhindered_sites[0]+1-i)?max_N_binding_act:max_unhindered_sites[0]+1-i);j++)        
-//            temp+=ratio_matrices[pos_next_record][i][j];        
-//    }     
+    for(i=1;i<max_N_binding_rep;i++)
+    {  
+        for(j=2*i+1;j<max_N_binding_act;j++)
+//        for(;j<((max_N_binding_act<max_unhindered_sites[0]+1-i)?max_N_binding_act:max_unhindered_sites[0]+1-i);j++)        
+            temp+=ratio_matrices[pos_next_record][i][j];        
+    }     
 	*PaNr = (float)(temp / sum);
    
 	*Pno_TF = (float)(ratio_matrices[pos_next_record][0][0] / sum);
@@ -957,6 +957,7 @@ void initialize_cell(   CellState *state,
     state->last_event_t=0.0;  
     state->change_signal_strength_head=NULL;
     state->change_signal_strength_tail=NULL;
+    state->t_to_update_Pact_or_Prep=0.0;
     /*initialize gene state, mRNA number*/
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
     {
@@ -966,6 +967,8 @@ void initialize_cell(   CellState *state,
         state->mRNA_under_transc_num[i]=0;
         state->last_Pact[i]=0.0;
         state->last_Prep[i]=0.0;
+        state->last_Pact_No_rep[i]=0.0;
+        state->last_Pno_TF[i]=0.0;
     }       
     /* initiate protein concentration*/
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
@@ -1016,7 +1019,7 @@ void set_signal(CellState *state,
     char flag;    
     if(signal_profile==NULL)   
     {
-        flag='o'; 
+        flag='f'; 
         state->protein_number[N_SIGNAL_TF-1]=signal_on_strength;    //always start with signal on
         #if N_SIGNAL_TF==2
             state->protein_number[0]=background_signal_strength;
@@ -1598,9 +1601,9 @@ void calc_instantaneous_fitness( Genotype *genotype,
     cost_of_expression=total_translation_rate*c_transl;
     state->cumulative_cost+=cost_of_expression*dt;
     /*list the genes that encode effectors*/
+    counter=0;
     for(i=0;i<genotype->n_output_proteins;i++)
-    {
-        counter=0;
+    {        
         protein_id=genotype->output_protein_id[i];            
         for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
         {
@@ -1886,10 +1889,10 @@ void update_protein_number_and_fitness( Genotype *genotype,
     float N_output_molecules_aft_dt[MAX_OUTPUT_GENES];  
     FILE *fperror;     
     
-    /* store the numbers of the effector proteins encoded by each copy of gene before updating*/   
+    /* store the numbers of the effector proteins encoded by each copy of gene before updating*/  
+    counter=0;
     for(i=0;i<genotype->n_output_proteins;i++)
-    {
-        counter=0;
+    {        
         protein_id=genotype->output_protein_id[i];            
         for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
         {
@@ -1915,9 +1918,9 @@ void update_protein_number_and_fitness( Genotype *genotype,
             state->protein_number[i]+=state->gene_specific_protein_number[genotype->protein_pool[i][1][j]];
     }   
     /*store the numbers of the effector proteins encoded by each copy of gene after updating*/
+    counter=0;
     for(i=0;i<genotype->n_output_proteins;i++)
-    {
-        counter=0;
+    {        
         protein_id=genotype->output_protein_id[i];            
         for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
         {
@@ -2397,7 +2400,7 @@ int do_fixed_event(Genotype *genotype,
                     Mutation *mut_record,
                     float *signal_profile)
 {     
-    int i, return_value;
+    int i,j, protein_id, return_value;
     return_value=0;
     switch (event) 
     {
@@ -2455,7 +2458,13 @@ int do_fixed_event(Genotype *genotype,
             *dt=state->sampling_point_end_head->time-state->t;
             update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0, NULL);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
-            state->sampled_response[state->N_samples]=state->protein_number[genotype->nproteins-1];
+            state->sampled_response[state->N_samples]=0.0;
+            for(i=0;i<genotype->n_output_proteins;i++)
+            {                
+                protein_id=genotype->output_protein_id[i];            
+                for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
+                    state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
+            } 
             state->N_samples++;
             break;            
     }  
@@ -2759,7 +2768,7 @@ void calc_cellular_fitness(  Genotype *genotype,
             } 
             if(end_state==1) // no error
             {	
-                gr1[i]=calc_replicate_fitness(&state_clone,1,env1_t_development);
+                gr1[i]=calc_replicate_fitness(&state_clone,1,env1_t_development,genotype_clone.n_output_proteins);
             #if CAUTIOUS                
                 if(gr1[i]<0.0)
                 {
@@ -2845,7 +2854,7 @@ void calc_cellular_fitness(  Genotype *genotype,
             } 
             if(end_state==1)
             {
-                gr2[i]=calc_replicate_fitness(&state_clone,2,env2_t_development);
+                gr2[i]=calc_replicate_fitness(&state_clone,2,env2_t_development,genotype_clone.n_output_proteins);
 #if CAUTIOUS
                 FILE *fp;
                 if(gr2[i]<0.0)
@@ -2891,7 +2900,7 @@ void calc_cellular_fitness(  Genotype *genotype,
     } 
 }
 
-float calc_replicate_fitness(CellState *state, int which_env, float t_development)
+float calc_replicate_fitness(CellState *state, int which_env, float t_development, int N_output)
 {
     float fitness;
     int i;
@@ -2944,7 +2953,16 @@ float calc_replicate_fitness(CellState *state, int which_env, float t_developmen
         fitness=bmax/3.0*fitness-state->cumulative_cost/t_development;          
     }             
 #else
-    fitness=(state->cumulative_fitness-state->cumulative_fitness_after_burn_in)/(t_development-duration_of_burn_in_growth_rate); 
+    if(POOL_EFFECTORS)
+        fitness=(state->cumulative_fitness[0]-state->cumulative_fitness_after_burn_in[0])/(t_development-duration_of_burn_in_growth_rate); 
+    else
+    {
+        fitness=0.0;
+        for(i=0;i<N_output;i++)
+            fitness+=(state->cumulative_fitness[i]-state->cumulative_fitness_after_burn_in[i])/(t_development-duration_of_burn_in_growth_rate); 
+        fitness/=N_output;
+    }
+    fitness-=state->cumulative_cost/t_development;
 #endif
     return fitness;
 }
@@ -4828,7 +4846,11 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
                 genotype->which_protein[which_gene]=genotype->nproteins;
                 genotype->Kd[genotype->nproteins]=genotype->Kd[which_protein];
                 genotype->protein_identity[genotype->nproteins][0]=genotype->protein_identity[which_protein][0];
-                genotype->protein_identity[genotype->nproteins][1]=-1;                
+                genotype->protein_identity[genotype->nproteins][1]=-1;    
+                if(genotype->protein_identity[genotype->nproteins][0])
+                    genotype->N_act++;
+                else
+                    genotype->N_rep++;
                 genotype->nproteins++;
             }
             else /*just remove the gene from output_protein_id*/
@@ -4838,7 +4860,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
                     genotype->protein_identity[genotype->output_protein_id[i]][1]=(genotype->protein_identity[genotype->output_protein_id[i]][1]<which_output)?
                                                                                     genotype->protein_identity[genotype->output_protein_id[i]][1]:genotype->protein_identity[genotype->output_protein_id[i]][1]-1;
                 for(i=which_output;i<genotype->n_output_proteins-1;i++)
-                    genotype->output_protein_id[i]=(genotype->output_protein_id[i+1]==-1)?-1:genotype->output_protein_id[i+1]-1;
+                    genotype->output_protein_id[i]=genotype->output_protein_id[i+1];
                 
                 genotype->protein_identity[which_protein][1]=-1;
                 genotype->n_output_proteins--;
@@ -5420,23 +5442,23 @@ void run_simulation(    Genotype *genotype_ori,
     /* post-burn-in simulations*/
     run_burn_in=0;
     max_mut_steps=MAX_MUT_STEP;    
-    env1_t_development=89.9;
-    env2_t_development=89.9;
+    env1_t_development=139.9;
+    env2_t_development=139.9;
     opt_pulse_duration=30.0;    
     sampling_interval=1.0;          
     saturate_pulse_amplitude=Ne_saturate;
     sd_opt_pulse_duration=20.0;
     saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
     tolerable_delay_bf_pulse=40.0;
-    duration_of_burn_in_growth_rate=0.0;
+    duration_of_burn_in_growth_rate=60.0;
     env1_signal_strength=1000.0;
     env2_signal_strength=1000.0;
-    env1_t_signal_on=100.0;    
-    env1_t_signal_off=0.0;     
-    env2_t_signal_on=100.0;
-    env2_t_signal_off=0.0;
-    env1_initial_effect_of_effector='b';
-    env2_initial_effect_of_effector='b';
+    env1_t_signal_on=60.0;    
+    env1_t_signal_off=70.0;     
+    env2_t_signal_on=60.0;
+    env2_t_signal_off=70.0;
+    env1_initial_effect_of_effector='d';
+    env2_initial_effect_of_effector='d';
     env1_fixed_effector_effect=0;    
     env2_fixed_effector_effect=0;                 // global variable
     recalc_new_fitness=5;                   // global variable, make sure its value is smaller than MAX_RECALC_FITNESS        
@@ -5765,8 +5787,8 @@ int evolve_N_steps(Genotype *genotype_ori,
             calc_all_binding_sites(genotype_ori); 
         #endif            
         /*calculate the number of c1-ffls every step*/
-        find_i1ffl(genotype_ori); 
-        print_core_i1ffls(genotype_ori); 
+//        find_i1ffl(genotype_ori); 
+//        print_core_i1ffls(genotype_ori); 
         /*output network topology every OUTPUT_INTERVAL steps*/
         if(i%OUTPUT_INTERVAL==0 && i!=0) 
             summarize_binding_sites(genotype_ori,i);        
@@ -5948,8 +5970,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     {   
         /* record the initial network topology*/
         summarize_binding_sites(&genotype_ori,init_step); /*snapshot of the initial (0) distribution binding sites */   
-        find_i1ffl(&genotype_ori); 
-        print_core_i1ffls(&genotype_ori);
+//        find_i1ffl(&genotype_ori); 
+//        print_core_i1ffls(&genotype_ori);
 
     #if JUST_PLOTTING 
         fp=fopen("MUT.txt","r");    
@@ -5978,23 +6000,23 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     #else     
         if(!SKIP_INITIAL_GENOTYPE)/* get the fitness of the initial genotype */ 
         {                     
-            env1_t_development=89.9;
-            env2_t_development=89.9;
+            env1_t_development=139.9;
+            env2_t_development=139.9;
             opt_pulse_duration=30.0;
             sampling_interval=1.0;          
             saturate_pulse_amplitude=Ne_saturate;
             sd_opt_pulse_duration=20.0;
             saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
             tolerable_delay_bf_pulse=40.0;
-            duration_of_burn_in_growth_rate=0.0;
+            duration_of_burn_in_growth_rate=60.0;
             env1_signal_strength=1000.0;
             env2_signal_strength=1000.0;
-            env1_t_signal_on=100.0;    
-            env1_t_signal_off=0.0;     
-            env2_t_signal_on=100.0;
-            env2_t_signal_off=0.0;
-            env1_initial_effect_of_effector='b';
-            env2_initial_effect_of_effector='b';
+            env1_t_signal_on=60.0;    
+            env1_t_signal_off=70.0;     
+            env2_t_signal_on=60.0;
+            env2_t_signal_off=70.0;
+            env1_initial_effect_of_effector='d';
+            env2_initial_effect_of_effector='d';
             env1_fixed_effector_effect=0;    
             env2_fixed_effector_effect=0; 
             recalc_new_fitness=5; // make sure its value is smaller than MAX_RECALC_FITNESS
@@ -6984,17 +7006,17 @@ void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     remove(file_mutations);
     rename("temp",file_mutations);
     
-    fp1=fopen("proportion_c1ffl.txt","r");
-    fp2=fopen("temp","w");
-    for(i=0;i<replay_N_steps;i++)
-    {
-        fgets(buffer,600,fp1);
-        fputs(buffer,fp2);
-    }
-    fclose(fp1);
-    fclose(fp2);
-    remove("proportion_c1ffl.txt");
-    rename("temp","proportion_c1ffl.txt");
+//    fp1=fopen("proportion_c1ffl.txt","r");
+//    fp2=fopen("temp","w");
+//    for(i=0;i<replay_N_steps;i++)
+//    {
+//        fgets(buffer,600,fp1);
+//        fputs(buffer,fp2);
+//    }
+//    fclose(fp1);
+//    fclose(fp2);
+//    remove("proportion_c1ffl.txt");
+//    rename("temp","proportion_c1ffl.txt");
     
     fp1=fopen("MUT_Detail.txt","r");
     fp2=fopen("temp","w");
