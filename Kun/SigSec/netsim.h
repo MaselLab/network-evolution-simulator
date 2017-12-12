@@ -21,14 +21,14 @@
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 51000
-#define BURN_IN_I 1000
+#define MAX_MUT_STEP 55000
+#define BURN_IN_I 5000
 #define BURN_IN_II 0
-#define MAX_MUTATIONS 500000
+#define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
 #define N_REPLICATES 200
-#define OUTPUT_INTERVAL 100
+#define OUTPUT_INTERVAL 10
 
 /*Miscellaneous settings*/
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -42,6 +42,7 @@
 /*Biology and evolution settings*/
 #define ROUND_UP_NEGATIVE_FITNESS 0
 #define DIRECT_REG 0
+#define NO_PENALTY 0
 #define ADD_2_PATHWAYS 0
 #define FORCE_OR_GATE 0
 #define RANDOM_COOPERATION_LOGIC 0
@@ -70,13 +71,13 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 20         /* the initial value is set in initiate_genotype*/
+#define TFGENES 21         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef NGENES
-#define NGENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+#define NGENES 26  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
 #endif
 #ifndef NPROTEINS           
-#define NPROTEINS 25
+#define NPROTEINS 26
 #endif
 #ifndef EFFECTOR_GENES
 #define EFFECTOR_GENES 5  /* this is the upper limit of effector gene copies*/
@@ -85,9 +86,14 @@
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
 #define NMIN 6                /* minimal number of nucleotide that matches the binding sequence of a TF in its binding site*/
                               /* DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake*/  
+//#define NUM_K_DISASSEMBLY 131 /* number of differents for PIC disassembly from data file  */
+#ifndef HIND_LENGTH
 #define HIND_LENGTH 3         /* default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH */
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
+#endif
 #define MAX_BINDING 10  /* MAX_MODE is the max number of tf that can bind to a promoter plus 1*/
+//#define MAX_BS_IN_CLUSTER 100
+
 
 /* 
  * define macros for logging warning/errors 
@@ -183,6 +189,7 @@ struct Genotype {
     int recalc_TFBS[NGENES];                                /* whether to recalc the TFBS*/
     
     int binding_sites_num[NGENES];                          /* total number of binding sites */
+    int N_allocated_elements;
     int max_unhindered_sites[NGENES][3];                    /* maximal number of binding sites that do not hinder each other. 0 for activator BS, 1 for repressor BS*/  
     int max_hindered_sites[NGENES];                        /* maximal number of BSs a BS can hinder*/ 
 
@@ -359,7 +366,7 @@ FILE *fp_rounding[2];
 
 /* function prototypes */
 
-extern void initialize_parameters();
+extern char set_base_pair(float);
 
 extern void initialize_growth_rate_parameters();
 
@@ -415,7 +422,7 @@ extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int,
                                         float *,
                                         float *,
-                                        float *,
+					float *,
                                         float *);
 
 extern int add_fixed_event(int,                           
@@ -622,7 +629,7 @@ extern void calc_configurations(Genotype *, int);
 
 extern void mutate(Genotype *, RngStream, Mutation *);
 
-extern void mut_susbtitution(Genotype *, Mutation *, RngStream);
+extern void mut_substitution(Genotype *, Mutation *, RngStream);
 
 extern void mut_insertion(Genotype *,Mutation *, RngStream);
 
@@ -630,7 +637,7 @@ extern void mut_partial_deletion(Genotype *,Mutation *, RngStream);
 
 extern void mut_whole_gene_deletion(Genotype *,Mutation *, RngStream);
 
-extern void mut_duplicaton(Genotype *,Mutation *, RngStream);
+extern void mut_duplication(Genotype *,Mutation *, RngStream);
 
 extern void mut_binding_sequence(Genotype *,Mutation *, RngStream);
 
@@ -644,7 +651,7 @@ extern void mut_koff(Genotype *, Mutation *, RngStream);
 
 extern void reproduce_mutate(Genotype *, Mutation *,RngStream);
 
-extern void reproduce_susbtitution(Genotype *, Mutation *);
+extern void reproduce_substitution(Genotype *, Mutation *);
 
 extern void reproduce_insertion(Genotype *,Mutation *);
 
@@ -652,7 +659,7 @@ extern void reproduce_partial_deletion(Genotype *,Mutation *);
 
 extern void reproduce_whole_gene_deletion(Genotype *,Mutation *);
 
-extern void reproduce_gene_duplicaton(Genotype *,Mutation *);
+extern void reproduce_gene_duplication(Genotype *,Mutation *);
 
 extern void reproduce_mut_binding_sequence(Genotype *,Mutation *);
 
@@ -777,5 +784,4 @@ extern void tidy_output_files(char*, char*);
 extern void print_core_c1ffls(Genotype *);
 
 extern void initialization_add_regulation(Genotype *, RngStream);
-#endif /*FILE_NETSIM_SEEN*/
-
+#endif /* !FILE_NETSIM_SEEN */
