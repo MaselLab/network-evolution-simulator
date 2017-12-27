@@ -753,7 +753,10 @@ void calc_TF_dist_from_all_BS( AllTFBindingSites *BS_info,
 		temp+=ratio_matrices[pos_next_record][0][j];
 	*PaNr = (float)(temp / sum);
     
-    *Pno_TF=(float)(ratio_matrices[pos_next_record][0][0]/sum);
+    temp=0.0;
+    for(j=0;j<min_act_to_transcr;j++)
+        temp+=ratio_matrices[pos_next_record][0][j];
+    *Pno_TF=(float)(temp/sum);    
     // end of the forward algorithm   
 }
 
@@ -2254,7 +2257,7 @@ void do_single_timestep(Genotype *genotype,
         if(event==5)
         {
             *did_burn_in=1;
-            state->cell_size_after_burn_in=state->cell_size;
+            state->cumulative_fitness_after_burn_in=state->cumulative_fitness;
         }          
         fixed_time=*t+dt;
         event2=does_fixed_event_end(state, fixed_time);
@@ -2262,7 +2265,7 @@ void do_single_timestep(Genotype *genotype,
         {
             fperror=fopen(error_file,"a+");
             LOG("overlapping fixed events at mut_step %d", mut_step);
-            fclose(fp);
+            fclose(fperror);
         }                       
         t_copy=*t; 
         dt_copy=dt;
@@ -2278,7 +2281,7 @@ void do_single_timestep(Genotype *genotype,
 #if CAUTIOUS // this rounding error can happen very often, therefore the error_log can be huge
             fperror=fopen(error_file,"a+");
             LOG("rounding error in dt at mut_step %d\n",mut_step);            	
-            fclose(fp);
+            fclose(fperror);
 #endif 
             dt=TIME_OFFSET; 
         }
@@ -2400,7 +2403,7 @@ int do_Gillespie_event(Genotype *genotype,
     float x; 
     int return_value;
     return_value=0;
-    FILE *fperrors; 
+    FILE *fperror; 
     while(1)
     {    
         x=RngStream_RandU01(RS)*(rates->subtotal);          
@@ -2452,9 +2455,9 @@ int do_Gillespie_event(Genotype *genotype,
                             else 
                             {                               
                               /* shouldn't get here, unless rounding error*/
-                                fperrors=fopen(error_file,"a+");
+                                fperror=fopen(error_file,"a+");
                                 LOG("at time %f in mut step %d\n", t, mut_step)                            
-                                fclose(fperrors); 
+                                fclose(fperror); 
                             }
                         }
                     }
@@ -2682,13 +2685,13 @@ void calc_avg_growth_rate(  Genotype *genotype,
                 {
                     fperror=fopen(error_file,"a+");
                     LOG("negative growth rate at replicate %d in test 1 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                    fclose(fp);
+                    fclose(fperror);
                 }
                 if(did_burn_in==0)
                 {
                     fperror=fopen(error_file,"a+");
                     LOG("burn_in did not engage at replicate %d in test 1 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                    fclose(fp);
+                    fclose(fperror);
                 }
             #endif
             }
@@ -2699,7 +2702,7 @@ void calc_avg_growth_rate(  Genotype *genotype,
 #if CAUTIOUS
                 fperror=fopen(error_file,"a+");
                 LOG("Rerun replicates at replicate %d in test 1 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                fclose(fp);
+                fclose(fperror);
 #endif
             }
             /*free linked tables*/
@@ -2770,13 +2773,13 @@ void calc_avg_growth_rate(  Genotype *genotype,
                 {
                     fperror=fopen(error_file,"a+");
                     LOG("negative growth rate at replicate %d in test 2 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                    fclose(fp);
+                    fclose(fperror);
                 }
                 if(did_burn_in==0)
                 {
                     fperror=fopen(error_file,"a+");
                     LOG("burn_in did not engage at replicate %d in test 2 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                    fclose(fp);
+                    fclose(fperror);
                 }
 #endif
             }
@@ -2786,7 +2789,7 @@ void calc_avg_growth_rate(  Genotype *genotype,
 #if CAUTIOUS
                 fperror=fopen(error_file,"a+");
                 LOG("Rerun replicates at replicate %d in test 2 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                fclose(fp);
+                fclose(fperror);
 #endif
             }            
             free_fixedevent(&state_clone);            
@@ -5468,7 +5471,7 @@ void run_simulation(    Genotype *genotype_ori,
         env2_signal_strength=0.0;
         env1_t_signal_on=200.0;    
         env1_t_signal_off=0.0;     
-        env2_t_signal_on=10.0;
+        env2_t_signal_on=100.0;
         env2_t_signal_off=130.0;
         env1_initial_effect_of_effector='b';
         env2_initial_effect_of_effector='d';
@@ -5588,7 +5591,7 @@ void run_simulation(    Genotype *genotype_ori,
     env2_signal_strength=0.0;
     env1_t_signal_on=200.0;    
     env1_t_signal_off=0.0;     
-    env2_t_signal_on=10.0;
+    env2_t_signal_on=100.0;
     env2_t_signal_off=130.0;
     env1_initial_effect_of_effector='b';
     env2_initial_effect_of_effector='d';
@@ -6151,7 +6154,7 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
             env2_signal_strength=0.0;
             env1_t_signal_on=200.0;    
             env1_t_signal_off=0.0;     
-            env2_t_signal_on=10.0;
+            env2_t_signal_on=100.0;
             env2_t_signal_off=130.0;
             env1_initial_effect_of_effector='b';
             env2_initial_effect_of_effector='d';

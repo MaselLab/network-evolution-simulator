@@ -71,13 +71,13 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 21         /* the initial value is set in initiate_genotype*/
+#define TFGENES 20         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef NGENES
-#define NGENES 26  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+#define NGENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
 #endif
 #ifndef NPROTEINS           
-#define NPROTEINS 26
+#define NPROTEINS 25
 #endif
 #ifndef EFFECTOR_GENES
 #define EFFECTOR_GENES 5  /* this is the upper limit of effector gene copies*/
@@ -99,7 +99,7 @@
  * define macros for logging warning/errors 
  */
 #ifndef LOGGING_OFF
-  #define LOG(...) { fprintf(fperrors, "%s: ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); } 
+  #define LOG(...) { fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); } 
 #else
   #define LOG 
 #endif
@@ -352,17 +352,8 @@ float cost_term;
 float penalty;
 int N_replicates;
 float duration_of_burn_in_growth_rate;
-/* file output parameters */
-char *output_directory ;
-int verbose ;
-FILE *fperrors;
-FILE *fp_cellsize[2];
-#if 0 
-FILE *fp_koff[2];
-FILE *fp_growthrate[2];
-FILE *fp_tfsbound[2];
-FILE *fp_rounding[2];
-#endif
+
+
 
 /* function prototypes */
 
