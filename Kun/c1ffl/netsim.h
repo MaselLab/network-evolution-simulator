@@ -11,18 +11,18 @@
 #include "RngStream.h"
 
 /*Simulation mode*/
-#define JUST_PLOTTING 0
-#define PLOT_ALTERNATIVE_FITNESS 0
+#define JUST_PLOTTING 1
+#define PLOT_ALTERNATIVE_FITNESS 1
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 1
+#define RUN_FULL_SIMULATION 0
 #define SKIP_INITIAL_GENOTYPE 0
 #define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 55000
-#define BURN_IN_I 5000
+#define MAX_MUT_STEP 50000
+#define BURN_IN_I 0
 #define BURN_IN_II 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
@@ -45,6 +45,11 @@
 #define NO_PENALTY 0
 #define ADD_2_PATHWAYS 0
 #define FORCE_OR_GATE 0
+#if FORCE_OR_GATE
+#define FORCE_MASTER_CONTROLLED 0
+#endif
+#define FORCE_PARALLEL 0
+#define FORCE_SINGLE_FFL 0
 #define RANDOM_COOPERATION_LOGIC 0
 #define N_SIGNAL_TF 1 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
 #define NO_REGULATION_COST 0
@@ -71,13 +76,13 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 21         /* the initial value is set in initiate_genotype*/
+#define TFGENES 20         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef NGENES
-#define NGENES 26  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+#define NGENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
 #endif
 #ifndef NPROTEINS           
-#define NPROTEINS 26
+#define NPROTEINS 25
 #endif
 #ifndef EFFECTOR_GENES
 #define EFFECTOR_GENES 5  /* this is the upper limit of effector gene copies*/
@@ -99,7 +104,7 @@
  * define macros for logging warning/errors 
  */
 #ifndef LOGGING_OFF
-  #define LOG(...) { fprintf(fperrors, "%s: ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); } 
+  #define LOG(...) { fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); } 
 #else
   #define LOG 
 #endif
@@ -190,7 +195,7 @@ struct Genotype {
     
     int binding_sites_num[NGENES];                          /* total number of binding sites */
     int N_allocated_elements;
-    int max_unhindered_sites[NGENES][3];                    /* maximal number of binding sites that do not hinder each other. 0 for activator BS, 1 for repressor BS*/  
+    int max_unhindered_sites[NGENES][3];                    /* maximal number of binding sites that do not hinder each other. element 1 for activator BS, 2 for repressor BS*/  
     int max_hindered_sites[NGENES];                        /* maximal number of BSs a BS can hinder*/ 
 
     int N_act_BS[NGENES];                                   /* total number of binding sites of activating TF */
@@ -207,7 +212,7 @@ struct Genotype {
     float fitness;
     float sq_SE_fitness;
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
-    int N_motifs[27];    
+    int N_motifs[36];    
 //     float proportion_motifs[18]; 
     int TF_in_core_C1ffl[NGENES][NPROTEINS];
     int gene_in_core_C1ffl[NGENES];
@@ -352,17 +357,7 @@ float cost_term;
 float penalty;
 int N_replicates;
 float duration_of_burn_in_growth_rate;
-/* file output parameters */
-char *output_directory ;
-int verbose ;
-FILE *fperrors;
-FILE *fp_cellsize[2];
-#if 0 
-FILE *fp_koff[2];
-FILE *fp_growthrate[2];
-FILE *fp_tfsbound[2];
-FILE *fp_rounding[2];
-#endif
+
 
 /* function prototypes */
 
@@ -775,6 +770,7 @@ extern void plot_alternative_fitness(   Genotype *,
                                         RngStream [N_THREADS],
                                         Mutation *,
                                         FILE *,
+                                        FILE *,
                                         int);
 
 extern void find_ffl(Genotype *);
@@ -783,5 +779,15 @@ extern void tidy_output_files(char*, char*);
 
 extern void print_core_c1ffls(Genotype *);
 
+extern void print_diamond(Genotype *);
+
 extern void initialization_add_regulation(Genotype *, RngStream);
+
+extern void remove_edges_iteratively(Genotype *);
+
+extern void modify_topology(Genotype *);
+
+extern void add_binding_site(Genotype *, int);
+
+extern void remove_binding_sites(Genotype *, int);
 #endif /* !FILE_NETSIM_SEEN */
