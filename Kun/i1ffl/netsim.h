@@ -64,10 +64,10 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef MAX_NON_OUTPUT_GENES             /* number of genes encoding TFs */
-#define MAX_NON_OUTPUT_GENES 91         /* the initial value is set in initiate_genotype*/
+#define MAX_NON_OUTPUT_GENES 21         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef MAX_NON_OUTPUT_PROTEINS
-#define MAX_NON_OUTPUT_PROTEINS 91
+#define MAX_NON_OUTPUT_PROTEINS 21
 #endif
 #ifndef MAX_OUTPUT_GENES
 #define MAX_OUTPUT_GENES 10  /* this is the upper limit of effector gene copies*/
@@ -163,7 +163,9 @@ struct Genotype {
     /*these apply to protein, not loci*/
     int N_act;                                              /* number of activators*/
     int N_rep;                                              /* number of repressors*/    
-    int protein_identity[NPROTEINS][2];                        /* 0 for non-output activator, -1 for non-ouput repressor */ 
+    int protein_identity[NPROTEINS][2];                     /* entry 1 marks activator (1) or repressor (0); */
+                                                            /* entry 2 marks output protein (id in output_protein_id) or
+                                                             * non-output protein (-1) */
     int output_protein_id[MAX_OUTPUT_PROTEINS];
     char tf_binding_seq[NPROTEINS][TF_ELEMENT_LEN];
     char tf_binding_seq_rc[NPROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
@@ -202,12 +204,12 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*measurement of network topology*/
-    int N_motifs[27]; 
+    int N_motifs[3]; 
     int TF_in_core_C1ffl[NGENES][NPROTEINS];
     int gene_in_core_C1ffl[NGENES];
-    int N_act_genes; 
-    int N_act_genes_reg_by_env;
-    int N_act_genes_not_reg_by_env;
+    int N_act_genes;    
+    int normalizer1;
+    int normalizer2;
 };
 
 /* 

@@ -121,13 +121,6 @@ int env2_fixed_effector_effect;
 float env1_occurence;             /* one environment can occur more frequently than*/                                
 float env2_occurence;             /* the other*/ 
 
-/* initialize the growth rate parameters: 
- * do computations here so that we can easily change the scaling factor and Pp */
-void initialize_growth_rate_parameters() 
-{    
-    
-}
-
 char set_base_pair(float x) 
 {
     char base;
@@ -749,6 +742,7 @@ void calc_TF_dist_from_all_BS( AllTFBindingSites *BS_info,
     temp=0.0;
 	for(j= min_act_to_transcr;j<max_N_binding_act;j++)
 		temp+=ratio_matrices[pos_next_record][0][j];   
+    
     for(i=1;i<max_N_binding_rep;i++)
     {  
         for(j=2*i+1;j<max_N_binding_act;j++)
@@ -2425,7 +2419,7 @@ int do_fixed_event(Genotype *genotype,
             *dt = state->signal_on_head->time - state->t;   
             update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
-            state->protein_number[N_SIGNAL_TF-1]+=5*signal_on_strength;
+            state->protein_number[N_SIGNAL_TF-1]+=10*signal_on_strength;
             if(fixed_effector_effect)                               
                 *effect_of_effector=init_effector_effect;            
             else                 
@@ -5378,84 +5372,27 @@ void run_simulation(    Genotype *genotype_ori,
         fclose(fp);
         
         if(end_state==-1)
-            return;
-//         if(first_step==BURN_IN_I+1)
-//             return;        
-        /*2nd stage of burn-in*/
-        if(BURN_IN_II)
-        {
-            end_state=0;
-            run_burn_in=1;      
-            max_mut_steps=BURN_IN_II;    
-            env1_t_development=89.9;
-            env2_t_development=89.9;                 // global variable
-            duration_of_burn_in_growth_rate=0.0;// global variable
-            env1_signal_strength=10000.0;
-            env2_signal_strength=0.0;
-            env1_t_signal_on=200.0;    
-            env1_t_signal_off=0.0;     
-            env2_t_signal_on=100.0;
-            env2_t_signal_off=130.0;
-            env1_initial_effect_of_effector='b';
-            env2_initial_effect_of_effector='d';
-            env1_fixed_effector_effect=0;    
-            env2_fixed_effector_effect=1;            // global variable
-            recalc_new_fitness=5;               // global variable, make sure its value is smaller than MAX_RECALC_FITNESS
-            env1_occurence=0.33;                 // global variable
-            env2_occurence=0.67;                 // global variable
-            DUPLICATION=5.25e-9;                 
-            SILENCING =5.25e-9;         
-
-            fp=fopen(RuntimeSumm,"a+");
-            fprintf(fp,"**********Burn-in_II conditions**********\n");
-            fprintf(fp,"BURN_IN_II=%d\n",BURN_IN_II);                
-            fprintf(fp,"N_REPLICATES=%d\n",N_REPLICATES);        
-            fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
-            fprintf(fp,"env1_t_development=%f, env2_t_development=%f\n",env1_t_development,env2_t_development);
-            fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);        
-            fprintf(fp,"env1: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env1_t_signal_on, env1_t_signal_off, env1_initial_effect_of_effector, env1_fixed_effector_effect, env1_occurence);
-            fprintf(fp,"env2: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env2_t_signal_on, env2_t_signal_off, env2_initial_effect_of_effector, env2_fixed_effector_effect, env2_occurence);
-            fclose(fp); 
-            
-            end_state=evolve_N_steps( genotype_ori, 
-                            genotype_ori_copy,
-                            &first_step, 
-                            max_mut_steps, 
-                            &N_tot_trials,                      
-                            init_protein_number,
-                            init_mRNA,                         
-                            mut_record, 
-                            RS_main,
-                            RS_parallel,
-                            run_burn_in); 
-            
-            fp=fopen(RuntimeSumm,"a+");
-            fprintf(fp,"Burn_in completes after the %dth step.\n",first_step);
-            fclose(fp);
-            
-            if(end_state==-1)
-                return;           
-        }        
+            return;    
     }    
     
     /* post-burn-in simulations*/
     run_burn_in=0;
     max_mut_steps=MAX_MUT_STEP;    
-    env1_t_development=139.9;
-    env2_t_development=139.9;
+    env1_t_development=79.9;
+    env2_t_development=79.9;
     opt_pulse_duration=30.0;    
     sampling_interval=1.0;          
     saturate_pulse_amplitude=Ne_saturate;
     sd_opt_pulse_duration=20.0;
     saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
     tolerable_delay_bf_pulse=40.0;
-    duration_of_burn_in_growth_rate=60.0;
+    duration_of_burn_in_growth_rate=30.0;
     env1_signal_strength=1000.0;
     env2_signal_strength=1000.0;
-    env1_t_signal_on=60.0;    
-    env1_t_signal_off=70.0;     
-    env2_t_signal_on=60.0;
-    env2_t_signal_off=70.0;
+    env1_t_signal_on=30.0;    
+    env1_t_signal_off=40.0;     
+    env2_t_signal_on=30.0;
+    env2_t_signal_off=40.0;
     env1_initial_effect_of_effector='d';
     env2_initial_effect_of_effector='d';
     env1_fixed_effector_effect=0;    
@@ -5464,7 +5401,7 @@ void run_simulation(    Genotype *genotype_ori,
     env1_occurence=0.5;                     // global variable
     env2_occurence=0.5;                     // global variable
     DUPLICATION=1.5e-7;                 
-    SILENCING = 3.0e-7;
+    SILENCING = 1.5e-7;
     miu_PIC_disassembly=5.22;
     miu_mRNA_decay=-1.13;
     miu_protein_decay=-4.58;
@@ -5896,15 +5833,6 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     RS_main=RngStream_CreateStream("Main");
     for(i=0; i < N_THREADS; i++)
         RS_parallel[i]=RngStream_CreateStream("");
-//    /* initialize min_act_to_transcribe*/
-//    for(i=0;i<N_THREADS;i++)
-//    {
-//        for(j=0;j<MAX_BINDING;j++)
-//        {
-//            min_act_to_transcribe[i][j]=(int)ceil(fabs((j-0.31)/0.33)); // determine the number of activators needs for transcription 
-//                                                                    // based the number of repressors, j
-//        }
-//    }
     /* set initial numbers of mRNA and protein*/
     for(i=N_SIGNAL_TF; i < NGENES; i++) /* loop through tf genes*/
     {
@@ -5999,21 +5927,21 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     #else     
         if(!SKIP_INITIAL_GENOTYPE)/* get the fitness of the initial genotype */ 
         {                     
-            env1_t_development=139.9;
-            env2_t_development=139.9;
+            env1_t_development=79.9;
+            env2_t_development=79.9;
             opt_pulse_duration=30.0;
             sampling_interval=1.0;          
             saturate_pulse_amplitude=Ne_saturate;
             sd_opt_pulse_duration=20.0;
             saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
             tolerable_delay_bf_pulse=40.0;
-            duration_of_burn_in_growth_rate=60.0;
+            duration_of_burn_in_growth_rate=30.0;
             env1_signal_strength=1000.0;
             env2_signal_strength=1000.0;
-            env1_t_signal_on=60.0;    
-            env1_t_signal_off=70.0;     
-            env2_t_signal_on=60.0;
-            env2_t_signal_off=70.0;
+            env1_t_signal_on=30.0;    
+            env1_t_signal_off=40.0;     
+            env2_t_signal_on=30.0;
+            env2_t_signal_off=40.0;
             env1_initial_effect_of_effector='d';
             env2_initial_effect_of_effector='d';
             env1_fixed_effector_effect=0;    
@@ -6193,39 +6121,13 @@ void print_core_i1ffls(Genotype *genotype)
 {
     FILE *fp; 
     fp=fopen("proportion_c1ffl.txt","a+");
-    fprintf(fp,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
-                                                                                                genotype->N_motifs[0],
-                                                                                                genotype->N_motifs[1],
-                                                                                                genotype->N_motifs[2],
-                                                                                                genotype->N_motifs[3],
-                                                                                                genotype->N_motifs[4],
-                                                                                                genotype->N_motifs[5],
-                                                                                                genotype->N_motifs[6],
-                                                                                                genotype->N_motifs[7],
-                                                                                                genotype->N_motifs[8],
-                                                                                                genotype->N_motifs[9],
-                                                                                                genotype->N_motifs[10],
-                                                                                                genotype->N_motifs[11],
-                                                                                                genotype->N_motifs[12],
-                                                                                                genotype->N_motifs[13],
-                                                                                                genotype->N_motifs[14],
-                                                                                                genotype->N_motifs[15],
-                                                                                                genotype->N_motifs[16],
-                                                                                                genotype->N_motifs[17],
-                                                                                                genotype->N_motifs[18],
-                                                                                                genotype->N_motifs[19],
-                                                                                                genotype->N_motifs[20],
-                                                                                                genotype->N_motifs[21],
-                                                                                                genotype->N_motifs[22],
-                                                                                                genotype->N_motifs[23],
-                                                                                                genotype->N_motifs[24],
-                                                                                                genotype->N_motifs[25],
-                                                                                                genotype->N_motifs[26],
-                                                                                                genotype->N_act_genes_reg_by_env+genotype->N_act_genes_not_reg_by_env,
-                                                                                                genotype->N_act_genes_reg_by_env,
-                                                                                                genotype->N_act_genes_not_reg_by_env,
-                                                                                                genotype->protein_pool[genotype->nproteins-1][0][0]);
-        fclose(fp); 
+    fprintf(fp,"%d %d %d %d %d\n",
+            genotype->N_motifs[0],
+            genotype->N_motifs[1],
+            genotype->N_motifs[2],
+            genotype->normalizer1,
+            genotype->normalizer2);                                                                                                
+    fclose(fp); 
 }
 
 void print_all_protein_time_courses(int nprotein, TimeCourse **timecoursestart, TimeCourse **timecourselast, FILE *fp)
@@ -6439,30 +6341,35 @@ void find_i1ffl(Genotype *genotype)
     int i,j,k,l,cluster_size;
     int found_bs;
     int gene_id,gene_id_copy,site_id,protein_id,N_copies,N_activators, N_repressors;
-    int master_TF,aux_TF;
     int repressors[NPROTEINS];
     int activators[NPROTEINS];
     int copies_reg_by_env[NGENES],copies_not_reg_by_env[NGENES],N_copies_reg_by_env,N_copies_not_reg_by_env;
-    int hindrance[NPROTEINS][NPROTEINS];
-    int pos_binding_sites_of_j[MAXELEMENTS],pos_binding_sites_of_k[MAXELEMENTS],N_binding_sites_of_j,N_binding_sites_of_k;
+    int N_act_effector_genes;
+    int N_rep_non_effector_genes;
+    int N_rep_effector_genes_per_protein[MAX_OUTPUT_PROTEINS],N_rep_effector_genes,N_rep_effector;
     int N_all_motifs;
     int N_motifs;    
   
+    /*reset variables*/   
+    genotype->normalizer1=0;
+    genotype->normalizer2=0;   
+    N_act_effector_genes=0;
+    N_rep_non_effector_genes=0;
+    N_rep_effector_genes=0;
+    N_rep_effector=0;
+    for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
+        N_rep_effector_genes_per_protein[i]=0;
     for(i=0;i<NGENES;i++)
     {
         genotype->gene_in_core_C1ffl[i]=0;
         for(j=0;j<NPROTEINS;j++)
             genotype->TF_in_core_C1ffl[i][j]=0;
-    } 
-    
-#if DIRECT_REG    
+    }     
+    for(i=0;i<3;i++)    
+        genotype->N_motifs[i]=0;  
+    /*begin searching motifs*/
     if(genotype->N_rep>0)
-#else
-    if(genotype->N_act>N_SIGNAL_TF && genotype->N_rep>0)    
-#endif
-    {        
-        for(i=0;i<27;i++)
-            genotype->N_motifs[i]=0; 
+    {
         i=0;   
         while(genotype->cisreg_cluster[i][0]!=-1) 
         {    
@@ -6476,25 +6383,32 @@ void find_i1ffl(Genotype *genotype)
            
             gene_id=genotype->cisreg_cluster[i][0];
             gene_id_copy=gene_id;
-            if(genotype->which_protein[gene_id]==genotype->nproteins-1) // is a effector gene
+            protein_id=genotype->which_protein[gene_id];
+            
+            if(genotype->protein_identity[protein_id][1]!=-1) // is a effector gene
             {
                 for(j=0;j<NPROTEINS;j++)
                 {
                     repressors[j]=0;    
                     activators[j]=0;  
-                }
-                cluster_size=0;
-                while(genotype->cisreg_cluster[i][cluster_size]!=-1)
-                    cluster_size++;        
-
+                }  
+                /*effector genes can have the same cisreg_seq but differ in protein identity*/
+                cluster_size=1; 
+/*                cluster_size=0;
+  *                  while(genotype->cisreg_cluster[i][cluster_size]!=-1)
+   *                 cluster_size++;  
+               */
                 /*scan binding sites for tfs that regulate gene_id*/
                 for(j=0;j<genotype->binding_sites_num[gene_id];j++)
                 {
                     protein_id=genotype->all_binding_sites[gene_id][j].tf_id;
-                    if(genotype->protein_identity[protein_id][0]==1 ) // is a binding site of an activator 
-                        activators[protein_id]=1;
-                    else
-                        repressors[protein_id]=1;
+                    if(genotype->which_protein[gene_id]!=protein_id)// do not look for self-regulation
+                    {
+                        if(genotype->protein_identity[protein_id][0]==1 ) // is a binding site of an activator                     
+                            activators[protein_id]=1;
+                        else
+                            repressors[protein_id]=1;
+                    }
                 }
                 /* move non-zeros entries in activators and repressors to the front. */
                 k=0;
@@ -6526,103 +6440,8 @@ void find_i1ffl(Genotype *genotype)
                         N_repressors++;
                     }    
                     j++;
-                } 
-                
-                /*build a table to show hindrance between binding sites on effector gene*/
-                /*if every binding site of j can hinder all the binding site of k, denote hindrance[j][k]=1. Otherwise 0*/
-                /*For hindrance[j][j]=1, this means at most one binding site of j can be bound by TF j */
-                /*A strict AND gate between j and K should have H[j][j]=H[k][k]=1, and H[j][k]=0*/
-                for(j=0;j<NPROTEINS;j++)
-                {
-                    for(l=0;l<NPROTEINS;l++)
-                        hindrance[j][l]=1;
-                }
-                for(j=0;j<N_activators;j++)
-                {
-                    /*list the positions of all the binding sites of j*/
-                    for(l=0;l<MAXELEMENTS;l++)
-                        pos_binding_sites_of_j[l]=-CISREG_LEN; 
-                    N_binding_sites_of_j=0;
-                    gene_id=genotype->cisreg_cluster[i][0];
-                    for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
-                    {
-                        if(genotype->all_binding_sites[gene_id][site_id].tf_id==activators[j] )
-                        {
-                            pos_binding_sites_of_j[N_binding_sites_of_j]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
-                            N_binding_sites_of_j++;
-                        }
-                    } 
-                    if(N_binding_sites_of_j==1 && genotype->min_act_to_transc[gene_id_copy]==2)                        
-                    {
-                        hindrance[activators[j]][activators[j]]=1;
-                    }
-                    else
-                    {
-                        /*if the first bs hinders the last bs, we can be sure at most one binding site of j can be bound by TF j */
-                        if(pos_binding_sites_of_j[N_binding_sites_of_j-1]-pos_binding_sites_of_j[0]<TF_ELEMENT_LEN+2*HIND_LENGTH)                     
-                            hindrance[activators[j]][activators[j]]=1;
-                        else
-                            hindrance[activators[j]][activators[j]]=0;
-                    }
-                    
-                    /*list the positions of all the binding sites of k*/                  
-                    N_binding_sites_of_k=0;
-                    for(k=j+1;k<N_activators;k++)
-                    {
-                        for(l=0;l<MAXELEMENTS;l++)
-                            pos_binding_sites_of_k[l]=-CISREG_LEN;
-                        N_binding_sites_of_k=0;
-                        gene_id=genotype->cisreg_cluster[i][0];                     
-                        for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
-                        {
-                            if(genotype->all_binding_sites[gene_id][site_id].tf_id==activators[k] )
-                            {
-                                pos_binding_sites_of_k[N_binding_sites_of_k]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
-                                N_binding_sites_of_k++;
-                            } 
-                        }                    
-                        if(pos_binding_sites_of_j[N_binding_sites_of_j-1]-pos_binding_sites_of_k[0]>= TF_ELEMENT_LEN+2*HIND_LENGTH ||
-                            pos_binding_sites_of_k[N_binding_sites_of_k-1]-pos_binding_sites_of_j[0]>= TF_ELEMENT_LEN+2*HIND_LENGTH    )
-                        {
-                            hindrance[activators[j]][activators[k]]=0; 
-                            hindrance[activators[k]][activators[j]]=0;
-                        }
-                    }
-                }
-                
-                /*make lists of gene copies that are regulated by environmental signal and of those that are not*/
-//                for(j=0;j<N_activators;j++)
-//                {
-//                    if(activators[j]>=N_SIGNAL_TF)
-//                    {  
-//                        N_copies=genotype->protein_pool[activators[j]][0][0]; 
-//                        for(k=0;k<N_copies;k++)
-//                        {
-//                            gene_id=genotype->protein_pool[activators[j]][1][k];
-//                            found_bs=0;
-//                            for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
-//                            {
-//                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==N_SIGNAL_TF-1 && genotype->all_binding_sites[gene_id][site_id].mis_match<=CUT_OFF_MISMATCH_WHOLE_NETWORK)
-//                                {
-//                                    found_bs=1;
-//                                    break;
-//                                }
-//                            } 
-//                            if(found_bs)
-//                            {
-//                                copies_reg_by_env[N_copies_reg_by_env]=gene_id;
-//                                N_copies_reg_by_env++;                                
-//                            }
-//                            else
-//                            {
-//                                copies_not_reg_by_env[N_copies_not_reg_by_env]=gene_id;
-//                                N_copies_not_reg_by_env++;                                 
-//                            }
-//                        }                        
-//                    }
-//                } 
-                
-                /*make lists of gene copies that are regulated by environmental signal and of those that are not*/
+                }            
+                /*make lists of gene copies that are regulated by environmental signal and of those that are not*/             
                 for(j=0;j<N_repressors;j++)
                 {
                     if(repressors[j]>=N_SIGNAL_TF)
@@ -6653,321 +6472,97 @@ void find_i1ffl(Genotype *genotype)
                         }                        
                     }
                 } 
-
-                /*******************************count c1-ffls ************************/
-            #if DIRECT_REG
-                /*count i1-ffl formed by one env-regulated copy and one unregulated copy*/
-                if(activators[0]==N_SIGNAL_TF-1)
+                /***count I1-ffls and NFB ***/  
+                if(activators[0]==N_SIGNAL_TF-1) //effector is regulated by the signal
                 {
-                    N_motifs=cluster_size*N_copies_reg_by_env;
-                    genotype->N_motifs[0]+=N_motifs;
-                }                    
-            #endif
-
-                /*count c1-ffl formed by one env-regulated copy and one unregulated copy*/
-                for(j=0;j<N_copies_reg_by_env;j++)
-                {
-                    for(k=0;k<N_copies_not_reg_by_env;k++)
+                    protein_id=genotype->which_protein[gene_id_copy];
+                    /*separate I1FFL, NFB, and I1FFL+NFB*/
+                    if(genotype->protein_identity[protein_id][0]==1) // the effector is an activator
                     {
-                        /*search bs of k on j*/
-                        gene_id=copies_reg_by_env[j];
-                        found_bs=0;
-                        protein_id=genotype->which_protein[copies_not_reg_by_env[k]];
-                        for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
+                        for(j=0;j<N_copies_not_reg_by_env;j++)
                         {
-                            if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id )
-                            {
-                                found_bs=1;
-                                break;
-                            }
-                        }
-                        if(!found_bs) // j is not regulated by k  
-                        {
-                            /*search bs of j on k*/
-                            gene_id=copies_not_reg_by_env[k];
                             found_bs=0;
-                            protein_id=genotype->which_protein[copies_reg_by_env[j]];
+                            gene_id=copies_not_reg_by_env[j];
                             for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
                             {
-                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id )
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id) 
                                 {
                                     found_bs=1;
                                     break;
                                 }
                             }
-                            if(found_bs)                            
-                            {    
-                                genotype->N_motifs[9]+=cluster_size; 
-                                master_TF=genotype->which_protein[copies_reg_by_env[j]];
-                                aux_TF=genotype->which_protein[copies_not_reg_by_env[k]];
-                                if(hindrance[master_TF][aux_TF])
-                                {
-                                    if(hindrance[master_TF][master_TF])
-                                    {
-                                        if(hindrance[aux_TF][aux_TF])
-                                            genotype->N_motifs[10]+=cluster_size;
-                                        else  
-                                            genotype->N_motifs[11]+=cluster_size;
-                                    }
-                                    else
-                                    {
-                                        if(hindrance[aux_TF][aux_TF])
-                                            genotype->N_motifs[12]+=cluster_size;
-                                        else  
-                                            genotype->N_motifs[13]+=cluster_size;
-                                    }    
-                                }
-                                else
-                                {
-                                    if(hindrance[master_TF][master_TF])
-                                    {
-                                        if(hindrance[aux_TF][aux_TF])
-                                        {
-                                            genotype->N_motifs[14]+=cluster_size;
-                               #if FORCE_OR_GATE
-                                    #if !DIRECT_REG
-                                            genotype->gene_in_core_C1ffl[gene_id_copy]=1;
-                                            genotype->TF_in_core_C1ffl[gene_id_copy][master_TF]=1;
-                                            genotype->TF_in_core_C1ffl[gene_id_copy][aux_TF]=1;
-                                    #endif
-                               #elif FORCE_PARALLEL
-                                    #if !DIRECT_REG
-                                            genotype->gene_in_core_C1ffl[copies_not_reg_by_env[k]]=1;
-                                            genotype->TF_in_core_C1ffl[copies_not_reg_by_env[k]][master_TF]=1;
-                                    #endif                        
-                               #endif
-                                            
-                                        }
-                                        else  
-                                            genotype->N_motifs[15]+=cluster_size;
-                                    }
-                                    else
-                                    {
-                                        if(hindrance[aux_TF][aux_TF])
-                                            genotype->N_motifs[16]+=cluster_size;
-                                        else  
-                                            genotype->N_motifs[17]+=cluster_size;
-                                    }                                     
-                                } 
-                            }
-                        }
-                    }
-                }
-                /*count c1-ffls formed by two env-regulated copies*/
-                /*also count parallel structures*/
-                for(j=0;j<N_copies_reg_by_env;j++)
-                {
-                    for(k=j+1;k<N_copies_reg_by_env;k++)
-                    {
-                        if(k!=j)
-                        {                    
-                            /*search bs of k on j*/
+                            if(found_bs)//gene_id is regulated by the effector, we are looking at pure NFB                            
+                                genotype->N_motifs[0]++;                                                  
+                        }   
+                        for(j=0;j<N_copies_reg_by_env;j++)
+                        {
+                            found_bs=0;
                             gene_id=copies_reg_by_env[j];
-                            found_bs=0;
-                            protein_id=genotype->which_protein[copies_reg_by_env[k]];
                             for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
                             {
-                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id )
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id) 
                                 {
                                     found_bs=1;
                                     break;
                                 }
                             }
-                            if(!found_bs) // j is not regulated by k
-                            {
-                                /*search bs of j on k*/
-                                gene_id=copies_reg_by_env[k];
-                                found_bs=0;
-                                protein_id=genotype->which_protein[copies_reg_by_env[j]];
-                                for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
-                                {
-                                    if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id )
-                                    {
-                                        found_bs=1;
-                                        break;
-                                    }
-                                }
-                                if(found_bs)  // k is regulated by j                          
-                                {                                    
-                                    genotype->N_motifs[18]+=cluster_size; 
-                                    master_TF=genotype->which_protein[copies_reg_by_env[j]];
-                                    aux_TF=genotype->which_protein[copies_reg_by_env[k]];
-                                    if(hindrance[master_TF][aux_TF])
-                                    {
-                                        if(hindrance[master_TF][master_TF])
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                                genotype->N_motifs[19]+=cluster_size;
-                                            else  
-                                                genotype->N_motifs[20]+=cluster_size;
-                                        }
-                                        else
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                                genotype->N_motifs[21]+=cluster_size;
-                                            else  
-                                                genotype->N_motifs[22]+=cluster_size;
-                                        }    
-                                    }
-                                    else
-                                    {
-                                        if(hindrance[master_TF][master_TF])
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                            {
-                                                genotype->N_motifs[23]+=cluster_size;
-                                    #if FORCE_OR_GATE
-                                            #if !DIRECT_REG
-                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1;
-                                                genotype->TF_in_core_C1ffl[gene_id_copy][master_TF]=1;
-                                                genotype->TF_in_core_C1ffl[gene_id_copy][aux_TF]=1;
-                                            #endif
-                                    #elif FORCE_PARALLEL
-                                            #if !DIRECT_REG
-                                                    genotype->gene_in_core_C1ffl[copies_reg_by_env[k]]=1;
-                                                    genotype->TF_in_core_C1ffl[copies_reg_by_env[k]][master_TF]=1;
-                                            #endif
-                                    #elif FORCE_SINGLE_FFL
-                                            #if !DIRECT_REG
-                                                    genotype->gene_in_core_C1ffl[copies_not_reg_by_env[k]]=1;                                                   
-                                            #endif 
-                                    #endif 
-                                            }
-                                            else  
-                                                genotype->N_motifs[24]+=cluster_size;
-                                        }
-                                        else
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                                genotype->N_motifs[25]+=cluster_size;
-                                            else  
-                                                genotype->N_motifs[26]+=cluster_size;
-                                        }                                     
-                                    }
-                                }
-                            }
-                            else // j is regulated by k
-                            {
-                                /*search bs of j on k*/
-                                gene_id=copies_reg_by_env[k];
-                                found_bs=0;
-                                protein_id=genotype->which_protein[copies_reg_by_env[j]];
-                                for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
-                                {
-                                    if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id )
-                                    {
-                                        found_bs=1;
-                                        break;
-                                    }
-                                }
-                                if(!found_bs) // k is not regulated by j                           
-                                {
-                                    genotype->N_motifs[18]+=cluster_size; 
-                                    master_TF=genotype->which_protein[copies_reg_by_env[k]];
-                                    aux_TF=genotype->which_protein[copies_reg_by_env[j]];
-                                    if(hindrance[master_TF][aux_TF])
-                                    {
-                                        if(hindrance[master_TF][master_TF])
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                                genotype->N_motifs[19]+=cluster_size;
-                                            else  
-                                                genotype->N_motifs[20]+=cluster_size;
-                                        }
-                                        else
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                                genotype->N_motifs[21]+=cluster_size;
-                                            else  
-                                                genotype->N_motifs[22]+=cluster_size;
-                                        }    
-                                    }
-                                    else
-                                    {
-                                        if(hindrance[master_TF][master_TF])
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                            {
-                                                genotype->N_motifs[23]+=cluster_size;
-                                    #if FORCE_OR_GATE
-                                            #if !DIRECT_REG
-                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1;
-                                                genotype->TF_in_core_C1ffl[gene_id_copy][master_TF]=1;
-                                                genotype->TF_in_core_C1ffl[gene_id_copy][aux_TF]=1;
-                                            #endif
-                                    #elif FORCE_PARALLEL
-                                            #if !DIRECT_REG
-                                                    genotype->gene_in_core_C1ffl[copies_reg_by_env[j]]=1;
-                                                    genotype->TF_in_core_C1ffl[copies_reg_by_env[j]][master_TF]=1;
-                                            #endif
-                                    #elif FORCE_SINGLE_FFL
-                                            #if !DIRECT_REG
-                                                    genotype->gene_in_core_C1ffl[copies_not_reg_by_env[j]]=1;                                                    
-                                            #endif
-                                    #endif
-                                            }
-                                            else  
-                                                genotype->N_motifs[24]+=cluster_size;
-                                        }
-                                        else
-                                        {
-                                            if(hindrance[aux_TF][aux_TF])
-                                                genotype->N_motifs[25]+=cluster_size;
-                                            else  
-                                                genotype->N_motifs[26]+=cluster_size;
-                                        }                                     
-                                    }                                   
-                                }  
-                            }
-                        }
+                            if(found_bs)//gene_id is regulated by the effector, we are looking at I1FFL+NFB                            
+                                genotype->N_motifs[2]++;                         
+                            else // gene_id is not regulated by the effector, we are looking at I1FFL                           
+                                genotype->N_motifs[1]++;
+                        }  
                     }
-                }               
+                    else // the effector is an repressor
+                    {                        
+                        for(j=0;j<N_copies_reg_by_env;j++)
+                        {
+                            found_bs=0;
+                            gene_id=copies_reg_by_env[j];
+                            for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
+                            {
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id) 
+                                {
+                                    found_bs=1;
+                                    break;
+                                }
+                            }
+                            if(!found_bs)//gene_id is not regulated by the effector, we are looking at I1FFL
+                                genotype->N_motifs[1]++; 
+                        }  
+                    }
+                }        
             }
             i++;
         }  
-        genotype->N_act_genes=0;
+     
         for(i=N_SIGNAL_TF;i<genotype->nproteins;i++)
         {
             if(genotype->protein_identity[i][0]==1)
             {
                 genotype->N_act_genes+=genotype->protein_pool[i][0][0];
+                if(genotype->protein_identity[i][1]!=-1)
+                    N_act_effector_genes+=genotype->protein_pool[i][0][0];
             }
-        }
-
-        genotype->N_act_genes_reg_by_env=0;
-        genotype->N_act_genes_not_reg_by_env=0;
-        for(gene_id=N_SIGNAL_TF;gene_id<genotype->ngenes;gene_id++)
-        {
-            protein_id=genotype->which_protein[gene_id];
-            if(genotype->protein_identity[protein_id]==0)
+            else
             {
-                found_bs=0;
-                for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
-                {
-                    if(genotype->all_binding_sites[gene_id][site_id].tf_id==N_SIGNAL_TF-1)
-                    {
-                        found_bs=1;
-                        break;
-                    }
-                }
-                if(found_bs)
-                    genotype->N_act_genes_reg_by_env++;
+                if(genotype->protein_identity[i][1]!=-1)
+                    N_rep_non_effector_genes+=genotype->protein_pool[i][0][0];
                 else
-                    genotype->N_act_genes_not_reg_by_env++;                            
+                {
+                    N_rep_effector_genes_per_protein[N_rep_effector]=genotype->protein_pool[i][0][0];
+                    N_rep_effector_genes+=genotype->protein_pool[i][0][0];
+                    N_rep_effector++;
+                }
             }
         }
-
-    }    
-    else
-    {
-        for(i=0;i<27;i++)
-        {
-            genotype->N_motifs[i]=0;            
-        }
-        genotype->N_act_genes=0; 
-        genotype->N_act_genes_not_reg_by_env=0;
-        genotype->N_act_genes_reg_by_env=0;
-    }
+        
+        genotype->normalizer1=N_act_effector_genes*(N_rep_non_effector_genes+N_rep_effector_genes);
+        genotype->normalizer2=N_act_effector_genes*(N_rep_non_effector_genes+N_rep_effector_genes)+
+                                N_rep_non_effector_genes*N_rep_effector_genes+
+                                N_rep_effector_genes*(N_rep_effector_genes-1)/2;
+        for(i=0;i<N_rep_effector;i++)
+            genotype->normalizer2-=N_rep_effector_genes_per_protein[i]*(N_rep_effector_genes_per_protein[i]-1)/2;    
+    }       
 }
 
 void tidy_output_files(char *file_genotype_summary, char *file_mutations)
