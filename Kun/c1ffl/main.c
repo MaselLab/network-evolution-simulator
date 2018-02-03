@@ -25,7 +25,7 @@ int main()
     int i,seed;
     FILE *fp;	
     /*make rng seed*/
-    seed=38;
+    seed=1;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     /*make filenames*/    
@@ -44,7 +44,7 @@ int main()
         fprintf(fp,"max effector gene number=%d, max tf gene number=%d\n",EFFECTOR_GENES,TFGENES);            
         fprintf(fp,"c_transl=%f, penalty=%f\n",c_transl,penalty);
         fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);  
-        fprintf(fp,"minimal activators to transcribe selection gene: %d\n",min_act_to_transcr_selection_protein);  
+        fprintf(fp,"minimal activators to transcribe selection gene: %d\n",min_N_activator_to_transc_selection_protein);  
         init_run_pop(seeds,0);
     }
     else
