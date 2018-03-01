@@ -422,118 +422,118 @@ void quick_sort2(float *data, int n)
 }
 
 /*Wilcoxon two-sample test*/
-float Wilcoxon_test(Genotype *resident, Genotype *mutant, int n1, int n2, float *z_score, float *mean_rank_resident, float *mean_rank_mutant)
-{
-    float observation[n1+n2+1];
-    int group_of_observation[n1+n2];
-    float rank_of_observation[n1+n2];
-    float N_tied_observations[n1+n2];
-    int i, j, start_of_tie, tie_resolved, mutant_in_tie, resident_in_tie, tie_across_groups,N_ties;    
-    float summed_rank_of_tie, rank, summed_rank_of_mutant,W,ts,Tj,fn1,fn2,N;
-    
-    for(i=0;i<n1;i++)
-    {
-        observation[i]=resident->fitness_measurement[i];
-        group_of_observation[i]=1;
-    }
-    for(i=n1;i<n1+n2;i++)
-    {
-        observation[i]=mutant->fitness_measurement[i-n1];
-        group_of_observation[i]=2;
-    }
-    observation[n1+n2]=INF;
-    quick_sort(observation,group_of_observation,n1+n2);
-    
-    rank=0.0; 
-    tie_across_groups=0;
-    tie_resolved=1;    
-    N_ties=0;
-    for(i=0;i<n1+n2;i++)
-    {
-        if(observation[i]!=observation[i+1])
-        {    
-            if(tie_resolved==0) // first check if we need to resolve a tie
-            {
-                rank+=1.0;
-                summed_rank_of_tie+=rank;
-                N_tied_observations[N_ties]+=1.0; 
-                if(group_of_observation[i]==1)
-                    resident_in_tie=1; // observations of the resident present in the tie
-                else
-                    mutant_in_tie=1;   // observations of the mutant present in the tie 
-                /* decide the average rank in the tie*/
-                for(j=i;j>=start_of_tie;j--)                
-                    rank_of_observation[j]=(float)(summed_rank_of_tie/N_tied_observations[N_ties]);  
-                /* check if the tie is across both groups*/
-                if(resident_in_tie && mutant_in_tie)
-                    tie_across_groups=1;
-                /* mark tie as resolved*/
-                tie_resolved=1;               
-            }
-            else // otherwise, rank as usual
-            {
-                rank+=1.0;
-                rank_of_observation[i]=rank;
-            }
-        }
-        else
-        {
-            rank+=1.0; // the rank needs to be increased any way
-            if(tie_resolved==1) // if this is a new tie               
-            {  
-                /* reset the following quantities*/
-                start_of_tie=i;
-                summed_rank_of_tie=0.0;
-                N_ties++;
-                N_tied_observations[N_ties]=0.0;
-                tie_resolved=0;
-                mutant_in_tie=0;
-                resident_in_tie=0;
-            }          
-                                
-            summed_rank_of_tie+=rank;
-            N_tied_observations[N_ties]+=1.0;  
-            
-            if(group_of_observation[i]==1)
-                resident_in_tie=1; // observations of the resident present in the tie
-            else
-                mutant_in_tie=1;   // observations of the mutant present in the tie        
-        }
-    }
-    
-    /* calculate Wilcoxon statistic*/
-    summed_rank_of_mutant=0.0;
-    *mean_rank_resident=0.0;
-    for(i=0;i<n1+n2;i++)
-    {
-        if(group_of_observation[i]==2)
-            summed_rank_of_mutant+=rank_of_observation[i];
-        else
-            *mean_rank_resident+=rank_of_observation[i];
-    } 
-    fn1=(float)(n1);
-    fn2=(float)(n2);
-    N=fn1+fn2;
-    *mean_rank_resident/=fn1;
-    *mean_rank_mutant=summed_rank_of_mutant/fn2;            
-            
-    W=fn1*fn2+fn2*(fn2+1.0)/2.0-summed_rank_of_mutant;
-    W=(W>fn1*fn2-W)?W:fn1*fn2-W;
-    
-    if(tie_across_groups==0)    
-        ts=(W-fn1*fn2/2.0-0.5)/sqrt(fn1*fn2*(N+1.0)/12.0);
-    else
-    {
-        Tj=0.0;
-        for(i=1;i<=N_ties;i++)
-            Tj+=(N_tied_observations[i]+1.0)*(N_tied_observations[i]-1.0)*N_tied_observations[i];
-        ts=(W-fn1*fn2/2.0-0.5)/sqrt(fn1*fn2*(N+1.0)-Tj/(N*(N-1.0))/12.0);
-    } 
-    
-    *z_score=ts;
-   
-    return 1.0-pnorm(ts);
-}
+//float Wilcoxon_test(Genotype *resident, Genotype *mutant, int n1, int n2, float *z_score, float *mean_rank_resident, float *mean_rank_mutant)
+//{
+//    float observation[n1+n2+1];
+//    int group_of_observation[n1+n2];
+//    float rank_of_observation[n1+n2];
+//    float N_tied_observations[n1+n2];
+//    int i, j, start_of_tie, tie_resolved, mutant_in_tie, resident_in_tie, tie_across_groups,N_ties;    
+//    float summed_rank_of_tie, rank, summed_rank_of_mutant,W,ts,Tj,fn1,fn2,N;
+//    
+//    for(i=0;i<n1;i++)
+//    {
+//        observation[i]=resident->fitness_measurement[i];
+//        group_of_observation[i]=1;
+//    }
+//    for(i=n1;i<n1+n2;i++)
+//    {
+//        observation[i]=mutant->fitness_measurement[i-n1];
+//        group_of_observation[i]=2;
+//    }
+//    observation[n1+n2]=INF;
+//    quick_sort(observation,group_of_observation,n1+n2);
+//    
+//    rank=0.0; 
+//    tie_across_groups=0;
+//    tie_resolved=1;    
+//    N_ties=0;
+//    for(i=0;i<n1+n2;i++)
+//    {
+//        if(observation[i]!=observation[i+1])
+//        {    
+//            if(tie_resolved==0) // first check if we need to resolve a tie
+//            {
+//                rank+=1.0;
+//                summed_rank_of_tie+=rank;
+//                N_tied_observations[N_ties]+=1.0; 
+//                if(group_of_observation[i]==1)
+//                    resident_in_tie=1; // observations of the resident present in the tie
+//                else
+//                    mutant_in_tie=1;   // observations of the mutant present in the tie 
+//                /* decide the average rank in the tie*/
+//                for(j=i;j>=start_of_tie;j--)                
+//                    rank_of_observation[j]=(float)(summed_rank_of_tie/N_tied_observations[N_ties]);  
+//                /* check if the tie is across both groups*/
+//                if(resident_in_tie && mutant_in_tie)
+//                    tie_across_groups=1;
+//                /* mark tie as resolved*/
+//                tie_resolved=1;               
+//            }
+//            else // otherwise, rank as usual
+//            {
+//                rank+=1.0;
+//                rank_of_observation[i]=rank;
+//            }
+//        }
+//        else
+//        {
+//            rank+=1.0; // the rank needs to be increased any way
+//            if(tie_resolved==1) // if this is a new tie               
+//            {  
+//                /* reset the following quantities*/
+//                start_of_tie=i;
+//                summed_rank_of_tie=0.0;
+//                N_ties++;
+//                N_tied_observations[N_ties]=0.0;
+//                tie_resolved=0;
+//                mutant_in_tie=0;
+//                resident_in_tie=0;
+//            }          
+//                                
+//            summed_rank_of_tie+=rank;
+//            N_tied_observations[N_ties]+=1.0;  
+//            
+//            if(group_of_observation[i]==1)
+//                resident_in_tie=1; // observations of the resident present in the tie
+//            else
+//                mutant_in_tie=1;   // observations of the mutant present in the tie        
+//        }
+//    }
+//    
+//    /* calculate Wilcoxon statistic*/
+//    summed_rank_of_mutant=0.0;
+//    *mean_rank_resident=0.0;
+//    for(i=0;i<n1+n2;i++)
+//    {
+//        if(group_of_observation[i]==2)
+//            summed_rank_of_mutant+=rank_of_observation[i];
+//        else
+//            *mean_rank_resident+=rank_of_observation[i];
+//    } 
+//    fn1=(float)(n1);
+//    fn2=(float)(n2);
+//    N=fn1+fn2;
+//    *mean_rank_resident/=fn1;
+//    *mean_rank_mutant=summed_rank_of_mutant/fn2;            
+//            
+//    W=fn1*fn2+fn2*(fn2+1.0)/2.0-summed_rank_of_mutant;
+//    W=(W>fn1*fn2-W)?W:fn1*fn2-W;
+//    
+//    if(tie_across_groups==0)    
+//        ts=(W-fn1*fn2/2.0-0.5)/sqrt(fn1*fn2*(N+1.0)/12.0);
+//    else
+//    {
+//        Tj=0.0;
+//        for(i=1;i<=N_ties;i++)
+//            Tj+=(N_tied_observations[i]+1.0)*(N_tied_observations[i]-1.0)*N_tied_observations[i];
+//        ts=(W-fn1*fn2/2.0-0.5)/sqrt(fn1*fn2*(N+1.0)-Tj/(N*(N-1.0))/12.0);
+//    } 
+//    
+//    *z_score=ts;
+//   
+//    return 1.0-pnorm(ts);
+//}
 
 
 /*Abramowitz & Stegun 1974 algorithm 26.2.23*/
@@ -568,3 +568,49 @@ float Wilcoxon_test(Genotype *resident, Genotype *mutant, int n1, int n2, float 
 //    }   
 //}
 
+
+void determine_minimal_update_interval(Genotype *genotype, float *minimal_interval, float MAX_CHANGE, float KD2APP, float t_unreachable)
+{
+    int i;
+    float ta, tb;
+    float N_ss,N,Kd;
+   
+    for(i=1;i<genotype->ngenes;i++)
+    {
+        if(genotype->which_protein[i]!=genotype->nproteins-1)
+        {
+            /* Given Kd and translation rate of a gene, calculate the time required for an mRNA
+             * to translate enough protein such that the probability of binding increases from 0
+             * to MAX_CHANGE. 
+             */
+            N_ss=genotype->translation_rate[i]/genotype->protein_decay_rate[i];
+            Kd=KD2APP*genotype->Kd[genotype->which_protein[i]];
+            if(N_ss>Kd*MAX_CHANGE/(1.0-MAX_CHANGE))    
+                ta=-log(1.0-genotype->protein_decay_rate[i]*Kd*MAX_CHANGE/(1.0-MAX_CHANGE)/genotype->translation_rate[i])/genotype->protein_decay_rate[i]; 
+            else
+                ta=t_unreachable;
+            
+            /* Calculate the time required for the probability of binding to decrease from M to 0.001,
+             * after all the mRNAs encoding the TF are degraded.
+             */
+            if(N_ss>Kd*(1.0+MAX_CHANGE)/(1.0-MAX_CHANGE))
+            {
+                tb=2.0*log((1.0+MAX_CHANGE)/(1.0-MAX_CHANGE))/genotype->protein_decay_rate[i];        
+            }
+            else if(N_ss>Kd*MAX_CHANGE/(1.0-MAX_CHANGE))
+            {
+                N=Kd*(N_ss/(N_ss+Kd)-MAX_CHANGE)/(1.0-N_ss/(N_ss+Kd)+MAX_CHANGE);       
+                tb=log(N_ss/N)/genotype->protein_decay_rate[i];
+            }
+            else 
+            {
+                tb=t_unreachable;
+            }
+                        
+            genotype->update_interval[i][0]=ta;
+            genotype->update_interval[i][1]=tb;
+            *minimal_interval=(*minimal_interval<ta)?*minimal_interval:ta; 
+            *minimal_interval=(*minimal_interval<tb)?*minimal_interval:tb;
+        }
+    }    
+}

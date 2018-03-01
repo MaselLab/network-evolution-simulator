@@ -23,7 +23,7 @@
 #define BURN_IN_I 5000
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
-#define N_THREADS 1
+#define N_THREADS 10
 #define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
 
@@ -38,7 +38,7 @@
 
 /*Biology and evolution settings*/
 #define DIRECT_REG 0
-#define NO_PENALTY 1
+#define NO_PENALTY 0
 #define FORCE_OR_GATE 0
 #if FORCE_OR_GATE
 #define FORCE_MASTER_CONTROLLED 0
@@ -158,6 +158,7 @@ struct Genotype {
     float translation_rate[NGENES];                         /* kinetic rates*/   
     float active_to_intermediate_rate[NGENES];                          /* kinetic rates*/    
     int min_N_activator_to_transc[NGENES];                  /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
+    float update_interval[NGENES][2];
  
     /* binding sites related data, applying to loci*/   
     int cisreg_cluster[NGENES+1][NGENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
@@ -184,7 +185,7 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*Motifs related*/
-    int N_motifs[36];  
+    int N_motifs[39];  
     int TF_in_core_C1ffl[NGENES][NPROTEINS];
     int gene_in_core_C1ffl[NGENES];
     int N_act_genes; 
@@ -234,7 +235,7 @@ struct CellState {
     FixedEvent *change_signal_strength_head;
     FixedEvent *change_signal_strength_tail;
 
-    float t_to_update_P_A_or_P_R;
+    float t_to_update_probability_of_binding;
     float P_A[NGENES];
     float P_R[NGENES];
     float P_A_no_R[NGENES];
@@ -323,6 +324,7 @@ int recalc_new_fitness;
 char init_env1;
 char init_env2;
 int min_N_activator_to_transc_selection_protein;
+
 float cost_term;
 float penalty;
 int N_replicates;
@@ -339,21 +341,15 @@ extern void initialize_sequence(char [], int, int, RngStream);
 
 extern void print_genotype(Genotype *, int);
 
-extern void print_all_binding_sites(int [NGENES],
-                                    AllTFBindingSites *, 
-                                    int ,
-                                    char [TFGENES][TF_ELEMENT_LEN],
-                                    char [NGENES][CISREG_LEN]
-//                                    int [NGENES][2]
-									);
-
-extern void print_tf_occupancy(CellState *,
-                               AllTFBindingSites *,
-                               float);
-
 extern void initialize_genotype(Genotype *, RngStream) ;
 
 extern void initialize_genotype_fixed(Genotype *, RngStream);
+
+extern void initialize_cell(Genotype *,
+                            CellState *,                          
+                            int [NGENES],
+                            float [NPROTEINS],
+                            float);
 
 extern void calc_all_binding_sites_copy(Genotype *, int);
 
@@ -361,23 +357,7 @@ extern void calc_all_binding_sites(Genotype *);
 
 extern void calc_all_binding_sites2(Genotype *);
 
-extern void calc_all_binding_sites_copy2(Genotype *, int
-
-extern void cluster_BS_cluster(Genotype *, int);
-
-extern double calc_flux(AllTFBindingSites *,int,int,double [MAX_BINDING]);
-
-extern float calc_ratio_act_to_rep(AllTFBindingSites *,
-                                    int ,
-                                    int ,
-                                    int ,
-                                    int ,
-                                    int , 
-                                    int [NGENES],                                    
-                                    int ,
-                                    int ,
-                                    int *,
-                                    float [NGENES]);
+extern void calc_all_binding_sites_copy2(Genotype *, int);
 
 extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
@@ -397,32 +377,12 @@ extern int add_fixed_event(int,
                            FixedEvent **,
                            FixedEvent **);
 
-extern void add_time_point(float,
-                           float,
-                           TimeCourse **,
-                           TimeCourse **);
-
-extern void add_fixed_event_end(int,                                
-                                float,
-                                FixedEvent **,
-                                FixedEvent **);
-
 extern void delete_fixed_event(int,                               
                                int,
                                FixedEvent **,
                                FixedEvent **);
 
-extern void delete_fixed_event_start(FixedEvent **,
-                                     FixedEvent **);
-
-extern void initialize_cell(Genotype *,
-                            CellState *,                          
-                            int [NGENES],
-                            float [NPROTEINS],
-                            float);
-
-extern int does_fixed_event_end(CellState*,
-                                float);
+extern int does_fixed_event_end(CellState*, float);
 
 extern int does_fixed_event_end_plotting(CellState *,float);
 
@@ -458,13 +418,6 @@ extern float calc_fitness(  float *,
                             int *,                                        
                             int,
                             Mutation *);
-
-extern void transport_event(Genotype *,
-                            CellState *,
-                            GillespieRates *,
-                            float,
-                            float,
-                            RngStream);
 
 extern int Gillespie_event_mRNA_decay(GillespieRates *, CellState *, Genotype *, float, RngStream);
 
@@ -506,7 +459,9 @@ extern void do_single_timestep_plotting(    Genotype *,
                                             int,   
                                             char,
                                             float (*)[90],
-                                            float [90],
+                                            float [90],                                      
+                                            int [4],
+                                            float [4],
                                             RngStream,                              
                                             int *,
                                             int *,
@@ -527,21 +482,14 @@ extern void calc_avg_growth_rate(   Genotype *,
   
 extern int init_run_pop(unsigned long int [6], int);
 
-extern void print_time_course(TimeCourse *, FILE *);
-
-extern void print_all_protein_time_courses(int, TimeCourse **, TimeCourse **, FILE *);
-
-extern void log_snapshot(Genotype *,
-                         CellState *,
-                         GillespieRates *,
-                         float ,
-                         float );
-
 extern void calc_all_rates(Genotype *,
                             CellState *,
                             GillespieRates *, 
                             float,
-                            int,int);
+                            int,
+                            int);
+//                            int [4],
+//                            float [4]);
 
 extern int fixed_event_end_translation_init(   Genotype *, 
                                                 CellState *,    
@@ -585,8 +533,6 @@ extern int do_fixed_event_plotting( Genotype *,
                                     float *);
 
 extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, float, RngStream, int *, int, Mutation *);
-
-extern void calc_configurations(Genotype *, int);
 
 extern void mutate(Genotype *, RngStream, Mutation *);
 
@@ -643,8 +589,6 @@ extern void summarize_binding_sites(Genotype *,int);
 
 extern void summarize_binding_sites2(Genotype *,int);
 
-extern void print_binding_sites_distribution(Genotype *,int, int);
-
 extern int check_concurrence(   float , 
                                 FixedEvent *, 
                                 FixedEvent *, 
@@ -661,8 +605,6 @@ extern void output_genotype(Genotype *, int);
 extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THREADS]);
 
 extern void calc_fx_dfx(float, int, float, float*, float*, float*, float*, float*);
-
-extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
 
 extern int evolve_N_steps(  Genotype *, 
                             Genotype *,
@@ -707,12 +649,10 @@ extern void calc_fitness_stats( Genotype *,
                                 float (*)[N_REPLICATES],
                                 int);
 
-
 extern void evolve_neutrally(   Genotype *,
                                 Genotype *,                             
                                 Mutation *,                              
                                 RngStream);
-
 
 extern void replay_mutations(   Genotype *,
                                 Genotype *,
@@ -737,10 +677,6 @@ extern void tidy_output_files(char*, char*);
 
 extern void print_core_c1ffls(Genotype *);
 
-extern void print_diamond(Genotype *);
-
-extern void initialization_add_regulation(Genotype *, RngStream);
-
 extern void remove_edges_iteratively(Genotype *);
 
 extern void modify_topology(Genotype *);
@@ -748,4 +684,6 @@ extern void modify_topology(Genotype *);
 extern void add_binding_site(Genotype *, int);
 
 extern void remove_binding_sites(Genotype *, int);
+
+
 #endif /* !FILE_NETSIM_SEEN */
