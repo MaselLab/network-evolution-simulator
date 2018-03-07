@@ -396,15 +396,17 @@ void find_x(float *data, int start, int end, float x, float *id_x, int find_x_ne
                 if(data[i+1]<=x)
                 {
                     *id_x=(x-data[i+1])/(data[i]-data[i+1])+(float)(i);
-                    break;
+                    return;
                 }
                 else
                     i++;
             }
-            *id_x=(x-data[end])/(data[end]-data[end-1])+(float)(end);
         }  
-        if(isnan(*id_x))
+        /*should find x by now. Otherwise,do an extrapolation*/
+        if(data[end]>=data[end-1]) //don't know when 
             *id_x=TIME_INFINITY;
+        else
+            *id_x=log(data[end]/x)/log(data[end-1]/data[end])+(float)(end);      
     }
     else
     {
@@ -416,7 +418,7 @@ void find_x(float *data, int start, int end, float x, float *id_x, int find_x_ne
                 if(data[i-1]<=x)
                 {
                     *id_x=(x-data[i-1])/(data[i]-data[i-1])+(float)(i-1);
-                    break;
+                    return;
                 }
                 else
                     i--;

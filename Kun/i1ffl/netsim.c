@@ -20,45 +20,44 @@
 #include "netsim.h"
 #include "RngStream.h"
 
-#define INITIALIZATION 2
-#define UPDATE_PACT_OR_PREP 1
-#define KD2APP_KD 1.8e10
+#define INITIALIZATION -1
+#define DO_NOTHING -2
 
 int MAXELEMENTS=100; 
 //int min_act_to_transcribe[N_THREADS][MAX_BINDING];
-const float TRANSLATION_TIME=1.0; 
-const float TRANSCRIPTION_TIME=1.0;
+const float TRANSLATION_TIME=2.0; 
+const float TRANSCRIPTION_TIME=2.0;
 const float PROB_ACTIVATING=0.62;
 const float TRANSCRIPTINIT=6.75; 
-const float MAX_NUC_DISASSEMBLY=1.7;
-const float BASE_NUC_DISASSEMBLY=0.15;
-const float MAX_NUC_ASSEMBLY=6.7;
-const float BASE_NUC_ASSEMBLY=0.67;
-const float MAX_PIC_ASSEMBLY=3.3; 
-const float BASE_PIC_ASSEMBLY=0.025;
-const float MEAN_PROTEIN_DECAY_RATE=-4.58;
-const float SD_PROTEIN_DECAY_RATE=0.67;
-const float MEAN_TM_DISASSEMBLY_RATE=2.92;
-const float SD_TM_DISASSEMBLY_RATE=0.52;
-const float MEAN_MRNA_DECAY_RATE=-3.43;
-const float SD_MRNA_DECAY_RATE=0.63;
-const float MEAN_TRANSLATION_INIT_RATE=0.94;
-const float SD_TRANSLATION_INIT_RATE=0.013;
+const float MAX_REP_TO_INT_RATE=0.92;
+const float BASAL_REP_TO_INT_RATE=0.15;
+const float MAX_INT_TO_REP_RATE=4.11;
+const float BASAL_INT_TO_REP_RATE=0.67;
+const float MAX_INT_TO_ACT_RATE=3.3; 
+const float BASAL_INT_TO_ACT_RATE=0.025;
+const float MEAN_PROTEIN_DECAY_RATE=-2.83;
+const float SD_PROTEIN_DECAY_RATE=0.286;
+const float MEAN_ACT_TO_INT_RATE=1.27;
+const float SD_ACT_TO_INT_RATE=0.226;
+const float MEAN_MRNA_DECAY_RATE=-1.49;
+const float SD_MRNA_DECAY_RATE=0.267;
+const float MEAN_TRANSLATION_INIT_RATE=0.408;
+const float SD_TRANSLATION_INIT_RATE=0.384;
 const float MIN_Kd=1.0e-9;
 const float MAX_Kd=1.0e-6;
 const float log_MIN_Kd=-9.0;
 const float log_MAX_Kd=-6.0;
 const float NS_Kd=1.0e-5;
-const float MIN_INTERVAL_TO_UPDATE_Pact_or_Prep=0.5; /* min */
-const float MAX_CHANGE_IN_Pact_or_Prep=0.1;
+const float KD2APP_KD=1.8e10;
+const float DEFAULT_UPDATE_INTERVAL=10.0; /*min*/
+const float MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING=0.01;
 
 /*Mutations*/
 float SUBSTITUTION = 3.5e-10; /* susbstitution rate per site per cell division. Lynch 2008*/
-float INDEL=0.0;
 /*the following mutations are enabled after burn-in*/
 float DUPLICATION = 0.0;   
 float SILENCING = 0.0;      
-float MUTKINETIC = 3.5e-9; /* 1% subs in a gene (~1kb, including introns) will change kinetic rates and binding seq */        
+float MUTKINETIC = 4.0e-9; /* 1% subs in a gene (~1kb, including introns) will change kinetic rates and binding seq */        
 float proportion_mut_binding_seq = 1.0;
 float proportion_mut_identity = 1.0;
 float proportion_mut_koff=1.0;
@@ -67,17 +66,28 @@ float proportion_mut_mRNA_decay=1.0;
 float proportion_mut_protein_decay=1.0;
 float proportion_mut_translation_rate=1.0;
 float proportion_mut_cooperation=0.0;
-float proportion_effector2TF=1.0;
-//float max_inset=3.0;
-//float max_delet=3.0;
-const float sd_mutation_effect=1.78; 
-//float bias_in_mut=1.15; 
-const float mutational_regression_rate=0.5;
-float miu_PIC_disassembly=5.22;
-float miu_mRNA_decay=-1.13;
-float miu_protein_decay=-4.58;
-float miu_translation_init=-1.36;
-float miu_Kd=-11.51;
+float proportion_effector2TF=0.1;
+float mutational_regression_rate=0.5;
+float sigma_ACT_TO_INT_RATE=0.39; 
+float sigma_mRNA_decay=0.39; 
+float sigma_protein_decay=0.39; 
+float sigma_translation_init=0.39; 
+float sigma_Kd=0.39;
+float miu_ACT_TO_INT_RATE=2.27;
+float miu_mRNA_decay=-0.49;
+float miu_protein_decay=-2.83;
+float miu_translation_init=-0.592;
+float miu_Kd=-5.0;
+const float MAX_ACT_TO_INT_RATE=416.0;
+const float MIN_ACT_TO_INT_RATE=0.1;
+const float MAX_MRNA_DECAY=1.39;
+const float MIN_MRNA_DECAY=7.7e-3;
+const float MAX_PROTEIN_DECAY=1.39;
+const float MIN_PROTEIN_DECAY=7.7e-3;
+const float MAX_TRANSLATION_RATE=33.0;
+const float MIN_TRANSLATION_RATE=0.0;
+const float MAX_KD=1.0e-5;
+const float MIN_KD=0.0;
 
 /*fitness*/
 float sampling_interval;
@@ -86,7 +96,7 @@ float saturate_pulse_amplitude;
 float opt_pulse_duration;
 float sd_opt_pulse_duration;
 float tolerable_delay_bf_pulse;
-float Ne_saturate = 10000.0;
+float Ne_saturate = 100000.0;
 float c_transl=2.0e-6;
 float bmax=1.0; 
 float duration_of_burn_in_growth_rate; /* allow cells to reach (possiblly) steady growth*/
@@ -104,8 +114,20 @@ int init_N_output_rep=0;
 float background_signal_strength = 0.0; /* number of TF0 protein */
 float signal_off_strength=0.0; /* number of signal protein at basal level */
 float signal_profile_matrix[N_THREADS][200][15];
-float env1_signal_strength;
-float env2_signal_strength;
+float env1_minimal_peak_response;
+float env2_minimal_peak_response;
+float env1_response_amplification;
+float env2_response_amplification;
+float env1_benefit1;
+float env1_benefit2;
+float env1_max_duration_bias;            
+float env2_benefit1;
+float env2_benefit2;
+float env2_max_duration_bias;
+float env1_signal1_strength;
+float env1_signal2_strength;
+float env2_signal1_strength;
+float env2_signal2_strength;
 float env1_t_development;
 float env2_t_development;
 float env1_t_signal_on;    
@@ -164,19 +186,29 @@ void initialize_genotype_fixed(Genotype *genotype, RngStream RS)
         #if RANDOM_COOPERATION_LOGIC        
             genotype->min_act_to_transc[i]=RngStream_RandInt(RS,1,2); //if one activator is sufficient to induce expression, the gene is regualted by OR gate.
         #else
-            genotype->min_act_to_transc[i]=1; 
-            genotype->min_act_to_transc[genotype->ngenes-1]=1;
+            genotype->min_N_activator_to_transc[i]=1; 
+            genotype->min_N_activator_to_transc[genotype->ngenes-1]=1;
         #endif             
         /* tf affinity */
         genotype->Kd[i]=pow(10.0,(log_MAX_Kd-log_MIN_Kd)*RngStream_RandU01(RS)+log_MIN_Kd); 
+        while(genotype->Kd[i]>=MAX_Kd || genotype->Kd[i]<=MIN_Kd)
+            genotype->Kd[i]=pow(10.0,(log_MAX_Kd-log_MIN_Kd)*RngStream_RandU01(RS)+log_MIN_Kd); 
         /* mRNA decay */
-        genotype->mRNAdecay[i] = exp(SD_MRNA_DECAY_RATE*gasdev(RS)+MEAN_MRNA_DECAY_RATE);
+        genotype->mRNA_decay_rate[i] = pow(10.0,SD_MRNA_DECAY_RATE*gasdev(RS)+MEAN_MRNA_DECAY_RATE);
+        while(genotype->mRNA_decay_rate[i]>=MAX_MRNA_DECAY || genotype->mRNA_decay_rate[i]<=MIN_MRNA_DECAY)
+            genotype->mRNA_decay_rate[i] = pow(10.0,SD_MRNA_DECAY_RATE*gasdev(RS)+MEAN_MRNA_DECAY_RATE);
         /* protein decay */
-        genotype->proteindecay[i] = exp(SD_PROTEIN_DECAY_RATE*gasdev(RS)+MEAN_PROTEIN_DECAY_RATE);        
+        genotype->protein_decay_rate[i] = pow(10.0,SD_PROTEIN_DECAY_RATE*gasdev(RS)+MEAN_PROTEIN_DECAY_RATE);  
+        while(genotype->protein_decay_rate[i]>=MAX_PROTEIN_DECAY || genotype->protein_decay_rate[i]<=MIN_PROTEIN_DECAY)
+            genotype->protein_decay_rate[i] = pow(10.0,SD_PROTEIN_DECAY_RATE*gasdev(RS)+MEAN_PROTEIN_DECAY_RATE);
         /* translation rate */
-        genotype->translation[i] = exp(SD_TRANSLATION_INIT_RATE*gasdev(RS)+MEAN_TRANSLATION_INIT_RATE);      
+        genotype->translation_rate[i] = pow(10.0,SD_TRANSLATION_INIT_RATE*gasdev(RS)+MEAN_TRANSLATION_INIT_RATE);  
+        while(genotype->translation_rate[i]>=MAX_TRANSLATION_RATE || genotype->translation_rate[i]<=MIN_TRANSLATION_RATE)
+            genotype->translation_rate[i] = pow(10.0,SD_TRANSLATION_INIT_RATE*gasdev(RS)+MEAN_TRANSLATION_INIT_RATE); 
         /*PIC disassembly rate*/
-        genotype->pic_disassembly[i]=exp(SD_TM_DISASSEMBLY_RATE*gasdev(RS)+MEAN_TM_DISASSEMBLY_RATE); 
+        genotype->active_to_intermediate_rate[i]=pow(10.0,SD_ACT_TO_INT_RATE*gasdev(RS)+MEAN_ACT_TO_INT_RATE);  
+        while(genotype->active_to_intermediate_rate[i]>=MAX_ACT_TO_INT_RATE || genotype->active_to_intermediate_rate[i]<=MIN_ACT_TO_INT_RATE)
+            genotype->active_to_intermediate_rate[i]=pow(10.0,SD_ACT_TO_INT_RATE*gasdev(RS)+MEAN_ACT_TO_INT_RATE);  
     }          
     /* assign tf identity*/
     genotype->N_act=0;
@@ -243,10 +275,10 @@ void initialize_genotype_fixed(Genotype *genotype, RngStream RS)
     /* parameterize sensor TF*/
     for(i=0;i<N_SIGNAL_TF;i++)
     {
-        genotype->mRNAdecay[i]=0.0; // we assume environmental signal toggles the state of sensor TF between active and inactive 
-        genotype->proteindecay[i]=0.0; // the concentration of sensor TF is constant.
-        genotype->translation[i]=0.0;
-        genotype->pic_disassembly[i]=0.0; 
+        genotype->mRNA_decay_rate[i]=0.0; // we assume environmental signal toggles the state of sensor TF between active and inactive 
+        genotype->protein_decay_rate[i]=0.0; // the concentration of sensor TF is constant.
+        genotype->translation_rate[i]=0.0;
+        genotype->active_to_intermediate_rate[i]=0.0; 
         genotype->protein_identity[i][0]=1; /*make sensor TF an activator*/
         genotype->protein_identity[i][1]=-1;
         genotype->N_act++;
@@ -263,7 +295,7 @@ void initialize_genotype_fixed(Genotype *genotype, RngStream RS)
             genotype->N_rep++;
         }
     #endif
-#endif
+#endif   
 }
 
 /*
@@ -741,11 +773,10 @@ void calc_TF_dist_from_all_BS( AllTFBindingSites *BS_info,
     
     temp=0.0;
 	for(j= min_act_to_transcr;j<max_N_binding_act;j++)
-		temp+=ratio_matrices[pos_next_record][0][j];   
-    
+		temp+=ratio_matrices[pos_next_record][0][j];       
     for(i=1;i<max_N_binding_rep;i++)
     {  
-        for(j=2*i+1;j<max_N_binding_act;j++)
+        for(j=2*i;j<max_N_binding_act;j++)
 //        for(;j<((max_N_binding_act<max_unhindered_sites[0]+1-i)?max_N_binding_act:max_unhindered_sites[0]+1-i);j++)        
             temp+=ratio_matrices[pos_next_record][i][j];        
     }     
@@ -787,7 +818,7 @@ int check_concurrence(  float t, //new fixed event is scheduled to happen at t
                         FixedEvent *signal_on, 
                         FixedEvent *signal_off,
                         FixedEvent *burn_in,
-                        float t_to_update_Pact_or_Prep,
+                        float t_to_update_probability_of_binding,
                         FixedEvent *change_signal)
 {   
     while(translation!=NULL)
@@ -826,7 +857,7 @@ int check_concurrence(  float t, //new fixed event is scheduled to happen at t
             return 1; 
         change_signal=change_signal->next;        
     }
-    if(t==t_to_update_Pact_or_Prep)
+    if(t==t_to_update_probability_of_binding)
         return 1;        
     return 0;
 }
@@ -905,7 +936,8 @@ void delete_fixed_event_from_head(FixedEvent **head,FixedEvent **tail)
  * initialize the cell state with the specified initial protein
  * concentration, mean mRNA number and mRNA decay
  */
-void initialize_cell(   CellState *state,                        
+void initialize_cell(   Genotype *genotype,
+                        CellState *state,                        
                         int ngenes,
                         int nproteins,
                         int protein_pool[NPROTEINS][2][NGENES], 
@@ -913,7 +945,8 @@ void initialize_cell(   CellState *state,
                         int init_mRNA_number[NGENES],
                         float init_protein_number[NPROTEINS], 
                         RngStream RS,
-                        float tdevelopment)
+                        float tdevelopment,
+                        float t_signal_on)
 {
     int i, j;
     /* start fitness at 1.0 */
@@ -928,12 +961,22 @@ void initialize_cell(   CellState *state,
     state->cumulative_advanced_benefit=0.0;
     state->cumulative_basal_benefit=0.0;
     state->cumulative_cost=0.0;
-    state->cumulative_damage=0.0;   
+    state->cumulative_damage=0.0;  
+    state->recording_basal_response=0;
+    state->found_gradient=0;
+    state->position=0;
+    state->cumulative_t_in_bias=0;    
+    state->moving=0;
+    state->cumulative_benefit=0.0;
+    state->cell_activated=0;
+    state->t_to_update_probability_of_binding=TIME_INFINITY;
     for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
     {
         state->cumulative_fitness[i] = 0.0;     
         state->cumulative_fitness_after_burn_in[i] = 0.0;   
-        state->instantaneous_fitness[i] = 0.0;    
+        state->instantaneous_fitness[i] = 0.0; 
+        state->threshold_response_to_bias[i]=0.0;
+        state->basal_response[i]=0.0;
     }
     /* initialize linked tables*/
     state->mRNA_transcr_time_end_head = NULL;
@@ -950,19 +993,19 @@ void initialize_cell(   CellState *state,
     state->sampling_point_end_tail=NULL;
     state->last_event_t=0.0;  
     state->change_signal_strength_head=NULL;
-    state->change_signal_strength_tail=NULL;
-    state->t_to_update_Pact_or_Prep=0.0;
+    state->change_signal_strength_tail=NULL; 
     /*initialize gene state, mRNA number*/
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
     {
-        state->gene_state[i]= NUC_NO_PIC;       
+        state->gene_state[i]= REPRESSED;       
         state->mRNA_aft_transl_delay_num[i]=init_mRNA_number[i];
         state->mRNA_under_transl_delay_num[i]=0;
         state->mRNA_under_transc_num[i]=0;
-        state->last_Pact[i]=0.0;
-        state->last_Prep[i]=0.0;
-        state->last_Pact_No_rep[i]=0.0;
-        state->last_Pno_TF[i]=0.0;
+        state->last_P_A[i]=0.0;
+        state->last_P_R[i]=0.0;
+        state->last_P_A_no_R[i]=0.0;
+        state->last_P_NotA_no_R[i]=0.0;
+        state->protein_synthesis_index[i]=(float)state->mRNA_aft_transl_delay_num[i]*genotype->translation_rate[i]/genotype->protein_decay_rate[i];
     }       
     /* initiate protein concentration*/
     for (i=N_SIGNAL_TF; i < ngenes; i++) 
@@ -986,17 +1029,34 @@ void initialize_cell(   CellState *state,
         add_fixed_event(-1,duration_of_burn_in_growth_rate,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail)); 
     else
         add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));                
-    /*plot protein concentration and fitness vs time*/   
+    /*plot protein concentration and fitness vs time*/ 
+#if !JUST_PLOTTING
+#if PEAK_SEARCH
     float t;
     int N_data_points; 
-    t=0.0+TIME_OFFSET;
-    N_data_points=(int)(tdevelopment/sampling_interval);
+    t=t_signal_on+TIME_OFFSET;
+    N_data_points=(int)((tdevelopment-t_signal_on)/sampling_interval);
     for(i=0;i<N_data_points;i++)
     {
         add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
         t+=sampling_interval;            
     } 
-    state->sampled_response=(float*)calloc(N_data_points,sizeof(float));
+    state->sampled_response=(float*)calloc(N_data_points,sizeof(float)); 
+#elif CHEMOTAXIS
+    add_fixed_event(-1,t_signal_on-1.0,&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
+#endif    
+#else
+    float t;    
+    int N_data_points;
+    N_data_points=(int)((tdevelopment-t_signal_on)/sampling_interval);
+    state->sampled_response=(float*)calloc(N_data_points,sizeof(float)); 
+    t=TIME_OFFSET;   
+    for(i=0;i<N_TIMEPOINTS;i++)
+    {
+        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
+        t+=1.0;            
+    }      
+#endif
 }
 
 /*
@@ -1053,73 +1113,55 @@ void set_signal(CellState *state,
  */
 void calc_all_rates(Genotype *genotype,
                     CellState *state,
-                    GillespieRates *rates,                  
+                    GillespieRates *rates,                    
                     int UPDATE_WHAT,
                     int thread_id)
 {
-    int i,cluster_id,too_much_error;
-    float salphc;
+    int i,cluster_id,gene_id;
     int concurrent;
-    float t_to_update_Pact_or_Prep,interval_to_update_Pact_or_Prep;
-    
-    /*Update the rates of protein synthesis and decay*/
-    /*These values are usually updated in update_protein_number_and_fitness, unless at initialization or 
-     *forced to update*/
-    if(UPDATE_WHAT==UPDATE_PACT_OR_PREP || UPDATE_WHAT==INITIALIZATION) 
-    {
-        for (i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
-        {          
-            salphc = state->mRNA_aft_transl_delay_num[i] * genotype->translation[i]/(genotype->proteindecay[i]);
-            state->konvalues[i][KON_PROTEIN_DECAY_INDEX] = genotype->proteindecay[i];
-            state->konvalues[i][KON_SALPHAC_INDEX] = salphc;
-        }
-        for (i=0;i<N_SIGNAL_TF;i++)
-        {
-            state->konvalues[i][KON_PROTEIN_DECAY_INDEX]=0.0;
-            state->konvalues[i][KON_SALPHAC_INDEX]=0.0;
-        }
-    }    
+    float t_to_update_probability_of_binding,interval_to_update_probability_of_binding;  
+    float diff_PA,diff_PR,diff_PnotAnoR,diff_PAnoR,diff_max;  
     /* reset rates */
-    rates->mRNAdecay=0.0;
-    rates->pic_disassembly=0.0;
-    rates->nuc_disassembly=0.0;
-    rates->nuc_assembly=0.0;
-    rates->transcript_init=0;
-    rates->pic_assembly=0.0;
-    rates->subtotal=0.0;    
+    rates->total_mRNA_decay_rate=0.0;
+    rates->total_active_to_intermediate_rate=0.0;
+    rates->total_repressed_to_intermediate_rate=0.0;
+    rates->total_intermediate_to_repressed_rate=0.0;
+    rates->total_N_gene_transcript_initiated=0;
+    rates->total_intermediate_to_active_rate=0.0;
+    rates->total_Gillespie_rate=0.0;    
     for(i=0;i<genotype->ngenes;i++)
     {
-        rates->nuc_disassembly_rate[i]=0.0;
-        rates->nuc_assembly_rate[i]=0.0;
-        rates->pic_assembly_rate[i]=0.0;
-        rates->pic_disassembly_rate[i]=0.0;
-        rates->mRNAdecay_rate[i]=0.0;
-        rates->transcript_init_rate[i]=0;
-        state->Pact[i]=0.0;
-        state->Prep[i]=0.0;
-        state->Pact_No_rep[i]=0.0;
-        state->Pno_TF[i]=0.0;
+        rates->repressed_to_intermediate_rate[i]=0.0;
+        rates->intermediate_to_repressed_rate[i]=0.0;
+        rates->intermediate_to_active_rate[i]=0.0;
+        rates->active_to_intermediate_rate[i]=0.0;
+        rates->mRNA_decay_rate[i]=0.0;
+        rates->transcript_initiation_state[i]=0;
+        state->P_A[i]=0.0;
+        state->P_R[i]=0.0;
+        state->P_A_no_R[i]=0.0;
+        state->P_NotA_no_R[i]=0.0;
     } 
     /* update mRNA decay rates*/
     for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
     {
-        rates->mRNAdecay_rate[i] = genotype->mRNAdecay[i] * (state->mRNA_aft_transl_delay_num[i] + state->mRNA_under_transl_delay_num[i]);
-        rates->mRNAdecay += rates->mRNAdecay_rate[i];        
+        rates->mRNA_decay_rate[i] = genotype->mRNA_decay_rate[i] * (state->mRNA_aft_transl_delay_num[i] + state->mRNA_under_transl_delay_num[i]);
+        rates->total_mRNA_decay_rate += rates->mRNA_decay_rate[i];        
     }
     /*update probability of binding configurations that activates expression
      * and use it to update other rates*/
-    for (i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
+    for(i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
     {    
         #if NO_REGULATION //if we manually turn off the expression of non-sensor TFs
-            if(genotype->protein_identity[genotype->which_protein[i]]==-1) // we only calculate the binding configurations for effector genes
+            if(genotype->protein_identity[genotype->which_protein[i]]==NON_TF) // we only calculate the binding configurations for effector genes
             {
                 cluster_id=genotype->which_cluster[i];        
                 if(genotype->cisreg_cluster[cluster_id][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
                 {                
-                    state->Pact[i]=state->Pact[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
-                    state->Prep[i]=state->Prep[genotype->cisreg_cluster[cluster_id][0]];
-                    state->Pact_No_rep[i]=state->Pact_No_rep[genotype->cisreg_cluster[cluster_id][0]];
-                    state->no_TF[i]=state->Pno_TF[genotype->cisreg_cluster[cluster_id][0]];
+                    state->P_A[i]=state->P_A[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
+                    state->P_R[i]=state->P_R[genotype->cisreg_cluster[cluster_id][0]];
+                    state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster[cluster_id][0]];
+                    state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster[cluster_id][0]];
                 }
                 else /* otherwise, we need to calc the ratio*/
                 {
@@ -1131,35 +1173,35 @@ void calc_all_rates(Genotype *genotype,
                                                     genotype->protein_identity, 
                                                     genotype->max_unhindered_sites[i],
                                                     state->protein_number,
-                                                    genotype->min_act_to_transc[i],
-                                                    &(state->Pact[i]),
-													&(state->Prep[i]),
-                                                    &(state->Pact_No_rep[i]),
-                                                    &(state->Pno_TF[i]));
+                                                    genotype->min_N_activator_to_transc[i],
+                                                    &(state->P_A[i]),
+                                                    &(state->P_R[i]),
+													&(state->P_A_no_R[i]),
+                                                    &(state->P_NotA_no_R[i]));
                     else
                     {
-                        state->Pact[i]=0.0;     
-                        state->Prep[i]=0.0;
-						state->Pact_No_rep[i] = 0.0;
-                        state->Pno_TF[i]=0.0;
+                        state->P_A[i]=0.0;     
+                        state->P_R[i]=0.0;
+						state->P_A_no_R[i] = 0.0;
+                        state->P_NotA_no_R[i]=0.0;
                     }
                 }
             }
             else
             {
-               state->Pact[i]=0.0; 
-               state->Prep[i]=0.0;
-			   state->Pact_No_rep[i] = 0.0;
-               state->Pno_TF[i]=0.0;
+               state->P_A[i]=0.0; 
+               state->P_R[i]=0.0;
+			   state->P_A_no_R[i] = 0.0;
+               state->P_NotA_no_R[i]=0.0;
             }
         #else
             cluster_id=genotype->which_cluster[i];        
             if(genotype->cisreg_cluster[cluster_id][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
             {                
-                state->Pact[i]=state->Pact[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
-                state->Prep[i]=state->Prep[genotype->cisreg_cluster[cluster_id][0]];
-                state->Pact_No_rep[i]=state->Pact_No_rep[genotype->cisreg_cluster[cluster_id][0]];
-                state->Pno_TF[i]=state->Pno_TF[genotype->cisreg_cluster[cluster_id][0]];
+                state->P_A[i]=state->P_A[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
+                state->P_R[i]=state->P_R[genotype->cisreg_cluster[cluster_id][0]];
+                state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster[cluster_id][0]];
+                state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster[cluster_id][0]];
             }
             else /* otherwise, we need to calc the ratio*/
             {
@@ -1171,157 +1213,112 @@ void calc_all_rates(Genotype *genotype,
                                                 genotype->protein_identity, 
                                                 genotype->max_unhindered_sites[i],
                                                 state->protein_number,
-                                                genotype->min_act_to_transc[i],
-                                                &(state->Pact[i]),
-												&(state->Prep[i]),
-												&(state->Pact_No_rep[i]),
-                                                &(state->Pno_TF[i]));
+                                                genotype->min_N_activator_to_transc[i],
+                                                &(state->P_A[i]),
+                                                &(state->P_R[i]),
+												&(state->P_A_no_R[i]),
+                                                &(state->P_NotA_no_R[i]));
                 else
                 {
-                    state->Pact[i]=0.0;     
-                    state->Prep[i]=0.0;
-					state->Pact_No_rep[i] = 0.0;
-                    state->Pno_TF[i]=0.0;
+                    state->P_A[i]=0.0;     
+                    state->P_R[i]=0.0;
+					state->P_A_no_R[i] = 0.0;
+                    state->P_NotA_no_R[i]=0.0;
                 }
             }
         #endif
         /* calc other rates*/
         switch (state->gene_state[i])
         {
-            case NUC_NO_PIC:
-                rates->nuc_disassembly_rate[i]=state->Pact[i]*(MAX_NUC_DISASSEMBLY-BASE_NUC_DISASSEMBLY)+BASE_NUC_DISASSEMBLY;             
-                rates->nuc_disassembly+=rates->nuc_disassembly_rate[i];
-                rates->nuc_assembly_rate[i]=0.0;
-                rates->pic_assembly_rate[i]=0.0;
-                rates->pic_disassembly_rate[i]=0.0;
+            case REPRESSED:
+                rates->repressed_to_intermediate_rate[i]=state->P_A[i]*(MAX_REP_TO_INT_RATE-BASAL_REP_TO_INT_RATE)+BASAL_REP_TO_INT_RATE;             
+                rates->total_repressed_to_intermediate_rate+=rates->repressed_to_intermediate_rate[i];
+                rates->intermediate_to_repressed_rate[i]=0.0;
+                rates->intermediate_to_active_rate[i]=0.0;
+                rates->active_to_intermediate_rate[i]=0.0;
                 break;                
-            case NO_NUC_NO_PIC:
-                rates->nuc_assembly_rate[i]=state->Prep[i]*(MAX_NUC_ASSEMBLY-BASE_NUC_ASSEMBLY)+BASE_NUC_ASSEMBLY;
-                rates->nuc_assembly+=rates->nuc_assembly_rate[i];
-                rates->pic_assembly_rate[i]=MAX_PIC_ASSEMBLY*state->Pact_No_rep[i]+BASE_PIC_ASSEMBLY*state->Pno_TF[i];
-                rates->pic_assembly+=rates->pic_assembly_rate[i]; 
-                rates->pic_disassembly_rate[i]=0.0;
-                rates->nuc_disassembly_rate[i]=0.0;
+            case INTERMEDIATE:
+                rates->intermediate_to_repressed_rate[i]=state->P_R[i]*(MAX_INT_TO_REP_RATE-BASAL_INT_TO_REP_RATE)+BASAL_INT_TO_REP_RATE;
+                rates->total_intermediate_to_repressed_rate+=rates->intermediate_to_repressed_rate[i];
+                rates->intermediate_to_active_rate[i]=MAX_INT_TO_ACT_RATE*state->P_A_no_R[i]+BASAL_INT_TO_ACT_RATE*state->P_NotA_no_R[i];
+                rates->total_intermediate_to_active_rate+=rates->intermediate_to_active_rate[i]; 
+                rates->active_to_intermediate_rate[i]=0.0;
+                rates->repressed_to_intermediate_rate[i]=0.0;
                 break;                
-            case PIC_NO_NUC: 
-                rates->pic_disassembly_rate[i]=genotype->pic_disassembly[i];
-                rates->pic_disassembly+=rates->pic_disassembly_rate[i]; 
-                rates->transcript_init_rate[i]= 1;
-                rates->transcript_init+=1;
-                rates->nuc_assembly_rate[i]=0.0; 
-                rates->nuc_disassembly_rate[i]=0.0;
-                rates->pic_assembly_rate[i]=0.0;
+            case ACTIVE: 
+                rates->active_to_intermediate_rate[i]=genotype->active_to_intermediate_rate[i];
+                rates->total_active_to_intermediate_rate+=rates->active_to_intermediate_rate[i]; 
+                rates->transcript_initiation_state[i]= 1;
+                rates->total_N_gene_transcript_initiated+=1;
+                rates->intermediate_to_repressed_rate[i]=0.0; 
+                rates->repressed_to_intermediate_rate[i]=0.0;
+                rates->intermediate_to_active_rate[i]=0.0;
                 break;
         }
     }
-    rates->subtotal+=rates->nuc_assembly;
-    rates->subtotal+=rates->pic_assembly;
-    rates->subtotal+=rates->nuc_disassembly;
-    rates->subtotal+=rates->mRNAdecay;
-    rates->subtotal+=rates->pic_disassembly;
-    rates->subtotal+=(float)rates->transcript_init*TRANSCRIPTINIT;  
+    rates->total_Gillespie_rate+=rates->total_intermediate_to_repressed_rate;
+    rates->total_Gillespie_rate+=rates->total_intermediate_to_active_rate;
+    rates->total_Gillespie_rate+=rates->total_repressed_to_intermediate_rate;
+    rates->total_Gillespie_rate+=rates->total_mRNA_decay_rate;
+    rates->total_Gillespie_rate+=rates->total_active_to_intermediate_rate;
+    rates->total_Gillespie_rate+=(float)rates->total_N_gene_transcript_initiated*TRANSCRIPTINIT;  
     
-    /*Check if Pact needs to be updated more or less often*/
-    if(UPDATE_WHAT!=INITIALIZATION)
-    {
-        if(UPDATE_WHAT==UPDATE_PACT_OR_PREP)
-            interval_to_update_Pact_or_Prep=MIN_INTERVAL_TO_UPDATE_Pact_or_Prep;
-        else
+    /*Check if Pact needs to be updated more or less often*/ 
+    if(UPDATE_WHAT!=INITIALIZATION && state->cell_activated==1)
+    {  
+        diff_max=0.0;
+        cluster_id=1;    
+        while(genotype->cisreg_cluster[cluster_id][0]!=-1) //check if Pact changes too much
         {
-            too_much_error=0;        
-            for(i=N_SIGNAL_TF;i<genotype->ngenes;i++) //check if Pact changes too much for at least one gene
-            {
-                if(state->last_Pact[i]!=0.0)
-                {
-                    if(fabs(state->Pact[i]-state->last_Pact[i])/state->last_Pact[i]>MAX_CHANGE_IN_Pact_or_Prep)
-                    {
-                        too_much_error=1;  
-                        break;                        
-                    }   
-                }
-                if(state->last_Pact[i]==0.0 && state->Pact[i]!=0.0)
-                {
-                    too_much_error=1;
-                    break;
-                }
-                if(state->last_Prep[i]!=0.0)
-                {
-                    if(fabs(state->Prep[i]-state->last_Prep[i])/state->last_Prep[i]>MAX_CHANGE_IN_Pact_or_Prep)
-                    {
-                        too_much_error=1;  
-                        break;                        
-                    }   
-                }
-                if(state->last_Prep[i]==0.0 && state->Prep[i]!=0.0)
-                {
-                    too_much_error=1;
-                    break;
-                }
-                if (state->last_Pact_No_rep[i] != 0.0)
-				{
-					if (fabs(state->Pact_No_rep[i] - state->last_Pact_No_rep[i]) / state->last_Pact_No_rep[i]>MAX_CHANGE_IN_Pact_or_Prep)
-					{
-						too_much_error = 1;
-						break;
-					}
-				}
-				if (state->last_Pact_No_rep[i] == 0.0 && state->Pact_No_rep[i] != 0.0)
-				{
-					too_much_error = 1;
-					break;
-				}
-                if (state->last_Pno_TF[i] != 0.0)
-				{
-					if (fabs(state->Pno_TF[i] - state->last_Pno_TF[i]) / state->last_Pno_TF[i]>MAX_CHANGE_IN_Pact_or_Prep)
-					{
-						too_much_error = 1;
-						break;
-					}
-				}
-				if (state->last_Pno_TF[i] == 0.0 && state->Pno_TF[i] != 0.0)
-				{
-					too_much_error = 1;
-					break;
-				}
-            }
-            if(!too_much_error)
-                interval_to_update_Pact_or_Prep=(state->t-state->last_event_t)*2.0;//the change in Pact is moderate, double the update interval     
-            else        
-                interval_to_update_Pact_or_Prep=(state->t-state->last_event_t)*0.5;//otherwise, reduce it by a half        
-            if(interval_to_update_Pact_or_Prep<MIN_INTERVAL_TO_UPDATE_Pact_or_Prep)
-                interval_to_update_Pact_or_Prep=MIN_INTERVAL_TO_UPDATE_Pact_or_Prep;
-        }    
+            gene_id=genotype->cisreg_cluster[cluster_id][0];
+            diff_PA=fabs(state->P_A[gene_id]-state->last_P_A[gene_id]);            
+            diff_PAnoR=fabs(state->P_A_no_R[gene_id]-state->last_P_A_no_R[gene_id]); 
+            diff_PnotAnoR=fabs(state->P_NotA_no_R[gene_id]-state->last_P_NotA_no_R[gene_id]);  
+            diff_PR=fabs(state->P_R[gene_id]-state->last_P_R[gene_id]);
+            diff_max=(diff_max>diff_PA)?diff_max:diff_PA;
+            diff_max=(diff_max>diff_PR)?diff_max:diff_PR;
+            diff_max=(diff_max>diff_PAnoR)?diff_max:diff_PAnoR;
+            diff_max=(diff_max>diff_PnotAnoR)?diff_max:diff_PnotAnoR;
+            cluster_id++;
+        }
+        if(diff_max<EPSILON)
+            interval_to_update_probability_of_binding=DEFAULT_UPDATE_INTERVAL;
+        else
+            interval_to_update_probability_of_binding=MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING/diff_max*(state->t-state->last_event_t);
+        if(UPDATE_WHAT!=DO_NOTHING)          
+            calc_leaping_interval(genotype,state,&interval_to_update_probability_of_binding,90.0,UPDATE_WHAT);  
+    
         /*Update the next time that Pact will be updated mandatorily*/
-        t_to_update_Pact_or_Prep=state->t+interval_to_update_Pact_or_Prep;
-        concurrent=check_concurrence(   t_to_update_Pact_or_Prep,
+        t_to_update_probability_of_binding=state->t+interval_to_update_probability_of_binding;
+        concurrent=check_concurrence(   t_to_update_probability_of_binding,
                                         state->mRNA_transl_init_time_end_head,
                                         state->mRNA_transcr_time_end_head,
                                         state->signal_on_head,
                                         state->signal_off_head,
                                         state->burn_in_growth_rate_head,
-                                        state->t_to_update_Pact_or_Prep,
+                                        state->t_to_update_probability_of_binding,
                                         state->change_signal_strength_head);
         while(concurrent)//if the time to update overlaps with existing events, add a tiny offset
         {
-            t_to_update_Pact_or_Prep+=TIME_OFFSET;
-            concurrent=check_concurrence(   t_to_update_Pact_or_Prep,
+            t_to_update_probability_of_binding+=TIME_OFFSET;
+            concurrent=check_concurrence(   t_to_update_probability_of_binding,
                                             state->mRNA_transl_init_time_end_head,
                                             state->mRNA_transcr_time_end_head,
                                             state->signal_on_head,
                                             state->signal_off_head,
                                             state->burn_in_growth_rate_head,
-                                            state->t_to_update_Pact_or_Prep,
+                                            state->t_to_update_probability_of_binding,
                                             state->change_signal_strength_head);        
         }
-        state->t_to_update_Pact_or_Prep=t_to_update_Pact_or_Prep;
+        state->t_to_update_probability_of_binding=t_to_update_probability_of_binding;
     }
     /*Keep a copy of Pact and time for comparison at next time Pact is updated*/
     for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
     {
-        state->last_Pact[i]=state->Pact[i];     
-        state->last_Prep[i]=state->Prep[i];
-		state->last_Pact_No_rep[i] = state->Pact_No_rep[i];
-        state->last_Pno_TF[i] = state->Pno_TF[i];
+        state->last_P_A[i]=state->P_A[i];     
+        state->last_P_R[i]=state->P_R[i];
+        state->last_P_A_no_R[i] = state->P_A_no_R[i];
+        state->last_P_NotA_no_R[i]=state->P_NotA_no_R[i];
     }
     state->last_event_t=state->t;  
 }
@@ -1355,7 +1352,7 @@ int does_fixed_event_end(CellState *state, float t)
     t3 = state->signal_off_head? state->signal_off_head->time : TIME_INFINITY;
     t4 = state->signal_on_head ? state->signal_on_head->time : TIME_INFINITY;
     t5 = state->burn_in_growth_rate_head ? state->burn_in_growth_rate_head->time : TIME_INFINITY;
-    t6 = state->t_to_update_Pact_or_Prep;
+    t6 = state->t_to_update_probability_of_binding;
     t7= state->change_signal_strength_head ? state->change_signal_strength_head->time : TIME_INFINITY;
     t8=state->sampling_point_end_head?state->sampling_point_end_head->time:TIME_INFINITY;
     if((t1 <= t2) && (t1 <= t) && (t1 <= t3) && (t1 <= t4) && (t1<=t5) &&(t1<=t6) && (t1<=t7)&&(t1<=t8))
@@ -1402,14 +1399,17 @@ int does_fixed_event_end(CellState *state, float t)
  * etc. accordingly and delete the event from the queue
  */
 void fixed_event_end_transcription( float *dt,   
-									float tdevelopment,
+//									float tdevelopment,
                                     CellState *state,
                                     GillespieRates *rates,
                                     Genotype *genotype,
                                     int *end_state,                        
                                     int mut_step,
                                     Mutation *mut_record,
-                                    char *effect_of_effector)
+//                                    char *effect_of_effector,
+                                    float benefit1,
+                                    float benefit2,
+                                    float max_t_bias)
 {
     int gene_id;
     float concurrent;
@@ -1417,7 +1417,7 @@ void fixed_event_end_transcription( float *dt,
     /* recompute the delta-t based on difference between now and the time of transcription end */
     *dt = state->mRNA_transcr_time_end_head->time - state->t;   
     /* update cell growth and protein concentration during dt*/
-    update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+    update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record, benefit1,benefit2,max_t_bias);
     /* get the gene which is ending transcription */
     gene_id = state->mRNA_transcr_time_end_head->event_id;    
     /* increase number of mRNAs that are initializing translation*/
@@ -1434,7 +1434,7 @@ void fixed_event_end_transcription( float *dt,
                                     state->signal_on_head,
                                     state->signal_off_head,
                                     state->burn_in_growth_rate_head,
-                                    state->t_to_update_Pact_or_Prep,
+                                    state->t_to_update_probability_of_binding,
                                     state->change_signal_strength_head);
     while(concurrent)//if the time to update overlaps with existing events, add a tiny offset
     {
@@ -1445,7 +1445,7 @@ void fixed_event_end_transcription( float *dt,
                                         state->signal_on_head,
                                         state->signal_off_head,
                                         state->burn_in_growth_rate_head,
-                                        state->t_to_update_Pact_or_Prep,
+                                        state->t_to_update_probability_of_binding,
                                         state->change_signal_strength_head);        
     }  
     /*add to translation initiation event*/
@@ -1459,17 +1459,20 @@ int fixed_event_end_translation_init(   Genotype *genotype,
                                         CellState *state, 
                                         GillespieRates *rates, 
                                         float *dt,    
-										float tdevelopment,
+//										float tdevelopment,
                                         int *end_state,                          
                                         int mut_step,
                                         Mutation *mut_record,
-                                        char *effect_of_effector)
+//                                        char *effect_of_effector,
+                                        float benefit1,
+                                        float benefit2,
+                                        float max_t_in_bias)
 {
     int gene_id;    
     /* calc the remaining time till translation initiation ends */
     *dt = state->mRNA_transl_init_time_end_head->time - state->t;         
     /* update cell growth and protein concentration during dt*/
-    update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+    update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record, benefit1,benefit2, max_t_in_bias);
     /* get identity of gene that has just finished translating */
     gene_id=state->mRNA_transl_init_time_end_head->event_id; 
     /* there is one less mRNA that is initializing translation */
@@ -1479,39 +1482,40 @@ int fixed_event_end_translation_init(   Genotype *genotype,
     /* there is one more mRNA that produces protein */
     (state->mRNA_aft_transl_delay_num[gene_id])++;   
     /* update protein synthesis rate*/
-    state->konvalues[gene_id][KON_SALPHAC_INDEX] = state->mRNA_aft_transl_delay_num[gene_id] * genotype->translation[gene_id] / state->konvalues[gene_id][KON_PROTEIN_DECAY_INDEX];
+    state->protein_synthesis_index[gene_id]= (float)state->mRNA_aft_transl_delay_num[gene_id]*genotype->translation_rate[gene_id]/genotype->protein_decay_rate[gene_id];
     
     if(genotype->which_protein[gene_id]==genotype->nproteins-1)//if the mRNA encodes a non-sensor TF, there could be a huge change in TF concentration
-        return 0;
+        return DO_NOTHING;
     else
-        return UPDATE_PACT_OR_PREP; //so update Pact and reset updating interval to MIN_INTERVAL_TO_UPDATE_PACT
+        return gene_id; //so update Pact and reset updating interval to MIN_INTERVAL_TO_UPDATE_PACT
 }
 
 /*
  * compute t' factor used in the integration of growth rate
  * t' is the time the effector protein increases or decreases to saturation level
  */
-float calc_tprime(CellState* state, float number_of_selection_protein_bf_dt[MAX_OUTPUT_GENES], float dt, float RHS,int gene_ids[MAX_OUTPUT_GENES],int start, int n_copies) 
+float calc_tprime(Genotype *genotype, CellState *state, float number_of_selection_protein_bf_dt[NGENES], float dt, float RHS,int gene_ids[NGENES],int start, int n_copies) 
 {    
     int i;   
-    float alpha_s[n_copies],c[n_copies];
+    float protein_synthesis_rate[n_copies],protein_decay_rate[n_copies];
 
     for(i=start;i<start+n_copies;i++)
     {
-        c[i]=state->konvalues[gene_ids[i]][KON_PROTEIN_DECAY_INDEX];
-        alpha_s[i]=c[i]*state->konvalues[gene_ids[i]][KON_SALPHAC_INDEX];
+        protein_decay_rate[i]=genotype->protein_decay_rate[gene_ids[i]];
+        protein_synthesis_rate[i]=protein_decay_rate[i]*state->protein_synthesis_index[gene_ids[i]];
     }       
     return rtsafe(  &calc_fx_dfx,
                     n_copies,
                     RHS,
                     number_of_selection_protein_bf_dt,
-                    alpha_s,
-                    c,
+                    protein_synthesis_rate,
+                    protein_decay_rate,
                     0.0,
                     dt,
-                    1.0/60.0,
+                    0.01,
                     start); //rtsafe is in numerical.c
 }
+
 
 /*
  * calculate f(x)-Pp_s and f'(x),
@@ -1534,17 +1538,17 @@ void calc_fx_dfx(float x, int n_copies, float RHS, float *p, float *alpha_s, flo
  * calculate F(delta_t)/Pp_s. F(x) is the integral of f(x) over delta_t.
  * f(x) is the number of effector protein molecules at time x
  */
-float calc_integral(CellState *state, float protein[MAX_OUTPUT_GENES], float dt, float Pp, int gene_ids[MAX_OUTPUT_GENES],int start, int n_copies)
+float calc_integral(Genotype *genotype, CellState *state, float protein[MAX_OUTPUT_GENES], float dt, float saturate_protein_number, int gene_ids[MAX_OUTPUT_GENES],int start, int n_copies)
 {
     int i;
-    float integral=0.0,ect1; 
+    float integral=0.0,ect_minus_one; 
     
     for(i=start;i<start+n_copies;i++)
     {
-        ect1=exp(-state->konvalues[gene_ids[i]][KON_PROTEIN_DECAY_INDEX]*dt)-1;    
-        integral+=1.0/Pp*(state->konvalues[gene_ids[i]][KON_SALPHAC_INDEX]*ect1/state->konvalues[gene_ids[i]][KON_PROTEIN_DECAY_INDEX]-
-                protein[i]*ect1/state->konvalues[gene_ids[i]][KON_PROTEIN_DECAY_INDEX]+ 
-                state->konvalues[gene_ids[i]][KON_SALPHAC_INDEX]*dt);
+        ect_minus_one=exp(-genotype->protein_decay_rate[gene_ids[i]]*dt)-1.0;    
+        integral+=1.0/saturate_protein_number*(state->protein_synthesis_index[gene_ids[i]]*ect_minus_one/genotype->protein_decay_rate[gene_ids[i]]-
+                protein[i]*ect_minus_one/genotype->protein_decay_rate[gene_ids[i]]+ 
+                state->protein_synthesis_index[gene_ids[i]]*dt);
     }
     return integral;
 }
@@ -1558,11 +1562,14 @@ void calc_instantaneous_fitness( Genotype *genotype,
                                 float number_of_selection_protein_bf_dt[MAX_OUTPUT_GENES],
                                 float number_of_selection_protein_aft_dt[MAX_OUTPUT_GENES],
                                 float dt,
-                                float tdevelopment,
-                                char effect_of_effector,
+//                                float tdevelopment,                               
+//                                char effect_of_effector,
                                 int *end_state,                         
                                 int mut_step,
-                                Mutation *mut_record)
+                                Mutation *mut_record,                                
+                                float benefit1,
+                                float benefit2,
+                                float max_t_bias)
 {
     int i,j,protein_id,counter;
     int N_output;
@@ -1587,8 +1594,8 @@ void calc_instantaneous_fitness( Genotype *genotype,
 #else
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++)        
     {     
-        total_translation_rate += genotype->translation[i]*(float)state->mRNA_aft_transl_delay_num[i]+
-                                    0.5*genotype->translation[i]*(float)state->mRNA_under_transl_delay_num[i];
+        total_translation_rate += genotype->translation_rate[i]*(float)state->mRNA_aft_transl_delay_num[i]+
+                                    0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i];
     } 
 #endif  
     cost_of_expression=total_translation_rate*c_transl;
@@ -1707,7 +1714,7 @@ void calc_instantaneous_fitness( Genotype *genotype,
                                                         state->signal_on_head,
                                                         state->signal_off_head,
                                                         state->burn_in_growth_rate_head,
-                                                        state->t_to_update_Pact_or_Prep,
+                                                        state->->last_P_NotA_no_R,
                                                         state->change_signal_strength_head);
                         while(concurrent)//if the time to update overlaps with existing events, add a tiny offset
                         {
@@ -1718,7 +1725,7 @@ void calc_instantaneous_fitness( Genotype *genotype,
                                                             state->signal_on_head,
                                                             state->signal_off_head,
                                                             state->burn_in_growth_rate_head,
-                                                            state->t_to_update_Pact_or_Prep,
+                                                            state->->last_P_NotA_no_R,
                                                             state->change_signal_strength_head);        
                         }  
                         add_fixed_event(-1,endtime,&(state->signal_off_head),&(state->signal_off_tail)); // mark when the pulse should be turned off
@@ -1755,8 +1762,83 @@ void calc_instantaneous_fitness( Genotype *genotype,
                 }                
             }   
             break;
-    }    
-    
+    } 
+#elif CHEMOTAXIS    
+    counter=0;
+    for(i=0;i<N_output;i++)        
+    {    
+        Ne=0.0;
+        Ne_next=0.0;
+        for(j=counter;j<counter+N_gene_copies[i];j++)
+        {            
+            Ne_next+=number_of_selection_protein_aft_dt[j];
+            Ne+=number_of_selection_protein_bf_dt[j];
+        } 
+        /*calculate the cumulative level of the effector protein during the 
+         *1 minute before the gradient is found*/        
+        if(state->recording_basal_response)
+            state->basal_response[i]+=calc_integral(state,number_of_selection_protein_bf_dt,dt,1.0,gene_copy_id,counter,N_gene_copies[i]);
+        
+        /*calculate if moving upstream of the gradient*/
+        if(state->found_gradient)
+        {    
+            switch (state->position)
+            {
+                case 0: //still in poor media
+                    if(Ne_next>=state->threshold_response_to_bias[i]) //expression increases
+                    {
+                        dt_prime=calc_tprime(state,number_of_selection_protein_bf_dt,dt,state->threshold_response_to_bias[i],gene_copy_id,counter,N_gene_copies[i]); 
+                        state->cumulative_benefit+=dt_prime*benefit1;
+                        state->position=1; //moving to rich media
+                        state->cumulative_benefit+=(dt-dt_prime)*benefit2;
+                    }
+                    else
+                        state->cumulative_benefit+=dt*benefit1;                        
+                    break;
+                case 1: //in rich media
+//                    switch (state->moving)
+//                    {
+//                        case 0:
+//                            break;
+//                        case 1:
+//                            break;
+//                    }
+                    
+                    if(Ne>Ne_next)//decrease in effector protein
+                    {
+                        if(Ne_next>=state->threshold_response_to_bias[i]) //too many effector throughout                   
+                            state->cumulative_t_in_bias+=dt; 
+                        else if(Ne>state->threshold_response_to_bias[i]) // bf dt_prime, the benefit saturates 
+                            state->cumulative_t_in_bias+=calc_tprime(state,number_of_selection_protein_bf_dt,dt,state->threshold_response_to_bias[i],gene_copy_id,counter,N_gene_copies[i]);  
+                    }
+                    else // increase in effector protein
+                    {
+                        if(Ne>=state->threshold_response_to_bias[i]) //too many effector throughout                
+                            state->cumulative_t_in_bias+=dt;
+                        else if(Ne_next>state->threshold_response_to_bias[i]) //Aft dt_prime, the benefit saturates
+                            state->cumulative_t_in_bias+=dt-calc_tprime(state,number_of_selection_protein_bf_dt,dt,state->threshold_response_to_bias[i],gene_copy_id,counter,N_gene_copies[i]);  
+                    }                     
+                    
+                    /*swimming in bias for too long?*/
+                    if(state->cumulative_t_in_bias>max_t_bias)//Yes. 
+                    {
+                        state->cumulative_benefit+=benefit2*(max_t_bias-(state->cumulative_t_in_bias-dt));
+                        state->position=2; //Then back to poor media
+                        state->cumulative_benefit+=benefit1*(state->cumulative_t_in_bias-max_t_bias);
+                    }
+                    else                    
+                        state->cumulative_benefit+=dt*benefit2;
+                    
+                    break;
+                case 2: //back to poor media
+                    state->cumulative_benefit+=dt*benefit1;
+                    break;
+            }      
+        }      
+        else        
+            state->cumulative_benefit+=dt*benefit1;        
+        counter+=N_gene_copies[i];
+    }     
 #elif !PEAK_SEARCH  
     counter=0;
     for(i=0;i<N_output;i++)        
@@ -1857,7 +1939,7 @@ void calc_instantaneous_fitness( Genotype *genotype,
         #endif
         }
         counter+=N_gene_copies[i];
-    }    
+    } 
 #endif     
 }
 
@@ -1870,14 +1952,17 @@ void update_protein_number_and_fitness( Genotype *genotype,
                                         CellState *state,                                   
                                         GillespieRates *rates,
                                         float dt, 
-                                        float tdevelopment,
-                                        char effect_of_effector,
+//                                        float tdevelopment,
+//                                        char effect_of_effector,
                                         int *end_state,                                   
                                         int mut_step,
-                                        Mutation *mut_record)
+                                        Mutation *mut_record,
+                                        float benefit1,
+                                        float benefit2,
+                                        float max_t_in_bias)
 {
     int i,j,protein_id,counter;
-    float ct, ect, ect1;
+    float ct, ect, one_minus_ect;
     float N_output_molecules_bf_dt[MAX_OUTPUT_GENES];  
     float N_output_molecules_aft_dt[MAX_OUTPUT_GENES];  
     FILE *fperror;     
@@ -1896,12 +1981,12 @@ void update_protein_number_and_fitness( Genotype *genotype,
     /* update protein numbers*/
     for (i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
     {     
-        ct = state->konvalues[i][KON_PROTEIN_DECAY_INDEX]*dt;
+        ct = genotype->protein_decay_rate[i]*dt;
         ect = exp(-ct);
-        if (fabs(ct)<EPSILON) ect1=ct;
-        else ect1 = 1-ect;      
+        if (fabs(ct)<EPSILON) one_minus_ect=ct;
+        else one_minus_ect = 1.0-ect;      
         /* get the new protein concentration for this gene */
-        state->gene_specific_protein_number[i]=ect*state->gene_specific_protein_number[i]+state->konvalues[i][KON_SALPHAC_INDEX]*ect1 ;        
+        state->gene_specific_protein_number[i]=ect*state->gene_specific_protein_number[i]+state->protein_synthesis_index[i]*one_minus_ect ;        
     }    
     /* now, use protein_pool to pool gene specific protein number*/
     for(i=N_SIGNAL_TF;i<genotype->nproteins;i++)
@@ -1927,11 +2012,14 @@ void update_protein_number_and_fitness( Genotype *genotype,
                                 N_output_molecules_bf_dt, 
                                 N_output_molecules_aft_dt,
                                 dt, 
-                                tdevelopment,
-                                effect_of_effector,
+//                                tdevelopment,
+//                                effect_of_effector,
                                 end_state,                                                   
                                 mut_step,
-                                mut_record);  
+                                mut_record,
+                                benefit1,
+                                benefit2,
+                                max_t_in_bias);  
     if(*end_state==0)/*use 0 to indicate abnormal behavior of the program.
                    *I am expecting rounding error to raise this flag.
                    *In case this flag is raised, quit the current replicate
@@ -1956,14 +2044,14 @@ int Gillespie_event_mRNA_decay(GillespieRates *rates, CellState *state, Genotype
     int mRNA_id;
     while(1)/*in case of numerical error*/    
     {           
-        x=RngStream_RandU01(RS)*rates->mRNAdecay;
+        x=RngStream_RandU01(RS)*rates->total_mRNA_decay_rate;
         gene_id=N_SIGNAL_TF-1;
         /* loop through mRNA products, to choose the mRNA with the
         proportionally higher decay rate */
         while (gene_id < genotype->ngenes-1 && x > 0.0) 
         {
             gene_id++;
-            x-= rates->mRNAdecay_rate[gene_id];
+            x-= rates->mRNA_decay_rate[gene_id];
         }
         /*rarely, numerical error picks up a gene that has no mRNA at all*/
         if((state->mRNA_aft_transl_delay_num[gene_id]+state->mRNA_under_transl_delay_num[gene_id])>=1)
@@ -1977,7 +2065,11 @@ int Gillespie_event_mRNA_decay(GillespieRates *rates, CellState *state, Genotype
         /* remove the mRNA from the cytoplasm count */
         (state->mRNA_aft_transl_delay_num[gene_id])--;  
         /*update protein synthesis rate*/
-        state->konvalues[gene_id][KON_SALPHAC_INDEX] = state->mRNA_aft_transl_delay_num[gene_id] * genotype->translation[gene_id] / state->konvalues[gene_id][KON_PROTEIN_DECAY_INDEX];;
+        state->protein_synthesis_index[gene_id] = (float)state->mRNA_aft_transl_delay_num[gene_id]*genotype->translation_rate[gene_id]/genotype->protein_decay_rate[gene_id];
+        if(genotype->which_protein[gene_id]==genotype->nproteins-1)
+        	return DO_NOTHING;
+    	else // an mRNA of transcription factor is degraded, which can cause fluctuation in transcription factor concentrations.
+        	return gene_id;    
     } 
     else 
     {
@@ -1987,94 +2079,89 @@ int Gillespie_event_mRNA_decay(GillespieRates *rates, CellState *state, Genotype
         delete_fixed_event(gene_id, mRNA_id, &(state->mRNA_transl_init_time_end_head), &(state->mRNA_transl_init_time_end_tail));       
         /* remove the mRNA from the count */
         (state->mRNA_under_transl_delay_num[gene_id])--; 
+        return DO_NOTHING;
     }
-    
-    if(genotype->which_protein[gene_id]==genotype->nproteins-1)
-        return 0;
-    else // an mRNA of transcription factor is degraded, which can cause fluctuation in transcription factor concentrations.
-        return UPDATE_PACT_OR_PREP;
 }
 
-void Gillespie_event_histone_acteylation(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
+void Gillespie_event_repressed_to_intermediate(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
     int gene_id;
     float x;
     while(1)
     {
-        x= RngStream_RandU01(RS)*rates->nuc_disassembly;
+        x= RngStream_RandU01(RS)*rates->total_repressed_to_intermediate_rate;
         gene_id=N_SIGNAL_TF-1;
         while(gene_id<genotype->ngenes-1 && x>0.0)
         {
             gene_id++;
-            x-=rates->nuc_disassembly_rate[gene_id];
+            x-=rates->repressed_to_intermediate_rate[gene_id];
         }
-        if(rates->nuc_disassembly_rate[gene_id]>0.0)
+        if(rates->repressed_to_intermediate_rate[gene_id]>0.0)
             break;
     }
-    /* set state: eject nucleosome, but there is no PIC yet */
-    state->gene_state[gene_id] = NO_NUC_NO_PIC;
+    /* set state */
+    state->gene_state[gene_id]=INTERMEDIATE;
 }
 
-void Gillespie_event_histone_deacteylation(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
+void Gillespie_event_intermediate_to_repressed(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
     int gene_id; 
     float x; 
     while(1)
     {    
-        x= RngStream_RandU01(RS)*rates->nuc_assembly;
+        x= RngStream_RandU01(RS)*rates->total_intermediate_to_repressed_rate;
         gene_id=N_SIGNAL_TF-1;
         /* choose a particular gene copy to change state */
         while(gene_id<genotype->ngenes-1 && x>0.0)
         {
             gene_id++;
-            x-=rates->nuc_assembly_rate[gene_id];
+            x-=rates->intermediate_to_repressed_rate[gene_id];
         }
-        if(rates->nuc_assembly_rate[gene_id]>0.0)
+        if(rates->intermediate_to_repressed_rate[gene_id]>0.0)
             break;
     }
-    /* set state: nucleosome returns */
-    state->gene_state[gene_id] = NUC_NO_PIC;
+    /* set state */
+    state->gene_state[gene_id]=REPRESSED;
 }
 
-void Gillespie_event_assemble_PIC(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
+void Gillespie_event_intermediate_to_active(GillespieRates *rates, CellState *state, Genotype *genotype, RngStream RS)
 {
     float x; 
     int gene_id;
     while(1)
     {    
-        x= RngStream_RandU01(RS)*rates->pic_assembly;
+        x= RngStream_RandU01(RS)*rates->total_intermediate_to_active_rate;
         gene_id=N_SIGNAL_TF-1;
         /* choose a particular gene copy to change state */
         while(gene_id<genotype->ngenes-1 && x>0.0)
         {
             gene_id++;
-            x-=rates->pic_assembly_rate[gene_id];
+            x-=rates->intermediate_to_active_rate[gene_id];
         }
-        if(rates->pic_assembly_rate[gene_id]>0.0)
+        if(rates->intermediate_to_active_rate[gene_id]>0.0)
             break;
     }
-    /* turn gene fully on: ready for transcription and adjust rates */
-    state->gene_state[gene_id] = PIC_NO_NUC;  
+    /* set state */
+    state->gene_state[gene_id] =ACTIVE;  
 }
 
-void Gillespie_event_disassemble_PIC(Genotype *genotype, CellState *state,GillespieRates *rates, RngStream RS)
+void Gillespie_event_active_to_intermediate(Genotype *genotype, CellState *state,GillespieRates *rates, RngStream RS)
 {
     int gene_id;
     float x;
     while(1)
     {
-        x=RngStream_RandU01(RS)*rates->pic_disassembly;   
-        gene_id=N_SIGNAL_TF-1;
-        /* choose an appropriate gene copy to disassemble the PIC from */
+        x=RngStream_RandU01(RS)*rates->total_active_to_intermediate_rate;   
+        gene_id=N_SIGNAL_TF-1;       
         while(gene_id < genotype->ngenes-1 && x>0.0) 
         {
             gene_id++;       
-            x -= rates->pic_disassembly_rate[gene_id];
+            x -= rates->active_to_intermediate_rate[gene_id];
         }
-        if(rates->pic_disassembly_rate[gene_id]>0.0)
+        if(rates->active_to_intermediate_rate[gene_id]>0.0)
             break;
     }
-    state->gene_state[gene_id]=NO_NUC_NO_PIC;   
+    state->gene_state[gene_id]=INTERMEDIATE;   
 }
 
 void Gillespie_event_transcription_init(GillespieRates *rates, CellState *state, Genotype *genotype, float dt, RngStream RS)
@@ -2084,11 +2171,11 @@ void Gillespie_event_transcription_init(GillespieRates *rates, CellState *state,
     float candidate_t;
     int concurrent;    
     gene_id=N_SIGNAL_TF-1;    
-    x=RngStream_RandInt(RS,1,rates->transcript_init);
+    x=RngStream_RandInt(RS,1,rates->total_N_gene_transcript_initiated);
     while(gene_id<genotype->ngenes-1 && x>0)
     {
         gene_id++;
-        x-=rates->transcript_init_rate[gene_id];
+        x-=rates->transcript_initiation_state[gene_id];
     }     
     /* now that transcription of gene has been initiated, 
      * we add the timepoint at which the transcription ends, 
@@ -2100,7 +2187,7 @@ void Gillespie_event_transcription_init(GillespieRates *rates, CellState *state,
                                     state->signal_on_head,
                                     state->signal_off_head,
                                     state->burn_in_growth_rate_head,
-                                    state->t_to_update_Pact_or_Prep,
+                                    state->t_to_update_probability_of_binding,
                                     state->change_signal_strength_head);
     while(concurrent)//if the time to update overlaps with existing events, add a tiny offset
     {
@@ -2111,7 +2198,7 @@ void Gillespie_event_transcription_init(GillespieRates *rates, CellState *state,
                                         state->signal_on_head,
                                         state->signal_off_head,
                                         state->burn_in_growth_rate_head,
-                                        state->t_to_update_Pact_or_Prep,                                        
+                                        state->t_to_update_probability_of_binding,                                        
                                         state->change_signal_strength_head);        
     }    
     add_fixed_event(gene_id, candidate_t,&(state->mRNA_transcr_time_end_head), &(state->mRNA_transcr_time_end_tail));
@@ -2165,7 +2252,7 @@ void clone_genotype(Genotype *genotype_templet, Genotype *genotype_clone)
     for(i=0;i<NGENES;i++)
     {
         genotype_clone->which_protein[i]=-1;
-        genotype_clone->min_act_to_transc[i]=MAX_BINDING+1;
+        genotype_clone->min_N_activator_to_transc[i]=MAX_BINDING+1;
     }    
     /*reset clone's protein_pool*/
     for(i=0;i<NPROTEINS;i++)
@@ -2199,12 +2286,12 @@ void clone_genotype(Genotype *genotype_templet, Genotype *genotype_clone)
     /*copy kinetic constants*/
     for(i=0; i < genotype_templet->ngenes; i++) 
     {            
-        genotype_clone->mRNAdecay[i]=genotype_templet->mRNAdecay[i];
-        genotype_clone->proteindecay[i]=genotype_templet->proteindecay[i];
-        genotype_clone->translation[i]=genotype_templet->translation[i];            
-        genotype_clone->pic_disassembly[i]=genotype_templet->pic_disassembly[i];
+        genotype_clone->mRNA_decay_rate[i]=genotype_templet->mRNA_decay_rate[i];
+        genotype_clone->protein_decay_rate[i]=genotype_templet->protein_decay_rate[i];
+        genotype_clone->translation_rate[i]=genotype_templet->translation_rate[i];            
+        genotype_clone->active_to_intermediate_rate[i]=genotype_templet->active_to_intermediate_rate[i];
         genotype_clone->which_protein[i]=genotype_templet->which_protein[i];
-        genotype_clone->min_act_to_transc[i]=genotype_templet->min_act_to_transc[i];
+        genotype_clone->min_N_activator_to_transc[i]=genotype_templet->min_N_activator_to_transc[i];  
     } 
     /* copy TF information*/
     for(i=0;i<NPROTEINS;i++)
@@ -2242,18 +2329,19 @@ void clone_genotype(Genotype *genotype_templet, Genotype *genotype_clone)
  */
 void do_single_timestep(Genotype *genotype, 
                         CellState *state,                         
-                        GillespieRates *rates,                                                  
-                        char *effect_of_effector, 
-                        float signal_on_strength,
+                        GillespieRates *rates,                        
+                        float signal_strength,
+                        float response_amplification,
+                        float minimal_peak_response,
+                        float benefit1,
+                        float benefit2,
+                        float max_t_in_bias,    
                         float duration_signal_on,
-                        float duration_signal_off,
-                        char init_effector_effect,
-                        int fixed_effector_effect,
+                        float duration_signal_off,                    
                         RngStream RS,                       
                         int mut_step,
                         Mutation *mut_record,
-                        int *end_state,
-                        int *did_burn_in,
+                        int *end_state,                
                         int thread_id,
                         float tdevelopment,
                         float *signal_profile) 
@@ -2263,9 +2351,10 @@ void do_single_timestep(Genotype *genotype,
     float dt;
     float x;
     FILE *fperror;
+//    char *effect_of_effector;
 
     x = expdev(RS);        /* draw random number */
-    dt = x/rates->subtotal;
+    dt = x/rates->total_Gillespie_rate;
     if (dt < 0.0) 
     {	
         fperror=fopen(error_file,"a+");
@@ -2287,14 +2376,17 @@ void do_single_timestep(Genotype *genotype,
                                     state, 
                                     rates, 
                                     &dt, 
-									tdevelopment,
+//									tdevelopment,
                                     event, 
-                                    signal_on_strength,
+                                    signal_strength,
                                     duration_signal_on, 
                                     duration_signal_off, 
-                                    effect_of_effector, 
-                                    init_effector_effect,
-                                    fixed_effector_effect, 
+                                    response_amplification,
+                                    minimal_peak_response,
+                                    benefit1,
+                                    benefit2,
+                                    max_t_in_bias,
+//                                    effect_of_effector,
                                     end_state, 
                                     mut_step, 
                                     mut_record,
@@ -2304,12 +2396,7 @@ void do_single_timestep(Genotype *genotype,
         state->t += dt;  /* advance time by the dt */        
 #if CAUTIOUS //watch for overlapping fixed events -- one of which will be skipped and cause error
         float dt_copy,x_copy,rate_subtotal_copy,t_copy;  
-        int event2;
-        if(event==5)
-        {
-            *did_burn_in=1;
-            state->cell_size_after_burn_in=state->cell_size;
-        }          
+        int event2;      
         fixed_time=state->t+dt;
         event2=does_fixed_event_end(state, fixed_time);
         if(event2!=0)
@@ -2321,11 +2408,11 @@ void do_single_timestep(Genotype *genotype,
         t_copy=state->t; 
         dt_copy=dt;
         x_copy=x; 
-        rate_subtotal_copy=rates->subtotal; 
+        rate_subtotal_copy=rates->total_Gillespie_rate; 
 #endif        
-        x -= dt*rates->subtotal;  /* we've been running with rates->subtotal for dt, so substract it from x*/        
-        calc_all_rates(genotype, state, rates,UPDATE_WHAT,thread_id);  /* update rates->subtotal and re-compute a new dt */      
-        dt = x/rates->subtotal;
+        x -= dt*rates->total_Gillespie_rate;  /* we've been running with rates->total_Gillespie_rate for dt, so substract it from x*/        
+        calc_all_rates(genotype, state, rates,UPDATE_WHAT,thread_id);  /* update rates->total_Gillespie_rate and re-compute a new dt */      
+        dt = x/rates->total_Gillespie_rate;
         /*deal with rounding error*/
         if(dt<0.0)
         {  	
@@ -2346,7 +2433,7 @@ void do_single_timestep(Genotype *genotype,
      this  */          
     if (state->t+dt < tdevelopment)
     {
-        update_protein_number_and_fitness(genotype, state, rates, dt, tdevelopment,*effect_of_effector, end_state, mut_step, mut_record);
+        update_protein_number_and_fitness(genotype, state, rates, dt, end_state, mut_step, mut_record,benefit1, benefit2, max_t_in_bias);
         if(*end_state==0)
             return; 
         UPDATE_WHAT=do_Gillespie_event(genotype, state, rates, dt, RS, end_state, mut_step, mut_record);
@@ -2361,7 +2448,7 @@ void do_single_timestep(Genotype *genotype,
         /* do remaining dt */
         dt = tdevelopment - state->t;
         /* final update of protein concentration */
-        update_protein_number_and_fitness(genotype, state, rates, dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+        update_protein_number_and_fitness(genotype, state, rates, dt, end_state, mut_step, mut_record, benefit1, benefit2, max_t_in_bias);
         if(*end_state==0)
             return; 
         state->t+=dt;
@@ -2380,50 +2467,59 @@ int do_fixed_event(Genotype *genotype,
                     CellState *state, 
                     GillespieRates *rates, 
                     float *dt,  
-					float tdevelopment,
+//					float tdevelopment,
                     int event,
                     float signal_on_strength,
                     float duration_signal_on,
-                    float duration_signal_off,
-                    char *effect_of_effector,
-                    char init_effector_effect,
-                    int fixed_effector_effect,                
+                    float duration_signal_off,     
+                    float response_amplification,
+                    float minimal_peak_response,
+                    float benefit1,
+                    float benefit2,
+                    float max_t_in_bias,
+//                    char *effect_of_effector,
                     int *end_state,                  
                     int mut_step,
                     Mutation *mut_record,
                     float *signal_profile)
 {     
     int i,j, protein_id, return_value;
-    return_value=0;
+    return_value=DO_NOTHING;
     switch (event) 
     {
         case 1:     /* a transcription event ends */
-            fixed_event_end_transcription(dt, tdevelopment,state, rates, genotype,end_state,mut_step,mut_record,effect_of_effector);
+            fixed_event_end_transcription(dt, state, rates, genotype,end_state,mut_step,mut_record,benefit1,benefit2, max_t_in_bias);
             break;
         case 2:     /* a translation initialization event ends */ 
-            return_value=fixed_event_end_translation_init(genotype, state, rates, dt, tdevelopment, end_state, mut_step,mut_record,effect_of_effector);
+            return_value=fixed_event_end_translation_init(genotype, state, rates, dt, end_state, mut_step,mut_record,benefit1,benefit2, max_t_in_bias);
+            state->cell_activated=1;
             break;
         case 3:     /* turn signal off*/ 
             *dt = state->signal_off_head->time - state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record, benefit1,benefit2, max_t_in_bias);
             delete_fixed_event_from_head(&(state->signal_off_head),&(state->signal_off_tail));
-            if(fixed_effector_effect)
-                *effect_of_effector=init_effector_effect;
-            else
-                *effect_of_effector='d';
+//            if(fixed_effector_effect)
+//                *effect_of_effector=init_effector_effect;
+//            else
+//                *effect_of_effector='d';
 #if SELECT_SENSITIVITY_AND_PRECISION
 			state->precision[0] = state->protein_number[genotype->nproteins - 1]; //reset running precision
 #endif
             break;
         case 4:     /*turn signal on*/
             *dt = state->signal_on_head->time - state->t;   
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record, benefit1,benefit2, max_t_in_bias);
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
-            state->protein_number[N_SIGNAL_TF-1]+=10*signal_on_strength;
-            if(fixed_effector_effect)                               
-                *effect_of_effector=init_effector_effect;            
-            else                 
-                *effect_of_effector='b'; 
+            state->protein_number[N_SIGNAL_TF-1]=signal_on_strength;
+            state->recording_basal_response=0;
+            state->found_gradient=1;
+#if POOL_EFFECTORS
+            state->threshold_response_to_bias[0]=(minimal_peak_response>state->basal_response[0]*response_amplification)?minimal_peak_response:state->basal_response[0]*response_amplification;
+#endif           
+//            if(fixed_effector_effect)                               
+//                *effect_of_effector=init_effector_effect;            
+//            else                 
+//                *effect_of_effector='b'; 
 #if SELECT_SENSITIVITY_AND_PRECISION
 			state->precision[1] = state->precision[0]; //record the max precision to signal change 1
 			state->sensitivity[1] = state->sensitivity[0]; //record the max sensitivity to signal change 1
@@ -2432,24 +2528,29 @@ int do_fixed_event(Genotype *genotype,
             break;	
         case 5: /* finishing burn-in growth rate*/
             *dt=duration_of_burn_in_growth_rate-state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record,benefit1,benefit2, max_t_in_bias);
             for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
                 state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
             break;
         case 6: /* mandatorily updating Pact and Prep*/
-            *dt=state->t_to_update_Pact_or_Prep-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+            *dt=state->t_to_update_probability_of_binding-state->t;
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record, benefit1,benefit2, max_t_in_bias);
             break;
         case 7: /* update signal strength */
             *dt=state->change_signal_strength_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, mut_step, mut_record);
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, mut_step, mut_record, benefit1,benefit2, max_t_in_bias);
             state->protein_number[N_SIGNAL_TF-1]=signal_profile[state->change_signal_strength_head->event_id];
             delete_fixed_event_from_head(&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
             break;  
         case 8: /* sample concentration*/           
             *dt=state->sampling_point_end_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0, NULL);
+#if CHEMOTAXIS            
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
+            state->recording_basal_response=1;
+            delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
+#else
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
             state->sampled_response[state->N_samples]=0.0;
             for(i=0;i<genotype->n_output_proteins;i++)
@@ -2459,7 +2560,8 @@ int do_fixed_event(Genotype *genotype,
                     state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
             } 
             state->N_samples++;
-            break;            
+#endif           
+            break;          
     }  
     return return_value;
 }
@@ -2470,7 +2572,7 @@ int do_fixed_event(Genotype *genotype,
 int do_Gillespie_event(Genotype *genotype,
                         CellState *state,
                         GillespieRates *rates,
-                        float dt,                       
+                        float dt,                    
                         RngStream RS,
                         int *end_state,                        
                         int mut_step,
@@ -2478,63 +2580,55 @@ int do_Gillespie_event(Genotype *genotype,
 {
     float x; 
     int return_value;
-    return_value=0;
-    FILE *fperrors; 
+    return_value=DO_NOTHING;
     while(1)
     {    
-        x=RngStream_RandU01(RS)*(rates->subtotal);          
-        if (x <= rates->mRNAdecay)  /*STOCHASTIC EVENT: an mRNA decay event */
+        x=RngStream_RandU01(RS)*(rates->total_Gillespie_rate);          
+        if (x <= rates->total_mRNA_decay_rate)  /*STOCHASTIC EVENT: an mRNA decay event */
         {    
             return_value=Gillespie_event_mRNA_decay(rates, state, genotype, RS);                
             break;
         } 
         else 
         {               
-            x -= rates->mRNAdecay;             
-            if (x <= rates->pic_disassembly) /* STOCHASTIC EVENT: PIC disassembly*/
+            x -= rates->total_mRNA_decay_rate;             
+            if (x <= rates->total_active_to_intermediate_rate) /* STOCHASTIC EVENT: active transcriptional state to intermediate*/
             {                   
-                Gillespie_event_disassemble_PIC(genotype, state, rates, RS);
+                Gillespie_event_active_to_intermediate(genotype, state, rates, RS);
                 break;
             } 
             else 
             {  
-                x -= rates->pic_disassembly;  
-                if (x <= rates->nuc_disassembly)  /* acetylation*/
+                x -= rates->total_active_to_intermediate_rate;  
+                if (x <= rates->total_repressed_to_intermediate_rate)  /* repressed to intermediate*/
                 {    
-                    Gillespie_event_histone_acteylation(rates, state, genotype, RS);
+                    Gillespie_event_repressed_to_intermediate(rates, state, genotype, RS);
                     break;
                 } 
                 else 
                 { 
-                    x-= rates->nuc_disassembly;                  
-                    if (x <= rates->nuc_assembly)/* STOCHASTIC EVENT: histone deacetylation */ 
+                    x-= rates->total_repressed_to_intermediate_rate;                  
+                    if (x <= rates->total_intermediate_to_repressed_rate)/* intermediate to repressed */ 
                     {   
-                        Gillespie_event_histone_deacteylation(rates, state, genotype, RS);
+                        Gillespie_event_intermediate_to_repressed(rates, state, genotype, RS);
                         break;
                     } 
                     else 
                     {
-                        x -= rates->nuc_assembly;                        
-                        if (x <= rates->pic_assembly)/* STOCHASTIC EVENT: PIC assembly*/
+                        x -= rates->total_intermediate_to_repressed_rate;                        
+                        if (x <= rates->total_intermediate_to_active_rate)/* intermediate to active*/
                         {  
-                            Gillespie_event_assemble_PIC(rates, state, genotype, RS); 
+                            Gillespie_event_intermediate_to_active(rates, state, genotype, RS); 
                             break;
                         } 
                         else 
                         {
-                            x -= rates->pic_assembly;                            
-                            if (x <= rates->transcript_init * TRANSCRIPTINIT) /* STOCHASTIC EVENT: transcription initiation */
+                            x -= rates->total_intermediate_to_active_rate;                            
+                            if (x <= rates->total_N_gene_transcript_initiated * TRANSCRIPTINIT) /* STOCHASTIC EVENT: transcription initiation */
                             {   
                                 Gillespie_event_transcription_init(rates, state, genotype, dt, RS);
                                 break;
-                            }                           
-                            else 
-                            {                               
-                              /* shouldn't get here, unless rounding error*/
-                                fperrors=fopen(error_file,"a+");
-                                LOG("at time %f in mut step %d\n", state->t, mut_step)                            
-                                fclose(fperrors); 
-                            }
+                            }   
                         }
                     }
                 }
@@ -2641,11 +2735,9 @@ void calc_cellular_fitness(  Genotype *genotype,
         GillespieRates rate_clone;
         int init_mRNA_clone[NGENES]; 
         float init_protein_number_clone[NGENES];
-        float gr1[N_replicates_per_thread],gr2[N_replicates_per_thread];        
-        //float t;
+        float gr1[N_replicates_per_thread],gr2[N_replicates_per_thread];   
         int mRNA[genotype->ngenes];
-        float protein[genotype->ngenes];       
-        int did_burn_in;  
+        float protein[genotype->ngenes];     
         float *signal_profile;
 #if CAUTIOUS
         FILE *fperror;
@@ -2693,6 +2785,15 @@ void calc_cellular_fitness(  Genotype *genotype,
             }   
         #endif
         } 
+        /*Set initial mRNA and protein number using given values*/
+        for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)  //expression of the sensor TF is not considered in the model           
+            mRNA[j] = init_mRNA_clone[j];                       
+        for(j=N_SIGNAL_TF; j<genotype_clone.nproteins;j++)
+        {
+            for(k=0;k<genotype_clone.protein_pool[j][0][0];k++)
+                protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0]; //split the initial protein number equally to different copies
+                                                                                                                                        //this is to make sure all proteins have equal initial numbers
+        }        
     #if !SET_BS_MANUALLY
         calc_all_binding_sites(&genotype_clone);
     #endif        
@@ -2700,40 +2801,32 @@ void calc_cellular_fitness(  Genotype *genotype,
         for(i=0;i<N_replicates_per_thread;i++) /* env 1, usually a constant signal that matches env*/
         {	 
             effect_of_effector=env1_initial_effect_of_effector; // whether the effector is beneficial or deleterious
-            end_state=1; //flag to show whether do_single_time_step encounters an error. 1 means no error, 0 means error
-            did_burn_in=0; //if burn-in growth is enabled, and correctly executed, this flag will be set to 1 by do_single_time_step.
+            end_state=1; //flag to show whether do_single_time_step encounters an error. 1 means no error, 0 means error           
 #if EXTERNAL_SIGNAL
             j=RngStream_RandInt(RS_parallel[thread_ID],0,99);
             signal_profile=&(signal_profile_matrix[thread_ID][j][0]);
 #else
-            signal_profile=NULL;             
-#endif
-            /*Set initial mRNA and protein number using given values*/
-            for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)  //expression of the sensor TF is not considered in the model           
-                mRNA[j] = init_mRNA_clone[j];                       
-            for(j=N_SIGNAL_TF; j<genotype_clone.nproteins;j++)
-            {
-                for(k=0;k<genotype_clone.protein_pool[j][0][0];k++)
-                    protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0]; //split the initial protein number equally to different copies
-                                                                                                                                            //this is to make sure all proteins have equal initial numbers
-            }
+            signal_profile=NULL;            
+#endif            
             /*initialize mRNA and protein numbers, and gene states, in cell*/
-            initialize_cell(&state_clone,                             
+            initialize_cell(&genotype_clone,
+                            &state_clone,                             
                             genotype_clone.ngenes, 
                             genotype_clone.nproteins,
                             genotype_clone.protein_pool,
-                            genotype_clone.mRNAdecay, 
+                            genotype_clone.mRNA_decay_rate, 
                             mRNA, 
                             protein, 
                             RS_parallel[thread_ID],
-                            env1_t_development);
+                            env1_t_development,
+                            env1_t_signal_off);
             /*set how the environment signal should change during simulation*/
             set_signal(&state_clone,
                         env1_t_signal_on,
                         env1_t_signal_off,
                         signal_profile,
                         env1_t_development,
-                        env1_signal_strength);          
+                        env1_signal1_strength);          
             /*growth starts at 0 min*/
             state_clone.t = 0.0;
             /*calcualte the rates of cellular activity based on the initial cellular state*/
@@ -2743,38 +2836,33 @@ void calc_cellular_fitness(  Genotype *genotype,
             {
                 do_single_timestep(&genotype_clone, 
                                     &state_clone, 
-                                    &rate_clone,                                                                         
-                                    &effect_of_effector,
-                                    env1_signal_strength,
-                                    env1_t_signal_on,
+                                    &rate_clone,                               
+                                    env1_signal2_strength,
+                                    env1_response_amplification,
+                                    env1_minimal_peak_response,
+                                    env1_benefit1,
+                                    env1_benefit2,
+                                    env1_max_duration_bias,
+                                    env1_t_signal_on, 
                                     env1_t_signal_off,
-                                    env1_initial_effect_of_effector,
-                                    env1_fixed_effector_effect,
                                     RS_parallel[thread_ID],                                   
                                     mut_step,  
                                     mut_record,
-                                    &end_state,
-                                    &did_burn_in,
+                                    &end_state,                           
                                     thread_ID,
                                     env1_t_development,
                                     signal_profile);
             } 
             if(end_state==1) // no error
-            {	
-                gr1[i]=calc_replicate_fitness(&state_clone,1,env1_t_development,genotype_clone.n_output_proteins);
+            {               
+                gr1[i]=calc_replicate_fitness(&state_clone,1,env1_t_development,env1_t_signal_off,env1_response_amplification,env1_minimal_peak_response,genotype_clone.n_output_proteins);
             #if CAUTIOUS                
                 if(gr1[i]<0.0)
                 {
                     fperror=fopen(error_file,"a+");
                     LOG("negative growth rate at replicate %d in test 1 thread %d at mut step %d\n", i, thread_ID, mut_step);
                     fclose(fp);
-                }
-                if(did_burn_in==0)
-                {
-                    fperror=fopen(error_file,"a+");
-                    LOG("burn_in did not engage at replicate %d in test 1 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                    fclose(fp);
-                }
+                }              
             #endif
             }
             else
@@ -2788,38 +2876,34 @@ void calc_cellular_fitness(  Genotype *genotype,
 #endif
             }
             /*free linked tables*/
+#if PEAK_SEARCH
             free(state_clone.sampled_response);
+#endif
             free_fixedevent(&state_clone);           
         }            
         /*******************env2*********************/
         for(i=0;i<N_replicates_per_thread;i++) 
         {	 
             effect_of_effector=env2_initial_effect_of_effector;  
-            end_state=1;
-            did_burn_in=0;
-            signal_profile=NULL;  
-            for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)             
-                mRNA[j] = init_mRNA_clone[j];                       
-            for(j=N_SIGNAL_TF; j<genotype_clone.nproteins;j++)
-            {
-                for(k=0;k<genotype_clone.protein_pool[j][0][0];k++)
-                    protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0];                
-            }
-            initialize_cell(&state_clone, 
+            end_state=1;           
+            signal_profile=NULL;            
+            initialize_cell(&genotype_clone,
+                            &state_clone, 
                             genotype_clone.ngenes, 
                             genotype_clone.nproteins,
                             genotype_clone.protein_pool,
-                            genotype_clone.mRNAdecay, 
+                            genotype_clone.mRNA_decay_rate, 
                             mRNA, 
                             protein, 
                             RS_parallel[thread_ID],
-                            env2_t_development);
+                            env2_t_development,
+                            env2_t_signal_off);
             set_signal( &state_clone,
                         env2_t_signal_on,   
                         env2_t_signal_off,
                         signal_profile,
                         env2_t_development,
-                        env2_signal_strength);  
+                        env2_signal1_strength);  
             state_clone.t = 0.0;
             calc_all_rates( &genotype_clone, 
                             &state_clone, 
@@ -2829,39 +2913,33 @@ void calc_cellular_fitness(  Genotype *genotype,
             {
                 do_single_timestep(&genotype_clone, 
                                     &state_clone, 
-                                    &rate_clone,                                                                                                                      
-                                    &effect_of_effector,
-                                    env2_signal_strength,
+                                    &rate_clone,               
+                                    env2_signal2_strength,
+                                    env2_response_amplification,
+                                    env2_minimal_peak_response,
+                                    env2_benefit1,
+                                    env2_benefit2,
+                                    env2_max_duration_bias,
                                     env2_t_signal_on,
                                     env2_t_signal_off,
-                                    env2_initial_effect_of_effector,
-                                    env2_fixed_effector_effect,                                  
                                     RS_parallel[thread_ID],                                  
                                     mut_step,
                                     mut_record,
-                                    &end_state,
-                                    &did_burn_in,
+                                    &end_state,                           
                                     thread_ID,
                                     env2_t_development,
                                     signal_profile);
             } 
             if(end_state==1)
             {
-                gr2[i]=calc_replicate_fitness(&state_clone,2,env2_t_development,genotype_clone.n_output_proteins);
-#if CAUTIOUS
-                FILE *fp;
+                gr2[i]=calc_replicate_fitness(&state_clone,2,env2_t_development,env2_t_signal_off,env2_response_amplification,env2_minimal_peak_response,genotype_clone.n_output_proteins);
+#if CAUTIOUS             
                 if(gr2[i]<0.0)
                 {
                     fperror=fopen(error_file,"a+");
                     LOG("negative growth rate at replicate %d in test 2 thread %d at mut step %d\n", i, thread_ID, mut_step);
                     fclose(fp);
-                }
-                if(did_burn_in==0)
-                {
-                    fperror=fopen(error_file,"a+");
-                    LOG("burn_in did not engage at replicate %d in test 2 thread %d at mut step %d\n", i, thread_ID, mut_step);
-                    fclose(fp);
-                }
+                }               
 #endif
             }
             else
@@ -2872,8 +2950,10 @@ void calc_cellular_fitness(  Genotype *genotype,
                 LOG("Rerun replicates at replicate %d in test 2 thread %d at mut step %d\n", i, thread_ID, mut_step);
                 fclose(fp);
 #endif
-            }       
+            } 
+#if PEAK_SEARCH
             free(state_clone.sampled_response);
+#endif
             free_fixedevent(&state_clone);            
         }    
         /*free linked tables*/
@@ -2893,13 +2973,14 @@ void calc_cellular_fitness(  Genotype *genotype,
     } 
 }
 
-float calc_replicate_fitness(CellState *state, int which_env, float t_development, int N_output)
+float calc_replicate_fitness(CellState *state, int which_env, float t_development, float t_signal_on, float response_amplitude, float minimal_peak_response, int N_output)
 {
-    float fitness;
+    float fitness, peak_response;
     int i;
-    float max,mid1,mid2,min;
-    int pos_max;
-    float pos_mid1,pos_mid2;
+    float max_response,fifty_percent_response,ninty_percent_recovery;
+    int pos_max_response;
+    float pos_fifty_percent_response,pos_ninty_percent_recovery;
+    FILE *fp;
 #if SELECT_SENSITIVITY_AND_PRECISION
     fitness = (state->sensitivity[which_env] > Ne_saturate) ? 1.0 : (state->sensitivity[which_env] / Ne_saturate);
     fitness -= (state->precision[which_env] > Ne_saturate) ? 0.5 : 0.5*(state->precision[1which_env] / Ne_saturate);
@@ -2922,30 +3003,36 @@ float calc_replicate_fitness(CellState *state, int which_env, float t_developmen
     fitness+=(state->cumulative_advanced_benefit<saturate_cumulative_response_from_pulse)?state->cumulative_advanced_benefit/saturate_cumulative_response_from_pulse*bmax:bmax;
     fitness-=0.5*bmax*state->cumulative_damage/saturate_cumulative_response_from_pulse;
 #elif PEAK_SEARCH
-    find_max(&(state->sampled_response[0]),0,state->N_samples-1,&max,&pos_max);
-    if(max==0.0)//no pulse
+    find_max(&(state->sampled_response[0]),0,state->N_samples,&max_response,&pos_max_response);
+    if(max_response==0.0 || fabs(max_response-state->sampled_response[0])/state->sampled_response[0]<=EPSILON)//"flat" or monotonous decrease
     {
         fitness=0.0-state->cumulative_cost/t_development;
     }
     else 
     {
-        if(pos_max==state->N_samples-1)//monotonous increase
+        if(pos_max_response==state->N_samples-1)//monotonous increase
         {           
-            pos_mid2=TIME_INFINITY;
+            pos_ninty_percent_recovery=TIME_INFINITY;
         }    
         else //there is a pulse. Flat tail is taken care of by find_x, making pos_mid2=TIME_INFINITY
-        {           
-            mid2=max/2.0; 
-            find_x(&(state->sampled_response[0]),pos_max,state->N_samples-1,mid2,&pos_mid2,1); 
+        {  
+            ninty_percent_recovery=max_response*0.1+state->sampled_response[0]*0.9;  
+            find_x(&(state->sampled_response[0]),pos_max_response,state->N_samples-1,ninty_percent_recovery,&pos_ninty_percent_recovery,1); // look for mid point aft the peak
         }
-        mid1=max/2.0;
-        find_x(&(state->sampled_response[0]),0,pos_max,mid1,&pos_mid1,0);  
-        fitness=(max>saturate_pulse_amplitude)?1.0:max/saturate_pulse_amplitude;
-        fitness+=(t_development-pos_mid1)/t_development;
-        fitness+=exp(-pow((sampling_interval*(pos_mid2-pos_mid1)-opt_pulse_duration)/sd_opt_pulse_duration,2.0));
-        fitness=bmax/3.0*fitness-state->cumulative_cost/t_development;          
+        fifty_percent_response=(max_response+state->sampled_response[0])*0.5;
+        find_x(&(state->sampled_response[0]),0,pos_max_response,fifty_percent_response,&pos_fifty_percent_response,0); // look for mid point bf the peak
+        peak_response=(minimal_peak_response>(response_amplitude*state->sampled_response[0]))?minimal_peak_response:(response_amplitude*state->sampled_response[0]);
+//        fitness=(max>saturate_pulse_amplitude)?1.0:max/saturate_pulse_amplitude;
+        fitness=max_response/(max_response+peak_response/9.0);
+        fitness*=(t_development-t_signal_on-pos_fifty_percent_response)/(t_development-t_signal_on);
+//        fitness*=exp(-pow((sampling_interval*(pos_mid2-pos_mid1)-opt_pulse_duration)/sd_opt_pulse_duration,2.0));
+        fitness*=opt_pulse_duration*9.0/(opt_pulse_duration*9.0+sampling_interval*(pos_ninty_percent_recovery-pos_fifty_percent_response));
+        fitness=fitness-state->cumulative_cost/t_development;          
     }             
-#else
+#elif CHEMOTAXIS
+    if(POOL_EFFECTORS)
+        fitness=(state->cumulative_benefit-state->cumulative_cost)/t_development;
+#else    
     if(POOL_EFFECTORS)
         fitness=(state->cumulative_fitness[0]-state->cumulative_fitness_after_burn_in[0])/(t_development-duration_of_burn_in_growth_rate); 
     else
@@ -2985,7 +3072,7 @@ int does_fixed_event_end_plotting(  CellState *state,
     t4 = state->signal_on_head ? state->signal_on_head->time : TIME_INFINITY;
     t5 = state->burn_in_growth_rate_head ? state->burn_in_growth_rate_head->time : TIME_INFINITY;    
     t6 = state->sampling_point_end_head ? state->sampling_point_end_head->time : TIME_INFINITY;
-    t7 = state->t_to_update_Pact_or_Prep;
+    t7 = state->t_to_update_probability_of_binding;
     t8 = state->change_signal_strength_head ? state->change_signal_strength_head->time : TIME_INFINITY;
     if((t1 <= t2) && (t1 <= t) && (t1 <= t3) && (t1 <= t4) && (t1<=t5) && (t1<=t6) && (t1<=t7)&&(t1<=t8))
     {
@@ -3029,68 +3116,94 @@ int does_fixed_event_end_plotting(  CellState *state,
 int do_fixed_event_plotting(    Genotype *genotype, 
                                 CellState *state, 
                                 GillespieRates *rates, 
-                                float *dt,
-                                float tdevelopment,        
+                                float *dt,                                 
                                 int event, 
-                                float signal_strength,
+                                float signal_on_strength,
                                 float duration_signal_on,
-                                float duration_signal_off,
-                                char *effect_of_effector,
-                                char init_effector_effect,
-                                int fixed_effector_effect,                              
+                                float duration_signal_off,     
+                                float response_amplification,
+                                float minimal_peak_response,
+                                float benefit1,
+                                float benefit2,
+                                float max_t_in_bias,                             
                                 int *end_state,
                                 float *signal_profile)
 {      
-    int i, return_value;
+    int i, j, return_value,protein_id;
     return_value=0;
     switch (event) 
     {        
-         case 1:     /* a transcription event ends */
-            fixed_event_end_transcription(dt, tdevelopment, state, rates, genotype,end_state,0,NULL,effect_of_effector); 
+        case 1:     /* a transcription event ends */
+            fixed_event_end_transcription(dt, state, rates, genotype,end_state,0,NULL,benefit1,benefit2, max_t_in_bias);
             break;
         case 2:     /* a translation initialization event ends */ 
-            return_value=fixed_event_end_translation_init(genotype, state, rates, dt, tdevelopment,end_state,0,NULL,effect_of_effector);
+            return_value=fixed_event_end_translation_init(genotype, state, rates, dt, end_state, 0,NULL,benefit1,benefit2, max_t_in_bias);
             break;
-        case 3:     /* turn off signal*/ 
+        case 3:     /* turn signal off*/ 
             *dt = state->signal_off_head->time - state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0,NULL); 
-            delete_fixed_event_from_head(&(state->signal_off_head),&(state->signal_off_tail));            
-//            state->protein_number[N_SIGNAL_TF-1]=signal_off_strength;
-            if(fixed_effector_effect)
-                *effect_of_effector=init_effector_effect;
-            else
-                *effect_of_effector='d';
-//            state->protein_number[N_SIGNAL_TF-1]=signal_off_strength;
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
+            delete_fixed_event_from_head(&(state->signal_off_head),&(state->signal_off_tail));
+//            if(fixed_effector_effect)
+//                *effect_of_effector=init_effector_effect;
+//            else
+//                *effect_of_effector='d';
+#if SELECT_SENSITIVITY_AND_PRECISION
+			state->precision[0] = state->protein_number[genotype->nproteins - 1]; //reset running precision
+#endif
             break;
-        case 4:     /* turn on signal*/
+        case 4:     /*turn signal on*/
             *dt = state->signal_on_head->time - state->t;   
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0,NULL);  
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
-            state->protein_number[N_SIGNAL_TF-1]+=5.0*signal_strength;
-             if(fixed_effector_effect)                               
-                *effect_of_effector=init_effector_effect;            
-            else                 
-                *effect_of_effector='b'; 
+            if(state->protein_number[N_SIGNAL_TF-1]<signal_on_strength)
+                state->protein_number[N_SIGNAL_TF-1]=signal_on_strength;
+            else
+                state->protein_number[N_SIGNAL_TF-1]*=2.0;
+            state->recording_basal_response=0;
+            state->found_gradient=1;
+#if POOL_EFFECTORS
+            state->threshold_response_to_bias[0]=(minimal_peak_response>state->basal_response[0]*response_amplification)?minimal_peak_response:state->basal_response[0]*response_amplification;
+#endif           
+//            if(fixed_effector_effect)                               
+//                *effect_of_effector=init_effector_effect;            
+//            else                 
+//                *effect_of_effector='b'; 
+#if SELECT_SENSITIVITY_AND_PRECISION
+			state->precision[1] = state->precision[0]; //record the max precision to signal change 1
+			state->sensitivity[1] = state->sensitivity[0]; //record the max sensitivity to signal change 1
+			state->sensitivity[0] = 0.0;	// reset running sensitivity
+#endif
             break;	
         case 5: /* finishing burn-in growth rate*/
             *dt=duration_of_burn_in_growth_rate-state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0,NULL);
-//            for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
-//                state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];              
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL,benefit1,benefit2, max_t_in_bias);
+            for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
+                state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
             break;
         case 6:
             *dt=state->sampling_point_end_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0, NULL);
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
+            if(state->t>60.0)
+            {
+                for(i=0;i<genotype->n_output_proteins;i++)
+                {                
+                    protein_id=genotype->output_protein_id[i];            
+                    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
+                        state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
+                } 
+                state->N_samples++;  
+            }
+            
             break;
         case 7: /* update force to update Pact and Prep*/
-            *dt=state->t_to_update_Pact_or_Prep-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0,NULL);          
+            *dt=state->t_to_update_probability_of_binding-state->t;
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
             break;  
         case 8: /* update signal strength */
             *dt=state->change_signal_strength_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt, tdevelopment, *effect_of_effector, end_state, 0, NULL);
+            update_protein_number_and_fitness(genotype, state, rates, *dt, end_state, 0, NULL, benefit1,benefit2, max_t_in_bias);
             state->protein_number[N_SIGNAL_TF-1]=signal_profile[state->change_signal_strength_head->event_id];
             delete_fixed_event_from_head(&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
             break;
@@ -3101,12 +3214,14 @@ int do_fixed_event_plotting(    Genotype *genotype,
 void do_single_timestep_plotting(   Genotype *genotype, 
                                     CellState *state,                         
                                     GillespieRates *rates,                                                           
-                                    char *effect_of_effector,  
                                     float signal_strength,
+                                    float response_amplification,
+                                    float minimal_peak_response,
+                                    float benefit1,
+                                    float benefit2,
+                                    float max_t_in_bias,    
                                     float duration_signal_on,
-                                    float duration_signal_off,
-                                    int fixed_effector_effect,
-                                    char initial_effect_of_effector,    
+                                    float duration_signal_off,       
                                     float (*phenotype)[N_TIMEPOINTS],                                    
                                     float fitness[N_TIMEPOINTS],                                    
                                     RngStream RS,                                    
@@ -3121,7 +3236,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
     float dt;
     float x;    
     x = expdev(RS);        
-    dt = x/rates->subtotal;    
+    dt = x/rates->total_Gillespie_rate;    
     fixed_time = (state->t+dt<tdevelopment)?(state->t+dt):tdevelopment;
     event = does_fixed_event_end_plotting(state, fixed_time);
     while(event!=0)
@@ -3130,30 +3245,31 @@ void do_single_timestep_plotting(   Genotype *genotype,
                                             state, 
                                             rates, 
                                             &dt, 
-                                            tdevelopment,
                                             event, 
                                             signal_strength,
                                             duration_signal_on, 
                                             duration_signal_off, 
-                                            effect_of_effector,
-                                            initial_effect_of_effector,
-                                            fixed_effector_effect, 
+                                            response_amplification,
+                                            minimal_peak_response,
+                                            benefit1,
+                                            benefit2,
+                                            max_t_in_bias,
                                             end_state,
                                             signal_profile);
         if(*end_state==0)
             return;        
         if(event==6)/*time to take a snapshot of fitness and protein number*/
         {    
-//            for(i=0;i<genotype->nproteins;i++)
-//                phenotype[i][*timepoint]=state->protein_number[i];            
+            for(i=0;i<genotype->nproteins;i++)
+                phenotype[i][*timepoint]=state->protein_number[i];            
 //            fitness[*timepoint]=state->instantaneous_fitness;          
-//            (*timepoint)++;    
+            (*timepoint)++;    
         }              
         fixed_time=state->t+dt; 
         state->t += dt;                     
-        x -= dt*rates->subtotal;       
+        x -= dt*rates->total_Gillespie_rate;       
         calc_all_rates(genotype, state, rates, UPDATE_WHAT,thread_id);  
-        dt = x/rates->subtotal;	
+        dt = x/rates->total_Gillespie_rate;	
         if(dt<0.0)	
             dt=TIME_OFFSET;         
         /* check to see there aren't more fixed events to do */
@@ -3166,7 +3282,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
      this  */          
     if (state->t+dt < tdevelopment)
     { 
-        update_protein_number_and_fitness(genotype, state, rates, dt, tdevelopment,*effect_of_effector, end_state, 0, NULL);  
+        update_protein_number_and_fitness(genotype, state, rates, dt, end_state, 0, NULL, benefit1, benefit2, max_t_in_bias);  
         if(*end_state==0)
             return; 
         UPDATE_WHAT=do_Gillespie_event(genotype, state, rates, dt, RS, end_state, 0, NULL);
@@ -3181,7 +3297,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
         /* do remaining dt */
         dt = tdevelopment - state->t;
         /* final update of protein concentration */
-        update_protein_number_and_fitness(genotype, state, rates, dt, tdevelopment, *effect_of_effector, end_state, 0, NULL); 
+        update_protein_number_and_fitness(genotype, state, rates, dt, end_state, 0, NULL, benefit1, benefit2, max_t_in_bias);
        
         if(*end_state==0)
             return;         
@@ -3189,6 +3305,7 @@ void do_single_timestep_plotting(   Genotype *genotype,
         state->t = tdevelopment;
     }
 }
+
 
 void calc_cellular_fitness_plotting( Genotype *genotype,
                                         int init_mRNA[NGENES],
@@ -3199,6 +3316,8 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
     float phenotypeB[N_REPLICATES][genotype->nproteins][N_TIMEPOINTS];
     float fitnessA[N_REPLICATES][N_TIMEPOINTS];
     float fitnessB[N_REPLICATES][N_TIMEPOINTS];
+    float fitnessA2[N_REPLICATES];
+    float fitnessB2[N_REPLICATES];
     int l,m,n;
     char filename1[32],filename2[32];
     FILE *fp1,*fp2;
@@ -3216,6 +3335,8 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
     }    
     for(l=0;l<N_REPLICATES;l++)
     {   
+        fitnessA2[l]=0.0;
+        fitnessB2[l]=0.0;
         for(n=0;n<N_TIMEPOINTS;n++)
             {
                 fitnessA[l][n]=0.0;
@@ -3267,35 +3388,53 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
     #if !SET_BS_MANUALLY        
         calc_all_binding_sites(&genotype_clone); 
     #endif   
+        for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)             
+                mRNA[j] = init_mRNA_clone[j];                       
+        for(j=N_SIGNAL_TF; j<genotype_clone.nproteins;j++)
+        {
+            for(k=0;k<genotype_clone.protein_pool[j][0][0];k++)
+                protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0];                
+        }  
+        
         for(i=0;i<N_replicates_per_thread;i++)        
         {             
             effect_of_effector=env1_initial_effect_of_effector;
             end_state=1;
             signal_profile=NULL;
-            for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)             
-                mRNA[j] = init_mRNA_clone[j];                       
-            for(j=N_SIGNAL_TF; j<genotype_clone.nproteins;j++)
-            {
-                for(k=0;k<genotype_clone.protein_pool[j][0][0];k++)
-                    protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0];                
-            }
-            initialize_cell(&state_clone, genotype_clone.ngenes, genotype_clone.nproteins,
-                            genotype_clone.protein_pool,genotype_clone.mRNAdecay, mRNA, protein, RS[thread_ID],env1_t_development);
-            set_signal(&state_clone,env1_t_signal_on,env1_t_signal_off,signal_profile,env1_t_development,env1_signal_strength);        
+                     
+            initialize_cell(&genotype_clone,
+                            &state_clone,                             
+                            genotype_clone.ngenes, 
+                            genotype_clone.nproteins,
+                            genotype_clone.protein_pool,
+                            genotype_clone.mRNA_decay_rate, 
+                            mRNA, 
+                            protein, 
+                            RS[thread_ID],
+                            env1_t_development,
+                            env1_t_signal_off);            
+            set_signal(&state_clone,
+                        env1_t_signal_on,
+                        env1_t_signal_off,
+                        signal_profile,
+                        env1_t_development,
+                        env1_signal1_strength);         
             state_clone.t = 0.0;
             calc_all_rates(&genotype_clone, &state_clone, &rate_clone, INITIALIZATION,thread_ID);
             timepoint=0;
             while(state_clone.t<env1_t_development && end_state==1)
-            {    
+            { 
                 do_single_timestep_plotting(&genotype_clone, 
                                             &state_clone, 
                                             &rate_clone,                                                                                                                                
-                                            &effect_of_effector,
-                                            env1_signal_strength,
-                                            env1_t_signal_on,
+                                            env1_signal2_strength,
+                                            env1_response_amplification,
+                                            env1_minimal_peak_response,
+                                            env1_benefit1,
+                                            env1_benefit2,
+                                            env1_max_duration_bias,
+                                            env1_t_signal_on, 
                                             env1_t_signal_off,
-                                            env1_fixed_effector_effect,  
-                                            env1_initial_effect_of_effector,
                                             phenotypeA[thread_ID*N_replicates_per_thread+i],                                           
                                             fitnessA[thread_ID*N_replicates_per_thread+i],  
                                             RS[thread_ID],                                           
@@ -3306,24 +3445,36 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
                                             signal_profile);        
             }
             if(end_state==0)
-                i--;            
+                i--;        
+            else
+                fitnessA2[thread_ID*N_replicates_per_thread+i]=calc_replicate_fitness(&state_clone,1,env1_t_development,env1_t_signal_off,env1_response_amplification,env1_minimal_peak_response,genotype_clone.n_output_proteins);
             free_fixedevent(&state_clone);
+#if PEAK_SEARCH
+            free(state_clone.sampled_response);
+#endif
         }
         for(i=0;i<N_replicates_per_thread;i++)        
         {              
             effect_of_effector=env2_initial_effect_of_effector; 
             end_state=1;
-            signal_profile=NULL;            
-            for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)             
-                mRNA[j] = init_mRNA_clone[j];                       
-            for(j=N_SIGNAL_TF; j<genotype_clone.nproteins;j++)
-            {
-                for(k=0;k<genotype_clone.protein_pool[j][0][0];k++)
-                    protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0];                
-            }
-            initialize_cell(&state_clone, genotype_clone.ngenes, genotype_clone.nproteins,
-                            genotype_clone.protein_pool,genotype_clone.mRNAdecay, mRNA, protein, RS[thread_ID],env2_t_development);
-            set_signal(&state_clone,env2_t_signal_on,env2_t_signal_off,signal_profile,env2_t_development,env2_signal_strength);        
+            signal_profile=NULL;         
+            initialize_cell(&genotype_clone,
+                            &state_clone, 
+                            genotype_clone.ngenes, 
+                            genotype_clone.nproteins,
+                            genotype_clone.protein_pool,
+                            genotype_clone.mRNA_decay_rate, 
+                            mRNA, 
+                            protein, 
+                            RS[thread_ID],
+                            env2_t_development,
+                            env2_t_signal_off);
+            set_signal( &state_clone,
+                        env2_t_signal_on,   
+                        env2_t_signal_off,
+                        signal_profile,
+                        env2_t_development,
+                        env2_signal1_strength);    
             state_clone.t = 0.0;
             calc_all_rates(&genotype_clone, &state_clone, &rate_clone, INITIALIZATION,thread_ID);        
             timepoint=0;
@@ -3332,12 +3483,14 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
                 do_single_timestep_plotting(&genotype_clone, 
                                             &state_clone, 
                                             &rate_clone,                                                                                                                                       
-                                            &effect_of_effector,
-                                            env2_signal_strength,
+                                            env2_signal2_strength,
+                                            env2_response_amplification,
+                                            env2_minimal_peak_response,
+                                            env2_benefit1,
+                                            env2_benefit2,
+                                            env2_max_duration_bias,
                                             env2_t_signal_on,
                                             env2_t_signal_off,
-                                            env2_fixed_effector_effect,  
-                                            env2_initial_effect_of_effector,
                                             phenotypeB[thread_ID*N_replicates_per_thread+i],
                                             fitnessB[thread_ID*N_replicates_per_thread+i],                                            
                                             RS[thread_ID],                                          
@@ -3348,8 +3501,13 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
                                             signal_profile);
             }
             if(end_state==0)
-                i--;            
+                i--;
+            else
+                fitnessB2[thread_ID*N_replicates_per_thread+i]=calc_replicate_fitness(&state_clone,2,env2_t_development,env2_t_signal_off,env2_response_amplification,env2_minimal_peak_response,genotype_clone.n_output_proteins);            
             free_fixedevent(&state_clone);
+#if PEAK_SEARCH
+            free(state_clone.sampled_response);
+#endif
         }        
     }//end of parallel section   
     /*Output protein numbers at each timepoint*/
@@ -3379,18 +3537,28 @@ void calc_cellular_fitness_plotting( Genotype *genotype,
     /*In each file, columns are replicates, rows are timepoints*/
     fp1=fopen("fitnessA","w");
     fp2=fopen("fitnessB","w");    
-    for(m=0;m<N_TIMEPOINTS;m++)
+//    for(m=0;m<N_TIMEPOINTS;m++)
+//    {
+//        for(n=0;n<N_REPLICATES;n++)
+//        {
+//            fprintf(fp1,"%f ",fitnessA[n][m]);
+//            fprintf(fp2,"%f ",fitnessB[n][m]);
+//        }
+//        fprintf(fp1,"\n");
+//        fprintf(fp2,"\n");
+//    }  
+    for(l=0;l<N_REPLICATES;l++)
     {
-        for(n=0;n<N_REPLICATES;n++)
-        {
-            fprintf(fp1,"%f ",fitnessA[n][m]);
-            fprintf(fp2,"%f ",fitnessB[n][m]);
-        }
-        fprintf(fp1,"\n");
-        fprintf(fp2,"\n");
-    }  
+        fprintf(fp1,"%f\n",fitnessA2[l]);
+        fprintf(fp2,"%f\n",fitnessB2[l]);
+    }
     fclose(fp1);
     fclose(fp2);
+    
+    fp1=fopen("output_protein_id.txt","w");
+    for(l=0;l<genotype->n_output_proteins;l++)
+        fprintf(fp1,"%d\n",genotype->output_protein_id[l]);
+    fclose(fp1);
 }
 #endif /*End of plotting functions*/
 
@@ -3681,11 +3849,11 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
     /* remove it from PIC_assembly, mRNAdecay, proteinDecay, translation and re_calc*/
     for(i=which_gene;i<genotype->ngenes-1;i++)
     {
-        genotype->min_act_to_transc[i]=genotype->min_act_to_transc[i+1];
-        genotype->pic_disassembly[i]=genotype->pic_disassembly[i+1];             
-        genotype->mRNAdecay[i]=genotype->mRNAdecay[i+1];
-        genotype->proteindecay[i]=genotype->proteindecay[i+1];
-        genotype->translation[i]=genotype->translation[i+1];         
+        genotype->min_N_activator_to_transc[i]=genotype->min_N_activator_to_transc[i+1];
+        genotype->active_to_intermediate_rate[i]=genotype->active_to_intermediate_rate[i+1];            
+        genotype->mRNA_decay_rate[i]=genotype->mRNA_decay_rate[i+1];
+        genotype->protein_decay_rate[i]=genotype->protein_decay_rate[i+1];
+        genotype->translation_rate[i]=genotype->translation_rate[i+1];          
         genotype->recalc_TFBS[i]=1;        
     }
     /* if the to-be-deleted gene is an effector gene, change n_output_genes as well*/
@@ -3727,11 +3895,11 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
     }
     for(i=which_gene;i<genotype->ngenes-1;i++)
     {
-        genotype->min_act_to_transc[i]=genotype->min_act_to_transc[i+1];
-        genotype->pic_disassembly[i]=genotype->pic_disassembly[i+1];            
-        genotype->mRNAdecay[i]=genotype->mRNAdecay[i+1];
-        genotype->proteindecay[i]=genotype->proteindecay[i+1];
-        genotype->translation[i]=genotype->translation[i+1];         
+        genotype->min_N_activator_to_transc[i]=genotype->min_N_activator_to_transc[i+1];
+        genotype->active_to_intermediate_rate[i]=genotype->active_to_intermediate_rate[i+1];            
+        genotype->mRNA_decay_rate[i]=genotype->mRNA_decay_rate[i+1];
+        genotype->protein_decay_rate[i]=genotype->protein_decay_rate[i+1];
+        genotype->translation_rate[i]=genotype->translation_rate[i+1];         
         genotype->recalc_TFBS[i]=1;
     }
     if(genotype->protein_identity[protein_id][1]!=-1)
@@ -3785,11 +3953,11 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS)
     for(i=0;i<CISREG_LEN;i++)
         *temp2++=*temp1++;           
     /* copy and paste info to the slot*/
-    genotype->min_act_to_transc[genotype->ngenes]=genotype->min_act_to_transc[which_gene];
-    genotype->pic_disassembly[genotype->ngenes]=genotype->pic_disassembly[which_gene];
-    genotype->mRNAdecay[genotype->ngenes]=genotype->mRNAdecay[which_gene];
-    genotype->proteindecay[genotype->ngenes]=genotype->proteindecay[which_gene];
-    genotype->translation[genotype->ngenes]=genotype->translation[which_gene];
+    genotype->min_N_activator_to_transc[genotype->ngenes]=genotype->min_N_activator_to_transc[which_gene];
+    genotype->active_to_intermediate_rate[genotype->ngenes]=genotype->active_to_intermediate_rate[which_gene];
+    genotype->mRNA_decay_rate[genotype->ngenes]=genotype->mRNA_decay_rate[which_gene];
+    genotype->protein_decay_rate[genotype->ngenes]=genotype->protein_decay_rate[which_gene];
+    genotype->translation_rate[genotype->ngenes]=genotype->translation_rate[which_gene]; 
     genotype->recalc_TFBS[genotype->ngenes]=1;
     /* update protein_pool*/
     protein_id=genotype->which_protein[which_gene];    
@@ -3812,11 +3980,11 @@ void reproduce_gene_duplication(Genotype *genotype, Mutation *mut_record) //any 
     temp2=&genotype->cisreg_seq[genotype->ngenes][0];  
     for(i=0;i<CISREG_LEN;i++) 
         *temp2++=*temp1++;    
-    genotype->min_act_to_transc[genotype->ngenes]=genotype->min_act_to_transc[which_gene];
-    genotype->pic_disassembly[genotype->ngenes]=genotype->pic_disassembly[which_gene];
-    genotype->mRNAdecay[genotype->ngenes]=genotype->mRNAdecay[which_gene];
-    genotype->proteindecay[genotype->ngenes]=genotype->proteindecay[which_gene];
-    genotype->translation[genotype->ngenes]=genotype->translation[which_gene]; 
+    genotype->min_N_activator_to_transc[genotype->ngenes]=genotype->min_N_activator_to_transc[which_gene];
+    genotype->active_to_intermediate_rate[genotype->ngenes]=genotype->active_to_intermediate_rate[which_gene];
+    genotype->mRNA_decay_rate[genotype->ngenes]=genotype->mRNA_decay_rate[which_gene];
+    genotype->protein_decay_rate[genotype->ngenes]=genotype->protein_decay_rate[which_gene];
+    genotype->translation_rate[genotype->ngenes]=genotype->translation_rate[which_gene]; 
     genotype->recalc_TFBS[genotype->ngenes]=1;
     protein_id=genotype->which_protein[which_gene];
     update_protein_pool(genotype,protein_id,which_gene,'d');     
@@ -4077,97 +4245,71 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
  */
 void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
-    float random1,temp;    
-    int which_gene,protein_id;
+    float random;    
+    int which_gene;
     float total_mut_flux=   proportion_mut_kdis+
                             proportion_mut_mRNA_decay+
                             proportion_mut_protein_decay+
                             proportion_mut_translation_rate+
                             proportion_mut_cooperation;
     
-    random1=RngStream_RandU01(RS);
+    random=RngStream_RandU01(RS);
     which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);    
     /*record mutation info*/
     mut_record->which_gene=which_gene;
     /********************************** mut kdis *******************************/
-    if(random1<=proportion_mut_kdis/total_mut_flux) 
-    {    
-    #if REGRESSIVE_MUTATION
-        genotype->pic_disassembly[which_gene]=mut_make_new_value(genotype->pic_disassembly[which_gene],miu_PIC_disassembly,RS);
-    #else
-        temp=genotype->pic_disassembly[which_gene]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);  //otherwise apply a fold change
-        while(temp<MIN_PICDISASSEMBLE || temp>MAX_PICDISASSEMBLE || temp==genotype->pic_disassembly[which_gene])
-            temp=genotype->pic_disassembly[which_gene]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);
-        genotype->pic_disassembly[which_gene]=temp;
-    #endif        
+    if(random<=proportion_mut_kdis/total_mut_flux) 
+    {  
+        genotype->active_to_intermediate_rate[which_gene]=mut_make_new_value(genotype->active_to_intermediate_rate[which_gene],
+                                                                            miu_ACT_TO_INT_RATE,
+                                                                            sigma_ACT_TO_INT_RATE,
+                                                                            MAX_ACT_TO_INT_RATE,
+                                                                            MIN_ACT_TO_INT_RATE,
+                                                                            RS,
+                                                                            mut_record);
         /*record mutation info*/
         mut_record->kinetic_type=0;
-        mut_record->kinetic_diff=genotype->pic_disassembly[which_gene];
+        mut_record->kinetic_diff=genotype->active_to_intermediate_rate[which_gene];
     }
     else /******************************** mut mRNAdecay **********************/
     {
-        random1-=proportion_mut_kdis/total_mut_flux;
-        if(random1<=proportion_mut_mRNA_decay/total_mut_flux) 
-        {
-        #if REGRESSIVE_MUTATION
-            genotype->mRNAdecay[which_gene]=mut_make_new_value(genotype->mRNAdecay[which_gene],miu_mRNA_decay,RS);
-        #else            
-            temp=genotype->mRNAdecay[which_gene]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut); 
-            while(temp>MAX_mRNA_decay || temp<MIN_mRNA_decay || temp==genotype->mRNAdecay[which_gene])
-                temp=genotype->mRNAdecay[which_gene]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);
-            genotype->mRNAdecay[which_gene]=temp;
-        #endif
+        random-=proportion_mut_kdis/total_mut_flux;
+        if(random<=proportion_mut_mRNA_decay/total_mut_flux) 
+        {       
+            genotype->mRNA_decay_rate[which_gene]=mut_make_new_value(genotype->mRNA_decay_rate[which_gene],miu_mRNA_decay,sigma_mRNA_decay, MAX_MRNA_DECAY, MIN_MRNA_DECAY,RS,mut_record);
             /*record mutation info*/
             mut_record->kinetic_type=1;
-            mut_record->kinetic_diff=genotype->mRNAdecay[which_gene];
+            mut_record->kinetic_diff=genotype->mRNA_decay_rate[which_gene];
         }
         else /*************************** mut translation *********************/
         {
-            random1-=proportion_mut_mRNA_decay/total_mut_flux;
-            if(random1<=proportion_mut_translation_rate/total_mut_flux) 
-            {
-        #if REGRESSIVE_MUTATION
-                genotype->translation[which_gene]=mut_make_new_value(genotype->translation[which_gene],miu_translation_init,RS);
-        #else
-                temp=genotype->translation[which_gene]*exp(sd_mut_effect*gasdev(RS)-bias_in_mut);
-                while(temp>MAX_TRANSLATION || temp< MIN_TRANSLATION || temp==genotype->translation[which_gene])
-                    temp=genotype->translation[which_gene]*exp(sd_mut_effect*gasdev(RS)-bias_in_mut);
-                genotype->translation[which_gene]=temp;
-        #endif
+            random-=proportion_mut_mRNA_decay/total_mut_flux;
+            if(random<=proportion_mut_translation_rate/total_mut_flux) 
+            {       
+                genotype->translation_rate[which_gene]=mut_make_new_value(genotype->translation_rate[which_gene],miu_translation_init,sigma_translation_init, MAX_TRANSLATION_RATE, MIN_TRANSLATION_RATE,RS,mut_record);        
                 mut_record->kinetic_type=2;
-                mut_record->kinetic_diff=genotype->translation[which_gene];
+                mut_record->kinetic_diff=genotype->translation_rate[which_gene];
             }
             else /********************* mut protein decay **********************/
             {  
-                random1-=proportion_mut_translation_rate/total_mut_flux;
-                if(random1<=proportion_mut_protein_decay/total_mut_flux)
-                {
-                    #if REGRESSIVE_MUTATION
-                        genotype->proteindecay[which_gene]=mut_make_new_value(genotype->proteindecay[which_gene],miu_protein_decay,RS);
-                    #else
-                        temp=genotype->proteindecay[which_gene]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut);  
-                        while(temp>MAX_protein_decay || temp<MIN_protein_decay || temp==genotype->proteindecay[which_gene])
-                            temp=genotype->proteindecay[which_gene]*exp(sd_mut_effect*gasdev(RS)+bias_in_mut); 
-                        genotype->proteindecay[which_gene]=temp;
-                    #endif
-                        mut_record->kinetic_type=3;
-                        mut_record->kinetic_diff=genotype->proteindecay[which_gene];
+                random-=proportion_mut_translation_rate/total_mut_flux;
+                if(random<=proportion_mut_protein_decay/total_mut_flux)
+                {                   
+                    genotype->protein_decay_rate[which_gene]=mut_make_new_value(genotype->protein_decay_rate[which_gene],miu_protein_decay,sigma_protein_decay,MAX_PROTEIN_DECAY,MIN_PROTEIN_DECAY,RS,mut_record);                  
+                    mut_record->kinetic_type=3;
+                    mut_record->kinetic_diff=genotype->protein_decay_rate[which_gene];
                 }
                 else /****************** mut cooperation ***********************/
                 {
-                    protein_id=genotype->which_protein[which_gene];
-                    while(genotype->protein_identity[protein_id][1]==-1)
-                    {
+                    while(genotype->which_protein[which_gene]!=genotype->nproteins-1)
                         which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);
-                        protein_id=genotype->which_protein[which_gene];
-                    }
                     mut_record->which_gene=which_gene;
-                    if(genotype->min_act_to_transc[which_gene]==1)
-                        genotype->min_act_to_transc[which_gene]=2;
+                    if(genotype->min_N_activator_to_transc[which_gene]==1)
+                        genotype->min_N_activator_to_transc[which_gene]=2;
                     else
-                        genotype->min_act_to_transc[which_gene]=1;
+                        genotype->min_N_activator_to_transc[which_gene]=1;
                     mut_record->kinetic_type=4;
-                    mut_record->kinetic_diff=(float)genotype->min_act_to_transc[which_gene];
+                    mut_record->kinetic_diff=(float)genotype->min_N_activator_to_transc[which_gene];
                     update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
                 }
             } 
@@ -4175,13 +4317,18 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, RngStream RS
     }
 }
 
-float mut_make_new_value(float old_val, float miu, RngStream RS)
+float mut_make_new_value(float old_val, float miu, float sigma, float upper_bound, float lower_bound, RngStream RS, Mutation *mut_record)
 {
     float new_val;
     new_val=old_val;
-    while(new_val==old_val)
+    while(new_val==old_val) 
     {
-        new_val=old_val*exp(sd_mutation_effect*gasdev(RS)+mutational_regression_rate*(miu-log(old_val)));
+        new_val=old_val*pow(10.0,sigma*gasdev(RS)+mutational_regression_rate*(miu-log10(old_val)));
+        while(new_val>=upper_bound || new_val<=lower_bound)
+        {
+            new_val=old_val*pow(10.0,sigma*gasdev(RS)+mutational_regression_rate*(miu-log10(old_val)));
+            mut_record->N_hit_bound++;
+        }            
     }
     return new_val;
 }
@@ -4194,19 +4341,19 @@ void reproduce_mut_kinetic_constant(Genotype *genotype, Mutation *mut_record)
     switch (mut_record->kinetic_type)
     {
         case 0: /* mut kdis */
-            genotype->pic_disassembly[which_gene]=mut_record->kinetic_diff;
+            genotype->active_to_intermediate_rate[which_gene]=mut_record->kinetic_diff;
             break;
         case 1: /* mut mRNAdecay */ 
-            genotype->mRNAdecay[which_gene]=mut_record->kinetic_diff;
+            genotype->mRNA_decay_rate[which_gene]=mut_record->kinetic_diff;
             break;
         case 2: /* mut translation */                      
-            genotype->translation[which_gene]=mut_record->kinetic_diff;           
+            genotype->translation_rate[which_gene]=mut_record->kinetic_diff;           
             break;        
         case 3: /* mut protein decay */
-            genotype->proteindecay[which_gene]=mut_record->kinetic_diff;            
+            genotype->protein_decay_rate[which_gene]=mut_record->kinetic_diff;            
             break; 
         case 4:
-            genotype->min_act_to_transc[which_gene]=(int)mut_record->kinetic_diff;
+            genotype->min_N_activator_to_transc[which_gene]=(int)mut_record->kinetic_diff;
             update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
     }
 }
@@ -4297,7 +4444,7 @@ void reproduce_mut_identity(Genotype *genotype, Mutation *mut_record)
 /*
  * mutate affinity of TF
  */
-void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
+void mut_Kd(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
     int i;   
     float new_Kd; 
@@ -4305,17 +4452,9 @@ void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
     char *tf_binding_seq,*tf_binding_seq_rc,*temp1,*temp2;
     /*which TF to mutate*/
     tf_id=RngStream_RandInt(RS,0,genotype->ngenes-1);
-    protein_id=genotype->which_protein[tf_id];    
-    /*generate a new koff */ 
-#if REGRESSIVE_MUTATION    
-    new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,RS); 
-    while(new_Kd>NS_Kd)
-        new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,RS);
-#else 
-    new_Kd=genotype->Kd[protein_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
-    while(new_Kd<MIN_Kd || new_Kd>MAX_Kd || new_Kd==genotype->Kd[protein_id])
-        new_Kd=genotype->Kd[protein_id]*exp(gasdev(RS)*sd_mut_effect+bias_in_mut);
-#endif    
+    protein_id=genotype->which_protein[tf_id];   
+    /*generate a new koff */    
+    new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,sigma_Kd,MAX_KD,MIN_KD,RS,mut_record);  
     /* if this tf gene has more than one copies, the mutation adds a new protein*/    
     if(genotype->protein_pool[protein_id][0][0]!=1)
     {    
@@ -4334,29 +4473,16 @@ void mut_koff(Genotype *genotype, Mutation *mut_record, RngStream RS)
         genotype->Kd[genotype->nproteins-1]=new_Kd;  
     }                                                                                                           
     else
-        genotype->Kd[protein_id]=new_Kd; 
-#if SET_BS_MANUALLY 
-    int j;
-    for(i=1;i<genotype->ngenes-1;i++)
-    {
-        for(j=0;j<genotype->binding_sites_num[i];j++)
-        {
-            if(genotype->all_binding_sites[i][j].tf_id==tf_id)
-                genotype->all_binding_sites[i][j].Kd=genotype->Kd[protein_id]*
-                        pow(NS_Kd/genotype->Kd[protein_id],(float)genotype->all_binding_sites[i][j].mis_match/(TF_ELEMENT_LEN-NMIN+1));
-            
-        }
-    }
-#endif    
+        genotype->Kd[protein_id]=new_Kd;     
     /*record mutation*/
     mut_record->which_gene=tf_id;
     mut_record->kinetic_diff=new_Kd; 
     /* recalculate binding sites on every promoter */
     for(i=0;i<genotype->ngenes;i++) 
-        genotype->recalc_TFBS[i]=1;
+        genotype->recalc_TFBS[i]=YES;
 }
 
-void reproduce_mut_koff(Genotype *genotype, Mutation *mut_record)
+void reproduce_mut_Kd(Genotype *genotype, Mutation *mut_record)
 {   
     int tf_id,protein_id,i;
     char *tf_binding_seq, *tf_binding_seq_rc, *temp1, *temp2;    
@@ -4378,20 +4504,8 @@ void reproduce_mut_koff(Genotype *genotype, Mutation *mut_record)
     }    
     else
         genotype->Kd[protein_id]=mut_record->kinetic_diff;
-#if SET_BS_MANUALLY 
-    int j;
-    for(i=1;i<genotype->ngenes;i++)
-    {
-        for(j=0;j<genotype->binding_sites_num[i];j++)
-        {
-            if(genotype->all_binding_sites[i][j].tf_id==mut_record->which_gene)
-                genotype->all_binding_sites[i][j].Kd=genotype->Kd[genotype->which_protein[mut_record->which_gene]]*
-                        pow(NS_Kd/genotype->Kd[protein_id],(float)genotype->all_binding_sites[i][j].mis_match/(TF_ELEMENT_LEN-NMIN+1));
-        }
-    }
-#endif
     for(i=0;i<genotype->ngenes;i++) 
-        genotype->recalc_TFBS[i]=1;   
+        genotype->recalc_TFBS[i]=YES;   
 }
 
 /*
@@ -4434,7 +4548,7 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
             mut_identity(genotype, mut_record, RS);            
             break;
         case 'f': //mutations to the koff of a tf
-            mut_koff(genotype,mut_record,RS);            
+            mut_Kd(genotype,mut_record,RS);            
             break;
         case 't': //effector to regular TF
             mut_effector2TF(genotype,mut_record,RS);
@@ -4466,7 +4580,7 @@ void reproduce_mutate(Genotype *genotype, Mutation *mut_record,RngStream RS)
             reproduce_mut_identity(genotype, mut_record);
             break;
         case 'f':
-            reproduce_mut_koff(genotype,mut_record);
+            reproduce_mut_Kd(genotype,mut_record);
             break; 
         case 't': //effector to regular TF
             reproduce_effector2TF(genotype,mut_record);
@@ -5043,7 +5157,7 @@ void initialize_cache(Genotype *genotype)
         genotype->which_protein[j]=-1;                
         genotype->recalc_TFBS[j]=1;
         genotype->which_cluster[j]=-1; 
-        genotype->min_act_to_transc[j]=MAX_BINDING+1; /*by default a gene cannot be turned on. 
+        genotype->min_N_activator_to_transc[j]=MAX_BINDING+1; /*by default a gene cannot be turned on. 
                                                        *MAX_BINDING is the maximum number of tf that 
                                                        *can bind to a cis-reg sequence.*/
         genotype->Kd[j]=-1.0;
@@ -5112,16 +5226,14 @@ void replay_mutations(  Genotype *genotype_ori,
                         RngStream RS)
 {
     int i;
-    FILE *fp;
-    
-    remove("proportion_c1ffl.txt"); 
-    remove("summary_BS.txt");
+    FILE *fp;  
+
     
     for(i=0;i<replay_N_steps;i++)
     {
         calc_all_binding_sites(genotype_ori);
-        if(i%OUTPUT_INTERVAL==0)
-            summarize_binding_sites(genotype_ori,i); 
+//        if(i%OUTPUT_INTERVAL==0)
+//            summarize_binding_sites(genotype_ori,i); 
 //        find_i1ffl(genotype_ori);
 //        print_core_i1ffls(genotype_ori);
         clone_genotype(genotype_ori,genotype_ori_copy);
@@ -5136,7 +5248,7 @@ void replay_mutations(  Genotype *genotype_ori,
 //        printf("%d, %c, %f\n",i,mut_record->mut_type,mut_record->kinetic_diff);
     }
     calc_all_binding_sites(genotype_ori);
-    summarize_binding_sites(genotype_ori,i); 
+//    summarize_binding_sites(genotype_ori,i); 
 //    find_i1ffl(genotype_ori);
 //    print_core_i1ffls(genotype_ori);
 }
@@ -5195,22 +5307,35 @@ void run_plotting(  Genotype *genotype_ori,
 //         calc_all_binding_sites(genotype_ori);  
     #endif
 //    summarize_binding_sites(genotype_ori,1);   
-    exit(0);
+//    exit(0);
     /* conditions under which the phenotype and fitness is measured */    
-    env1_t_development=89.9;
-    env2_t_development=89.9;
+    env1_t_development=899.9;
+    env2_t_development=899.9;
     opt_pulse_duration=30.0;
-    saturate_cumulative_response_from_pulse=4.0*Ne_saturate*opt_pulse_duration;
-    tolerable_delay_bf_pulse=40.0;
-    duration_of_burn_in_growth_rate=30.0;
-    env1_signal_strength=10000.0;
-    env2_signal_strength=10000.0;
-    env1_t_signal_on=40.0;    
-    env1_t_signal_off=10.0;     
-    env2_t_signal_on=40.0;
-    env2_t_signal_off=10.0;
+    sampling_interval=1.0; 
+//    saturate_cumulative_response_from_pulse=4.0*Ne_saturate*opt_pulse_duration;
+//    tolerable_delay_bf_pulse=40.0;
+    duration_of_burn_in_growth_rate=0.0;
+    env1_minimal_peak_response=100000.0;
+    env2_minimal_peak_response=100000.0;
+    env1_response_amplification=10000.0;
+    env2_response_amplification=10000.0;
+    env1_benefit1=0.1;
+    env1_benefit2=1.0;
+    env1_max_duration_bias=20.0;            
+    env2_benefit1=0.1;
+    env2_benefit2=1.0;
+    env2_max_duration_bias=20.0;
+    env1_signal1_strength=10.0;
+    env1_signal2_strength=500.0;
+    env2_signal1_strength=10.0;
+    env2_signal2_strength=500.0;
+    env1_t_signal_on=120.0;    
+    env1_t_signal_off=60.0;     
+    env2_t_signal_on=120.0;
+    env2_t_signal_off=60.0;
     env1_initial_effect_of_effector='d';
-    env2_initial_effect_of_effector='d';
+    env2_initial_effect_of_effector='d';            
     env1_fixed_effector_effect=0;    
     env2_fixed_effector_effect=0; 
     recalc_new_fitness=1;
@@ -5321,11 +5446,21 @@ void run_simulation(    Genotype *genotype_ori,
     {
         run_burn_in=1;      
         max_mut_steps=BURN_IN_I;    
-        env1_t_development=89.9;
-        env2_t_development=89.9;                 // global variable
-        duration_of_burn_in_growth_rate=0.0;// global variable
-        env1_signal_strength=1000.0;
-        env2_signal_strength=1000.0;
+        env1_t_development=119.9;
+        env2_t_development=119.9;                 // global variable
+        duration_of_burn_in_growth_rate=0.0;// global variable        
+        env1_response_amplification=5.0;
+        env2_response_amplification=5.0;
+        env1_benefit1=1.0;
+        env1_benefit2=2.0;
+        env1_max_duration_bias=20.0;            
+        env2_benefit1=1.0;
+        env2_benefit2=2.0;
+        env2_max_duration_bias=20.0;
+        env1_signal1_strength=1000.0;
+        env1_signal2_strength=1000.0;
+        env2_signal1_strength=1000.0;
+        env2_signal2_strength=1000.0;    
         env1_t_signal_on=70.0;    
         env1_t_signal_off=20.0;     
         env2_t_signal_on=70.0;
@@ -5339,10 +5474,9 @@ void run_simulation(    Genotype *genotype_ori,
         env2_occurence=0.5;                 // global variable
         DUPLICATION=1.5e-7;                 
         SILENCING = 3.0e-7;
-        miu_PIC_disassembly=5.22;
-        miu_mRNA_decay=-1.13;
-        miu_protein_decay=-4.58;
-        miu_translation_init=-1.36;
+        miu_ACT_TO_INT_RATE=1.27;
+        miu_mRNA_decay=-1.49;       
+        miu_translation_init=0.408;
       
         fp=fopen(RuntimeSumm,"a+");
         fprintf(fp,"**********Burn-in_I conditions**********\n");
@@ -5378,34 +5512,45 @@ void run_simulation(    Genotype *genotype_ori,
     /* post-burn-in simulations*/
     run_burn_in=0;
     max_mut_steps=MAX_MUT_STEP;    
-    env1_t_development=79.9;
-    env2_t_development=79.9;
-    opt_pulse_duration=30.0;    
+    env1_t_development=119.9;
+    env2_t_development=119.9;
+    opt_pulse_duration=10.0;
     sampling_interval=1.0;          
-    saturate_pulse_amplitude=Ne_saturate;
-    sd_opt_pulse_duration=20.0;
-    saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
-    tolerable_delay_bf_pulse=40.0;
-    duration_of_burn_in_growth_rate=30.0;
-    env1_signal_strength=1000.0;
-    env2_signal_strength=1000.0;
-    env1_t_signal_on=30.0;    
-    env1_t_signal_off=40.0;     
-    env2_t_signal_on=30.0;
-    env2_t_signal_off=40.0;
+//    saturate_pulse_amplitude=Ne_saturate;
+//    sd_opt_pulse_duration=10.0;
+//    saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
+//    tolerable_delay_bf_pulse=40.0;
+    duration_of_burn_in_growth_rate=0.0;
+    env1_minimal_peak_response=10000.0;
+    env2_minimal_peak_response=10000.0;
+    env1_response_amplification=1000.0;
+    env2_response_amplification=1000.0;
+    env1_benefit1=0.1;
+    env1_benefit2=1.0;
+    env1_max_duration_bias=20.0;            
+    env2_benefit1=0.1;
+    env2_benefit2=1.0;
+    env2_max_duration_bias=20.0;
+    env1_signal1_strength=10.0;
+    env1_signal2_strength=500.0;
+    env2_signal1_strength=500.0;
+    env2_signal2_strength=25000.0;
+    env1_t_signal_on=300.0;    
+    env1_t_signal_off=60.0;     
+    env2_t_signal_on=300.0;
+    env2_t_signal_off=60.0;
     env1_initial_effect_of_effector='d';
     env2_initial_effect_of_effector='d';
     env1_fixed_effector_effect=0;    
-    env2_fixed_effector_effect=0;                 // global variable
-    recalc_new_fitness=5;                   // global variable, make sure its value is smaller than MAX_RECALC_FITNESS        
-    env1_occurence=0.5;                     // global variable
-    env2_occurence=0.5;                     // global variable
+    env2_fixed_effector_effect=0; 
+    recalc_new_fitness=5; // make sure its value is smaller than MAX_RECALC_FITNESS
+    env1_occurence=0.5;
+    env2_occurence=0.5;                       // global variable
     DUPLICATION=1.5e-7;                 
     SILENCING = 1.5e-7;
-    miu_PIC_disassembly=5.22;
-    miu_mRNA_decay=-1.13;
-    miu_protein_decay=-4.58;
-    miu_translation_init=-1.36;
+    miu_ACT_TO_INT_RATE=1.27;
+    miu_mRNA_decay=-1.49;       
+    miu_translation_init=0.408;
     
 //     for(i=N_SIGNAL_TF;i<genotype_ori->ngenes;i++)
 //     {
@@ -5423,7 +5568,7 @@ void run_simulation(    Genotype *genotype_ori,
 //    fprintf(fp,"env1: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env1_t_signal_on, env1_t_signal_off, env1_initial_effect_of_effector, env1_fixed_effector_effect, env1_occurence);
 //    fprintf(fp,"env2: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env2_t_signal_on, env2_t_signal_off, env2_initial_effect_of_effector, env2_fixed_effector_effect, env2_occurence);       
     fprintf(fp,"Background signal strength=%f\n",background_signal_strength);
-    fprintf(fp,"Signal off strength=%f, env1 signal on strength=%f, env2 signal on strength=%f \n",signal_off_strength,env1_signal_strength,env2_signal_strength);
+//    fprintf(fp,"Signal off strength=%f, env1 signal on strength=%f, env2 signal on strength=%f \n",signal_off_strength,env1_signal_strength,env2_signal_strength);
 //    fprintf(fp,"env1 init effecto effect %c, fixed? %d. env2 init effecto effect %c, fixed? %d.\n",env1_initial_effect_of_effector,env1_fixed_effector_effect,env2_initial_effect_of_effector,env2_fixed_effector_effect);
     fclose(fp);
     
@@ -5723,8 +5868,8 @@ int evolve_N_steps(Genotype *genotype_ori,
             calc_all_binding_sites(genotype_ori); 
         #endif            
         /*calculate the number of c1-ffls every step*/
-//        find_i1ffl(genotype_ori); 
-//        print_core_i1ffls(genotype_ori); 
+        find_i1ffl(genotype_ori); 
+        print_core_i1ffls(genotype_ori); 
         /*output network topology every OUTPUT_INTERVAL steps*/
         if(i%OUTPUT_INTERVAL==0 && i!=0) 
             summarize_binding_sites(genotype_ori,i);        
@@ -5897,8 +6042,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     {   
         /* record the initial network topology*/
         summarize_binding_sites(&genotype_ori,init_step); /*snapshot of the initial (0) distribution binding sites */   
-//        find_i1ffl(&genotype_ori); 
-//        print_core_i1ffls(&genotype_ori);
+        find_i1ffl(&genotype_ori); 
+        print_core_i1ffls(&genotype_ori);
 
     #if JUST_PLOTTING 
         fp=fopen("MUT.txt","r");    
@@ -5927,21 +6072,33 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
     #else     
         if(!SKIP_INITIAL_GENOTYPE)/* get the fitness of the initial genotype */ 
         {                     
-            env1_t_development=79.9;
-            env2_t_development=79.9;
-            opt_pulse_duration=30.0;
+            env1_t_development=119.9;
+            env2_t_development=119.9;
+            opt_pulse_duration=10.0;
             sampling_interval=1.0;          
-            saturate_pulse_amplitude=Ne_saturate;
-            sd_opt_pulse_duration=20.0;
-            saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
-            tolerable_delay_bf_pulse=40.0;
-            duration_of_burn_in_growth_rate=30.0;
-            env1_signal_strength=1000.0;
-            env2_signal_strength=1000.0;
-            env1_t_signal_on=30.0;    
-            env1_t_signal_off=40.0;     
-            env2_t_signal_on=30.0;
-            env2_t_signal_off=40.0;
+//            saturate_pulse_amplitude=Ne_saturate;
+//            sd_opt_pulse_duration=30.0;
+//            saturate_cumulative_response_from_pulse=50.0*Ne_saturate*opt_pulse_duration;
+//            tolerable_delay_bf_pulse=40.0;
+            duration_of_burn_in_growth_rate=0.0;
+            env1_minimal_peak_response=10000.0;
+            env2_minimal_peak_response=10000.0;
+            env1_response_amplification=1000.0;
+            env2_response_amplification=1000.0;
+            env1_benefit1=0.1;
+            env1_benefit2=1.0;
+            env1_max_duration_bias=20.0;            
+            env2_benefit1=0.1;
+            env2_benefit2=1.0;
+            env2_max_duration_bias=20.0;
+            env1_signal1_strength=10.0;
+            env1_signal2_strength=500.0;
+            env2_signal1_strength=500.0;
+            env2_signal2_strength=25000.0;
+            env1_t_signal_on=300.0;    
+            env1_t_signal_off=60.0;     
+            env2_t_signal_on=300.0;
+            env2_t_signal_off=60.0;
             env1_initial_effect_of_effector='d';
             env2_initial_effect_of_effector='d';
             env1_fixed_effector_effect=0;    
@@ -6121,12 +6278,14 @@ void print_core_i1ffls(Genotype *genotype)
 {
     FILE *fp; 
     fp=fopen("proportion_c1ffl.txt","a+");
-    fprintf(fp,"%d %d %d %d %d\n",
+    fprintf(fp,"%d %d %d %d %d %d %d\n",
             genotype->N_motifs[0],
             genotype->N_motifs[1],
             genotype->N_motifs[2],
+            genotype->N_motifs[3],
             genotype->normalizer1,
-            genotype->normalizer2);                                                                                                
+            genotype->normalizer2,
+            genotype->n_output_genes);                                                                                                
     fclose(fp); 
 }
 
@@ -6228,7 +6387,7 @@ void summarize_binding_sites(Genotype *genotype,int step_i)
             if(genotype->protein_identity[genotype->which_protein[i]][0]==0)
                 fprintf(OUTPUT1,"r%d",genotype->which_protein[i]);
         }
-        fprintf(OUTPUT1," %d \n",genotype->min_act_to_transc[i]);
+        fprintf(OUTPUT1," %d \n",genotype->min_N_activator_to_transc[i]);
     }
     fprintf(OUTPUT1,"\n"); 
     fprintf(OUTPUT1,"\n"); 
@@ -6365,7 +6524,7 @@ void find_i1ffl(Genotype *genotype)
         for(j=0;j<NPROTEINS;j++)
             genotype->TF_in_core_C1ffl[i][j]=0;
     }     
-    for(i=0;i<3;i++)    
+    for(i=0;i<4;i++)    
         genotype->N_motifs[i]=0;  
     /*begin searching motifs*/
     if(genotype->N_rep>0)
@@ -6528,7 +6687,18 @@ void find_i1ffl(Genotype *genotype)
                             }
                             if(!found_bs)//gene_id is not regulated by the effector, we are looking at I1FFL
                                 genotype->N_motifs[1]++; 
-                        }  
+                        } 
+                        found_bs=0;
+                        for(site_id=0;site_id<genotype->binding_sites_num[gene_id_copy];site_id++)
+                        {
+                            if(genotype->all_binding_sites[gene_id_copy][site_id].tf_id==protein_id)
+                            {
+                                found_bs=1;
+                                break;
+                            }
+                        }
+                        if(found_bs)
+                            genotype->N_motifs[3]++; //auto-inhibition
                     }
                 }        
             }
@@ -6556,8 +6726,8 @@ void find_i1ffl(Genotype *genotype)
             }
         }
         
-        genotype->normalizer1=N_act_effector_genes*(N_rep_non_effector_genes+N_rep_effector_genes);
-        genotype->normalizer2=N_act_effector_genes*(N_rep_non_effector_genes+N_rep_effector_genes)+
+        genotype->normalizer1=N_act_effector_genes*(N_rep_non_effector_genes+N_rep_effector_genes); //normalizer for NFB
+        genotype->normalizer2=N_act_effector_genes*(N_rep_non_effector_genes+N_rep_effector_genes)+ //normalizer for I1ffl
                                 N_rep_non_effector_genes*N_rep_effector_genes+
                                 N_rep_effector_genes*(N_rep_effector_genes-1)/2;
         for(i=0;i<N_rep_effector;i++)
@@ -6649,3 +6819,81 @@ void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     rename("temp","precise_fitness.txt");
 }
 
+void calc_leaping_interval(Genotype *genotype, CellState *state, float *minimal_interval, float t_unreachable,int which_gene)
+{
+    int protein_id,j;
+    float dt;
+    float N_proteins_cause_change,Kd,N_at_end_of_simulation;
+    float overall_rate;
+    float P_binding;
+    float t_remaining;
+    float N_proteins_at_now[genotype->ngenes];
+    int gene_ids[NGENES]; 
+    float ct, ect, one_minus_ect;
+    
+    t_remaining=t_unreachable-state->t;
+    dt=t_unreachable;  
+ 	protein_id=genotype->which_protein[which_gene];
+    Kd=KD2APP_KD*genotype->Kd[protein_id];
+    P_binding=state->protein_number[protein_id]/(state->protein_number[protein_id]+Kd);  
+    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
+        gene_ids[j]=genotype->protein_pool[protein_id][1][j];
+    
+
+    /*determine whether the protein tends to increase or decrease concentration*/
+    overall_rate=0.0;
+    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)     
+        overall_rate+=(state->protein_synthesis_index[gene_ids[j]]-state->gene_specific_protein_number[gene_ids[j]])*genotype->protein_decay_rate[gene_ids[j]];
+
+    if(overall_rate>0.0) //tend to increase
+    {            
+        if(P_binding>=(1.0-MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING)) //concentration already very high
+            dt=t_unreachable;
+        else
+        {
+            /* check if much change is possible within the duration of simulation*/
+            N_proteins_cause_change=Kd*(P_binding+MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING)/(1.0-P_binding-MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING); 
+            /* calc N_protein at the end of simulation*/
+            N_at_end_of_simulation=0.0;
+            for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
+            {                  
+                ct=genotype->protein_decay_rate[gene_ids[j]]*t_remaining;
+                ect = exp(-ct);
+                if (fabs(ct)<EPSILON) one_minus_ect=ct;
+                else one_minus_ect = 1.0-ect;   
+                N_at_end_of_simulation+=ect*state->gene_specific_protein_number[gene_ids[j]]+state->protein_synthesis_index[gene_ids[j]]*one_minus_ect;        
+            }               
+            if(N_at_end_of_simulation<N_proteins_cause_change)
+                dt=t_unreachable; 
+            else /*We need to solve an equation*/ 
+                dt=calc_tprime(genotype,state,state->gene_specific_protein_number,t_remaining,N_proteins_cause_change,gene_ids,0,genotype->protein_pool[protein_id][0][0]); 
+        }
+        *minimal_interval=(*minimal_interval<dt)?*minimal_interval:dt; 
+    }
+    else //tends to decrease
+    {
+        if(P_binding<=MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING) //concentration already very low
+            dt=t_unreachable;
+        else
+        {
+            /* first check if much change is possible within the duration of simulation*/
+            N_proteins_cause_change=Kd*(P_binding-MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING)/(1.0-P_binding+MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING); 
+            /* calc N_protein at the end of simulation*/
+            N_at_end_of_simulation=0.0;
+            for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
+            { 
+                ct=genotype->protein_decay_rate[gene_ids[j]]*t_remaining;
+                ect = exp(-ct);
+                if (fabs(ct)<EPSILON) one_minus_ect=ct;
+                else one_minus_ect = 1.0-ect;   
+                N_at_end_of_simulation+=ect*state->gene_specific_protein_number[gene_ids[j]]+state->protein_synthesis_index[gene_ids[j]]*one_minus_ect;        
+            }               
+            if(N_at_end_of_simulation>N_proteins_cause_change)
+                dt=t_unreachable; 
+            else
+                dt=calc_tprime(genotype,state,state->gene_specific_protein_number,t_remaining,N_proteins_cause_change,gene_ids,0,genotype->protein_pool[protein_id][0][0]); 
+            
+        }
+        *minimal_interval=(*minimal_interval<dt)?*minimal_interval:dt;  
+    }
+}

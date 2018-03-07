@@ -25,7 +25,7 @@ int main()
     int i,seed;
     FILE *fp;	
     /*make rng seed*/
-    seed=1;
+    seed=10;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     /*make filenames*/    
