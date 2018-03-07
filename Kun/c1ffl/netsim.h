@@ -19,8 +19,8 @@
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 55000
-#define BURN_IN_I 5000
+#define MAX_MUT_STEP 50000
+#define BURN_IN_I 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
@@ -37,7 +37,7 @@
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define DIRECT_REG 0
+#define DIRECT_REG 1
 #define NO_PENALTY 0
 #define FORCE_OR_GATE 0
 #if FORCE_OR_GATE
@@ -158,7 +158,6 @@ struct Genotype {
     float translation_rate[NGENES];                         /* kinetic rates*/   
     float active_to_intermediate_rate[NGENES];                          /* kinetic rates*/    
     int min_N_activator_to_transc[NGENES];                  /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
-    float update_interval[NGENES][2];
  
     /* binding sites related data, applying to loci*/   
     int cisreg_cluster[NGENES+1][NGENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
@@ -235,6 +234,7 @@ struct CellState {
     FixedEvent *change_signal_strength_head;
     FixedEvent *change_signal_strength_tail;
 
+    int cell_activated;
     float t_to_update_probability_of_binding;
     float P_A[NGENES];
     float P_R[NGENES];
@@ -271,6 +271,7 @@ struct Mutation
     char nuc_diff[3];    /*the first three elements store the nuc after mutation (max_indel=3)*/
     int kinetic_type;    /*0 for pic_disassembly, 1 for mRNA_decay, 2 for translation, 3 for protein_decay*/
     float kinetic_diff;
+    int N_hit_bound;
 };
 
 /*
@@ -405,7 +406,7 @@ extern void fixed_event_end_transcription(  float *,
                                             int,
                                             Mutation *,
                                             char *);
-extern float calc_tprime(Genotype*, CellState*, float*, float, float);
+extern float calc_tprime(Genotype*, CellState*, float*, float, float, int);
 
 extern float calc_integral(Genotype *, CellState *, float *, float, float);
 
@@ -488,8 +489,6 @@ extern void calc_all_rates(Genotype *,
                             float,
                             int,
                             int);
-//                            int [4],
-//                            float [4]);
 
 extern int fixed_event_end_translation_init(   Genotype *, 
                                                 CellState *,    
@@ -546,7 +545,7 @@ extern void mut_binding_sequence(Genotype *,Mutation *, RngStream);
 
 extern void mut_kinetic_constant(Genotype *, Mutation *, RngStream);
 
-extern float mut_make_new_value(float, float, RngStream);
+extern float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *);
 
 extern void mut_identity(Genotype *, Mutation *, RngStream);
 
@@ -685,5 +684,7 @@ extern void add_binding_site(Genotype *, int);
 
 extern void remove_binding_sites(Genotype *, int);
 
+extern void calc_leaping_interval(Genotype*, CellState*, float *, float, float, int);
 
+extern void print_mutatable_parameters(Genotype*);
 #endif /* !FILE_NETSIM_SEEN */
