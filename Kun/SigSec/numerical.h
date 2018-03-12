@@ -34,3 +34,4 @@ extern float Wilcoxon_test(Genotype*, Genotype*, int, int, float *, float *, flo
 /*support functions of Wilcoxon test*/
 void quick_sort(float *, int *, int);
 void quick_sort2(float *, int);
+
