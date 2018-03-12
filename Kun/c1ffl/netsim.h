@@ -26,6 +26,7 @@
 #define N_THREADS 10
 #define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
+#define OUTPUT_MUTANT_DETAILS 0
 
 /*Miscellaneous settings*/
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -38,7 +39,7 @@
 
 /*Biology and evolution settings*/
 #define DIRECT_REG 1
-#define NO_PENALTY 0
+#define NO_PENALTY 1
 #define FORCE_OR_GATE 0
 #if FORCE_OR_GATE
 #define FORCE_MASTER_CONTROLLED 0
@@ -58,7 +59,7 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 #ifndef TFGENES             /* number of genes encoding TFs */
-#define TFGENES 20         /* the initial value is set in initiate_genotype*/
+#define TFGENES 19         /* the initial value is set in initiate_genotype*/
 #endif
 #ifndef NGENES
 #define NGENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
@@ -140,17 +141,20 @@ struct Genotype {
     int ntfgenes;                                           /* the number of tf loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
-    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */   
+
+    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */ 
     char cisreg_seq[NGENES][CISREG_LEN];    
     
     /*these apply to protein, not loci*/
-    int N_act;                                              /* number of activators*/
-    int N_rep;                                              /* number of repressors*/    
+    int N_act;                                              /* number of activators*/  
+    int N_rep;                                              /* number of repressors*/  
     int protein_identity[NPROTEINS];                        /* 1 for activator, 0 for repressor, -1 for non-tf */ 
     char tf_seq[NPROTEINS][TF_ELEMENT_LEN];                 /* concensus binding sequences*/
     char tf_seq_rc[NPROTEINS][TF_ELEMENT_LEN];              /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
-    float Kd[NPROTEINS];
+                            //add another entry to specify variants
+    float Kd[NPROTEINS]; // Kd needs to be changed to locus specific.
+
     
     /*these apply to loci*/
     float mRNA_decay_rate[NGENES];                          /* kinetic rates*/
@@ -487,6 +491,7 @@ extern void calc_all_rates(Genotype *,
                             CellState *,
                             GillespieRates *, 
                             float,
+                            float,
                             int,
                             int);
 
@@ -572,6 +577,8 @@ extern void draw_mutation(Genotype *, char *, RngStream);
 extern void initialize_cache(Genotype *);
 
 extern void update_protein_pool(Genotype *, int, int, char);
+
+extern void update_protein_pool2(Genotype *, int, int, char);
 
 extern void update_cisreg_cluster(Genotype *, int, char, int [NGENES][NGENES], int, int);
 
