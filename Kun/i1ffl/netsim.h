@@ -11,10 +11,10 @@
 #include "RngStream.h"
 
 /*Simulation mode*/
-#define JUST_PLOTTING 1
+#define JUST_PLOTTING 0
 #define PLOT_ALTERNATIVE_FITNESS 0
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 0
+#define RUN_FULL_SIMULATION 1
 #define SKIP_INITIAL_GENOTYPE 0
 #define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
@@ -30,6 +30,7 @@
 #define N_REPLICATES 100
 #define OUTPUT_INTERVAL 10
 #define N_TIMEPOINTS 900 // for plotting
+#define OUTPUT_MUTANT_DETAILS 0
 
 /*Miscellaneous settings*/
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
@@ -105,7 +106,7 @@
  * primary data structures for model
  */
 enum GENE_STATE {REPRESSED, INTERMEDIATE, ACTIVE};
-enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_TF=-1};
+enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_OUTPUT_PROTEIN=-1,NON_TF=-2};
 enum BOOLEAN {NA=-1, NO=0, YES=1};
 
 
@@ -189,7 +190,8 @@ struct Genotype {
     float translation_rate[NGENES];                              /* kinetic rates*/   
     float active_to_intermediate_rate[NGENES];                          /* kinetic rates*/    
     int min_N_activator_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
- 
+    int locus_specific_TF_behavior[NGENES][NPROTEINS];      /* whether a TF behaves as activator or repressor depends on locus*/
+    
     /* binding sites related data, applying to loci*/   
     int cisreg_cluster[NGENES+1][NGENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
                                                              * Genes having the same cis-reg are clustered.
@@ -215,7 +217,7 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*measurement of network topology*/
-    int N_motifs[4]; 
+    int N_motifs[5]; 
     int TF_in_core_C1ffl[NGENES][NPROTEINS];
     int gene_in_core_C1ffl[NGENES];
     int N_act_genes;    
@@ -324,6 +326,7 @@ struct Mutation
 {
     char mut_type;
     int which_gene;
+    int which_protein;
     int which_nucleotide;
     char nuc_diff[3];    /*the first three elements store the nuc after mutation (max_indel=3)*/
     int kinetic_type;    /*0 for pic_disassembly, 1 for mRNA_decay, 2 for translation, 3 for protein_decay*/
@@ -390,7 +393,7 @@ extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
                                         int ,
                                         int ,                                         
-                                        int [NPROTEINS][2],                                    
+                                        int [NPROTEINS],                                    
                                         int [3],
                                         float [NGENES],
                                         int,
@@ -398,13 +401,6 @@ extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         float *,
                                         float *,
                                         float *);
-
-extern float calc_TF_dist_from_all_BS_simple(   AllTFBindingSites *,
-                                                int,
-                                                int,
-                                                int [NPROTEINS],                                    
-                                                float [NGENES],                                               
-                                                int);
 
 extern int add_fixed_event(int,                           
                            float,
@@ -555,7 +551,8 @@ extern int mod(int, int);
 
 extern void calc_all_rates(Genotype *,
                             CellState *,
-                            GillespieRates *,                          
+                            GillespieRates *,  
+                            float,
                             int,
                             int);
 
