@@ -40,12 +40,6 @@
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define OLD_MODEL 0
-#if OLD_MODEL
-#define MUT_LOCUS_LENGTH 0
-#else
-#define MUT_LOCUS_LENGTH 0
-#endif
 #define DIRECT_REG 0
 #define NO_PENALTY 0
 #define FORCE_OR_GATE 0
@@ -165,8 +159,8 @@ struct Genotype {
 
     
     /*these apply to loci*/
-    float locus_length[NGENES];                               /* relates to transcriptional and translational delay */
-    float total_loci_length;
+    int locus_length[NGENES];                               /* in codon, relates to transcriptional and translational delay */
+    int total_loci_length;                                    
     float mRNA_decay_rate[NGENES];                          /* kinetic rates*/
     float protein_decay_rate[NGENES];                       /* kinetic rates*/
     float translation_rate[NGENES];                         /* kinetic rates*/   
@@ -350,27 +344,25 @@ float duration_of_burn_in_growth_rate;
 float SUBSTITUTION; 
 float DUPLICATION;   
 float SILENCING;      
-float MUTKINETIC;     
-float MUT_LOCUS_LENGTH_RATE;
-float proportion_mut_binding_seq;
-float proportion_mut_identity;
-float proportion_mut_koff;
-float proportion_mut_kdis;
-float proportion_mut_mRNA_decay;
-float proportion_mut_protein_decay;
-float proportion_mut_translation_rate;
-float proportion_mut_cooperation;
-float proportion_mut_locus_length;
+float MUT_Kd;
+float MUT_ACT_to_INT;
+float MUT_mRNA_decay;
+float MUT_protein_decay;
+float MUT_protein_syn_rate;
+float MUT_identity;
+float MUT_binding_seq;
+float MUT_GENE_LENGTH_RATE;
+float MUT_cooperation;
 float mutational_regression_rate;
 float sigma_ACT_TO_INT_RATE; 
 float sigma_mRNA_decay; 
 float sigma_protein_decay; 
-float sigma_translation_init; 
+float sigma_protein_syn_rate; 
 float sigma_Kd;
 float miu_ACT_TO_INT_RATE;
 float miu_mRNA_decay;
 float miu_protein_decay;
-float miu_translation_init;
+float miu_protein_syn_rate;
 float miu_Kd;
 const float MAX_ACT_TO_INT_RATE;
 const float MIN_ACT_TO_INT_RATE;
@@ -378,13 +370,13 @@ const float MAX_MRNA_DECAY;
 const float MIN_MRNA_DECAY;
 const float MAX_PROTEIN_DECAY;
 const float MIN_PROTEIN_DECAY;
-const float MAX_TRANSLATION_RATE;
-const float MIN_TRANSLATION_RATE;
+const float MAX_PROTEIN_SYN_RATE;
+const float MIN_PROTEIN_SYN_RATE;
 const float MAX_KD;
 const float MIN_KD;
 const float NS_Kd;
-const float MAX_PROTEIN_LENGTH;
-const float MIN_PROTEIN_LENGTH;
+const int MAX_GENE_LENGTH;
+const int MIN_GENE_LENGTH;
 
 /* function prototypes */
 

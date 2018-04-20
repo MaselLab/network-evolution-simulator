@@ -11,7 +11,8 @@
 #include "numerical.h"
 #include "mutation.h"
 
-
+const int BOUND_INCLUDED=1;
+const int BOUND_EXCLUDED=0;
 
 /*
  ************ begin of mutation functions **************
@@ -340,6 +341,8 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
             }   
         }
     } 
+    /*update total loci length before removing info of which_gene*/
+    genotype->total_loci_length-=genotype->locus_length[which_gene];    
     /* remove it from PIC_assembly, mRNAdecay, proteinDecay, translation and re_calc*/
     for(i=which_gene;i<genotype->ngenes;i++)
     {
@@ -350,10 +353,10 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
         genotype->translation_rate[i]=genotype->translation_rate[i+1];  
         genotype->locus_length[i]=genotype->locus_length[i+1];
         genotype->recalc_TFBS[i]=YES;        
-    }
+    }     
     /* if the to-be-deleted gene is a tf gene, change ntfgenes as well*/
-    if(protein_id<genotype->nproteins-1)
-        genotype->ntfgenes--;    
+    if(protein_id!=genotype->nproteins-1)    
+        genotype->ntfgenes--;  
     /* now change protein_pool and cisreg_cluster*/   
     update_protein_pool(genotype,protein_id,which_gene,'w'); 
     update_cisreg_cluster(genotype,which_gene,'w',NULL,-1,-1);  
@@ -441,6 +444,9 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
             }   
         }
     }
+    /*update total loci length before removing info of which_gene*/
+    genotype->total_loci_length-=genotype->locus_length[which_gene];
+        
     for(i=which_gene;i<genotype->ngenes;i++)
     {
         genotype->min_N_activator_to_transc[i]=genotype->min_N_activator_to_transc[i+1];
@@ -451,8 +457,9 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
         genotype->locus_length[i]=genotype->locus_length[i+1];
         genotype->recalc_TFBS[i]=YES;
     }
-    if(protein_id<genotype->nproteins-1)
-        genotype->ntfgenes--;
+    /* if the to-be-deleted gene is a tf gene, change ntfgenes as well*/
+    if(protein_id!=genotype->nproteins-1)    
+        genotype->ntfgenes--;          
     update_protein_pool(genotype,protein_id,which_gene,'w'); 
     update_cisreg_cluster(genotype,which_gene,'w',NULL,-1,-1);
     genotype->ngenes--;   
@@ -526,14 +533,16 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS)
     genotype->translation_rate[genotype->ngenes-1]=genotype->translation_rate[which_gene_copy];
     genotype->locus_length[genotype->ngenes-1]=genotype->locus_length[which_gene_copy];
     genotype->recalc_TFBS[genotype->ngenes-1]=YES;
+    /*update total loci length*/
+    genotype->total_loci_length+=genotype->locus_length[which_gene_copy];
     /* update protein_pool*/
     protein_id=genotype->which_protein[which_gene];    
     update_protein_pool(genotype,protein_id,which_gene,'d'); 
     /* update cisreg_cluster*/    
     update_cisreg_cluster(genotype,which_gene,'d',NULL,-1,-1);
     /* update gene numbers*/  
-    if(protein_id<genotype->nproteins-1)//note duplication do not change nproteins           
-        genotype->ntfgenes++;     
+    if(protein_id<genotype->nproteins-1)//note duplication do not change nproteins              
+        genotype->ntfgenes++;          
     genotype->ngenes++;
 }
 
@@ -571,11 +580,12 @@ void reproduce_gene_duplication(Genotype *genotype, Mutation *mut_record) //any 
     genotype->translation_rate[genotype->ngenes-1]=genotype->translation_rate[which_gene_copy]; 
     genotype->locus_length[genotype->ngenes-1]=genotype->locus_length[which_gene_copy];
     genotype->recalc_TFBS[genotype->ngenes-1]=YES;
+    genotype->total_loci_length+=genotype->locus_length[which_gene_copy];
     protein_id=genotype->which_protein[which_gene];
     update_protein_pool(genotype,protein_id,which_gene,'d');     
     update_cisreg_cluster(genotype,which_gene,'d',NULL,-1,-1);
-    if(protein_id<genotype->nproteins-1)
-        genotype->ntfgenes++;      
+    if(protein_id<genotype->nproteins-1)//note duplication do not change nproteins              
+        genotype->ntfgenes++;           
     genotype->ngenes++;     
 }
 
@@ -588,9 +598,9 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     char nucleotide;      
     char *tf_seq, *tf_seq_rc,*temp1,*temp2;
     /*get which gene to mutate*/
-    which_gene=RngStream_RandInt(RS,0,genotype->ngenes-2); // ngenes-1 is the selection gene, so tf genes must be 0 to ngenes-2
+    which_gene=RngStream_RandInt(RS,0,genotype->ngenes-1);  
     while(genotype->which_protein[which_gene]==genotype->nproteins-1)
-        which_gene=RngStream_RandInt(RS,0,genotype->ngenes-2);
+        which_gene=RngStream_RandInt(RS,0,genotype->ngenes-1);    
     /*if this TF has more than one copies of gene, then the mutation adds a new tf
      *which requires a new slot in tf_seq and tf_seq_rc to store the new binding seq*/
     protein_id=genotype->which_protein[which_gene];    
@@ -838,120 +848,143 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
  */
 void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
-    float random;    
+    float random;
+    int random2;    
     int which_gene;
-    float total_mut_flux=   proportion_mut_kdis+
-                            proportion_mut_mRNA_decay+
-                            proportion_mut_protein_decay+
-                            proportion_mut_translation_rate+
-                            proportion_mut_cooperation;                          
+    float total_mut_flux; 
+    float total_mut_ACT_to_INT; 
+    float total_mut_mRNA_decay;
+    float total_mut_translation_rate;
+    float total_mut_protein_decay;
+    float total_mut_cooperation;
     
-    random=RngStream_RandU01(RS);
-    which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);    
-    /*record mutation info*/
-    mut_record->which_gene=which_gene;
+    total_mut_ACT_to_INT=(genotype->ngenes-N_SIGNAL_TF)*MUT_ACT_to_INT;
+    total_mut_mRNA_decay=genotype->total_loci_length*MUT_mRNA_decay;
+    total_mut_protein_decay=genotype->total_loci_length*MUT_protein_decay;
+    total_mut_translation_rate=genotype->total_loci_length*MUT_protein_syn_rate;
+    total_mut_cooperation=(genotype->ngenes-genotype->ntfgenes)*MUT_cooperation;
+    total_mut_flux=total_mut_ACT_to_INT+total_mut_mRNA_decay+total_mut_protein_decay+total_mut_translation_rate+total_mut_cooperation;
+   
     while(1)
     {
+        random=RngStream_RandU01(RS)*total_mut_flux;
         /********************************** mut kdis *******************************/
-        if(random<=proportion_mut_kdis/total_mut_flux) 
+        if(random<=total_mut_ACT_to_INT) 
         {  
+            which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);            
             genotype->active_to_intermediate_rate[which_gene]=mut_make_new_value(genotype->active_to_intermediate_rate[which_gene],
                                                                                 miu_ACT_TO_INT_RATE,
                                                                                 sigma_ACT_TO_INT_RATE,
                                                                                 MAX_ACT_TO_INT_RATE,
                                                                                 MIN_ACT_TO_INT_RATE,
                                                                                 RS,
-                                                                                mut_record);
+                                                                                mut_record,
+                                                                                BOUND_INCLUDED);
             /*record mutation info*/
+            mut_record->which_gene=which_gene;
             mut_record->kinetic_type=0;
             mut_record->kinetic_diff=genotype->active_to_intermediate_rate[which_gene];
             break;
         }
         else 
         {
-            random-=proportion_mut_kdis/total_mut_flux;
-            /******************************** mut mRNAdecay **********************/
-            if(random<=proportion_mut_mRNA_decay/total_mut_flux) 
-            {       
-                genotype->mRNA_decay_rate[which_gene]=mut_make_new_value(genotype->mRNA_decay_rate[which_gene],miu_mRNA_decay,sigma_mRNA_decay, MAX_MRNA_DECAY, MIN_MRNA_DECAY,RS,mut_record);
-                /*record mutation info*/
-                mut_record->kinetic_type=1;
-                mut_record->kinetic_diff=genotype->mRNA_decay_rate[which_gene];
+            random-=total_mut_ACT_to_INT;
+            /****************** mut cooperation ***********************/
+            if(random<=total_mut_cooperation && MUT_cooperation!=0.0)
+            {   
+                which_gene=0;
+                while(genotype->which_protein[which_gene]!=genotype->nproteins-1)
+                    which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);
+                mut_record->which_gene=which_gene;
+                if(genotype->min_N_activator_to_transc[which_gene]==1)
+                    genotype->min_N_activator_to_transc[which_gene]=2;
+                else
+                    genotype->min_N_activator_to_transc[which_gene]=1;
+                mut_record->kinetic_type=4;
+                mut_record->kinetic_diff=(float)genotype->min_N_activator_to_transc[which_gene];
+                update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
                 break;
             }
-            else 
-            {
-                random-=proportion_mut_mRNA_decay/total_mut_flux;
-                /*************************** mut translation *********************/
-                if(random<=proportion_mut_translation_rate/total_mut_flux) 
+            else
+            { 
+                /* The rest mutation rates are proportional to gene length, so we can pick which genes first*/
+                random2=RngStream_RandInt(RS,1,genotype->total_loci_length);
+                which_gene=N_SIGNAL_TF-1;
+                while(which_gene<genotype->ngenes-1 && random2>0)
+                {
+                    which_gene++;
+                    random2-=genotype->locus_length[which_gene];
+                } 
+                mut_record->which_gene=which_gene;
+                /* now pick which type of mutation*/
+                random-=total_mut_cooperation;
+                /******************************** mut mRNAdecay **********************/
+                if(random<=total_mut_mRNA_decay) 
                 {       
-                    genotype->translation_rate[which_gene]=mut_make_new_value(genotype->translation_rate[which_gene],miu_translation_init,sigma_translation_init, MAX_TRANSLATION_RATE, MIN_TRANSLATION_RATE,RS,mut_record);        
-                    mut_record->kinetic_type=2;
-                    mut_record->kinetic_diff=genotype->translation_rate[which_gene];
+                    genotype->mRNA_decay_rate[which_gene]=mut_make_new_value(genotype->mRNA_decay_rate[which_gene],miu_mRNA_decay,sigma_mRNA_decay, MAX_MRNA_DECAY, MIN_MRNA_DECAY,RS,mut_record,BOUND_INCLUDED);
+                    /*record mutation info*/
+                    mut_record->kinetic_type=1;
+                    mut_record->kinetic_diff=genotype->mRNA_decay_rate[which_gene];
                     break;
                 }
                 else 
-                {  
-                    random-=proportion_mut_translation_rate/total_mut_flux;
-                    /********************* mut protein decay **********************/
-                    if(random<=proportion_mut_protein_decay/total_mut_flux)
-                    {                   
-                        genotype->protein_decay_rate[which_gene]=mut_make_new_value(genotype->protein_decay_rate[which_gene],miu_protein_decay,sigma_protein_decay,MAX_PROTEIN_DECAY,MIN_PROTEIN_DECAY,RS,mut_record);                  
-                        mut_record->kinetic_type=3;
-                        mut_record->kinetic_diff=genotype->protein_decay_rate[which_gene];
+                {
+                    random-=total_mut_mRNA_decay;
+                    /*************************** mut translation *********************/
+                    if(random<=total_mut_translation_rate) 
+                    {       
+                        genotype->translation_rate[which_gene]=mut_make_new_value(genotype->translation_rate[which_gene],miu_protein_syn_rate,sigma_protein_syn_rate, MAX_PROTEIN_SYN_RATE, MIN_PROTEIN_SYN_RATE,RS,mut_record,BOUND_INCLUDED);        
+                        mut_record->kinetic_type=2;
+                        mut_record->kinetic_diff=genotype->translation_rate[which_gene];
                         break;
                     }
                     else 
-                    {
-                        random-=proportion_mut_protein_decay/total_mut_flux;
-                        /****************** mut cooperation ***********************/
-                        if(random<=proportion_mut_cooperation/total_mut_flux)
-                        {                            
-                            while(genotype->which_protein[which_gene]!=genotype->nproteins-1)
-                                which_gene=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);
-                            mut_record->which_gene=which_gene;
-                            if(genotype->min_N_activator_to_transc[which_gene]==1)
-                                genotype->min_N_activator_to_transc[which_gene]=2;
-                            else
-                                genotype->min_N_activator_to_transc[which_gene]=1;
-                            mut_record->kinetic_type=4;
-                            mut_record->kinetic_diff=(float)genotype->min_N_activator_to_transc[which_gene];
-                            update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
+                    {  
+                        random-=total_mut_translation_rate;
+                        /********************* mut protein decay **********************/
+                        if(random<=total_mut_protein_decay)
+                        {                   
+                            genotype->protein_decay_rate[which_gene]=mut_make_new_value(genotype->protein_decay_rate[which_gene],miu_protein_decay,sigma_protein_decay,MAX_PROTEIN_DECAY,MIN_PROTEIN_DECAY,RS,mut_record,BOUND_INCLUDED);                  
+                            mut_record->kinetic_type=3;
+                            mut_record->kinetic_diff=genotype->protein_decay_rate[which_gene];
                             break;
-                        }
-                    }
-                } 
+                        }                    
+                    } 
+                }
             }
         }
     }
 }
 
-float mut_make_new_value(float old_val, float miu, float sigma, float upper_bound, float lower_bound, RngStream RS, Mutation *mut_record)
+float mut_make_new_value(float old_val, float miu, float sigma, float upper_bound, float lower_bound, RngStream RS, Mutation *mut_record, int boudary_condition)
 {
     float new_val;
     new_val=old_val;
     while(new_val==old_val) 
     {
-#if OLD_MODEL
-        new_val=old_val*exp(sigma*gasdev(RS)+mutational_regression_rate*(miu-log(old_val)));
-#else
         new_val=old_val*pow(10.0,sigma*gasdev(RS)+mutational_regression_rate*(miu-log10(old_val)));
-        if(new_val>upper_bound)
+        if(boudary_condition==BOUND_INCLUDED)
         {
-            new_val=upper_bound;
-            mut_record->N_hit_bound++;
+            if(new_val>upper_bound)
+            {
+                new_val=upper_bound;
+                mut_record->N_hit_bound++;
+            }
+            if(new_val<lower_bound)
+            {
+                new_val=lower_bound;
+                mut_record->N_hit_bound++;
+            }
         }
-        if(new_val<lower_bound)
+        else
         {
-            new_val=lower_bound;
-            mut_record->N_hit_bound++;
+            if(new_val>=upper_bound || new_val<=lower_bound)
+            {
+                new_val=old_val;
+                mut_record->N_hit_bound++;
+            }
         }
-#endif
-//        while(new_val>=upper_bound || new_val<=lower_bound)
-//        {
-//            new_val=old_val*pow(10.0,sigma*gasdev(RS)+mutational_regression_rate*(miu-log10(old_val)));
-//            mut_record->N_hit_bound++;
-//        }            
+        
     }
     return new_val;
 }
@@ -983,37 +1016,36 @@ void reproduce_mut_kinetic_constant(Genotype *genotype, Mutation *mut_record)
 void mut_locus_length(Genotype *genotype, Mutation *mut_record, RngStream RS)
 {
     int which_gene;
-    float random;    
-    while(1)
+    int random;    
+   
+    random=RngStream_RandInt(RS,1,genotype->total_loci_length);
+    which_gene=N_SIGNAL_TF-1;
+    while(which_gene<genotype->ngenes-1 && random>0)
     {
-        random=RngStream_RandU01(RS)*genotype->total_loci_length;
-        which_gene=N_SIGNAL_TF-1;
-        while(which_gene<genotype->ngenes-1 && random>0.0)
-        {
-            which_gene++;
-            random-=genotype->locus_length[which_gene];
-        }
-        if(genotype->locus_length[which_gene]>0.0)
-            break;
-    }
+        which_gene++;
+        random-=genotype->locus_length[which_gene];
+    }        
+    
     genotype->total_loci_length-=genotype->locus_length[which_gene];
-    if(genotype->locus_length[which_gene]>=3.0*MAX_PROTEIN_LENGTH)
-        genotype->locus_length[which_gene]-=3.0;
-    else if(genotype->locus_length[which_gene]<=3.0*MAX_PROTEIN_LENGTH)
-        genotype->locus_length[which_gene]+=3.0;
+    
+    if(genotype->locus_length[which_gene]>=MAX_GENE_LENGTH)
+        genotype->locus_length[which_gene]-=1;
+    else if(genotype->locus_length[which_gene]<=MAX_GENE_LENGTH)
+        genotype->locus_length[which_gene]+=1;
     else                            
-        genotype->locus_length[which_gene]+=(RngStream_RandU01(RS)<0.5)?3.0:-3.0;   
-    genotype->total_loci_length+=genotype->locus_length[which_gene];
+        genotype->locus_length[which_gene]+=(RngStream_RandU01(RS)<0.5)?1:-1;  
+    
+    genotype->total_loci_length+=genotype->locus_length[which_gene];  
     mut_record->mut_type='l';   
     mut_record->which_gene=which_gene;
-    mut_record->kinetic_diff=genotype->locus_length[which_gene];
+    mut_record->kinetic_diff=(float)genotype->locus_length[which_gene];
 }
 
 void reproduce_mut_locus_length(Genotype *genotype, Mutation *mut_record)
 {
-    genotype->total_loci_length-=genotype->locus_length[mut_record->which_gene];
-    genotype->locus_length[mut_record->which_gene]=mut_record->kinetic_diff;
-    genotype->total_loci_length+=genotype->locus_length[mut_record->which_gene];
+    genotype->total_loci_length-=genotype->locus_length[mut_record->which_gene];   
+    genotype->locus_length[mut_record->which_gene]=(int)mut_record->kinetic_diff;
+    genotype->total_loci_length+=(int)genotype->locus_length[mut_record->which_gene];    
 }
 
 void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
@@ -1021,15 +1053,12 @@ void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
     int tf_id,protein_id,i;   
     char *tf_seq,*tf_seq_rc,*temp1,*temp2; 
     /*which tf gene to mutate*/
-    tf_id = RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-2); // the first sensor tf must be an activator, therefore is not subject to mutation
-    protein_id=genotype->which_protein[tf_id];    
-    while(protein_id==genotype->nproteins-1) // copies of effector gene are not subjected to this mutation
-    {
-        tf_id = RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-2); 
-        protein_id=genotype->which_protein[tf_id];
-    }    
+    tf_id=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);    
+    while(genotype->which_protein[tf_id]==genotype->nproteins-1)
+        tf_id=RngStream_RandInt(RS,N_SIGNAL_TF,genotype->ngenes-1);    
     /*save record*/
-    mut_record->which_gene=tf_id;       
+    mut_record->which_gene=tf_id;    
+    protein_id=genotype->which_protein[tf_id];
     /* if this tf gene has more than one copies, the mutation adds a new protein*/
     if(genotype->protein_pool[protein_id][0][0]!=1)
     {
@@ -1108,25 +1137,20 @@ void reproduce_mut_identity(Genotype *genotype, Mutation *mut_record)
  * mutate affinity of TF
  */
 void mut_Kd(Genotype *genotype, Mutation *mut_record, RngStream RS)
-{
-    int i;   
+{      
     float new_Kd; 
-    int tf_id,protein_id;
-    char *tf_seq,*tf_seq_rc,*temp1,*temp2;
+    int tf_id,protein_id,i;
+    char *tf_seq,*tf_seq_rc,*temp1,*temp2;   
+    
     /*which TF to mutate*/
-    tf_id=RngStream_RandInt(RS,0,genotype->ngenes-2);
+    tf_id=RngStream_RandInt(RS,0,genotype->ngenes-1);
+    while(genotype->which_protein[tf_id]==genotype->nproteins-1)
+        tf_id=RngStream_RandInt(RS,0,genotype->ngenes-1);
+    
+    mut_record->which_gene=tf_id;
     protein_id=genotype->which_protein[tf_id];
-    while(protein_id==genotype->nproteins-1)
-    {
-        tf_id=RngStream_RandInt(RS,0,genotype->ngenes-2);
-        protein_id=genotype->which_protein[tf_id];
-    }
     /*generate a new koff */    
-    new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,sigma_Kd,MAX_KD,MIN_KD,RS,mut_record);  
-#if OLD_MODEL  
-    while(new_Kd>NS_Kd)
-        new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,sigma_Kd,MAX_KD,MIN_KD,RS,mut_record);  
-#endif
+    new_Kd=mut_make_new_value(genotype->Kd[protein_id],miu_Kd,sigma_Kd,MAX_KD,MIN_KD,RS,mut_record,BOUND_EXCLUDED);  
     /* if this tf gene has more than one copies, the mutation adds a new protein*/    
     if(genotype->protein_pool[protein_id][0][0]!=1)
     {    
@@ -1255,11 +1279,11 @@ void reproduce_mutate(Genotype *genotype, Mutation *mut_record,RngStream RS)
  * the current genotype, and draws a mutation accordingly.
  */
 void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
-{
+{    
     float random;
     float tot_mut_rate=0.0;
     float tot_subs_rate, tot_dup_rate, tot_sil_rate, tot_mut_kin_rate, tot_mut_identity_rate, tot_mut_binding_seq_rate, tot_mut_koff_rate; 
-    float tot_mut_locus_length_rate;
+    float tot_mut_locus_length_rate;    
     
     int N_genes_to_be_duplicated; 
     /* duplication rate*/    
@@ -1270,7 +1294,8 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
     if(genotype->protein_pool[genotype->nproteins-1][0][0]>=N_EFFECTOR_GENES)//too many effector gene
         N_genes_to_be_duplicated-=genotype->protein_pool[genotype->nproteins-1][0][0];//do not duplicate effector gene anymore
     tot_dup_rate=N_genes_to_be_duplicated*DUPLICATION;
-    tot_mut_rate+=tot_dup_rate;   
+    tot_mut_rate+=tot_dup_rate;
+    
     /* silencing rate*/ 
     if(genotype->ntfgenes-N_SIGNAL_TF>1)//if there are more than one copy of non-sensor TF gene
         tot_sil_rate=(genotype->ntfgenes-N_SIGNAL_TF)*SILENCING;    
@@ -1280,91 +1305,95 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
         tot_sil_rate+=genotype->protein_pool[genotype->nproteins-1][0][0]*SILENCING;
     else
         tot_sil_rate+=0.0; // otherwise last copy effector gene cannot be deleted either*/
-    tot_mut_rate+=tot_sil_rate;    
+    tot_mut_rate+=tot_sil_rate;  
+    
     /* calc total susbtitution rate*/
     tot_subs_rate=(genotype->ngenes-N_SIGNAL_TF)*CISREG_LEN*SUBSTITUTION; //NA to the sensor TF gene
     tot_mut_rate+=tot_subs_rate;
+    
     /* mut in kinetic constants */    
-    tot_mut_kin_rate=(genotype->ngenes-N_SIGNAL_TF)*MUTKINETIC*(proportion_mut_kdis+proportion_mut_mRNA_decay+proportion_mut_protein_decay+proportion_mut_translation_rate); // NA to the sensor TF gene
-    tot_mut_kin_rate+=genotype->protein_pool[genotype->nproteins-1][0][0]*MUTKINETIC*proportion_mut_cooperation;
+    tot_mut_kin_rate=(genotype->ngenes-N_SIGNAL_TF)*MUT_ACT_to_INT; // NA to the sensor TF gene
+    tot_mut_kin_rate+=genotype->total_loci_length*(MUT_protein_syn_rate+MUT_mRNA_decay+MUT_protein_decay);
+    tot_mut_kin_rate+=(genotype->ngenes-N_SIGNAL_TF)*MUT_cooperation;
     tot_mut_rate+=tot_mut_kin_rate;
-    /* mut in binding seq*/
-    tot_mut_binding_seq_rate=genotype->ntfgenes*MUTKINETIC*proportion_mut_binding_seq; // NA to the effector genes
-    tot_mut_rate+=tot_mut_binding_seq_rate;    
+    
+    /* mut in binding seq*/  
+    tot_mut_binding_seq_rate=genotype->ntfgenes*MUT_binding_seq; // NA to the effector genes
+    tot_mut_rate+=tot_mut_binding_seq_rate;  
+    
     /* mut in identity*/
-    tot_mut_identity_rate=(genotype->ntfgenes-N_SIGNAL_TF)*MUTKINETIC*proportion_mut_identity; // NA to the sensor TF gene
+    tot_mut_identity_rate=(genotype->ntfgenes-N_SIGNAL_TF)*MUT_identity; // NA to the sensor TF gene
     tot_mut_rate+=tot_mut_identity_rate;
-    /* mut in koff*/
-    tot_mut_koff_rate=genotype->ntfgenes*MUTKINETIC*proportion_mut_koff;  
+    
+    /* mut in Kd*/
+    tot_mut_koff_rate=genotype->ntfgenes*MUT_Kd;  
     tot_mut_rate+=tot_mut_koff_rate;    
+    
     /* mut locus length*/
-#if MUT_LOCUS_LENGTH
-    tot_mut_locus_length_rate=MUT_LOCUS_LENGTH_RATE*genotype->total_loci_length;
-#else
-    tot_mut_locus_length_rate=0.0;
-#endif
+    tot_mut_locus_length_rate=MUT_GENE_LENGTH_RATE*genotype->total_loci_length;
     tot_mut_rate+=tot_mut_locus_length_rate;
+    
     /*Draw a mutation based on the above rates*/
     while(1)
     {
-        random=RngStream_RandU01(RS);    
-        if(random<=tot_subs_rate/tot_mut_rate) 
+        random=RngStream_RandU01(RS)*tot_mut_rate;    
+        if(random<=tot_subs_rate) 
         {
             *mut_type='s';                      /* substitution*/
             break;
         }
         else
         {   
-            random-=tot_subs_rate/tot_mut_rate;
-            if(random<= tot_dup_rate/tot_mut_rate)
+            random-=tot_subs_rate;
+            if(random<= tot_dup_rate)
             {
                 *mut_type='d';                          /* gene duplication */
                 break;
             }
             else
             {
-                random-=tot_dup_rate/tot_mut_rate;
-                if(random<=tot_sil_rate/tot_mut_rate)
+                random-=tot_dup_rate;
+                if(random<=tot_sil_rate)
                 {
                     *mut_type='w';                              /* gene deletion*/  
                     break;
                 }
                 else
                 {                  
-                    random-=tot_sil_rate/tot_mut_rate; 
-                    if(random<=tot_mut_locus_length_rate/tot_mut_rate)
+                    random-=tot_sil_rate; 
+                    if(random<=tot_mut_locus_length_rate)
                     {
                         *mut_type='l';      /* mut locus length */
                         break;
                     }                    
                     else
                     {                        
-                        random-=tot_mut_locus_length_rate/tot_mut_rate;
-                        if(random<=tot_mut_kin_rate/tot_mut_rate)
+                        random-=tot_mut_locus_length_rate;
+                        if(random<=tot_mut_kin_rate)
                         {
                             *mut_type='k';                  /* mut kinetic const*/
                             break;
                         }                        
                         else
                         {
-                            random-=tot_mut_kin_rate/tot_mut_rate;
-                            if(random<=tot_mut_binding_seq_rate/tot_mut_rate)
+                            random-=tot_mut_kin_rate;
+                            if(random<=tot_mut_binding_seq_rate)
                             {
                                 *mut_type='c';              /* mut binding seq*/
                                 break;
                             }                            
                             else
                             {
-                                random-=tot_mut_binding_seq_rate/tot_mut_rate;
-                                if(random<=tot_mut_koff_rate/tot_mut_rate)
+                                random-=tot_mut_binding_seq_rate;
+                                if(random<=tot_mut_koff_rate)
                                 {                                
-                                    *mut_type='f';          /* mut koff*/
+                                    *mut_type='f';          /* mut Kd*/
                                     break;
                                 }                               
                                 else
                                 {                                    
-                                    random-=tot_mut_koff_rate/tot_mut_rate;
-                                    if(random<=tot_mut_identity_rate/tot_mut_rate)
+                                    random-=tot_mut_koff_rate;
+                                    if(random<=tot_mut_identity_rate)
                                     {
                                         *mut_type='e';           /* mut identity of a TF */
                                         break;
@@ -1439,49 +1468,55 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
                         protein_id++;
                     }  
                     /* update TF_family_pool*/
-                    tf_family_id=genotype->which_TF_family[protein_id];
+                    tf_family_id=genotype->which_TF_family[which_protein];
                     if(genotype->TF_family_pool[tf_family_id][0][0]==1) /*there is one member in the family, so delete the family*/
                     {
                         /*shift tf_family_id to overwrite*/
-                        for(i=tf_family_id;i<genotype->nTF_families-1;i++)
+                        for(i=tf_family_id;i<genotype->nTF_families;i++)
                         {
                             /*reset entries of family i*/
                             for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
                                 genotype->TF_family_pool[i][1][j]=NA;
                             /*copy entries of family i+1 to family i. Proteins with id > protein_id needs a new id */
                             for(j=0;j<genotype->TF_family_pool[i+1][0][0];j++)
-                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i+1][1][j]>protein_id)?genotype->TF_family_pool[i+1][1][j]-1:genotype->TF_family_pool[i+1][1][j];
-                            genotype->TF_family_pool[i][0][0]=genotype->TF_family_pool[i+1][1][j];
+                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i+1][1][j]>which_protein)?genotype->TF_family_pool[i+1][1][j]-1:genotype->TF_family_pool[i+1][1][j];
+                            genotype->TF_family_pool[i][0][0]=genotype->TF_family_pool[i+1][0][0];
                         }
-                        /*reset the last family*/
-                        for(i=0;i<genotype->TF_family_pool[genotype->nTF_families-1][0][0];i++)
-                            genotype->TF_family_pool[genotype->nTF_families-1][1][i]=NA;
-                        genotype->TF_family_pool[genotype->nTF_families-1][0][0]=0; 
+                        /* update the protein id for tf family < tf_family_id*/
+                        for(i=0;i<tf_family_id;i++)
+                        {
+                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
+                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>which_protein)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
+                        }
                         /*update nTF_family*/
                         genotype->nTF_families--;
                         /*shift which_tf_family and update the family id of protein with family id > tf_family_id*/
-                        for(i=protein_id;i<genotype->nproteins-1;i++)
+                        for(i=which_protein;i<genotype->nproteins-1;i++)
                             genotype->which_TF_family[i]=(genotype->which_TF_family[i+1]>tf_family_id)?genotype->which_TF_family[i+1]-1:genotype->which_TF_family[i+1];
+                        /*update the family id for proteins < which_protein*/
+                        for(i=0;i<which_protein;i++)
+                            genotype->which_TF_family[i]=(genotype->which_TF_family[i]>tf_family_id)?genotype->which_TF_family[i]-1:genotype->which_TF_family[i];
                     }
                     else /* the tf family has multiple proteins, no need to delete the family*/
                     {
                         /*find where is protein_id in its family*/
                         for(i=0;i<genotype->TF_family_pool[tf_family_id][0][0];i++)
                         {
-                            if(genotype->TF_family_pool[tf_family_id][1][i]==protein_id)
+                            if(genotype->TF_family_pool[tf_family_id][1][i]==which_protein)
                                 break;
                         }
                         /*shift entries in its family*/
                         for(;i<genotype->TF_family_pool[tf_family_id][0][0];i++)
                             genotype->TF_family_pool[tf_family_id][1][i]=genotype->TF_family_pool[tf_family_id][1][i+1];
+                        genotype->TF_family_pool[tf_family_id][0][0]--;
                         /*update protein ids in all families*/
                         for(i=0;i<genotype->nTF_families;i++)
                         {
                             for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
-                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>protein_id)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
+                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>which_protein)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
                         } 
                         /*shift which_tf_family*/
-                        for(i=protein_id;i<genotype->nproteins-1;i++)
+                        for(i=which_protein;i<genotype->nproteins-1;i++)
                             genotype->which_TF_family[i]=genotype->which_TF_family[i+1];
                     }
                     /* in the case, all genes need to recalc binding sites*/
@@ -1566,7 +1601,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             {
                 genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j]; //shift the protein pool of effector gene
                 genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;//update which_protein
-                genotype->protein_pool[genotype->nproteins-1][1][j]=-1; //reset the original protein pool of the effector 
+                genotype->protein_pool[genotype->nproteins-1][1][j]=NA; //reset the original protein pool of the effector 
             }                       
             /* create a new protein and link it to which_gene*/
             genotype->which_protein[which_gene]=genotype->nproteins-1; //put the new protein to the original place of the effector protein
@@ -1582,8 +1617,8 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             genotype->Kd[genotype->nproteins-1]=genotype->Kd[which_protein];
             /* make a new tf family and add in the new tf*/
             genotype->TF_family_pool[genotype->nTF_families][0][0]=1;
-            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins;
-            genotype->which_TF_family[genotype->nproteins]=genotype->nTF_families;
+            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins-1;
+            genotype->which_TF_family[genotype->nproteins-1]=genotype->nTF_families;
             /* update tf family number*/
             genotype->nTF_families++;
             /* finally, update protein numbers*/
@@ -1604,7 +1639,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             {
                 genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
                 genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
-                genotype->protein_pool[genotype->nproteins-1][1][j]=-1;
+                genotype->protein_pool[genotype->nproteins-1][1][j]=NA;
             }            
             /* create a new protein and link it to which_gene*/
             genotype->which_protein[which_gene]=genotype->nproteins-1; 
@@ -1620,8 +1655,8 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             genotype->Kd[genotype->nproteins-1]=genotype->Kd[which_protein];
             /* make a new tf family and add in the new tf*/
             genotype->TF_family_pool[genotype->nTF_families][0][0]=1;
-            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins;
-            genotype->which_TF_family[genotype->nproteins]=genotype->nTF_families;
+            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins-1;
+            genotype->which_TF_family[genotype->nproteins-1]=genotype->nTF_families;
             /* update tf family number*/
             genotype->nTF_families++;
             /* finally, update protein numbers*/
@@ -1642,12 +1677,17 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
             {
                 genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
                 genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
-                genotype->protein_pool[genotype->nproteins-1][1][j]=-1;
+                genotype->protein_pool[genotype->nproteins-1][1][j]=NA;
             }            
             /* create a new protein and link it to this gene*/
             genotype->which_protein[which_gene]=genotype->nproteins-1; 
             genotype->protein_pool[genotype->nproteins-1][0][0]=1;
-            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;            
+            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;   
+            /* add the new protein to the original protein's family*/
+            tf_family_id=genotype->which_TF_family[which_protein];
+            genotype->TF_family_pool[tf_family_id][1][genotype->TF_family_pool[tf_family_id][0][0]]=genotype->nproteins-1;
+            genotype->TF_family_pool[tf_family_id][0][0]++;
+            genotype->which_TF_family[genotype->nproteins-1]=tf_family_id;
             /* update activating*/
             if(genotype->protein_identity[which_protein]==ACTIVATOR) 
                 genotype->N_act++;  
@@ -1677,51 +1717,48 @@ void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, in
      *Therefore, we always set all the slots in a cluster to -1, when deleting or overwrting the cluster. 
      */
     int cisreg_seq_cluster_id, cisreg_seq_cluster_id_copy, i, j, last_cluster; 
-    
-    if(mut_type=='c')//a mutation to the binding sequence of a TF happened. this can create new clusters.
-    {    
-        /*reset the original cisreg_cluster*/
-        i=0;
-        while(genotype->cisreg_cluster[original_cluster_id][i]!=NA)
-        {
-            genotype->cisreg_cluster[original_cluster_id][i]=NA;
-            i++;
-        }
-        /*assign the first new cluster to the original cluster*/
-        i=0;
-        while(new_clusters[0][i]!=NA)
-        {
-            genotype->cisreg_cluster[original_cluster_id][i]=new_clusters[0][i];
-            genotype->which_cluster[new_clusters[0][i]]=original_cluster_id;
-            i++;
-        }
-        /*find a empty slot in cisreg_cluster for the rest of new clusters*/    
-        last_cluster=N_SIGNAL_TF;
-        while(genotype->cisreg_cluster[last_cluster][0]!=NA)last_cluster++;//an empty cluster has all of its slots marked by -1
-        /*assign the rest of new clusters into empty slots*/       
-        for(i=1;i<N_new_clusters;i++)
-        {
-            /*reset the empty cluster, just in case*/
-            j=0;
-            while(genotype->cisreg_cluster[last_cluster][j]!=NA)j++;
-            /*assign new clusters*/
-            j=0;
-            while(new_clusters[i][j]!=NA)
+    switch(mut_type)
+    {
+        case 'c': //a mutation to the binding sequence of a TF happened. this can create new clusters.
+            /*reset the original cisreg_cluster*/
+            i=0;
+            while(genotype->cisreg_cluster[original_cluster_id][i]!=NA)
             {
-                genotype->cisreg_cluster[last_cluster][j]=new_clusters[i][j];
-                genotype->which_cluster[new_clusters[i][j]]=last_cluster;
-                j++;
+                genotype->cisreg_cluster[original_cluster_id][i]=NA;
+                i++;
             }
-            last_cluster++;
-        }        
-        return;
-    } 
-    /*find the cis-reg cluster of which gene*/
-    cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
-    if(mut_type!='d')/*not a duplication*/
-    {   
-        if(mut_type!='w') /*not a gene deletion. Substitution (or small indel) just kicked one gene copy out of a cluster*/
-        {
+            /*assign the first new cluster to the original cluster*/
+            i=0;
+            while(new_clusters[0][i]!=NA)
+            {
+                genotype->cisreg_cluster[original_cluster_id][i]=new_clusters[0][i];
+                genotype->which_cluster[new_clusters[0][i]]=original_cluster_id;
+                i++;
+            }
+            /*find a empty slot in cisreg_cluster for the rest of new clusters*/    
+            last_cluster=N_SIGNAL_TF;
+            while(genotype->cisreg_cluster[last_cluster][0]!=NA)last_cluster++;//an empty cluster has all of its slots marked by -1
+            /*assign the rest of new clusters into empty slots*/       
+            for(i=1;i<N_new_clusters;i++)
+            {
+                /*reset the empty cluster, just in case*/
+                j=0;
+                while(genotype->cisreg_cluster[last_cluster][j]!=NA)j++;
+                /*assign new clusters*/
+                j=0;
+                while(new_clusters[i][j]!=NA)
+                {
+                    genotype->cisreg_cluster[last_cluster][j]=new_clusters[i][j];
+                    genotype->which_cluster[new_clusters[i][j]]=last_cluster;
+                    j++;
+                }
+                last_cluster++;
+            }        
+            break;
+     
+        case 's': /*Substitution in cis-regulatory sequence just kicked one gene copy out of a cluster*/
+            /*find the cis-reg cluster of which gene*/
+            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
             if(genotype->cisreg_cluster[cisreg_seq_cluster_id][1]!=NA) //if a cluster contains more than 1 gene
             {   
                 /*then remove which_gene from the original cluster*/        
@@ -1739,9 +1776,11 @@ void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, in
                 genotype->cisreg_cluster[last_cluster][0]=which_gene;
                 genotype->which_cluster[which_gene]=last_cluster;
             }
-        }
-        else /*is gene deletion*/
-        {               
+            break;
+            
+        case 'w': /*is gene deletion*/
+            /*find the cis-reg cluster of which gene*/
+            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];                    
             if(genotype->cisreg_cluster[cisreg_seq_cluster_id][1]!=NA) //if a cluster contains more than 1 gene
             {   
                 /*then remove which_gene from the original cluster*/        
@@ -1809,40 +1848,42 @@ void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, in
                     j++;
                 }
             }                                            
-        }
+            break;
+            
+        case 'd': /*gene duplication*/  
+            /*find the cis-reg cluster of which gene*/
+            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
+            /*Assuming the last gene is in cis-reg cluster X, check whether the duplicated
+             *gene is also in cluster X*/
+            if(genotype->which_cluster[which_gene]!=genotype->which_cluster[genotype->ngenes-1]) //No
+            {    
+                /*find an empty slot in cisreg_seq_cluster_id*/
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++;
+                /*the duplicated gene is always add to ngene-1. Note that ngenes has not been 
+                 *updated when update_cisreg_cluster is called.*/
+                genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes-1;            
+                /* now find the cis-reg cluster of the effector gene at ngenes-1*/           
+                cisreg_seq_cluster_id_copy=genotype->which_cluster[genotype->ngenes-1];
+                /*find this effector gene in the cluster*/
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=genotype->ngenes-1)i++;
+                /*increase the gene id by 1*/
+                genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=genotype->ngenes;
+            }
+            else //the last gene is duplicated
+            {   
+                /*simply add ngenes to the cis-reg cluster of the last gene*/
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++; //find an empty slot
+                genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes; //add ngenes to the slot
+                genotype->cisreg_cluster[cisreg_seq_cluster_id][i-1]=genotype->ngenes-1; //this is the duplicated gene                     
+            }
+            /*update which_cluster*/
+            genotype->which_cluster[genotype->ngenes]=genotype->which_cluster[genotype->ngenes-1]; 
+            genotype->which_cluster[genotype->ngenes-1]=cisreg_seq_cluster_id;
+            break;
     }
-    else /*gene duplication*/
-    {      
-        /*Assuming the last gene is in cis-reg cluster X, check whether the duplicated
-         *gene is also in cluster X*/
-        if(genotype->which_cluster[which_gene]!=genotype->which_cluster[genotype->ngenes-1]) //No
-        {    
-            /*find an empty slot in cisreg_seq_cluster_id*/
-            i=0;
-            while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++;
-            /*the duplicated gene is always add to ngene-1. Note that ngenes has not been 
-             *updated when update_cisreg_cluster is called.*/
-            genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes-1;            
-            /* now find the cis-reg cluster of the effector gene at ngenes-1*/           
-            cisreg_seq_cluster_id_copy=genotype->which_cluster[genotype->ngenes-1];
-            /*find this effector gene in the cluster*/
-            i=0;
-            while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=genotype->ngenes-1)i++;
-            /*increase the gene id by 1*/
-            genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=genotype->ngenes;
-        }
-        else //the last gene is duplicated
-        {   
-            /*simply add ngenes to the cis-reg cluster of the last gene*/
-            i=0;
-            while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++; //find an empty slot
-            genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes; //add ngenes to the slot
-            genotype->cisreg_cluster[cisreg_seq_cluster_id][i-1]=genotype->ngenes-1; //this is the duplicated gene                     
-        }
-        /*update which_cluster*/
-        genotype->which_cluster[genotype->ngenes]=genotype->which_cluster[genotype->ngenes-1]; 
-        genotype->which_cluster[genotype->ngenes-1]=cisreg_seq_cluster_id;
-    }   
 }
 
 /****************** end of mutation functions *********************************/

@@ -54,7 +54,7 @@ void mut_locus_length(Genotype *, Mutation *, RngStream);
 void mut_Kd(Genotype *, Mutation *, RngStream);
 
 /*generate value of a mutant parameter*/
-float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *);
+float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *, int);
 
 /*activator to repressor or the reverse*/
 void mut_identity(Genotype *, Mutation *, RngStream);
