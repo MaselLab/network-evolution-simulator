@@ -16,7 +16,6 @@
 #define NEUTRAL 0
 #define RUN_FULL_SIMULATION 1
 #define SKIP_INITIAL_GENOTYPE 0
-#define SET_BS_MANUALLY 0
 #define QUICK_BURN_IN 0
 #define EXTERNAL_SIGNAL 0
 
@@ -112,19 +111,12 @@ enum BOOLEAN {NA=-1, NO=0, YES=1};
 
 /*
  * Rates for Gillespie algorithm
- *
- * Events with exponentially-distributed waiting times are:
- * - transcription initiation
- * - mRNA transport and decay
- * - acetylation and deacetylation, 
- * - and PIC assembly and disassembly.
- *
  */
 typedef struct GillespieRates GillespieRates;
 struct GillespieRates {
-  float total_mRNA_decay_rate;         /* rates[2] */
+  float total_mRNA_decay_rate;         
   float mRNA_decay_rate[NGENES];
-  float total_active_to_intermediate_rate;    /* rates[3] */
+  float total_active_to_intermediate_rate;   
   float active_to_intermediate_rate[NGENES]; 
   float total_repressed_to_intermediate_rate;
   float repressed_to_intermediate_rate[NGENES]; 
@@ -146,30 +138,16 @@ struct AllTFBindingSites {
   int N_hindered;    /* the number of BS hindered by this TF when it binds to the current BS */  
 };
 
-//typedef struct Environment Environment;
-//struct Environment {
-//    float signal1_strength;
-//    float signal2_strength;
-//    float t_signal2_on;
-//    float t_signal2_off;
-//    float max_t_in_bias;
-//    float response_amplification;
-//    float benefit1;
-//    float benefit2;
-//    float t_development;
-//    float t_burn_in;
-//    float en
-//};
-
 typedef struct Genotype Genotype;
 struct Genotype {
     int ngenes;                                             /* the number of loci */
-//    int ntfgenes;                                           /* the number of tf loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
     int n_output_genes;
     int n_output_proteins;
-    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */   
+    int nTF_families;
+    int which_protein[NGENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */ 
+    
     char cisreg_seq[NGENES][CISREG_LEN];    
     
     /*these apply to protein, not loci*/
@@ -182,12 +160,20 @@ struct Genotype {
     char tf_binding_seq[NPROTEINS][TF_ELEMENT_LEN];
     char tf_binding_seq_rc[NPROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int protein_pool[NPROTEINS][2][NGENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
+    int which_TF_family[NPROTEINS];                         /* We consider mutation to Kd does not create a new TF (matters when counting motifs), 
+                                                             * but the calculation of TF binding distribution demands tfs with different Kd
+                                                             * to be treated differently. We call tfs that differ only in Kd a tf family.
+                                                             * We use this array and TF_family_pool to track which TF belongs which TF family.
+                                                             */
+    int TF_family_pool[NPROTEINS][2][NPROTEINS];                            
     float Kd[NPROTEINS];
     
     /*these apply to loci*/
+    int locus_length[NGENES];
+    int total_loci_length;
     float mRNA_decay_rate[NGENES];                                /* kinetic rates*/
     float protein_decay_rate[NGENES];                             /* kinetic rates*/
-    float translation_rate[NGENES];                              /* kinetic rates*/   
+    float protein_syn_rate[NGENES];                              /* kinetic rates*/   
     float active_to_intermediate_rate[NGENES];                          /* kinetic rates*/    
     int min_N_activator_to_transc[NGENES];                          /* 1 for OR GATE, at leat 2 FOR AND GATE */ 
     int locus_specific_TF_behavior[NGENES][NPROTEINS];      /* whether a TF behaves as activator or repressor depends on locus*/
@@ -217,12 +203,11 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*measurement of network topology*/
-    int N_motifs[5]; 
+    int N_motifs[11]; 
     int TF_in_core_C1ffl[NGENES][NPROTEINS];
     int gene_in_core_C1ffl[NGENES];
-    int N_act_genes;    
-    int normalizer1;
-    int normalizer2; 
+    int N_act_genes;  
+    int N_act_effector_genes;
 };
 
 /* 
@@ -341,11 +326,49 @@ char RuntimeSumm[32];
 char output_file[32];
 FILE *fperrors;
 
+/*mutation*/
+float SUBSTITUTION; 
+float DUPLICATION;   
+float SILENCING;      
+float MUT_Kd;
+float MUT_ACT_to_INT;
+float MUT_mRNA_decay;
+float MUT_protein_decay;
+float MUT_protein_syn_rate;
+float MUT_identity;
+float MUT_binding_seq;
+float MUT_LOCUS_LENGTH_RATE;
+float MUT_cooperation;
+float MUT_effector_to_TF;
+float MUT_locus_specific_tf_behavior;
+float mutational_regression_rate;
+float sigma_ACT_TO_INT_RATE; 
+float sigma_mRNA_decay; 
+float sigma_protein_decay; 
+float sigma_protein_syn_rate; 
+float sigma_Kd;
+float miu_ACT_TO_INT_RATE;
+float miu_mRNA_decay;
+float miu_protein_decay;
+float miu_protein_syn_rate;
+float miu_Kd;
+const float MAX_ACT_TO_INT_RATE;
+const float MIN_ACT_TO_INT_RATE;
+const float MAX_MRNA_DECAY;
+const float MIN_MRNA_DECAY;
+const float MAX_PROTEIN_DECAY;
+const float MIN_PROTEIN_DECAY;
+const float MAX_PROTEIN_SYN_RATE;
+const float MIN_PROTEIN_SYN_RATE;
+const float MAX_KD;
+const float MIN_KD;
+const float NS_Kd;
+const int MAX_GENE_LENGTH;
+const int MIN_GENE_LENGTH;
+
+
 /* function prototypes */
-
-extern void initialize_parameters();
-
-extern void initialize_growth_rate_parameters();
+char set_base_pair(float);
 
 extern void initialize_sequence(char [], int, int, RngStream);
 
@@ -359,10 +382,6 @@ extern void print_all_binding_sites(int [NGENES],
 //                                    int [NGENES][2]
 									);
 
-extern void print_tf_occupancy(CellState *,
-                               AllTFBindingSites *,
-                               float);
-
 extern void initialize_genotype(Genotype *, RngStream) ;
 
 extern void initialize_genotype_fixed(Genotype *, RngStream);
@@ -370,24 +389,6 @@ extern void initialize_genotype_fixed(Genotype *, RngStream);
 extern void calc_all_binding_sites_copy(Genotype *, int);
 
 extern void calc_all_binding_sites(Genotype *);
-
-extern void set_binding_sites(Genotype *,int *, int (*)[5], int (*)[5], float (*)[5]);
-
-extern void cluster_BS_cluster(Genotype *, int);
-
-extern double calc_flux(AllTFBindingSites *,int,int,double [MAX_BINDING]);
-
-extern float calc_ratio_act_to_rep(AllTFBindingSites *,
-                                    int ,
-                                    int ,
-                                    int ,
-                                    int ,
-                                    int , 
-                                    int [NGENES],                                    
-                                    int ,
-                                    int ,
-                                    int *,
-                                    float [NGENES]);
 
 extern void calc_TF_dist_from_all_BS(  AllTFBindingSites *,
                                         int ,
@@ -543,12 +544,6 @@ extern void calc_cellular_fitness(   Genotype *,
   
 extern int init_run_pop(unsigned long int [6], int);
 
-//extern void print_time_course(TimeCourse *, FILE *);
-//
-//extern void print_all_protein_time_courses(int, TimeCourse **, TimeCourse **, FILE *);
-
-extern int mod(int, int); 
-
 extern void calc_all_rates(Genotype *,
                             CellState *,
                             GillespieRates *,  
@@ -605,51 +600,7 @@ extern int do_fixed_event_plotting( Genotype *,
 
 extern int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, RngStream, int *, int, Mutation *);
 
-extern void mutate(Genotype *, RngStream, Mutation *);
-
-extern void mut_effector2TF(Genotype *, Mutation *, RngStream);
-
-extern void mut_susbtitution(Genotype *, Mutation *, RngStream);
-
-extern void mut_whole_gene_deletion(Genotype *,Mutation *, RngStream);
-
-extern void mut_duplicaton(Genotype *,Mutation *, RngStream);
-
-extern void mut_binding_sequence(Genotype *,Mutation *, RngStream);
-
-extern void mut_kinetic_constant(Genotype *, Mutation *, RngStream);
-
-extern float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *);
-
-extern void mut_identity(Genotype *, Mutation *, RngStream);
-
-extern void mut_Kd(Genotype *, Mutation *, RngStream);
-
-extern void reproduce_mutate(Genotype *, Mutation *,RngStream);
-
-extern void reproduce_effector2TF(Genotype *, Mutation *);
-
-extern void reproduce_susbtitution(Genotype *, Mutation *);
-
-extern void reproduce_whole_gene_deletion(Genotype *,Mutation *);
-
-extern void reproduce_gene_duplicaton(Genotype *,Mutation *);
-
-extern void reproduce_mut_binding_sequence(Genotype *,Mutation *);
-
-extern void reproduce_mut_kinetic_constant(Genotype *, Mutation *);
-
-extern void reproduce_mut_identity(Genotype *, Mutation *);
-
-extern void reproduce_mut_Kd(Genotype *, Mutation *);
-
-extern void draw_mutation(Genotype *, char *, RngStream);
-
 extern void initialize_cache(Genotype *);
-
-extern void update_protein_pool(Genotype *, int, int, char);
-
-extern void update_cisreg_cluster(Genotype *, int, char, int [NGENES][NGENES], int, int);
 
 extern void clone_genotype(Genotype *, Genotype *);
 
@@ -678,8 +629,6 @@ extern void output_genotype(Genotype *, int);
 extern void release_memory(Genotype *,Genotype *, RngStream *, RngStream [N_THREADS]);
 
 extern void calc_fx_dfx(float, int, float, float*, float*, float*, float*, float*, int);
-
-extern void resolve_overlapping_sites(Genotype *, int, int [NGENES]);
 
 extern int evolve_N_steps(  Genotype *, 
                             Genotype *,
@@ -755,8 +704,6 @@ extern void find_i1ffl(Genotype *);
 extern void tidy_output_files(char*, char*);
 
 extern void print_core_i1ffls(Genotype *);
-
-extern void initialization_add_regulation(Genotype *, RngStream);
 
 extern float calc_replicate_fitness(CellState *, int, float, float, float, float, int);
 

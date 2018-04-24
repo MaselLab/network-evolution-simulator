@@ -20,50 +20,50 @@
 
 // System panics need to be handled better, but this will do for the moment.
 // --blr
-static void
-panic(char *file, int line, char *msg){
-	// Notes:  
-	//
-	// The fflush is (strictly speaking) redundant as abort() will also 
-	//   cause all open files to be flushed.  It has been retained for 
-	//   readability.
-	//
-	// abort() bypasses calls to atexit() and onexit() handlers.  The 
-	//   assumption here is that things have gone sufficiently wrong
-	//   that calling those functions would make a bigger mess than 
-	//   avoiding them.  Perhaps "fatal()" could be implemented as an
-	//   additional logging function with a call to "exit()" instead  
-	//   of "abort()" if this proves problematic.
-	//
-	// Example:
-	//    panic( __FILE__, __LINE__, "Can't open kdis.txt." );
-	//
-
-	// Do a sanity check on the two strings.
-	if(file==NULL){
-		file="[Unspecified File]";
-	}
-	if(msg==NULL){
-		msg="[No error msg given.]";
-	}
-
-	// Send panic msg to stderr.  
-        fprintf(stderr, "%s::%d  PANIC:  program aborting. '%s'\n",
-                file, line, msg);
-
-	// If we have an error file, send the message there as well.
-	//   (Not guaranteed to work, which is why we send to stderr first.)
-	if(fperrors!=NULL){
-		fprintf(fperrors, "%s::%d  PANIC:  program aborting. '%s'\n",
-			file, line, msg);
-	}
-
-	// Cleanup code should go here.
-	fflush(NULL);
-
-	// Bye!
-	abort();
-}
+//static void
+//panic(char *file, int line, char *msg){
+//	// Notes:  
+//	//
+//	// The fflush is (strictly speaking) redundant as abort() will also 
+//	//   cause all open files to be flushed.  It has been retained for 
+//	//   readability.
+//	//
+//	// abort() bypasses calls to atexit() and onexit() handlers.  The 
+//	//   assumption here is that things have gone sufficiently wrong
+//	//   that calling those functions would make a bigger mess than 
+//	//   avoiding them.  Perhaps "fatal()" could be implemented as an
+//	//   additional logging function with a call to "exit()" instead  
+//	//   of "abort()" if this proves problematic.
+//	//
+//	// Example:
+//	//    panic( __FILE__, __LINE__, "Can't open kdis.txt." );
+//	//
+//
+//	// Do a sanity check on the two strings.
+//	if(file==NULL){
+//		file="[Unspecified File]";
+//	}
+//	if(msg==NULL){
+//		msg="[No error msg given.]";
+//	}
+//
+//	// Send panic msg to stderr.  
+//        fprintf(stderr, "%s::%d  PANIC:  program aborting. '%s'\n",
+//                file, line, msg);
+//
+//	// If we have an error file, send the message there as well.
+//	//   (Not guaranteed to work, which is why we send to stderr first.)
+//	if(fperrors!=NULL){
+//		fprintf(fperrors, "%s::%d  PANIC:  program aborting. '%s'\n",
+//			file, line, msg);
+//	}
+//
+//	// Cleanup code should go here.
+//	fflush(NULL);
+//
+//	// Bye!
+//	abort();
+//}
 
 // TODO: remove, keep track of comparisons only for debugging
 int sls_store(FixedEvent *i, 
