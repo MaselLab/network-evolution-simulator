@@ -58,18 +58,18 @@ int sls_store(FixedEvent *i,
 }
 
 
-void delete_time_course(TimeCourse *start2)
-{
-  TimeCourse *info, *start;
-  
-  start = start2; 
-   
-  while (start){
-    info = start;
-    start = start->next;
-    free(info);
-  }
-}
+//void delete_time_course(TimeCourse *start2)
+//{
+//  TimeCourse *info, *start;
+//  
+//  start = start2; 
+//   
+//  while (start){
+//    info = start;
+//    start = start->next;
+//    free(info);
+//  }
+//}
 
 /*append to the end*/      
 void sls_store_end(FixedEvent *i, 
@@ -82,12 +82,12 @@ void sls_store_end(FixedEvent *i,
   *last = i;
 }
 
-void sls_store_end2(TimeCourse *i, 
-                    TimeCourse **start, 
-                    TimeCourse **last)
-{
-  i->next = NULL;
-  if (!*last) *start = i;
-  else (*last)->next = i;
-  *last = i;
-}
+//void sls_store_end2(TimeCourse *i, 
+//                    TimeCourse **start, 
+//                    TimeCourse **last)
+//{
+//  i->next = NULL;
+//  if (!*last) *start = i;
+//  else (*last)->next = i;
+//  *last = i;
+//}

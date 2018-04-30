@@ -14,17 +14,24 @@
 #ifndef MUTATION_H
 #define MUTATION_H
 
-#include <stdio.h>
 #include "RngStream.h"
 #include "netsim.h"
+
+/*mutation rate*/
+extern float DUPLICATION;   
+extern float SILENCING;  
+
+/*mutation effect*/
+extern float miu_ACT_TO_INT_RATE;
+extern float miu_protein_syn_rate;
+extern float miu_Kd;
+
 
 /*Maintain loci-protein relation in case of mutation*/
 void update_protein_pool(Genotype *, int, int, char);
 
-void update_protein_pool2(Genotype *, int, int, char);
-
 /*Maintain loci-cisreg_sequence relation*/
-void update_cisreg_cluster(Genotype *, int, char, int [NGENES][NGENES], int, int);
+void update_cisreg_cluster(Genotype *, int, char, int [MAX_GENES][MAX_GENES], int, int);
 
 /*Wrapper of mutation functions*/
 void mutate(Genotype *, RngStream, Mutation *);
@@ -60,7 +67,7 @@ float mut_make_new_value(float, float, float, float, float, RngStream, Mutation 
 void mut_identity(Genotype *, Mutation *, RngStream);
 
 /* Below are functions used to replay mutations*/
-void reproduce_mutate(Genotype *, Mutation *,RngStream);
+void reproduce_mutate(Genotype *, Mutation *);
 
 void reproduce_substitution(Genotype *, Mutation *);
 

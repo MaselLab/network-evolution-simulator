@@ -3,7 +3,6 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include "RngStream.h"
@@ -11,8 +10,34 @@
 #include "numerical.h"
 #include "mutation.h"
 
-const int BOUND_INCLUDED=1;
-const int BOUND_EXCLUDED=0;
+enum mutation_bound {BOUND_EXCLUDED=0,BOUND_INCLUDED=1};
+
+/*Mutation rates*/
+float DUPLICATION=1.5e-7;   
+float SILENCING=1.5e-7; 
+static const float SUBSTITUTION = 3.5e-10; // per bp 
+static const float MUT_Kd=3.5e-9; //per gene
+static const float MUT_identity=3.5e-9; //per gene
+static const float MUT_binding_seq=3.5e-9; //per gene
+static const float MUT_ACT_to_INT=3.5e-9; //per gene
+static const float MUT_mRNA_decay=9.5e-12; //per codon
+static const float MUT_protein_decay=9.5e-12; //per codon
+static const float MUT_protein_syn_rate=9.5e-12; //per codon
+static const float MUT_GENE_LENGTH_RATE=1.2e-11; //per codon
+static const float MUT_cooperation=0.0;
+
+/*Mutational effect*/
+float miu_ACT_TO_INT_RATE=1.57;
+float miu_Kd=-5;       
+float miu_protein_syn_rate=0.021; 
+static const float sigma_ACT_TO_INT_RATE=0.773; 
+static const float sigma_mRNA_decay=0.396; 
+static const float sigma_protein_decay=0.739; 
+static const float sigma_protein_syn_rate=0.76; 
+static const float sigma_Kd=0.78;
+static const float miu_mRNA_decay=-1.19;
+static const float miu_protein_decay=-1.88;
+static const float mutational_regression_rate=0.5;
 
 /*
  ************ begin of mutation functions **************
@@ -656,8 +681,8 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     for(i=0;i<genotype->ngenes;i++)    
         genotype->recalc_TFBS[i]=YES;
     /*decide whether to update cisreg clusters. Mutation to binding seq may differ bs distributions among genes in a cluster*/       
-    int new_clusters[NGENES][NGENES]; // 
-    int genes_in_cluster[NGENES];
+    int new_clusters[MAX_GENES][MAX_GENES]; // 
+    int genes_in_cluster[MAX_GENES];
     int N_genes_in_cluster,no_difference,reference_gene,gene_to_be_sorted;
     int N_new_clusters,N_genes_in_new_cluster,j,k;
     calc_all_binding_sites(genotype); 
@@ -666,9 +691,9 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     {        
         N_new_clusters=0;
         N_genes_in_cluster=0;
-        for(j=0;j<NGENES;j++)
+        for(j=0;j<MAX_GENES;j++)
         {
-            for(k=0;k<NGENES;k++)
+            for(k=0;k<MAX_GENES;k++)
                 new_clusters[j][k]=NA;
         }    
         while(genotype->cisreg_cluster[i][N_genes_in_cluster]!=NA)
@@ -779,7 +804,7 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
     for(i=0;i<genotype->ngenes;i++)
         genotype->recalc_TFBS[i]=YES;
     calc_all_binding_sites(genotype);
-    int new_clusters[NGENES][NGENES],genes_in_cluster[NGENES];
+    int new_clusters[MAX_GENES][MAX_GENES],genes_in_cluster[MAX_GENES];
     int N_genes_in_cluster,no_difference,reference_gene,gene_to_be_sorted;
     int N_new_clusters,N_genes_in_new_cluster,j,k;
     i=N_SIGNAL_TF;
@@ -787,9 +812,9 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
     {        
         N_new_clusters=0;
         N_genes_in_cluster=0;
-        for(j=0;j<NGENES;j++)
+        for(j=0;j<MAX_GENES;j++)
         {
-            for(k=0;k<NGENES;k++)
+            for(k=0;k<MAX_GENES;k++)
                 new_clusters[j][k]=NA;
         }  
         while(genotype->cisreg_cluster[i][N_genes_in_cluster]!=NA)
@@ -1244,7 +1269,7 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
 }
 
 /* this function perform mutation indicated by input. Used to reproduce the genotype following a serial of mutations*/
-void reproduce_mutate(Genotype *genotype, Mutation *mut_record,RngStream RS)
+void reproduce_mutate(Genotype *genotype, Mutation *mut_record)
 { 
     switch (mut_record->mut_type)
     {
@@ -1709,7 +1734,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
  *binding sites, therefore we need to check whether a gene copy is still in the original cis-reg cluster 
  *after mutation.We use cisreg_cluster and which_cluster to track the bi-way relation between a gene and 
  *a cis-reg cluster.*/
-void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, int new_clusters[NGENES][NGENES], int N_new_clusters, int original_cluster_id)
+void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, int new_clusters[MAX_GENES][MAX_GENES], int N_new_clusters, int original_cluster_id)
 {
     /*In a cis-reg cluster, gene copies are ordered ascendingly by their ids. There are no empty slots in the list 
      *of gene copies. Empty slots after the list are marked by -1. We do not track the number of gene copies in a

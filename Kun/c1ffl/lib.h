@@ -11,11 +11,12 @@
 extern int sls_store(FixedEvent *i, 
 		     FixedEvent **start, 
 		      FixedEvent **last);
-extern void delete_time_course(TimeCourse *start2);
+
+//extern void delete_time_course(TimeCourse *start2);
 
 extern void sls_store_end(FixedEvent *i, 
 			  FixedEvent **start, 
 			  FixedEvent **last);
-extern void sls_store_end2(TimeCourse *i, 
-			   TimeCourse **start, 
-			   TimeCourse **last);
+//extern void sls_store_end2(TimeCourse *i, 
+//			   TimeCourse **start, 
+//			   TimeCourse **last);
