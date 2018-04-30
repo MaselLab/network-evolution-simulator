@@ -5,18 +5,7 @@
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <sys/types.h>
-#include <time.h>
-#include <limits.h>
-#include <float.h>
-#include <string.h>
 #include <unistd.h>
-#include <getopt.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include "lib.h"
 #include "netsim.h"
 
 int main()
@@ -25,7 +14,7 @@ int main()
     int i,seed;
     FILE *fp;	
     /*make rng seed*/
-    seed=8;
+	 seed=98;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     /*make filenames*/    
@@ -45,6 +34,7 @@ int main()
         fprintf(fp,"c_transl=%f, penalty=%f\n",c_transl,penalty);
         fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep);  
         fprintf(fp,"minimal activators to transcribe selection gene: %d\n",min_N_activator_to_transc_selection_protein);  
+        fclose(fp);
         init_run_pop(seeds,0);
     }
     else

@@ -19,13 +19,14 @@
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 55000
-#define BURN_IN_I 5000
+#define MAX_MUT_STEP 50500
+#define BURN_IN_I 500
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
 #define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
+#define SAVING_INTERVAL 10
 #define OUTPUT_MUTANT_DETAILS 0
 #define N_TIMP_POINTS 90
 
@@ -198,11 +199,7 @@ struct Genotype {
     int gene_in_core_C1ffl[NGENES];
     int N_act_genes; 
     int N_act_genes_reg_by_env;
-    int N_act_genes_not_reg_by_env;
-    int normalizer1;
-    int normalizer2;
-    int normalizer3;
-    int normalizer4;
+    int N_act_genes_not_reg_by_env;    
 };
 
 /* 
