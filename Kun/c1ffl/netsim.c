@@ -9,12 +9,13 @@
 #include <math.h>
 #include <string.h>
 #include <omp.h>
+#include "netsim.h"
+#include "cellular_activity.h"
+#include "mutation.h"
 #include "numerical.h"
 #include "lib.h"
-#include "netsim.h"
 #include "RngStream.h"
-#include "mutation.h"
-#include "cellular_activity.h"
+
 
 #define INITIALIZATION -1
 #define DO_NOTHING -2

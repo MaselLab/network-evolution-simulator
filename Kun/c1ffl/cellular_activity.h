@@ -11,8 +11,8 @@
  * Created on April 30, 2018, 3:42 PM
  */
 
-#ifndef EXPRESSION_DYNAMICS_H
-#define EXPRESSION_DYNAMICS_H
+#ifndef CELLULAR_ACTIVITY_H
+#define CELLULAR_ACTIVITY_H
 
 #include "netsim.h"
 #include "RngStream.h"
@@ -104,5 +104,6 @@ void initialize_cell(Genotype *, CellState *, Test *, int [MAX_GENES], float [MA
 void do_single_timestep(Genotype *, CellState *, GillespieRates *, Test *, Phenotype *, RngStream) ;
 
 void calc_all_rates(Genotype *, CellState *, GillespieRates *, Test *, int);
+
 #endif /* EXPRESSION_DYNAMICS_H */
 

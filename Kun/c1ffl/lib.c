@@ -213,52 +213,69 @@ void free_fixedevent(CellState *state)
     }
     state->change_signal_strength_head=NULL;
     state->change_signal_strength_tail=NULL;
+    /*sampling*/
+    temp1=state->sampling_point_end_head;
+    while(temp1){
+            temp2=temp1;
+            temp1=temp1->next;            
+            free(temp2);	
+    }
+    state->sampling_point_end_head=NULL;
+    state->sampling_point_end_tail=NULL;
 }
 
 /**returns 0 if new fixed event won't happen concurrently with any exisiting event*/
 int check_concurrence(CellState *state, float t) 
 {   
-    while(state->mRNA_transl_init_time_end_head!=NULL)
+    FixedEvent *pointer;
+    pointer=state->mRNA_transl_init_time_end_head;
+    while(pointer!=NULL)
     {
-        if(t==state->mRNA_transl_init_time_end_head->time)            
+        if(t==pointer->time)            
             return 1;
-        state->mRNA_transl_init_time_end_head=state->mRNA_transl_init_time_end_head->next;
+        pointer=pointer->next;
     }
-    while(state->mRNA_transcr_time_end_head!=NULL)
+    pointer=state->mRNA_transcr_time_end_head;
+    while(pointer!=NULL)
     {
-        if(t==state->mRNA_transcr_time_end_head->time)        
+        if(t==pointer->time)            
             return 1;
-        state->mRNA_transcr_time_end_head=state->mRNA_transcr_time_end_head->next;
+        pointer=pointer->next;
     }
-    while(state->signal_on_head!=NULL)
+    pointer=state->signal_on_head;
+    while(pointer!=NULL)
     {
-        if(t==state->signal_on_head->time)        
-            return 1; 
-        state->signal_on_head=state->signal_on_head->next;
-    }
-    while(state->signal_off_head!=NULL)
-    {
-        if(t==state->signal_off_head->time)            
+        if(t==pointer->time)            
             return 1;
-        state->signal_off_head=state->signal_off_head->next;
+        pointer=pointer->next;
     }
-    while(state->burn_in_growth_rate_head!=NULL)
+    pointer=state->signal_off_head;
+    while(pointer!=NULL)
     {
-        if(t==state->burn_in_growth_rate_head->time)        
-            return 1; 
-        state->burn_in_growth_rate_head=state->burn_in_growth_rate_head->next;
+        if(t==pointer->time)            
+            return 1;
+        pointer=pointer->next;
     }
-    while(state->change_signal_strength_head!=NULL)
+    pointer=state->burn_in_growth_rate_head;
+    while(pointer!=NULL)
     {
-        if(t==state->change_signal_strength_head->time)        
-            return 1; 
-        state->change_signal_strength_head=state->change_signal_strength_head->next;        
+        if(t==pointer->time)            
+            return 1;
+        pointer=pointer->next;
     }
-    while(state->sampling_point_end_head!=NULL)
+    pointer=state->change_signal_strength_head;
+    while(pointer!=NULL)
     {
-        if(t==state->sampling_point_end_head->time)        
-            return 1; 
-        state->sampling_point_end_head=state->sampling_point_end_head;       
+        if(t==pointer->time)            
+            return 1;
+        pointer=pointer->next;
+    }
+    pointer=state->sampling_point_end_head;
+    while(pointer!=NULL)
+    {
+        if(t==pointer->time)            
+            return 1;
+        pointer=pointer->next;
     }
     if(t==state->t_to_update_probability_of_binding)
         return 1;        

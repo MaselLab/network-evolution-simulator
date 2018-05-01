@@ -18,8 +18,8 @@
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 334
-#define BURN_IN 200
+#define MAX_MUT_STEP 500
+#define BURN_IN 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
@@ -40,7 +40,7 @@
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define DIRECT_REG 0
+#define DIRECT_REG 1
 #define NO_PENALTY 0
 #define FORCE_OR_GATE 0
 #if FORCE_OR_GATE
