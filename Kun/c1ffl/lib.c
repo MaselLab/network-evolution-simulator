@@ -12,12 +12,14 @@
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdlib.h>
-#include <math.h>
-#include <sys/stat.h>   /* for file/directory permissions used by mkdir() */
-#include <errno.h>      /* for error codes */
+#include <stdio.h>
 #include "lib.h"
 
-int sls_store(FixedEvent *i, 
+static int sls_store(FixedEvent *i, 
+		     FixedEvent **start, 
+		      FixedEvent **last);
+
+static int sls_store(FixedEvent *i, 
 	      FixedEvent **start, 
 	      FixedEvent **last)
 {
@@ -57,37 +59,222 @@ int sls_store(FixedEvent *i,
   return pos;
 }
 
+/********Global functions******/
 
-//void delete_time_course(TimeCourse *start2)
-//{
-//  TimeCourse *info, *start;
-//  
-//  start = start2; 
-//   
-//  while (start){
-//    info = start;
-//    start = start->next;
-//    free(info);
-//  }
-//}
-
-/*append to the end*/      
-void sls_store_end(FixedEvent *i, 
-                   FixedEvent **start, 
-                   FixedEvent **last)
+/*Add fixed event to queue*/
+int add_fixed_event(int i,
+                    float t,
+                    FixedEvent **start,
+                    FixedEvent **last)
 {
-  i->next = NULL;
-  if (!*last) *start = i;
-  else (*last)->next = i;
-  *last = i;
+    FixedEvent *newtime;
+    int pos;
+    FILE *fp;
+
+    newtime = malloc(sizeof*newtime);
+    if (!newtime) 
+    {
+        fp=fopen("output.txt","a+");
+        fprintf(fp,"error in add_fixed_event\n");
+        fclose(fp); 
+        exit(1);
+    }
+    newtime->event_id = i;  
+    newtime->time = t;
+    pos = sls_store(newtime, start, last);
+    return pos;
 }
 
-//void sls_store_end2(TimeCourse *i, 
-//                    TimeCourse **start, 
-//                    TimeCourse **last)
-//{
-//  i->next = NULL;
-//  if (!*last) *start = i;
-//  else (*last)->next = i;
-//  *last = i;
-//}
+/*delete linked table from anywhere*/
+/*This function is used only to pick up mRNA that is under translation
+ *initiation*/
+void delete_fixed_event(int gene_x,                      
+                        int mRNA_y_of_gene_x,
+                        FixedEvent **head,
+                        FixedEvent **tail)
+{
+    FixedEvent *info, *lastinfo=NULL;
+    int j, done;
+    FILE *fp;
+  
+    j = -1;
+    done = 0;
+    info = *head;
+    while (info) 
+    {
+        if (info->event_id==gene_x) 
+        {
+            j++; //we are looking for the yth mRNA of gene x.
+            if (j == mRNA_y_of_gene_x) 
+            {
+                if (info == *head) //if we found mRNA y in the head of the queue
+                {
+                    *head = info->next; //the original 2nd in queue becomes the new head
+                    if (info == *tail) //if there is only one event in queue, deleting the event leaves an empty queue. 
+                        *tail = NULL; // Therefore the tail of the queue is NULL (the head is set to null in the upper line),                       
+                } 
+                else 
+                {
+                    lastinfo->next = info->next;
+                    if (info == *tail) //if we are going to delete the tail of the queue
+                        *tail = lastinfo; //the original second to last event becomes the new tail
+                }                
+                done = 1; //found mRNA y!
+                break;
+            } 
+            else 
+            {
+                lastinfo = info;
+                info = info->next;
+            }
+        } 
+        else 
+        {
+            lastinfo = info;
+            info = info->next;
+        }
+    }
+    if (done == 0) //if could not find mRNA y
+    {
+        fp=fopen("output.txt","a+");
+        fprintf(fp,"error in delete_fixed_event\n");
+        fclose(fp);        
+        exit(1);
+    }
+    free(info);
+}
+
+void delete_fixed_event_from_head(FixedEvent **head,FixedEvent **tail)
+{
+    FixedEvent *info;
+
+    info = *head;
+    *head = info->next;
+    if (*tail == info) 
+        *tail = NULL;
+    free(info);
+}
+
+/*Free linked tables*/
+void free_fixedevent(CellState *state)
+{
+    FixedEvent *temp1, *temp2;
+    /*signal_on_starts_end*/
+    temp1=state->signal_on_head;
+    while(temp1){		
+            temp2=temp1;
+            temp1=temp1->next;            
+            free(temp2);	
+    }
+    state->signal_on_head=NULL;
+    state->signal_on_tail=NULL;
+    /*signal_off_starts_end*/
+    temp1=state->signal_off_head;
+    while(temp1){
+            temp2=temp1;
+            temp1=temp1->next;            
+            free(temp2);	
+    }
+    state->signal_off_head=NULL;
+    state->signal_off_tail=NULL;
+    /*mRNA_transcr_time_end*/
+    temp1=state->mRNA_transcr_time_end_head;
+    while(temp1){
+            temp2=temp1;
+            temp1=temp1->next;           
+            free(temp2);	
+    }
+    state->mRNA_transcr_time_end_head=NULL;
+    state->mRNA_transcr_time_end_tail=NULL;
+    /*mRNA_transl_init_time_end*/
+    temp1=state->mRNA_transl_init_time_end_head;
+    while(temp1){
+            temp2=temp1;
+            temp1=temp1->next;            
+            free(temp2);	
+    }
+    state->mRNA_transl_init_time_end_head=NULL;
+    state->mRNA_transl_init_time_end_tail=NULL;
+    /*burn_in_growth_rate_end*/
+    temp1=state->burn_in_growth_rate_head;
+    while(temp1){
+            temp2=temp1;
+            temp1=temp1->next;            
+            free(temp2);	
+    }
+    state->burn_in_growth_rate_head=NULL;
+    state->burn_in_growth_rate_tail=NULL;
+    /*change_singal_strength_head*/
+    temp1=state->change_signal_strength_head;
+    while(temp1){
+            temp2=temp1;
+            temp1=temp1->next;            
+            free(temp2);	
+    }
+    state->change_signal_strength_head=NULL;
+    state->change_signal_strength_tail=NULL;
+}
+
+/**returns 0 if new fixed event won't happen concurrently with any exisiting event*/
+int check_concurrence(CellState *state, float t) 
+{   
+    while(state->mRNA_transl_init_time_end_head!=NULL)
+    {
+        if(t==state->mRNA_transl_init_time_end_head->time)            
+            return 1;
+        state->mRNA_transl_init_time_end_head=state->mRNA_transl_init_time_end_head->next;
+    }
+    while(state->mRNA_transcr_time_end_head!=NULL)
+    {
+        if(t==state->mRNA_transcr_time_end_head->time)        
+            return 1;
+        state->mRNA_transcr_time_end_head=state->mRNA_transcr_time_end_head->next;
+    }
+    while(state->signal_on_head!=NULL)
+    {
+        if(t==state->signal_on_head->time)        
+            return 1; 
+        state->signal_on_head=state->signal_on_head->next;
+    }
+    while(state->signal_off_head!=NULL)
+    {
+        if(t==state->signal_off_head->time)            
+            return 1;
+        state->signal_off_head=state->signal_off_head->next;
+    }
+    while(state->burn_in_growth_rate_head!=NULL)
+    {
+        if(t==state->burn_in_growth_rate_head->time)        
+            return 1; 
+        state->burn_in_growth_rate_head=state->burn_in_growth_rate_head->next;
+    }
+    while(state->change_signal_strength_head!=NULL)
+    {
+        if(t==state->change_signal_strength_head->time)        
+            return 1; 
+        state->change_signal_strength_head=state->change_signal_strength_head->next;        
+    }
+    while(state->sampling_point_end_head!=NULL)
+    {
+        if(t==state->sampling_point_end_head->time)        
+            return 1; 
+        state->sampling_point_end_head=state->sampling_point_end_head;       
+    }
+    if(t==state->t_to_update_probability_of_binding)
+        return 1;        
+    return 0;
+}
+
+void release_memory(Genotype *resident,Genotype *mutant, RngStream *RS_main, RngStream RS_parallel[N_THREADS])
+{
+    int i;    
+    for(i=0;i<MAX_GENES;i++)
+    {
+        free(resident->all_binding_sites[i]);
+        free(mutant->all_binding_sites[i]);
+    }
+    RngStream_DeleteStream(RS_main);  
+    
+    for(i=0;i<N_THREADS;i++)
+        RngStream_DeleteStream(&(RS_parallel[i])); 
+}

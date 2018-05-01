@@ -27,12 +27,6 @@ extern float miu_protein_syn_rate;
 extern float miu_Kd;
 
 
-/*Maintain loci-protein relation in case of mutation*/
-void update_protein_pool(Genotype *, int, int, char);
-
-/*Maintain loci-cisreg_sequence relation*/
-void update_cisreg_cluster(Genotype *, int, char, int [MAX_GENES][MAX_GENES], int, int);
-
 /*Wrapper of mutation functions*/
 void mutate(Genotype *, RngStream, Mutation *);
 
@@ -59,9 +53,6 @@ void mut_locus_length(Genotype *, Mutation *, RngStream);
 
 /*mutate Kd of a TF*/
 void mut_Kd(Genotype *, Mutation *, RngStream);
-
-/*generate value of a mutant parameter*/
-float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *, int);
 
 /*activator to repressor or the reverse*/
 void mut_identity(Genotype *, Mutation *, RngStream);

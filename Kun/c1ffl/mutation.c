@@ -39,8 +39,533 @@ static const float miu_mRNA_decay=-1.19;
 static const float miu_protein_decay=-1.88;
 static const float mutational_regression_rate=0.5;
 
+/*private function prototypes*/
+static float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *, int);
+
+static void update_protein_pool(Genotype *, int, int, char);
+
+static void update_cisreg_cluster(Genotype *, int, char, int [MAX_GENES][MAX_GENES], int, int);
+
+/*generate value of a mutant parameter*/
+static float mut_make_new_value(float old_val, float miu, float sigma, float upper_bound, float lower_bound, RngStream RS, Mutation *mut_record, int boudary_condition)
+{
+    float new_val;
+    new_val=old_val;
+    while(new_val==old_val) 
+    {
+        new_val=old_val*pow(10.0,sigma*gasdev(RS)+mutational_regression_rate*(miu-log10(old_val)));
+        if(boudary_condition==BOUND_INCLUDED)
+        {
+            if(new_val>upper_bound)
+            {
+                new_val=upper_bound;
+                mut_record->N_hit_bound++;
+            }
+            if(new_val<lower_bound)
+            {
+                new_val=lower_bound;
+                mut_record->N_hit_bound++;
+            }
+        }
+        else
+        {
+            if(new_val>=upper_bound || new_val<=lower_bound)
+            {
+                new_val=old_val;
+                mut_record->N_hit_bound++;
+            }
+        }
+        
+    }
+    return new_val;
+}
+
 /*
- ************ begin of mutation functions **************
+ *Maintain loci-protein relation in case of mutation.
+ *We use which_protein to look for the protein encoded by a given gene copy,
+ *and protein_pool to look for genes encoding a given protein. These two tables
+ *are updated upon mutations.
+ */
+static void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, char mut_type)
+{
+    int i, j, protein_id, gene_id, tf_family_id; 
+    /*Protein_pool stores the numbers of gene copies that encode a given protein, and the ids of these gene copies.
+     *One important thing is that the genes encoding a given protein are not stored by the order of their ids in protein_pool.
+     *To delete a gene, which might be the only gene, encoding a given protein, we shift protein_pool to overwrite the to-be-deleted gene
+     *We need to update the ids of the remaining genes and proteins
+     *For gene duplication, the new gene is always add to the end of the list of genes encoding a given protein.
+     *A new protein is also add to the end of protein_pool
+     *which_protein can be updated easily. Changing which protein a gene encodes is always easy. For deletion, 
+     *we just shift the array to overwrite the to-be-deleted gene and update the ids of the remaining genes.*/ 
+    switch (mut_type)
+    {
+        case 'w':/*a whole gene deletion*/        
+            if(genotype->protein_pool[which_protein][0][0]==1) /* if this is the only gene copy,we also need to delete a protein*/
+            {   
+                /*
+                 * UPDATE protein_pool for protein>=which_protein
+                 */
+                protein_id=which_protein;
+                /*shift protein>which_protein to overwrite the to-be-deleted protein*/
+                for(i=0;i<genotype->nproteins-which_protein;i++)  
+                {   
+                    /*reset the portion of protein_pool to be overwritten*/
+                    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
+                        genotype->protein_pool[protein_id][1][j]=NA;
+                    /*overwrite*/
+                    genotype->protein_pool[protein_id][0][0]=genotype->protein_pool[protein_id+1][0][0]; //this is number of gene copies encoding a protein
+                    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
+                    {
+                        gene_id=genotype->protein_pool[protein_id+1][1][j];//these are the gene copies encoding a protein
+                        /*note that deletion changes the ids of the remaining genes!!! Any gene that is greater than which_gene is reduced by one*/
+                        genotype->protein_pool[protein_id][1][j]=(gene_id>which_gene)?gene_id-1:gene_id;
+                    }            
+                    protein_id++;
+                }
+                /*
+                 * SPECIAL CASE: if a tf PROTEIN is deleted, we need to change the number of TF proteins and update TF_family_pool
+                 */                
+                if(which_protein<genotype->nproteins-1) 
+                {   
+                    /* reduce the number of activators or that of repressors */ 
+                    if(genotype->protein_identity[which_protein]==ACTIVATOR) 
+                        genotype->N_act--;
+                    else if(genotype->protein_identity[which_protein]==REPRESSOR)
+                        genotype->N_rep--;
+                    /* also remove it from activating and kd */
+                    protein_id=which_protein;
+                    for(i=0;i<genotype->nproteins-which_protein-1;i++)
+                    {
+                        genotype->protein_identity[protein_id]=genotype->protein_identity[protein_id+1];
+                        genotype->Kd[protein_id]=genotype->Kd[protein_id+1];
+                        protein_id++;
+                    }  
+                    /* update TF_family_pool*/
+                    tf_family_id=genotype->which_TF_family[which_protein];
+                    if(genotype->TF_family_pool[tf_family_id][0][0]==1) /*there is one member in the family, so delete the family*/
+                    {
+                        /*shift tf_family_id to overwrite*/
+                        for(i=tf_family_id;i<genotype->nTF_families;i++)
+                        {
+                            /*reset entries of family i*/
+                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
+                                genotype->TF_family_pool[i][1][j]=NA;
+                            /*copy entries of family i+1 to family i. Proteins with id > protein_id needs a new id */
+                            for(j=0;j<genotype->TF_family_pool[i+1][0][0];j++)
+                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i+1][1][j]>which_protein)?genotype->TF_family_pool[i+1][1][j]-1:genotype->TF_family_pool[i+1][1][j];
+                            genotype->TF_family_pool[i][0][0]=genotype->TF_family_pool[i+1][0][0];
+                        }
+                        /* update the protein id for tf family < tf_family_id*/
+                        for(i=0;i<tf_family_id;i++)
+                        {
+                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
+                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>which_protein)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
+                        }
+                        /*update nTF_family*/
+                        genotype->nTF_families--;
+                        /*shift which_tf_family and update the family id of protein with family id > tf_family_id*/
+                        for(i=which_protein;i<genotype->nproteins-1;i++)
+                            genotype->which_TF_family[i]=(genotype->which_TF_family[i+1]>tf_family_id)?genotype->which_TF_family[i+1]-1:genotype->which_TF_family[i+1];
+                        /*update the family id for proteins < which_protein*/
+                        for(i=0;i<which_protein;i++)
+                            genotype->which_TF_family[i]=(genotype->which_TF_family[i]>tf_family_id)?genotype->which_TF_family[i]-1:genotype->which_TF_family[i];
+                    }
+                    else /* the tf family has multiple proteins, no need to delete the family*/
+                    {
+                        /*find where is protein_id in its family*/
+                        for(i=0;i<genotype->TF_family_pool[tf_family_id][0][0];i++)
+                        {
+                            if(genotype->TF_family_pool[tf_family_id][1][i]==which_protein)
+                                break;
+                        }
+                        /*shift entries in its family*/
+                        for(;i<genotype->TF_family_pool[tf_family_id][0][0];i++)
+                            genotype->TF_family_pool[tf_family_id][1][i]=genotype->TF_family_pool[tf_family_id][1][i+1];
+                        genotype->TF_family_pool[tf_family_id][0][0]--;
+                        /*update protein ids in all families*/
+                        for(i=0;i<genotype->nTF_families;i++)
+                        {
+                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
+                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>which_protein)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
+                        } 
+                        /*shift which_tf_family*/
+                        for(i=which_protein;i<genotype->nproteins-1;i++)
+                            genotype->which_TF_family[i]=genotype->which_TF_family[i+1];
+                    }
+                    /* in the case, all genes need to recalc binding sites*/
+                    for(i=N_SIGNAL_TF;i<which_gene;i++)                    
+                        genotype->recalc_TFBS[i]=YES; /* recalc BS */                                       
+                }  
+                /*
+                 * UPDATE which_protein
+                 */
+                /* update which_protein for gene<which_gene in which_protein*/
+                for(i=N_SIGNAL_TF;i<which_gene;i++)
+                    genotype->which_protein[i]=(genotype->which_protein[i]<which_protein)?genotype->which_protein[i]:genotype->which_protein[i]-1;//the deletion also changes the ids of proteins
+                /* shift and update which_protein for gene>=which_gene in which_protein*/                
+                for(i=which_gene;i<genotype->ngenes;i++)
+                    genotype->which_protein[i]=(genotype->which_protein[i+1]>which_protein)?genotype->which_protein[i+1]-1:genotype->which_protein[i+1];                   
+                /*one less protein*/
+                genotype->nproteins--;
+            }  
+            else /*if the protein has more than one genes*/
+            {
+                /*
+                 * UPDATE protein_pool for protein>=which_protein
+                 */
+                /* find where is this which_gene*/
+                i=0;
+                while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++; 
+                /*shift protein_pool to overwrite which_gene, and update ids of genes*/
+                j=i;
+                for(;i<genotype->protein_pool[which_protein][0][0];i++)
+                    genotype->protein_pool[which_protein][1][i]=(genotype->protein_pool[which_protein][1][i+1]>which_gene)?genotype->protein_pool[which_protein][1][i+1]-1:genotype->protein_pool[which_protein][1][i+1];// deletion changes the ids of genes!!!
+                /*also update the ids for genes before j*/
+                for(i=0;i<j;i++)
+                    genotype->protein_pool[which_protein][1][i]=(genotype->protein_pool[which_protein][1][i]>which_gene)?genotype->protein_pool[which_protein][1][i]-1:genotype->protein_pool[which_protein][1][i];                            
+                /*one less copy encoding which_protein*/
+                genotype->protein_pool[which_protein][0][0]--;                
+                /*update the ids of genes in protein>which_protein*/                
+                for(i=which_protein+1;i<genotype->nproteins;i++)  
+                {   
+                    for(j=0;j<genotype->protein_pool[i][0][0];j++)
+                        genotype->protein_pool[i][1][j]=(genotype->protein_pool[i][1][j]>which_gene)?genotype->protein_pool[i][1][j]-1:genotype->protein_pool[i][1][j];//note that deletion changes the ids of genes!!!
+                }
+                /*
+                 * UPDATE which_protein
+                 */
+                /*shift which_protein to delete which_gene*/
+                for(i=which_gene;i<genotype->ngenes;i++)
+                    genotype->which_protein[i]=genotype->which_protein[i+1];                
+            }
+            /*
+             * UPDATE protein_pool for protein<which_protein
+             */           
+            for(i=N_SIGNAL_TF;i<which_protein;i++)
+            {
+                for(j=0;j<genotype->protein_pool[i][0][0];j++)
+                    genotype->protein_pool[i][1][j]=(genotype->protein_pool[i][1][j]<which_gene)?genotype->protein_pool[i][1][j]:genotype->protein_pool[i][1][j]-1;
+            }            
+            break;
+        case 'd': /*a gene duplication*/
+            /* add it to protein_pool, but do not change nproteins*/    
+            genotype->protein_pool[which_protein][1][genotype->protein_pool[which_protein][0][0]]=genotype->ngenes-1; //the newly duplicated gene takes the original place of the effector gene
+            genotype->protein_pool[which_protein][0][0]++; 
+            /*update the id of the original effector gene stored in protein_pool*/           
+            j=0;
+            while(genotype->protein_pool[genotype->nproteins-1][1][j]!=genotype->ngenes-1)j++;
+            genotype->protein_pool[genotype->nproteins-1][1][j]++; 
+            /*update which_protein*/          
+            genotype->which_protein[genotype->ngenes]=genotype->nproteins-1;//points to the effector protein       
+            genotype->which_protein[genotype->ngenes-1]=which_protein;            
+            break;
+        case 'c': /*mutation in tf binding seq, creating a new tf and a new TF family*/
+            /* remove this copy of gene from the original protein_pool*/
+            i=0;
+            while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++;
+            /*shift to delete which_gene*/
+            for(;i<genotype->protein_pool[which_protein][0][0];i++) 
+                genotype->protein_pool[which_protein][1][i]= genotype->protein_pool[which_protein][1][i+1]; 
+            /*one less gene copy to encoding which_protein*/
+            genotype->protein_pool[which_protein][0][0]--;
+            /* increase the protein id of the effector protein to make room for the new tf*/ 
+            genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
+            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
+            {
+                genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j]; //shift the protein pool of effector gene
+                genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;//update which_protein
+                genotype->protein_pool[genotype->nproteins-1][1][j]=NA; //reset the original protein pool of the effector 
+            }                       
+            /* create a new protein and link it to which_gene*/
+            genotype->which_protein[which_gene]=genotype->nproteins-1; //put the new protein to the original place of the effector protein
+            genotype->protein_pool[genotype->nproteins-1][0][0]=1;
+            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;
+            /* update activator or repressor numbers, and activating*/
+            if(genotype->protein_identity[which_protein]==ACTIVATOR) //mutation to binding seq does not change the identity of a tf
+                genotype->N_act++;
+            else if(genotype->protein_identity[which_protein]==REPRESSOR)
+                genotype->N_rep++;
+            genotype->protein_identity[genotype->nproteins-1]=genotype->protein_identity[which_protein];
+            /* update Kd*/
+            genotype->Kd[genotype->nproteins-1]=genotype->Kd[which_protein];
+            /* make a new tf family and add in the new tf*/
+            genotype->TF_family_pool[genotype->nTF_families][0][0]=1;
+            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins-1;
+            genotype->which_TF_family[genotype->nproteins-1]=genotype->nTF_families;
+            /* update tf family number*/
+            genotype->nTF_families++;
+            /* finally, update protein numbers*/
+            genotype->nproteins++;            
+            break;            
+        case 'e': /*mutation in the identity of a TF, creating a new tf and a new tf family*/
+            /* remove this copy of gene from the original protein*/
+            i=0;
+            while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++;
+            for(;i<genotype->protein_pool[which_protein][0][0];i++) 
+            {
+                genotype->protein_pool[which_protein][1][i]= genotype->protein_pool[which_protein][1][i+1]; 
+            }
+            genotype->protein_pool[which_protein][0][0]--;
+            /* increase the protein id of the effector protein*/               
+            genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
+            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
+            {
+                genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
+                genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
+                genotype->protein_pool[genotype->nproteins-1][1][j]=NA;
+            }            
+            /* create a new protein and link it to which_gene*/
+            genotype->which_protein[which_gene]=genotype->nproteins-1; 
+            genotype->protein_pool[genotype->nproteins-1][0][0]=1;
+            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;
+            /* update activating*/
+            if(genotype->protein_identity[which_protein]==ACTIVATOR) 
+                genotype->N_rep++;  /* an activator turns into a repressor */
+            else if(genotype->protein_identity[which_protein]==REPRESSOR)
+                genotype->N_act++;
+            genotype->protein_identity[genotype->nproteins-1]=genotype->protein_identity[which_protein];
+            /* update Kd*/
+            genotype->Kd[genotype->nproteins-1]=genotype->Kd[which_protein];
+            /* make a new tf family and add in the new tf*/
+            genotype->TF_family_pool[genotype->nTF_families][0][0]=1;
+            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins-1;
+            genotype->which_TF_family[genotype->nproteins-1]=genotype->nTF_families;
+            /* update tf family number*/
+            genotype->nTF_families++;
+            /* finally, update protein numbers*/
+            genotype->nproteins++;           
+            break;            
+        case 'f': /*mutation in tf kd, creating a new tf, BUT NOT CREATING NEW TF FAMILY*/
+            /* remove this copy of gene from the original protein pool*/
+            i=0;
+            while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++;
+            for(;i<genotype->protein_pool[which_protein][0][0];i++) 
+            {
+                genotype->protein_pool[which_protein][1][i]= genotype->protein_pool[which_protein][1][i+1]; /* rearrange data array */
+            }
+            genotype->protein_pool[which_protein][0][0]--;
+            /* increase the protein id of the effector protein*/               
+            genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
+            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
+            {
+                genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
+                genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
+                genotype->protein_pool[genotype->nproteins-1][1][j]=NA;
+            }            
+            /* create a new protein and link it to this gene*/
+            genotype->which_protein[which_gene]=genotype->nproteins-1; 
+            genotype->protein_pool[genotype->nproteins-1][0][0]=1;
+            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;   
+            /* add the new protein to the original protein's family*/
+            tf_family_id=genotype->which_TF_family[which_protein];
+            genotype->TF_family_pool[tf_family_id][1][genotype->TF_family_pool[tf_family_id][0][0]]=genotype->nproteins-1;
+            genotype->TF_family_pool[tf_family_id][0][0]++;
+            genotype->which_TF_family[genotype->nproteins-1]=tf_family_id;
+            /* update activating*/
+            if(genotype->protein_identity[which_protein]==ACTIVATOR) 
+                genotype->N_act++;  
+            else if(genotype->protein_identity[which_protein]==REPRESSOR) 
+                genotype->N_rep++;
+            genotype->protein_identity[genotype->nproteins-1]=genotype->protein_identity[which_protein];  
+            /* finally, update protein numbers*/
+            genotype->nproteins++;
+            /* NOTE: this mutation does not change the number of genes*/
+            break;
+    }
+}
+
+
+/* Maintain loci-cisreg_sequence relation
+ *To reduce the amount of calculation on the probability of binding distributions, we group gene copies
+ *that are created by whole gene duplication. We call such a group a cis-reg cluster because gene copies 
+ *in the group should have the same cis-reg sequence. For each cis-reg cluster we only need to calculate
+ *the probability of binding distributions once. However, substitutions is cis-reg sequence can create/remove
+ *binding sites, therefore we need to check whether a gene copy is still in the original cis-reg cluster 
+ *after mutation.We use cisreg_cluster and which_cluster to track the bi-way relation between a gene and 
+ *a cis-reg cluster.*/
+static void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, int new_clusters[MAX_GENES][MAX_GENES], int N_new_clusters, int original_cluster_id)
+{
+    /*In a cis-reg cluster, gene copies are ordered ascendingly by their ids. There are no empty slots in the list 
+     *of gene copies. Empty slots after the list are marked by -1. We do not track the number of gene copies in a
+     *cluster. In order to count the number of gene copies correctly, marking the empty slots accurately become important.
+     *Therefore, we always set all the slots in a cluster to -1, when deleting or overwrting the cluster. 
+     */
+    int cisreg_seq_cluster_id, cisreg_seq_cluster_id_copy, i, j, last_cluster; 
+    switch(mut_type)
+    {
+        case 'c': //a mutation to the binding sequence of a TF happened. this can create new clusters.
+            /*reset the original cisreg_cluster*/
+            i=0;
+            while(genotype->cisreg_cluster[original_cluster_id][i]!=NA)
+            {
+                genotype->cisreg_cluster[original_cluster_id][i]=NA;
+                i++;
+            }
+            /*assign the first new cluster to the original cluster*/
+            i=0;
+            while(new_clusters[0][i]!=NA)
+            {
+                genotype->cisreg_cluster[original_cluster_id][i]=new_clusters[0][i];
+                genotype->which_cluster[new_clusters[0][i]]=original_cluster_id;
+                i++;
+            }
+            /*find a empty slot in cisreg_cluster for the rest of new clusters*/    
+            last_cluster=N_SIGNAL_TF;
+            while(genotype->cisreg_cluster[last_cluster][0]!=NA)last_cluster++;//an empty cluster has all of its slots marked by -1
+            /*assign the rest of new clusters into empty slots*/       
+            for(i=1;i<N_new_clusters;i++)
+            {
+                /*reset the empty cluster, just in case*/
+                j=0;
+                while(genotype->cisreg_cluster[last_cluster][j]!=NA)j++;
+                /*assign new clusters*/
+                j=0;
+                while(new_clusters[i][j]!=NA)
+                {
+                    genotype->cisreg_cluster[last_cluster][j]=new_clusters[i][j];
+                    genotype->which_cluster[new_clusters[i][j]]=last_cluster;
+                    j++;
+                }
+                last_cluster++;
+            }        
+            break;
+     
+        case 's': /*Substitution in cis-regulatory sequence just kicked one gene copy out of a cluster*/
+            /*find the cis-reg cluster of which gene*/
+            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
+            if(genotype->cisreg_cluster[cisreg_seq_cluster_id][1]!=NA) //if a cluster contains more than 1 gene
+            {   
+                /*then remove which_gene from the original cluster*/        
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=which_gene) i++;
+                /*shift the slots to overwrite which_gene*/
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)
+                {
+                    genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->cisreg_cluster[cisreg_seq_cluster_id][i+1];
+                    i++;
+                }                     
+                /* and create a new cluster*/
+                last_cluster=N_SIGNAL_TF; // start from the first non-signal-tf gene
+                while(genotype->cisreg_cluster[last_cluster][0]!=NA) last_cluster++; 
+                genotype->cisreg_cluster[last_cluster][0]=which_gene;
+                genotype->which_cluster[which_gene]=last_cluster;
+            }
+            break;
+            
+        case 'w': /*is gene deletion*/
+            /*find the cis-reg cluster of which gene*/
+            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];                    
+            if(genotype->cisreg_cluster[cisreg_seq_cluster_id][1]!=NA) //if a cluster contains more than 1 gene
+            {   
+                /*then remove which_gene from the original cluster*/        
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=which_gene) i++;
+                /*shift to overwrite which_gene, and update ids of the remaining genes*/
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)
+                {      
+                    /*note that gene copies are ordered ascendingly*/
+                    genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=(genotype->cisreg_cluster[cisreg_seq_cluster_id][i+1]==NA)?NA:(genotype->cisreg_cluster[cisreg_seq_cluster_id][i+1]-1); 
+                    i++;
+                }               
+                /*take care of clusters>cisreg_seq_cluster_id*/
+                cisreg_seq_cluster_id_copy=cisreg_seq_cluster_id+1;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][0]!=NA)
+                {
+                    i=0;
+                    while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=NA)
+                    {
+                        genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]<which_gene)?genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]:genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]-1;
+                        i++;
+                    }
+                    cisreg_seq_cluster_id_copy++;
+                }              
+                /*update which_cluster*/
+                for(i=which_gene;i<genotype->ngenes;i++)                              
+                    genotype->which_cluster[i]=genotype->which_cluster[i+1];               
+            }
+            else//if a cluster contains only 1 gene
+            {   
+                /*need to shift cisreg_cluster*/ 
+                cisreg_seq_cluster_id_copy=cisreg_seq_cluster_id;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][0]!=NA)
+                {
+                    /*reset cluster=cisreg_seq_cluster_id_copy*/
+                    i=0;
+                    while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=NA)
+                    {
+                        genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=NA;
+                        i++;
+                    }
+                    /*then copy from cluster=cisreg_seq_cluster_id_copy+1*/                    
+                    i=0;
+                    while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]!=NA)
+                    {                        
+                        genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]<which_gene)?genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]:genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]-1; /*note deletion changes gene thread_ID*/
+                        i++;
+                    }
+                    cisreg_seq_cluster_id_copy++;
+                }
+                /*shift which_cluster and update cluster ids for gene>=which_gene*/                
+                for(i=which_gene;i<genotype->ngenes;i++)                                
+                    genotype->which_cluster[i]=(genotype->which_cluster[i+1]<cisreg_seq_cluster_id)?genotype->which_cluster[i+1]:genotype->which_cluster[i+1]-1;
+                /*update cluster ids for gene<which_gene*/
+                for(i=N_SIGNAL_TF;i<which_gene;i++)
+                    genotype->which_cluster[i]=(genotype->which_cluster[i]>cisreg_seq_cluster_id)?genotype->which_cluster[i]-1:genotype->which_cluster[i];
+            }
+            /*update gene ids in clusters<cisreg_seq_cluster_id*/
+            for(i=N_SIGNAL_TF;i<cisreg_seq_cluster_id;i++)
+            {
+                j=0;
+                while(genotype->cisreg_cluster[i][j]!=NA)
+                {
+                    genotype->cisreg_cluster[i][j]=(genotype->cisreg_cluster[i][j]<which_gene)?genotype->cisreg_cluster[i][j]:genotype->cisreg_cluster[i][j]-1;
+                    j++;
+                }
+            }                                            
+            break;
+            
+        case 'd': /*gene duplication*/  
+            /*find the cis-reg cluster of which gene*/
+            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
+            /*Assuming the last gene is in cis-reg cluster X, check whether the duplicated
+             *gene is also in cluster X*/
+            if(genotype->which_cluster[which_gene]!=genotype->which_cluster[genotype->ngenes-1]) //No
+            {    
+                /*find an empty slot in cisreg_seq_cluster_id*/
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++;
+                /*the duplicated gene is always add to ngene-1. Note that ngenes has not been 
+                 *updated when update_cisreg_cluster is called.*/
+                genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes-1;            
+                /* now find the cis-reg cluster of the effector gene at ngenes-1*/           
+                cisreg_seq_cluster_id_copy=genotype->which_cluster[genotype->ngenes-1];
+                /*find this effector gene in the cluster*/
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=genotype->ngenes-1)i++;
+                /*increase the gene id by 1*/
+                genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=genotype->ngenes;
+            }
+            else //the last gene is duplicated
+            {   
+                /*simply add ngenes to the cis-reg cluster of the last gene*/
+                i=0;
+                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++; //find an empty slot
+                genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes; //add ngenes to the slot
+                genotype->cisreg_cluster[cisreg_seq_cluster_id][i-1]=genotype->ngenes-1; //this is the duplicated gene                     
+            }
+            /*update which_cluster*/
+            genotype->which_cluster[genotype->ngenes]=genotype->which_cluster[genotype->ngenes-1]; 
+            genotype->which_cluster[genotype->ngenes-1]=cisreg_seq_cluster_id;
+            break;
+    }
+}
+
+/****************** private functions *********************************/
+
+
+
+/*
+ ************ Global functions **************
  */
 /*single nucleic acid substitution in cis-reg*/
 void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
@@ -981,39 +1506,6 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, RngStream RS
     }
 }
 
-float mut_make_new_value(float old_val, float miu, float sigma, float upper_bound, float lower_bound, RngStream RS, Mutation *mut_record, int boudary_condition)
-{
-    float new_val;
-    new_val=old_val;
-    while(new_val==old_val) 
-    {
-        new_val=old_val*pow(10.0,sigma*gasdev(RS)+mutational_regression_rate*(miu-log10(old_val)));
-        if(boudary_condition==BOUND_INCLUDED)
-        {
-            if(new_val>upper_bound)
-            {
-                new_val=upper_bound;
-                mut_record->N_hit_bound++;
-            }
-            if(new_val<lower_bound)
-            {
-                new_val=lower_bound;
-                mut_record->N_hit_bound++;
-            }
-        }
-        else
-        {
-            if(new_val>=upper_bound || new_val<=lower_bound)
-            {
-                new_val=old_val;
-                mut_record->N_hit_bound++;
-            }
-        }
-        
-    }
-    return new_val;
-}
-
 void reproduce_mut_kinetic_constant(Genotype *genotype, Mutation *mut_record)
 {    
     int which_gene;            
@@ -1432,484 +1924,3 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
         }  
     }
 }
-
-/*
- *We use which_protein to look for the protein encoded by a given gene copy,
- *and protein_pool to look for genes encoding a given protein. These two tables
- *are updated upon mutations.
- */
-void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, char mut_type)
-{
-    int i, j, protein_id, gene_id, tf_family_id; 
-    /*Protein_pool stores the numbers of gene copies that encode a given protein, and the ids of these gene copies.
-     *One important thing is that the genes encoding a given protein are not stored by the order of their ids in protein_pool.
-     *To delete a gene, which might be the only gene, encoding a given protein, we shift protein_pool to overwrite the to-be-deleted gene
-     *We need to update the ids of the remaining genes and proteins
-     *For gene duplication, the new gene is always add to the end of the list of genes encoding a given protein.
-     *A new protein is also add to the end of protein_pool
-     *which_protein can be updated easily. Changing which protein a gene encodes is always easy. For deletion, 
-     *we just shift the array to overwrite the to-be-deleted gene and update the ids of the remaining genes.*/ 
-    switch (mut_type)
-    {
-        case 'w':/*a whole gene deletion*/        
-            if(genotype->protein_pool[which_protein][0][0]==1) /* if this is the only gene copy,we also need to delete a protein*/
-            {   
-                /*
-                 * UPDATE protein_pool for protein>=which_protein
-                 */
-                protein_id=which_protein;
-                /*shift protein>which_protein to overwrite the to-be-deleted protein*/
-                for(i=0;i<genotype->nproteins-which_protein;i++)  
-                {   
-                    /*reset the portion of protein_pool to be overwritten*/
-                    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
-                        genotype->protein_pool[protein_id][1][j]=NA;
-                    /*overwrite*/
-                    genotype->protein_pool[protein_id][0][0]=genotype->protein_pool[protein_id+1][0][0]; //this is number of gene copies encoding a protein
-                    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
-                    {
-                        gene_id=genotype->protein_pool[protein_id+1][1][j];//these are the gene copies encoding a protein
-                        /*note that deletion changes the ids of the remaining genes!!! Any gene that is greater than which_gene is reduced by one*/
-                        genotype->protein_pool[protein_id][1][j]=(gene_id>which_gene)?gene_id-1:gene_id;
-                    }            
-                    protein_id++;
-                }
-                /*
-                 * SPECIAL CASE: if a tf PROTEIN is deleted, we need to change the number of TF proteins and update TF_family_pool
-                 */                
-                if(which_protein<genotype->nproteins-1) 
-                {   
-                    /* reduce the number of activators or that of repressors */ 
-                    if(genotype->protein_identity[which_protein]==ACTIVATOR) 
-                        genotype->N_act--;
-                    else if(genotype->protein_identity[which_protein]==REPRESSOR)
-                        genotype->N_rep--;
-                    /* also remove it from activating and kd */
-                    protein_id=which_protein;
-                    for(i=0;i<genotype->nproteins-which_protein-1;i++)
-                    {
-                        genotype->protein_identity[protein_id]=genotype->protein_identity[protein_id+1];
-                        genotype->Kd[protein_id]=genotype->Kd[protein_id+1];
-                        protein_id++;
-                    }  
-                    /* update TF_family_pool*/
-                    tf_family_id=genotype->which_TF_family[which_protein];
-                    if(genotype->TF_family_pool[tf_family_id][0][0]==1) /*there is one member in the family, so delete the family*/
-                    {
-                        /*shift tf_family_id to overwrite*/
-                        for(i=tf_family_id;i<genotype->nTF_families;i++)
-                        {
-                            /*reset entries of family i*/
-                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
-                                genotype->TF_family_pool[i][1][j]=NA;
-                            /*copy entries of family i+1 to family i. Proteins with id > protein_id needs a new id */
-                            for(j=0;j<genotype->TF_family_pool[i+1][0][0];j++)
-                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i+1][1][j]>which_protein)?genotype->TF_family_pool[i+1][1][j]-1:genotype->TF_family_pool[i+1][1][j];
-                            genotype->TF_family_pool[i][0][0]=genotype->TF_family_pool[i+1][0][0];
-                        }
-                        /* update the protein id for tf family < tf_family_id*/
-                        for(i=0;i<tf_family_id;i++)
-                        {
-                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
-                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>which_protein)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
-                        }
-                        /*update nTF_family*/
-                        genotype->nTF_families--;
-                        /*shift which_tf_family and update the family id of protein with family id > tf_family_id*/
-                        for(i=which_protein;i<genotype->nproteins-1;i++)
-                            genotype->which_TF_family[i]=(genotype->which_TF_family[i+1]>tf_family_id)?genotype->which_TF_family[i+1]-1:genotype->which_TF_family[i+1];
-                        /*update the family id for proteins < which_protein*/
-                        for(i=0;i<which_protein;i++)
-                            genotype->which_TF_family[i]=(genotype->which_TF_family[i]>tf_family_id)?genotype->which_TF_family[i]-1:genotype->which_TF_family[i];
-                    }
-                    else /* the tf family has multiple proteins, no need to delete the family*/
-                    {
-                        /*find where is protein_id in its family*/
-                        for(i=0;i<genotype->TF_family_pool[tf_family_id][0][0];i++)
-                        {
-                            if(genotype->TF_family_pool[tf_family_id][1][i]==which_protein)
-                                break;
-                        }
-                        /*shift entries in its family*/
-                        for(;i<genotype->TF_family_pool[tf_family_id][0][0];i++)
-                            genotype->TF_family_pool[tf_family_id][1][i]=genotype->TF_family_pool[tf_family_id][1][i+1];
-                        genotype->TF_family_pool[tf_family_id][0][0]--;
-                        /*update protein ids in all families*/
-                        for(i=0;i<genotype->nTF_families;i++)
-                        {
-                            for(j=0;j<genotype->TF_family_pool[i][0][0];j++)
-                                genotype->TF_family_pool[i][1][j]=(genotype->TF_family_pool[i][1][j]>which_protein)?genotype->TF_family_pool[i][1][j]-1:genotype->TF_family_pool[i][1][j];
-                        } 
-                        /*shift which_tf_family*/
-                        for(i=which_protein;i<genotype->nproteins-1;i++)
-                            genotype->which_TF_family[i]=genotype->which_TF_family[i+1];
-                    }
-                    /* in the case, all genes need to recalc binding sites*/
-                    for(i=N_SIGNAL_TF;i<which_gene;i++)                    
-                        genotype->recalc_TFBS[i]=YES; /* recalc BS */                                       
-                }  
-                /*
-                 * UPDATE which_protein
-                 */
-                /* update which_protein for gene<which_gene in which_protein*/
-                for(i=N_SIGNAL_TF;i<which_gene;i++)
-                    genotype->which_protein[i]=(genotype->which_protein[i]<which_protein)?genotype->which_protein[i]:genotype->which_protein[i]-1;//the deletion also changes the ids of proteins
-                /* shift and update which_protein for gene>=which_gene in which_protein*/                
-                for(i=which_gene;i<genotype->ngenes;i++)
-                    genotype->which_protein[i]=(genotype->which_protein[i+1]>which_protein)?genotype->which_protein[i+1]-1:genotype->which_protein[i+1];                   
-                /*one less protein*/
-                genotype->nproteins--;
-            }  
-            else /*if the protein has more than one genes*/
-            {
-                /*
-                 * UPDATE protein_pool for protein>=which_protein
-                 */
-                /* find where is this which_gene*/
-                i=0;
-                while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++; 
-                /*shift protein_pool to overwrite which_gene, and update ids of genes*/
-                j=i;
-                for(;i<genotype->protein_pool[which_protein][0][0];i++)
-                    genotype->protein_pool[which_protein][1][i]=(genotype->protein_pool[which_protein][1][i+1]>which_gene)?genotype->protein_pool[which_protein][1][i+1]-1:genotype->protein_pool[which_protein][1][i+1];// deletion changes the ids of genes!!!
-                /*also update the ids for genes before j*/
-                for(i=0;i<j;i++)
-                    genotype->protein_pool[which_protein][1][i]=(genotype->protein_pool[which_protein][1][i]>which_gene)?genotype->protein_pool[which_protein][1][i]-1:genotype->protein_pool[which_protein][1][i];                            
-                /*one less copy encoding which_protein*/
-                genotype->protein_pool[which_protein][0][0]--;                
-                /*update the ids of genes in protein>which_protein*/                
-                for(i=which_protein+1;i<genotype->nproteins;i++)  
-                {   
-                    for(j=0;j<genotype->protein_pool[i][0][0];j++)
-                        genotype->protein_pool[i][1][j]=(genotype->protein_pool[i][1][j]>which_gene)?genotype->protein_pool[i][1][j]-1:genotype->protein_pool[i][1][j];//note that deletion changes the ids of genes!!!
-                }
-                /*
-                 * UPDATE which_protein
-                 */
-                /*shift which_protein to delete which_gene*/
-                for(i=which_gene;i<genotype->ngenes;i++)
-                    genotype->which_protein[i]=genotype->which_protein[i+1];                
-            }
-            /*
-             * UPDATE protein_pool for protein<which_protein
-             */           
-            for(i=N_SIGNAL_TF;i<which_protein;i++)
-            {
-                for(j=0;j<genotype->protein_pool[i][0][0];j++)
-                    genotype->protein_pool[i][1][j]=(genotype->protein_pool[i][1][j]<which_gene)?genotype->protein_pool[i][1][j]:genotype->protein_pool[i][1][j]-1;
-            }            
-            break;
-        case 'd': /*a gene duplication*/
-            /* add it to protein_pool, but do not change nproteins*/    
-            genotype->protein_pool[which_protein][1][genotype->protein_pool[which_protein][0][0]]=genotype->ngenes-1; //the newly duplicated gene takes the original place of the effector gene
-            genotype->protein_pool[which_protein][0][0]++; 
-            /*update the id of the original effector gene stored in protein_pool*/           
-            j=0;
-            while(genotype->protein_pool[genotype->nproteins-1][1][j]!=genotype->ngenes-1)j++;
-            genotype->protein_pool[genotype->nproteins-1][1][j]++; 
-            /*update which_protein*/          
-            genotype->which_protein[genotype->ngenes]=genotype->nproteins-1;//points to the effector protein       
-            genotype->which_protein[genotype->ngenes-1]=which_protein;            
-            break;
-        case 'c': /*mutation in tf binding seq, creating a new tf and a new TF family*/
-            /* remove this copy of gene from the original protein_pool*/
-            i=0;
-            while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++;
-            /*shift to delete which_gene*/
-            for(;i<genotype->protein_pool[which_protein][0][0];i++) 
-                genotype->protein_pool[which_protein][1][i]= genotype->protein_pool[which_protein][1][i+1]; 
-            /*one less gene copy to encoding which_protein*/
-            genotype->protein_pool[which_protein][0][0]--;
-            /* increase the protein id of the effector protein to make room for the new tf*/ 
-            genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
-            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
-            {
-                genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j]; //shift the protein pool of effector gene
-                genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;//update which_protein
-                genotype->protein_pool[genotype->nproteins-1][1][j]=NA; //reset the original protein pool of the effector 
-            }                       
-            /* create a new protein and link it to which_gene*/
-            genotype->which_protein[which_gene]=genotype->nproteins-1; //put the new protein to the original place of the effector protein
-            genotype->protein_pool[genotype->nproteins-1][0][0]=1;
-            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;
-            /* update activator or repressor numbers, and activating*/
-            if(genotype->protein_identity[which_protein]==ACTIVATOR) //mutation to binding seq does not change the identity of a tf
-                genotype->N_act++;
-            else if(genotype->protein_identity[which_protein]==REPRESSOR)
-                genotype->N_rep++;
-            genotype->protein_identity[genotype->nproteins-1]=genotype->protein_identity[which_protein];
-            /* update Kd*/
-            genotype->Kd[genotype->nproteins-1]=genotype->Kd[which_protein];
-            /* make a new tf family and add in the new tf*/
-            genotype->TF_family_pool[genotype->nTF_families][0][0]=1;
-            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins-1;
-            genotype->which_TF_family[genotype->nproteins-1]=genotype->nTF_families;
-            /* update tf family number*/
-            genotype->nTF_families++;
-            /* finally, update protein numbers*/
-            genotype->nproteins++;            
-            break;            
-        case 'e': /*mutation in the identity of a TF, creating a new tf and a new tf family*/
-            /* remove this copy of gene from the original protein*/
-            i=0;
-            while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++;
-            for(;i<genotype->protein_pool[which_protein][0][0];i++) 
-            {
-                genotype->protein_pool[which_protein][1][i]= genotype->protein_pool[which_protein][1][i+1]; 
-            }
-            genotype->protein_pool[which_protein][0][0]--;
-            /* increase the protein id of the effector protein*/               
-            genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
-            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
-            {
-                genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
-                genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
-                genotype->protein_pool[genotype->nproteins-1][1][j]=NA;
-            }            
-            /* create a new protein and link it to which_gene*/
-            genotype->which_protein[which_gene]=genotype->nproteins-1; 
-            genotype->protein_pool[genotype->nproteins-1][0][0]=1;
-            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;
-            /* update activating*/
-            if(genotype->protein_identity[which_protein]==ACTIVATOR) 
-                genotype->N_rep++;  /* an activator turns into a repressor */
-            else if(genotype->protein_identity[which_protein]==REPRESSOR)
-                genotype->N_act++;
-            genotype->protein_identity[genotype->nproteins-1]=genotype->protein_identity[which_protein];
-            /* update Kd*/
-            genotype->Kd[genotype->nproteins-1]=genotype->Kd[which_protein];
-            /* make a new tf family and add in the new tf*/
-            genotype->TF_family_pool[genotype->nTF_families][0][0]=1;
-            genotype->TF_family_pool[genotype->nTF_families][1][0]=genotype->nproteins-1;
-            genotype->which_TF_family[genotype->nproteins-1]=genotype->nTF_families;
-            /* update tf family number*/
-            genotype->nTF_families++;
-            /* finally, update protein numbers*/
-            genotype->nproteins++;           
-            break;            
-        case 'f': /*mutation in tf kd, creating a new tf, BUT NOT CREATING NEW TF FAMILY*/
-            /* remove this copy of gene from the original protein pool*/
-            i=0;
-            while(genotype->protein_pool[which_protein][1][i]!=which_gene) i++;
-            for(;i<genotype->protein_pool[which_protein][0][0];i++) 
-            {
-                genotype->protein_pool[which_protein][1][i]= genotype->protein_pool[which_protein][1][i+1]; /* rearrange data array */
-            }
-            genotype->protein_pool[which_protein][0][0]--;
-            /* increase the protein id of the effector protein*/               
-            genotype->protein_pool[genotype->nproteins][0][0]=genotype->protein_pool[genotype->nproteins-1][0][0];
-            for(j=0;j<genotype->protein_pool[genotype->nproteins-1][0][0];j++)                
-            {
-                genotype->protein_pool[genotype->nproteins][1][j]=genotype->protein_pool[genotype->nproteins-1][1][j];
-                genotype->which_protein[genotype->protein_pool[genotype->nproteins-1][1][j]]++;
-                genotype->protein_pool[genotype->nproteins-1][1][j]=NA;
-            }            
-            /* create a new protein and link it to this gene*/
-            genotype->which_protein[which_gene]=genotype->nproteins-1; 
-            genotype->protein_pool[genotype->nproteins-1][0][0]=1;
-            genotype->protein_pool[genotype->nproteins-1][1][0]=which_gene;   
-            /* add the new protein to the original protein's family*/
-            tf_family_id=genotype->which_TF_family[which_protein];
-            genotype->TF_family_pool[tf_family_id][1][genotype->TF_family_pool[tf_family_id][0][0]]=genotype->nproteins-1;
-            genotype->TF_family_pool[tf_family_id][0][0]++;
-            genotype->which_TF_family[genotype->nproteins-1]=tf_family_id;
-            /* update activating*/
-            if(genotype->protein_identity[which_protein]==ACTIVATOR) 
-                genotype->N_act++;  
-            else if(genotype->protein_identity[which_protein]==REPRESSOR) 
-                genotype->N_rep++;
-            genotype->protein_identity[genotype->nproteins-1]=genotype->protein_identity[which_protein];  
-            /* finally, update protein numbers*/
-            genotype->nproteins++;
-            /* NOTE: this mutation does not change the number of genes*/
-            break;
-    }
-}
-
-
-/*To reduce the amount of calculation on the probability of binding distributions, we group gene copies
- *that are created by whole gene duplication. We call such a group a cis-reg cluster because gene copies 
- *in the group should have the same cis-reg sequence. For each cis-reg cluster we only need to calculate
- *the probability of binding distributions once. However, substitutions is cis-reg sequence can create/remove
- *binding sites, therefore we need to check whether a gene copy is still in the original cis-reg cluster 
- *after mutation.We use cisreg_cluster and which_cluster to track the bi-way relation between a gene and 
- *a cis-reg cluster.*/
-void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, int new_clusters[MAX_GENES][MAX_GENES], int N_new_clusters, int original_cluster_id)
-{
-    /*In a cis-reg cluster, gene copies are ordered ascendingly by their ids. There are no empty slots in the list 
-     *of gene copies. Empty slots after the list are marked by -1. We do not track the number of gene copies in a
-     *cluster. In order to count the number of gene copies correctly, marking the empty slots accurately become important.
-     *Therefore, we always set all the slots in a cluster to -1, when deleting or overwrting the cluster. 
-     */
-    int cisreg_seq_cluster_id, cisreg_seq_cluster_id_copy, i, j, last_cluster; 
-    switch(mut_type)
-    {
-        case 'c': //a mutation to the binding sequence of a TF happened. this can create new clusters.
-            /*reset the original cisreg_cluster*/
-            i=0;
-            while(genotype->cisreg_cluster[original_cluster_id][i]!=NA)
-            {
-                genotype->cisreg_cluster[original_cluster_id][i]=NA;
-                i++;
-            }
-            /*assign the first new cluster to the original cluster*/
-            i=0;
-            while(new_clusters[0][i]!=NA)
-            {
-                genotype->cisreg_cluster[original_cluster_id][i]=new_clusters[0][i];
-                genotype->which_cluster[new_clusters[0][i]]=original_cluster_id;
-                i++;
-            }
-            /*find a empty slot in cisreg_cluster for the rest of new clusters*/    
-            last_cluster=N_SIGNAL_TF;
-            while(genotype->cisreg_cluster[last_cluster][0]!=NA)last_cluster++;//an empty cluster has all of its slots marked by -1
-            /*assign the rest of new clusters into empty slots*/       
-            for(i=1;i<N_new_clusters;i++)
-            {
-                /*reset the empty cluster, just in case*/
-                j=0;
-                while(genotype->cisreg_cluster[last_cluster][j]!=NA)j++;
-                /*assign new clusters*/
-                j=0;
-                while(new_clusters[i][j]!=NA)
-                {
-                    genotype->cisreg_cluster[last_cluster][j]=new_clusters[i][j];
-                    genotype->which_cluster[new_clusters[i][j]]=last_cluster;
-                    j++;
-                }
-                last_cluster++;
-            }        
-            break;
-     
-        case 's': /*Substitution in cis-regulatory sequence just kicked one gene copy out of a cluster*/
-            /*find the cis-reg cluster of which gene*/
-            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
-            if(genotype->cisreg_cluster[cisreg_seq_cluster_id][1]!=NA) //if a cluster contains more than 1 gene
-            {   
-                /*then remove which_gene from the original cluster*/        
-                i=0;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=which_gene) i++;
-                /*shift the slots to overwrite which_gene*/
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)
-                {
-                    genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->cisreg_cluster[cisreg_seq_cluster_id][i+1];
-                    i++;
-                }                     
-                /* and create a new cluster*/
-                last_cluster=N_SIGNAL_TF; // start from the first non-signal-tf gene
-                while(genotype->cisreg_cluster[last_cluster][0]!=NA) last_cluster++; 
-                genotype->cisreg_cluster[last_cluster][0]=which_gene;
-                genotype->which_cluster[which_gene]=last_cluster;
-            }
-            break;
-            
-        case 'w': /*is gene deletion*/
-            /*find the cis-reg cluster of which gene*/
-            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];                    
-            if(genotype->cisreg_cluster[cisreg_seq_cluster_id][1]!=NA) //if a cluster contains more than 1 gene
-            {   
-                /*then remove which_gene from the original cluster*/        
-                i=0;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=which_gene) i++;
-                /*shift to overwrite which_gene, and update ids of the remaining genes*/
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)
-                {      
-                    /*note that gene copies are ordered ascendingly*/
-                    genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=(genotype->cisreg_cluster[cisreg_seq_cluster_id][i+1]==NA)?NA:(genotype->cisreg_cluster[cisreg_seq_cluster_id][i+1]-1); 
-                    i++;
-                }               
-                /*take care of clusters>cisreg_seq_cluster_id*/
-                cisreg_seq_cluster_id_copy=cisreg_seq_cluster_id+1;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][0]!=NA)
-                {
-                    i=0;
-                    while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=NA)
-                    {
-                        genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]<which_gene)?genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]:genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]-1;
-                        i++;
-                    }
-                    cisreg_seq_cluster_id_copy++;
-                }              
-                /*update which_cluster*/
-                for(i=which_gene;i<genotype->ngenes;i++)                              
-                    genotype->which_cluster[i]=genotype->which_cluster[i+1];               
-            }
-            else//if a cluster contains only 1 gene
-            {   
-                /*need to shift cisreg_cluster*/ 
-                cisreg_seq_cluster_id_copy=cisreg_seq_cluster_id;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][0]!=NA)
-                {
-                    /*reset cluster=cisreg_seq_cluster_id_copy*/
-                    i=0;
-                    while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=NA)
-                    {
-                        genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=NA;
-                        i++;
-                    }
-                    /*then copy from cluster=cisreg_seq_cluster_id_copy+1*/                    
-                    i=0;
-                    while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]!=NA)
-                    {                        
-                        genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]<which_gene)?genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]:genotype->cisreg_cluster[cisreg_seq_cluster_id_copy+1][i]-1; /*note deletion changes gene thread_ID*/
-                        i++;
-                    }
-                    cisreg_seq_cluster_id_copy++;
-                }
-                /*shift which_cluster and update cluster ids for gene>=which_gene*/                
-                for(i=which_gene;i<genotype->ngenes;i++)                                
-                    genotype->which_cluster[i]=(genotype->which_cluster[i+1]<cisreg_seq_cluster_id)?genotype->which_cluster[i+1]:genotype->which_cluster[i+1]-1;
-                /*update cluster ids for gene<which_gene*/
-                for(i=N_SIGNAL_TF;i<which_gene;i++)
-                    genotype->which_cluster[i]=(genotype->which_cluster[i]>cisreg_seq_cluster_id)?genotype->which_cluster[i]-1:genotype->which_cluster[i];
-            }
-            /*update gene ids in clusters<cisreg_seq_cluster_id*/
-            for(i=N_SIGNAL_TF;i<cisreg_seq_cluster_id;i++)
-            {
-                j=0;
-                while(genotype->cisreg_cluster[i][j]!=NA)
-                {
-                    genotype->cisreg_cluster[i][j]=(genotype->cisreg_cluster[i][j]<which_gene)?genotype->cisreg_cluster[i][j]:genotype->cisreg_cluster[i][j]-1;
-                    j++;
-                }
-            }                                            
-            break;
-            
-        case 'd': /*gene duplication*/  
-            /*find the cis-reg cluster of which gene*/
-            cisreg_seq_cluster_id=genotype->which_cluster[which_gene];
-            /*Assuming the last gene is in cis-reg cluster X, check whether the duplicated
-             *gene is also in cluster X*/
-            if(genotype->which_cluster[which_gene]!=genotype->which_cluster[genotype->ngenes-1]) //No
-            {    
-                /*find an empty slot in cisreg_seq_cluster_id*/
-                i=0;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++;
-                /*the duplicated gene is always add to ngene-1. Note that ngenes has not been 
-                 *updated when update_cisreg_cluster is called.*/
-                genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes-1;            
-                /* now find the cis-reg cluster of the effector gene at ngenes-1*/           
-                cisreg_seq_cluster_id_copy=genotype->which_cluster[genotype->ngenes-1];
-                /*find this effector gene in the cluster*/
-                i=0;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]!=genotype->ngenes-1)i++;
-                /*increase the gene id by 1*/
-                genotype->cisreg_cluster[cisreg_seq_cluster_id_copy][i]=genotype->ngenes;
-            }
-            else //the last gene is duplicated
-            {   
-                /*simply add ngenes to the cis-reg cluster of the last gene*/
-                i=0;
-                while(genotype->cisreg_cluster[cisreg_seq_cluster_id][i]!=NA)i++; //find an empty slot
-                genotype->cisreg_cluster[cisreg_seq_cluster_id][i]=genotype->ngenes; //add ngenes to the slot
-                genotype->cisreg_cluster[cisreg_seq_cluster_id][i-1]=genotype->ngenes-1; //this is the duplicated gene                     
-            }
-            /*update which_cluster*/
-            genotype->which_cluster[genotype->ngenes]=genotype->which_cluster[genotype->ngenes-1]; 
-            genotype->which_cluster[genotype->ngenes-1]=cisreg_seq_cluster_id;
-            break;
-    }
-}
-
-/****************** end of mutation functions *********************************/
-

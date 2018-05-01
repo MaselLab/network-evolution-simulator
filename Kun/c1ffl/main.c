@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include "netsim.h"
 #include "RngStream.h"
+#include "lib.h"
 
 char error_file[32];
 char mutation_file[32];
@@ -23,7 +24,7 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-    seed=98;
+    seed=87;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
@@ -82,8 +83,7 @@ int main()
     mut_record.N_hit_bound=0;
     
     /*set selection condition and burn_in condition*/
-    Selection selection, burn_in;
-    
+    Selection selection, burn_in;    
     
     selection.temporary_DUPLICATION=1.5e-7;
     selection.temporary_SILENCING=1.5e-7;
@@ -167,7 +167,7 @@ int main()
     /*modify network topology and calculate fitness of the modified network*/
 //    plot_alternative_fitness(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein,RS_parallel);   
     
-    release_memory(&resident, &mutant, &RS_main);
+    release_memory(&resident, &mutant, &RS_main, RS_parallel);
     
     return 0;
 }
