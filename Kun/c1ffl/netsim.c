@@ -37,7 +37,7 @@ const float BASAL_INT_TO_REP_RATE=0.67;
 const float MAX_INT_TO_ACT_RATE=3.3; 
 const float BASAL_INT_TO_ACT_RATE=0.025;
 const float MEAN_PROTEIN_DECAY_RATE=-1.88;
-const float SD_PROTEIN_DECAY_RATE=0.56;
+const float SD_PROTEIN_DECAY_RATE=0.561;
 const float MEAN_ACT_TO_INT_RATE=1.27;
 const float SD_ACT_TO_INT_RATE=0.226;
 const float MEAN_MRNA_DECAY_RATE=-1.49;
@@ -71,11 +71,11 @@ float DUPLICATION = 0.0;
 float SILENCING = 0.0;
 
 /*Mutational effect*/
-float sigma_ACT_TO_INT_RATE=0.773; 
+float sigma_ACT_TO_INT_RATE=0.773;//0.516; 
 float sigma_mRNA_decay=0.396; 
 float sigma_protein_decay=0.739; 
 float sigma_protein_syn_rate=0.76; 
-float sigma_Kd=0.78;
+float sigma_Kd=0.776;
 float miu_ACT_TO_INT_RATE=1.57;
 float miu_mRNA_decay=-1.19;
 float miu_protein_decay=-1.88;
@@ -84,7 +84,7 @@ float miu_Kd=-5.0;
 float mutational_regression_rate=0.5;
 
 /*Bounds*/
-const float MAX_ACT_TO_INT_RATE=64.6;
+const float MAX_ACT_TO_INT_RATE=64.7;
 const float MIN_ACT_TO_INT_RATE=0.59;
 const float MAX_MRNA_DECAY=0.54;
 const float MIN_MRNA_DECAY=7.5e-4;
@@ -3578,6 +3578,8 @@ void run_simulation(    Genotype *genotype_ori,
             fprintf(fp,"%d %d\n",BURN_IN_I,N_tot_trials);
             fclose(fp);
         }
+        
+        print_mutatable_parameters(genotype_ori,1);
     }    
     
     /* post-burn-in simulations*/
@@ -3604,25 +3606,25 @@ void run_simulation(    Genotype *genotype_ori,
     N_EFFECTOR_GENES=EFFECTOR_GENES;
     N_TF_GENES=TFGENES;
     miu_ACT_TO_INT_RATE=1.57;
-    miu_Kd=-5;       
+    miu_Kd=-5.0;       
     miu_protein_syn_rate=0.021; 
 //    miu_ACT_TO_INT_RATE=5.22;
 //    miu_mRNA_decay=-1.13;       
 //    miu_protein_syn_rate=-1.36; 
 
-    fp=fopen(RuntimeSumm,"a+");
-    fprintf(fp,"**********Post-burn-in conditions**********\n");
-    fprintf(fp,"second phase steps=%d\n",max_mut_steps);                
-    fprintf(fp,"N_replicates=%d\n",N_REPLICATES);        
-    fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
-    fprintf(fp,"env1_t_development=%f,env2_t_development=%f\n",env1_t_development,env2_t_development);        
-    fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);         
-    fprintf(fp,"env1: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env1_t_signal_on, env1_t_signal_off, env1_initial_effect_of_effector, env1_fixed_effector_effect, env1_occurence);
-    fprintf(fp,"env2: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env2_t_signal_on, env2_t_signal_off, env2_initial_effect_of_effector, env2_fixed_effector_effect, env2_occurence);       
-    fprintf(fp,"Background signal strength=%f\n",background_signal_strength);
-    fprintf(fp,"Signal off strength=%f, env1 signal on strength=%f, env2 signal on strength=%f \n",signal_off_strength,env1_signal_strength,env2_signal_strength);
-    fprintf(fp,"env1 init effecto effect %c, fixed? %d. env2 init effecto effect %c, fixed? %d.\n",env1_initial_effect_of_effector,env1_fixed_effector_effect,env2_initial_effect_of_effector,env2_fixed_effector_effect);
-    fclose(fp);
+//    fp=fopen(RuntimeSumm,"a+");
+//    fprintf(fp,"**********Post-burn-in conditions**********\n");
+//    fprintf(fp,"second phase steps=%d\n",max_mut_steps);                
+//    fprintf(fp,"N_replicates=%d\n",N_REPLICATES);        
+//    fprintf(fp,"N_recalc_fitness=%d\n",recalc_new_fitness);
+//    fprintf(fp,"env1_t_development=%f,env2_t_development=%f\n",env1_t_development,env2_t_development);        
+//    fprintf(fp,"Duration of burn-in growth rate=%f\n",duration_of_burn_in_growth_rate);         
+//    fprintf(fp,"env1: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env1_t_signal_on, env1_t_signal_off, env1_initial_effect_of_effector, env1_fixed_effector_effect, env1_occurence);
+//    fprintf(fp,"env2: signal on duration=%f min, signal off duration=%f min, initial effector effect=%c, always_deleterious_effector:%d occurrence=%f\n",env2_t_signal_on, env2_t_signal_off, env2_initial_effect_of_effector, env2_fixed_effector_effect, env2_occurence);       
+//    fprintf(fp,"Background signal strength=%f\n",background_signal_strength);
+//    fprintf(fp,"Signal off strength=%f, env1 signal on strength=%f, env2 signal on strength=%f \n",signal_off_strength,env1_signal_strength,env2_signal_strength);
+//    fprintf(fp,"env1 init effecto effect %c, fixed? %d. env2 init effecto effect %c, fixed? %d.\n",env1_initial_effect_of_effector,env1_fixed_effector_effect,env2_initial_effect_of_effector,env2_fixed_effector_effect);
+//    fclose(fp);
     
     end_state=evolve_N_steps( genotype_ori, 
                     genotype_ori_copy,
@@ -4081,6 +4083,7 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
         summarize_binding_sites(&genotype_ori,init_step); /*snapshot of the initial (0) distribution binding sites */   
         find_ffl(&genotype_ori); 
         print_core_c1ffls(&genotype_ori);
+        print_mutatable_parameters(&genotype_ori,0);
         if(!SKIP_INITIAL_GENOTYPE)/* get the fitness of the initial genotype */ 
         {                     
             env1_t_development=89.9;
@@ -4097,8 +4100,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
             env1_fixed_effector_effect=0;    
             env2_fixed_effector_effect=1; 
             recalc_new_fitness=5; 
-            env1_occurence=0.67;
-            env2_occurence=0.33;    
+            env1_occurence=0.33;
+            env2_occurence=0.67;    
             float GR1[recalc_new_fitness][N_REPLICATES],GR2[recalc_new_fitness][N_REPLICATES];
             /*Load external signal profile if there is one*/
             fp=fopen("noisy_signal.txt","r");
@@ -4171,7 +4174,7 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
 #endif
 #endif
     }
-    print_mutatable_parameters(&genotype_ori);
+    print_mutatable_parameters(&genotype_ori,2);
     /*release memory*/
     release_memory(&genotype_ori,&genotype_ori_copy,&RS_main, RS_parallel);
     return 1;	
@@ -5502,11 +5505,24 @@ void calc_leaping_interval(Genotype *genotype, CellState *state, float *minimal_
     }
 }
 
-void print_mutatable_parameters(Genotype *genotype)
+void print_mutatable_parameters(Genotype *genotype, int flag)
 {
     int i;
-    FILE *fp;    
-    fp=fopen("mutatable_parameters.txt","w");
+    FILE *fp;
+    
+    switch(flag)
+    {
+        case 0:
+            fp=fopen("init_mutatable_parameters.txt","w");
+            break;        
+        case 1:
+            fp=fopen("post_burn_in_mutatable_parameters.txt","w");
+            break; 
+        case 2:
+            fp=fopen("end_mutatable_parameters.txt","w");
+            break;
+    }    
+    
     for(i=0;i<genotype->ngenes;i++)
     {
         fprintf(fp,"%f %f %f %f %d ",genotype->active_to_intermediate_rate[i],
