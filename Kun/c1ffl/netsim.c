@@ -4100,8 +4100,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
             env1_fixed_effector_effect=0;    
             env2_fixed_effector_effect=1; 
             recalc_new_fitness=5; 
-            env1_occurence=0.33;
-            env2_occurence=0.67;    
+            env1_occurence=0.67;
+            env2_occurence=0.33;    
             float GR1[recalc_new_fitness][N_REPLICATES],GR2[recalc_new_fitness][N_REPLICATES];
             /*Load external signal profile if there is one*/
             fp=fopen("noisy_signal.txt","r");
