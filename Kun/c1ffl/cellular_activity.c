@@ -10,7 +10,6 @@
 #include "lib.h"
 #include "numerical.h"
 
-
 #define DO_NOTHING -2
 #define INITIALIZATION -1
 
@@ -26,7 +25,6 @@ static const float MAX_INT_TO_REP_RATE=4.11;
 static const float BASAL_INT_TO_REP_RATE=0.67;
 static const float MAX_INT_TO_ACT_RATE=3.3; 
 static const float BASAL_INT_TO_ACT_RATE=0.025;
-
 static const float NS_Kd=1.0e-5;
 static const float KD2APP_KD=1.8e10;
 static const float DEFAULT_UPDATE_INTERVAL=10.0; /*min*/
@@ -34,7 +32,7 @@ static const float MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING=0.01;
 
 /*fitness*/
 static const float Ne_saturate = 10000.0;
-static const float c_transl=2.0e-6;//2.0e-6;
+static const float c_transl=2.0e-6;
 static const float bmax=1.0; 
 
 
@@ -362,23 +360,11 @@ void do_single_timestep(Genotype *genotype,
     int event, UPDATE_WHAT;     
     float fixed_time; 
     float dt;
-    float x;
-    FILE *fperror;
+    float x; 
     
     /* draw random number */
     x = expdev(RS);       
     dt = x/rates->total_Gillespie_rate;
-    if (dt < 0.0) 
-    {	
-//        fperror=fopen(error_file,"a+");
-//        LOG("negative dt at mut_step %d\n",mut_step);
-//        fclose(fperror);
-        state->error=1; /*use 0 to indicate abnormal behavior of the program.
-                       *I expect rounding error to raise this flag.
-                       *In case this flag is raised, quit the current replicate
-                       *of growth and rerun a replicate.*/
-        return;    
-    }
     
     /* check if a fixed event occurs during dt, or in tdevelopment if running for a fixed development time */
     fixed_time = (state->t+dt<test->t_development)?(state->t+dt):test->t_development;
@@ -396,10 +382,8 @@ void do_single_timestep(Genotype *genotype,
         /*deal with rounding error*/
         if(dt<0.0)
         {  	
-#if CAUTIOUS // this rounding error can happen very often, therefore the error_log can be huge
-            fperror=fopen(error_file,"a+");
-            LOG("rounding error in dt at mut_step %d\n",mut_step);            	
-            fclose(fperror);
+#if CAUTIOUS // this rounding error can happen very often, therefore the error_log can be huge            
+            LOG("rounding error in dt at mut_step %d\n",mut_step);    
 #endif 
             dt=TIME_OFFSET; 
         }
@@ -459,15 +443,7 @@ static float calc_tprime(Genotype *genotype, CellState* state, float *number_of_
         protein_decay_rate[i]=genotype->protein_decay_rate[genotype->protein_pool[protein_id][1][i]];
         protein_synthesis_rate[i]=state->protein_synthesis_index[genotype->protein_pool[protein_id][1][i]]*protein_decay_rate[i];
     }       
-    return rtsafe(  &calc_fx_dfx,
-                    n_copies,
-                    given_amount,
-                    number_of_selection_protein_bf_dt,
-                    protein_synthesis_rate,
-                    protein_decay_rate,
-                    0.0,
-                    dt,
-                    0.01); //rtsafe is in numerical.c
+    return rtsafe(&calc_fx_dfx, n_copies, given_amount, number_of_selection_protein_bf_dt, protein_synthesis_rate, protein_decay_rate, 0.0, dt); 
 }
 
 /*
@@ -817,7 +793,6 @@ static void update_protein_number_and_fitness( Genotype *genotype,
     float N_effector_molecules_bf_dt[genotype->protein_pool[genotype->nproteins-1][0][0]];
     float instantaneous_fitness = 0.0;
     float integrated_fitness = 0.0;
-    FILE *fperror;
   
     /* store the numbers of the effector proteins encoded by each copy of gene before updating*/   
     for(i=0;i<genotype->protein_pool[genotype->nproteins-1][0][0];i++)

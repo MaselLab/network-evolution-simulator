@@ -17,6 +17,12 @@
 #include "netsim.h"
 #include "RngStream.h"
 
+#define EPSILON 1.0e-6       /* This is the "0" in changes of TF binding probabilities and of time */
+#define TIME_INFINITY 9.99e10 //min
+#define TIME_OFFSET 0.01    /* Added to the timing of a fixed event to avoid concurrnce. Unit is minute */
+
+enum TRANSCRIPTIONAL_STATE {REPRESSED, INTERMEDIATE, ACTIVE};
+
 /*
  * Rates for Gillespie algorithm
  */
@@ -49,6 +55,9 @@ struct FixedEvent {
   FixedEvent *next;
 };
 
+/*
+ * CellState store the 
+ */
 typedef struct CellState CellState;
 struct CellState { 
     float t;

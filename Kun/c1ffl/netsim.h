@@ -10,99 +10,97 @@
 #include <stdio.h>
 #include "RngStream.h"
 
-/*Simulation mode*/
-#define RUN_PLOTTING 0
-#define PLOT_ALTERNATIVE_FITNESS 0
+/*Simulate evolution under selection by default,
+ *These are the alternative modes, which can be specified by add -D mode (e.g.
+ * -D NEUTRAL) when compile the source code.
+ */
+#ifndef NEUTRAL
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 1
+#endif
+#ifndef REPLAY
+#define REPLAY 0
+#endif
+#ifndef MODIFY 
+#define MODIFY 0
+#endif
+#ifndef EXTERNAL_SIGNAL
 #define EXTERNAL_SIGNAL 0
+#endif
 
-/*Runtime control*/  
-#define MAX_MUT_STEP 500
-#define BURN_IN 0
-#define MAX_MUTATIONS 800000
+/*Runtime control*/ 
+#define MAX_MUTATIONS 1000000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
 #define N_REPLICATES 200
+#define HI_RESOLUTION_RECALC 5
 #define OUTPUT_INTERVAL 10
 #define SAVING_INTERVAL 10
 #define OUTPUT_MUTANT_DETAILS 0
 #define N_TIMP_POINTS 90
 
-
 /*Miscellaneous settings*/
-#define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
-#define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
-#define RT_SAFE_EPSILON 1e-6
 #define OUTPUT_RNG_SEEDS 1
-#define TIME_INFINITY 9.99e10
-#define TIME_OFFSET 0.01
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define DIRECT_REG 1
-#define NO_PENALTY 0
-#define FORCE_OR_GATE 0
-#if FORCE_OR_GATE
-#define FORCE_MASTER_CONTROLLED 0
+#ifndef DIRECT_REG  //direct regulation can be enabled by adding -D DIRECT_REG in compilation command
+#define DIRECT_REG 0
 #endif
-#define FORCE_DIAMOND 0
-#define FORCE_SINGLE_FFL 0
-#define RANDOM_COOPERATION_LOGIC 0
-#define N_SIGNAL_TF 1 // number of input signals
+#ifndef NO_PENALTY
+#define NO_PENALTY 0
+#endif
+#define minimal_selection_coefficient 1.0e-8
 #define NO_REGULATION_COST 0
 #define NO_REGULATION 0 // this locks the state of TF genes to Rep
-#define IGNORE_BS_OVERLAPPING 0
-#define SIMPLE_SUBSTITUTION 1
+#define RANDOM_COOPERATION_LOGIC 0 
+/******************************************************************************/
+/*DO NOT MODIFY THE FOLLOWING TWO PARAMETERS!!!
+ *I had intended to model more than one signals, but gave it up due to the
+ *complexity
+ */
+/******************************************************************************/
+#define N_SIGNAL_TF 1 // number of input signals
 #define RANDOMIZE_SIGNAL2 0
-#define MAX_RECALC_FITNESS 10
-#define minimal_selection_coefficient 1.0e-8
+/***********************************/
 
-/* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
- * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
-#ifndef MAX_TF_GENES             /* number of genes encoding TFs */
-#define MAX_TF_GENES 20         /* the initial value is set in initiate_genotype*/
+/*Available modifications to network.
+ *Enabled under mode MODIFICATION. 
+ *Set the desired modification to 1 to enabled it.
+ */
+#define DISABLE_AND_GATE 0 // change the logic of an effector gene
+#if DISABLE_OR_GATE
+#define FORCE_MASTER_CONTROLLED 0 // 1 for master TF controlled; 0 for aux. TF controlled 
 #endif
-#ifndef MAX_GENES
-#define MAX_GENES 25  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
-#endif
-#ifndef MAX_PROTEINS           
+#define FORCE_DIAMOND 0  // change an AND-gated FFL-in-diamond to diamond
+#define FORCE_SINGLE_FFL 0 // change an AND-gated FFL-in-diamond to isolated FFL
+
+/*Maximum number of genes*/          
+#define MAX_TF_GENES 20 
+#define MAX_EFFECTOR_GENES 5  
+#define MAX_GENES 25  /* total number of genes=effector genes + TF genes (including the signal) */     
 #define MAX_PROTEINS 25
-#endif
-#ifndef MAX_EFFECTOR_GENES
-#define MAX_EFFECTOR_GENES 5  /* this is the upper limit of effector gene copies*/
-#endif
+
+/*Cis-reg sequence and TF binding sequence*/
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
 #define NMIN 6                /* minimal number of nucleotide that matches the binding sequence of a TF in its binding site*/
                               /* DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake*/  
-
-#ifndef HIND_LENGTH
 #define HIND_LENGTH 3         /* default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH */
-                              /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
-#endif
 #define MAX_BINDING 10  /* MAX_MODE is the max number of tf that can bind to a promoter plus 1*/
 
 
-/* 
- * define macros for logging warning/errors 
- */
-#ifndef LOGGING_OFF
-  #define LOG(...) { fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); } 
-#else
-  #define LOG 
-#endif
 
 /*
  * enum for 'CellState'->transcriptional_state indices
  */
-enum TRANSCRIPTIONAL_STATE {REPRESSED, INTERMEDIATE, ACTIVE};
+
 enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_TF=-1};
 enum BOOLEAN {NA=-1, NO=0, YES=1};
 
+/*struct of a TF binding site*/
 typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
-  int tf_id;         
+  int tf_id;         /*which TF */
   float Kd;
   int mis_match;     /* number of mismatched nuc */
   int BS_pos;        /* start position of BS on DNA, always with reference to forward strand */                     
@@ -141,6 +139,7 @@ struct Selection
     float temporary_SILENCING;
     int temporary_N_effector_genes;
     int temporary_N_tf_genes;
+    int MAX_STEPS;
 };
 
 /*Genotype*/
@@ -204,7 +203,7 @@ struct Genotype {
     float sq_SE_GR2;
     float fitness;
     float sq_SE_fitness;
-    float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
+    float fitness_measurement[HI_RESOLUTION_RECALC*N_REPLICATES];
     
     /*Motifs related*/
     int N_motifs[39];  
@@ -215,6 +214,7 @@ struct Genotype {
     int N_act_genes_not_reg_by_env;    
 };
 
+/*A mutation is specified by its type, target, and mutant value*/
 typedef struct Mutation Mutation;
 struct Mutation
 {
@@ -227,6 +227,7 @@ struct Mutation
     int N_hit_bound;
 };
 
+/*Expression levels and instantaneous fitness*/
 typedef struct Phenotype Phenotype;
 struct Phenotype
 { 
@@ -241,17 +242,14 @@ struct Phenotype
 /*
  * global variables
  */
-
-/* see netsim.c for documentation for these global constant variables */
-extern int MAXELEMENTS;
-extern float signal_profile_matrix[N_THREADS][200][15];
-/*output files*/
-extern char error_file[32];
+/*output files. Initialized in main.c*/
 extern char mutation_file[32];
 extern char RuntimeSumm[32];
 extern char output_file[32];
+extern float signal_profile_matrix[N_THREADS][200][15];
 
-/* see netsim.c for documentation for these global variables */
+/*Initialized in netsim.c */
+extern int MAXELEMENTS;
 extern const float MEAN_GENE_LENGTH;
 extern int N_EFFECTOR_GENES;
 extern int N_TF_GENES;
@@ -268,7 +266,7 @@ extern const float MIN_KD;
 extern const int MAX_GENE_LENGTH;
 extern const int MIN_GENE_LENGTH;
 
-/* function prototypes */
+/* global function prototypes */
 
 char set_base_pair(float);
 
@@ -292,7 +290,6 @@ void evolve_neutrally(  Genotype *,
                         Mutation *,                              
                         RngStream);
 
-
 void plot_alternative_fitness(  Genotype *,
                                 Genotype *,
                                 Mutation *,
@@ -300,9 +297,7 @@ void plot_alternative_fitness(  Genotype *,
                                 int [MAX_GENES],
                                 float [MAX_GENES]);
 
-
 void print_mutatable_parameters(Genotype*,int);
-
 
 void calc_all_binding_sites_copy(Genotype *, int);
 

@@ -3,6 +3,11 @@
 #include "RngStream.h" /*replace ran1 with parallel RNG*/
 #include "netsim.h"
 
+#define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
+#define RT_SAFE_EPSILON 0.01 /* Minimal change in root values between iteration for Newtown-Raphson.
+                              * This parameter has unit of minute in this program.
+                              */
+
 float gasdev(RngStream RS)
 {
 //   static int iset=0;
@@ -36,11 +41,11 @@ float expdev(RngStream RS)
 /* 
  * Newton-Raphson root-finding method with bisection steps, out of
  * Numerical Recipes function bracketed by x1 and x2. Returns root
- * within accuracy +/-xacc funcd is function of interest, returning
+ * within accuracy +/-RT_SAFE_EPSILON funcd is function of interest, returning
  * both function value and first deriv.x  
  */
 float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, float*), 
-             int n_copies, float RHS, float *p_i, float *as_i, float *c_i, float x1, float x2, float xacc)
+             int n_copies, float RHS, float *p_i, float *as_i, float *c_i, float x1, float x2)
 {
     int j;
     float df,dx,dxold,f,fh,fl;
@@ -93,7 +98,7 @@ float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, fl
             rts -= dx;
             if (temp == rts) return rts;
         }
-        if (fabs(dx) < xacc) return rts;
+        if (fabs(dx) < RT_SAFE_EPSILON) return rts;
         
 //        if (rts==0.0)
 //        {

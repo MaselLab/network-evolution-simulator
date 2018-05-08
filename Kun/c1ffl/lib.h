@@ -13,6 +13,13 @@
 #include "cellular_activity.h"
 #include "netsim.h"
 
+/* 
+ * define macros for logging warning/errors 
+ */
+#ifndef LOGGING_OFF
+  #define LOG(...) { FILE *fp; fp=fopen("error.txt","a+"); fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); fclose(fp);} 
+#endif
+
 int add_fixed_event(int, float, FixedEvent **, FixedEvent **);
 
 void delete_fixed_event(int, int, FixedEvent **, FixedEvent **);

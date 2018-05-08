@@ -10,10 +10,12 @@
 #include "RngStream.h"
 #include "lib.h"
 
-char error_file[32];
 char mutation_file[32];
 char RuntimeSumm[32];
 char output_file[32];
+#if EXTERNAL_SIGNAL
+float signal_profile_matrix[N_THREADS][200][15];
+#endif
 
 int main()
 {
@@ -56,10 +58,9 @@ int main()
     /*Log*/
     FILE *fp;
     fp=fopen(RuntimeSumm,"w");
-    fprintf(fp,"Max simulation steps=%d, Burn-in steps=%d, max trials=%d\n",MAX_MUT_STEP, BURN_IN, MAX_TRIALS);        
-    fprintf(fp,"max effector gene number=%d, max tf gene number=%d\n",MAX_EFFECTOR_GENES,MAX_TF_GENES);    
-    fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n",init_TF_genes,init_N_act,init_N_rep); 
-    fclose(fp);
+    fprintf(fp,"Rng seed: %d\n",seed);
+    fprintf(fp,"Max effector gene number=%d, max tf gene number=%d\n",MAX_EFFECTOR_GENES,MAX_TF_GENES);    
+    fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n\n\n",init_TF_genes,init_N_act,init_N_rep);    
     
     /* initial mRNA and protein concentration are 0*/
     int init_mRNA[MAX_GENES]; 
@@ -83,33 +84,7 @@ int main()
     mut_record.N_hit_bound=0;
     
     /*set selection condition and burn_in condition*/
-    Selection selection, burn_in;    
-    
-    selection.temporary_DUPLICATION=1.5e-7;
-    selection.temporary_SILENCING=1.5e-7;
-    selection.temporary_N_effector_genes=MAX_EFFECTOR_GENES;
-    selection.temporary_N_tf_genes=MAX_TF_GENES;
-    selection.temporary_miu_ACT_TO_INT_RATE=1.57;
-    selection.temporary_miu_Kd=-5.0;
-    selection.temporary_miu_protein_syn_rate=0.021;
-    selection.test1.t_development=89.9;
-    selection.test2.t_development=89.9;
-    selection.test1.signal_on_strength=1000.0;
-    selection.test2.signal_on_strength=1000.0;
-    selection.test1.signal_off_strength=0.0;
-    selection.test2.signal_off_strength=0.0;
-    selection.test1.t_signal_on=200.0;
-    selection.test2.t_signal_on=10.0;
-    selection.test1.t_signal_off=0.0;
-    selection.test2.t_signal_off=200.0;
-    selection.test1.initial_effect_of_effector='b';
-    selection.test2.initial_effect_of_effector='d';
-    selection.test1.fixed_effector_effect=1;
-    selection.test2.fixed_effector_effect=1;
-    selection.test1_weight=0.33;
-    selection.test2_weight=0.67;
-    selection.test1.duration_of_burn_in_growth_rate=0.0;
-    selection.test2.duration_of_burn_in_growth_rate=0.0;   
+    Selection burn_in,selection;  
     
     burn_in.temporary_DUPLICATION=5.25e-9;
     burn_in.temporary_SILENCING=5.25e-9;
@@ -136,6 +111,102 @@ int main()
     burn_in.test2_weight=0.33;   
     burn_in.test1.duration_of_burn_in_growth_rate=0.0;
     burn_in.test2.duration_of_burn_in_growth_rate=0.0;
+    burn_in.MAX_STEPS=1000;
+    if(burn_in.MAX_STEPS!=0)
+    {
+        fprintf(fp,"Burn-in evolution enabled!");
+        fprintf(fp,"steps dup_rate del_rate max_N_tf max_N_effector miu_A2I miu_Kd miu_protein_syn\n");
+        fprintf(fp,"%d %.2e %.2e %d %d %.3f %.3f %.3f\n\n",
+                burn_in.MAX_STEPS,
+                burn_in.temporary_DUPLICATION,
+                burn_in.temporary_SILENCING,
+                burn_in.temporary_N_tf_genes,
+                burn_in.temporary_N_effector_genes,
+            burn_in.temporary_miu_ACT_TO_INT_RATE,
+            burn_in.temporary_miu_Kd,
+            burn_in.temporary_miu_protein_syn_rate);
+        fprintf(fp,"test weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
+        fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
+                burn_in.test1_weight,
+                burn_in.test1.t_development,
+                burn_in.test1.duration_of_burn_in_growth_rate,
+                burn_in.test1.t_signal_on,
+                burn_in.test1.t_signal_off,
+                burn_in.test1.signal_on_strength,
+                burn_in.test1.signal_off_strength,
+                burn_in.test1.initial_effect_of_effector,
+                burn_in.test1.fixed_effector_effect);
+        fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
+                burn_in.test2_weight,
+                burn_in.test2.t_development,
+                burn_in.test2.duration_of_burn_in_growth_rate,
+                burn_in.test2.t_signal_on,
+                burn_in.test2.t_signal_off,
+                burn_in.test2.signal_on_strength,
+                burn_in.test2.signal_off_strength,
+                burn_in.test2.initial_effect_of_effector,
+                burn_in.test2.fixed_effector_effect);        
+    }    
+    
+    selection.temporary_DUPLICATION=1.5e-7;
+    selection.temporary_SILENCING=1.5e-7;
+    selection.temporary_N_effector_genes=MAX_EFFECTOR_GENES;
+    selection.temporary_N_tf_genes=MAX_TF_GENES;
+    selection.temporary_miu_ACT_TO_INT_RATE=1.57;
+    selection.temporary_miu_Kd=-5.0;
+    selection.temporary_miu_protein_syn_rate=0.021;
+    selection.test1.t_development=89.9;
+    selection.test2.t_development=89.9;
+    selection.test1.signal_on_strength=1000.0;
+    selection.test2.signal_on_strength=1000.0;
+    selection.test1.signal_off_strength=0.0;
+    selection.test2.signal_off_strength=0.0;
+    selection.test1.t_signal_on=200.0;
+    selection.test2.t_signal_on=10.0;
+    selection.test1.t_signal_off=0.0;
+    selection.test2.t_signal_off=200.0;
+    selection.test1.initial_effect_of_effector='b';
+    selection.test2.initial_effect_of_effector='d';
+    selection.test1.fixed_effector_effect=1;
+    selection.test2.fixed_effector_effect=1;
+    selection.test1_weight=0.33;
+    selection.test2_weight=0.67;
+    selection.test1.duration_of_burn_in_growth_rate=0.0;
+    selection.test2.duration_of_burn_in_growth_rate=0.0;   
+    selection.MAX_STEPS=51000;
+    fprintf(fp,"Selection condition:\n");
+    fprintf(fp,"steps dup_rate del_rate max_N_tf max_N_effector miu_A2I miu_Kd miu_protein_syn\n");
+    fprintf(fp,"%d %.2e %.2e %d %d %.3f %.3f %.3f\n\n",
+            selection.MAX_STEPS,
+            selection.temporary_DUPLICATION,
+            selection.temporary_SILENCING,
+            selection.temporary_N_tf_genes,
+            selection.temporary_N_effector_genes,
+            selection.temporary_miu_ACT_TO_INT_RATE,
+            selection.temporary_miu_Kd,
+            selection.temporary_miu_protein_syn_rate);
+    fprintf(fp,"test weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
+    fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
+            selection.test1_weight,
+            selection.test1.t_development,
+            selection.test1.duration_of_burn_in_growth_rate,
+            selection.test1.t_signal_on,
+            selection.test1.t_signal_off,
+            selection.test1.signal_on_strength,
+            selection.test1.signal_off_strength,
+            selection.test1.initial_effect_of_effector,
+            selection.test1.fixed_effector_effect);
+    fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
+            selection.test2_weight,
+            selection.test2.t_development,
+            selection.test2.duration_of_burn_in_growth_rate,
+            selection.test2.t_signal_on,
+            selection.test2.t_signal_off,
+            selection.test2.signal_on_strength,
+            selection.test2.signal_off_strength,
+            selection.test2.initial_effect_of_effector,
+            selection.test2.fixed_effector_effect);   
+    fclose(fp);
     
     /*can also use an extra file to provide an irregular signal*/
 #if EXTERNAL_SIGNAL
@@ -156,18 +227,17 @@ int main()
     } 
 #endif
     
-    /*evolve network under selection*/
+#if NEUTRAL
+    evolve_neutrally(&resident, &mutant, &mut_record, RS_main); 
+#elif REPLAY
+    int replay_N_steps;
+    replay_N_steps=MAX_MUT_STEP; //default
+    run_plotting(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, replay_N_steps,RS_parallel);
+#elif MODIFY
+    plot_alternative_fitness(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein,RS_parallel); 
+#else    
     init_run_pop(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
-    /*just throw mutations to the network*/
-//    evolve_neutrally(&resident, &mutant, &mut_record, RS_main); 
-    /*replay evolution and output expression dynamics*/
-//    int replay_N_steps;
-//    replay_N_steps=MAX_MUT_STEP; //default
-//    run_plotting(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, replay_N_steps,RS_parallel);
-    /*modify network topology and calculate fitness of the modified network*/
-//    plot_alternative_fitness(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein,RS_parallel);   
-    
-    release_memory(&resident, &mutant, &RS_main, RS_parallel);
-    
+#endif        
+    release_memory(&resident, &mutant, &RS_main, RS_parallel);    
     return 0;
 }
