@@ -1,14 +1,18 @@
 #include <stdlib.h>
 #include <math.h>
-#include "RngStream.h" /*replace ran1 with parallel RNG*/
+#include "RngStream.h" 
 #include "netsim.h"
 
 #define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define RT_SAFE_EPSILON 0.01 /* Minimal change in root values between iteration for Newtown-Raphson.
                               * This parameter has unit of minute in this program.
                               */
-
-float gasdev(RngStream RS)
+/* Modified from p289, Numerical Recipes 2nd Edition.
+ * The original algorithm makes it difficult to reproduce random number
+ * for debugging and for Save/Load simulation. If neither is necessary, 
+ * just uncomment the lines. 
+ */
+float gasdev(RngStream RS) 
 {
 //   static int iset=0;
 //   static float gset;
@@ -30,6 +34,7 @@ float gasdev(RngStream RS)
 //   }
 }
 
+/*Modified from p287, Numerical Recipes 2nd edition*/
 float expdev(RngStream RS)
 {
   float dum;
@@ -38,7 +43,7 @@ float expdev(RngStream RS)
   return -log(dum);
 }
 
-/* 
+/* Modified from p366, Numerical Recipes 2nd edition
  * Newton-Raphson root-finding method with bisection steps, out of
  * Numerical Recipes function bracketed by x1 and x2. Returns root
  * within accuracy +/-RT_SAFE_EPSILON funcd is function of interest, returning
@@ -55,12 +60,12 @@ float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, fl
     (*funcd)(x2, n_copies, RHS,p_i,as_i, c_i, &fh, &df); /* note df isn't used here */
     if (fabs(fl) < 1e-9) return x1;
     if (fabs(fh) < 1e-9) return x2;
-    
-    if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0))
-    {
-//        if (verbose) fprintf(fperrors,"warning in rtsafe: root should be bracketed\n");
-//        if (fabs(fl) < fabs(fh)) return x1; else return x2;
-    }
+//    
+//    if ((fl > 0.0 && fh > 0.0) || (fl <0.0 && fh < 0.0))
+//    {
+////        if (verbose) fprintf(fperrors,"warning in rtsafe: root should be bracketed\n");
+////        if (fabs(fl) < fabs(fh)) return x1; else return x2;
+//    }
     
     if (fl < 0.0) 
     {

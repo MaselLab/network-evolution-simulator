@@ -25,8 +25,6 @@ static const float MAX_INT_TO_REP_RATE=4.11;
 static const float BASAL_INT_TO_REP_RATE=0.67;
 static const float MAX_INT_TO_ACT_RATE=3.3; 
 static const float BASAL_INT_TO_ACT_RATE=0.025;
-static const float NS_Kd=1.0e-5;
-static const float KD2APP_KD=1.8e10;
 static const float DEFAULT_UPDATE_INTERVAL=10.0; /*min*/
 static const float MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING=0.01;
 
@@ -34,7 +32,6 @@ static const float MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING=0.01;
 static const float Ne_saturate = 10000.0;
 static const float c_transl=2.0e-6;
 static const float bmax=1.0; 
-
 
 /******************************************************************************
  * 
@@ -100,7 +97,7 @@ void initialize_cell(   Genotype *genotype,
     state->cumulative_fitness_after_burn_in = 0.0;   
     state->instantaneous_fitness = 0.0; 
     state->effect_of_effector=test->initial_effect_of_effector;
-    state->error=0; //no error in simulation
+
     /* initialize linked tables*/
     state->mRNA_transcr_time_end_head = NULL;
     state->mRNA_transcr_time_end_tail = NULL;
@@ -364,26 +361,26 @@ void do_single_timestep(Genotype *genotype,
     
     /* draw random number */
     x = expdev(RS);       
-    dt = x/rates->total_Gillespie_rate;
-    
+    dt = x/rates->total_Gillespie_rate;    
     /* check if a fixed event occurs during dt, or in tdevelopment if running for a fixed development time */
     fixed_time = (state->t+dt<test->t_development)?(state->t+dt):test->t_development;
     event = does_fixed_event_end(state, fixed_time);
     while(event!=0)
     {           
         /*after doing fixed event, return a flag to indicate whether mandatorily update Pact or Prep*/
-        UPDATE_WHAT=do_fixed_event(genotype, state, rates, test, timecourse, &dt, event);        
-        if(state->error==1) 
-            return;
-        state->t += dt;  /* advance time by the dt */       
-        x -= dt*rates->total_Gillespie_rate;  /* we've been running with rates->total_Gillespie_rate for dt, so substract it from x*/        
-        calc_all_rates(genotype, state, rates, test, UPDATE_WHAT);  /* update rates->total_Gillespie_rate and re-compute a new dt */      
+        UPDATE_WHAT=do_fixed_event(genotype, state, rates, test, timecourse, &dt, event);       
+        /* advance time by the dt */  
+        state->t += dt;    
+        /* we've been running with rates->total_Gillespie_rate for dt, so substract it from x*/   
+        x -= dt*rates->total_Gillespie_rate;  
+        /* update rates->total_Gillespie_rate and compute a new dt */  
+        calc_all_rates(genotype, state, rates, test, UPDATE_WHAT);      
         dt = x/rates->total_Gillespie_rate;
         /*deal with rounding error*/
         if(dt<0.0)
         {  	
-#if CAUTIOUS // this rounding error can happen very often, therefore the error_log can be huge            
-            LOG("rounding error in dt at mut_step %d\n",mut_step);    
+#if VERBOSE // if enabled, error file can be huge, because this rounding error can happen very often            
+            LOG("Negative dt!\n");    
 #endif 
             dt=TIME_OFFSET; 
         }
@@ -391,18 +388,14 @@ void do_single_timestep(Genotype *genotype,
         /* check to see there aren't more fixed events to do */
         event = does_fixed_event_end(state, fixed_time);                                    
     } 
-  /* no remaining fixed events to do in dt, now do stochastic events */  
-  /* if we haven't already reached end of development with last
-     delta-t, if there is no fixed development time, we always execute
-     this  */          
+    /* no remaining fixed events to do in dt, now do stochastic events */  
+    /* if we haven't already reached end of development with last delta-t*/          
     if (state->t+dt < test->t_development)
-    {
-        update_protein_number_and_fitness(genotype, state, rates, dt);        
-        if(state->error==1)
-            return; 
-        UPDATE_WHAT=do_Gillespie_event(genotype, state, rates, dt, RS);
-        if(state->error==1)
-            return;  
+    {        
+        /*update protein concentration and fitness after dt*/
+        update_protein_number_and_fitness(genotype, state, rates, dt); 
+        /*do Gillespie event*/
+        UPDATE_WHAT=do_Gillespie_event(genotype, state, rates, dt, RS);       
         /* Gillespie step: advance time to next event at dt */
         state->t += dt;
         calc_all_rates(genotype,state,rates,test,UPDATE_WHAT);        
@@ -411,10 +404,8 @@ void do_single_timestep(Genotype *genotype,
     { 
         /* do remaining dt */
         dt = test->t_development - state->t;
-        /* final update of protein concentration */
-        update_protein_number_and_fitness(genotype, state, rates, dt); 
-        if(state->error==1)
-            return;         
+        /* the final update of protein concentration */
+        update_protein_number_and_fitness(genotype, state, rates, dt);
         /* advance to end of development (this exits the outer while loop) */
         state->t = test->t_development;
     }
@@ -490,7 +481,7 @@ static float calc_integral(Genotype *genotype, CellState *state, float *initial_
  * return the instantaneous growth rate given the current cell state and environment,
  * also return the integrated growth rate as a pointer
  */
-float calc_fitness(float *integrated_fitness,
+static float calc_fitness(float *integrated_fitness,
                             Genotype *genotype,
                             CellState *state,
                             float* number_of_selection_protein_bf_dt,
@@ -626,13 +617,14 @@ float calc_fitness(float *integrated_fitness,
 }
 
 /*Calculate probability of binding configurations*/
-void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int gene_id) 
+static void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int gene_id) 
 {
     int max_N_binding_act=genotype->max_unhindered_sites[gene_id][1]+1; //Binding configurations can contain at most x activators, plus 1 type of configurations that don't have activators at all. 
     int max_N_binding_rep=genotype->max_unhindered_sites[gene_id][2]+1; //Binding configurations can contain at most y repressors, plus 1 type of configurations that don't have repressors at all. 
     double ratio_matrices[genotype->binding_sites_num[gene_id]+1][max_N_binding_rep][max_N_binding_act]; 
     double sum;    
-    double product_of_freq; 
+    register double product_of_freq; 
+    register float cache_Kd;
     int pos_of_last_record;  
     int pos_of_mat_nH;
     int pos_next_record;
@@ -672,6 +664,7 @@ void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int gene_id)
             for(n=m-BS_info[m].N_hindered;n<=m-1;n++)
                 product_of_freq*=BS_info[n].Kd;            
         }
+        cache_Kd=BS_info[m].Kd;
         /*Check whether m is a site of activator or repressor*/
         switch(genotype->protein_identity[BS_info[m].tf_id])
         {
@@ -683,28 +676,20 @@ void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int gene_id)
                    /*find matrix(n)*/
                     pos_of_last_record=pos_next_record-1;
                     for(i=0;i<max_N_binding_rep;i++)
-                    {                
-                        /*Note that it is possible for pos_of_mat_nH=pos_next_record, 
-                         *which means we will be reading and writing to the same
-                         *matrix. Updating the xth column of matrix(n+1) uses
-                         *the (x-1)th column of matrix(n-H). To avoiding changing the values
-                         *of matrix(n-H) before using it to update matrix(n+1), we
-                         *need to update matrix(n+1) from its last column.*/
-                        for(j=max_N_binding_act-1;j>0;j--) 
-                            ratio_matrices[pos_next_record][i][j]=BS_info[m].Kd*ratio_matrices[pos_of_last_record][i][j]+product_of_freq*ratio_matrices[pos_of_mat_nH][i][j-1];
-                    }  
+                        for(j=1;j<max_N_binding_act;j++) 
+                            ratio_matrices[pos_next_record][i][j]=cache_Kd*ratio_matrices[pos_of_last_record][i][j]+product_of_freq*ratio_matrices[pos_of_mat_nH][i][j-1];
+                   
                     for(i=0;i<max_N_binding_rep;i++)
-                        ratio_matrices[pos_next_record][i][0]=BS_info[m].Kd*ratio_matrices[pos_of_last_record][i][0];                    
+                        ratio_matrices[pos_next_record][i][0]=cache_Kd*ratio_matrices[pos_of_last_record][i][0];                    
                 }
                 else
                 {
                     /*find matrix(n)*/
                     pos_of_last_record=pos_next_record-1;  //find last record     
-                    for(i=0;i<max_N_binding_rep;i++)
-                    {
+                    for(i=0;i<max_N_binding_rep;i++)                  
                         for(j=0;j<max_N_binding_act;j++) 
-                            ratio_matrices[pos_next_record][i][j]=BS_info[m].Kd*ratio_matrices[pos_of_last_record][i][j];
-                    }
+                            ratio_matrices[pos_next_record][i][j]=cache_Kd*ratio_matrices[pos_of_last_record][i][j];
+               
                     ratio_matrices[pos_next_record][0][1]+=product_of_freq;                    
                 }
                 break;
@@ -717,24 +702,21 @@ void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int gene_id)
                     /*find matrix(n)*/
                     pos_of_last_record=pos_next_record-1; 
                     /*Similar problem when pos_of_mat_nH=pos_next_record*/
-                    for(i=max_N_binding_rep-1;i>0;i--)
-                    {
+                    for(i=1;i<max_N_binding_rep;i++)                  
                         for(j=0;j<max_N_binding_act;j++)
-                            ratio_matrices[pos_next_record][i][j]=BS_info[m].Kd*ratio_matrices[pos_of_last_record][i][j]+product_of_freq*ratio_matrices[pos_of_mat_nH][i-1][j];
-                            
-                    }  
+                            ratio_matrices[pos_next_record][i][j]=cache_Kd*ratio_matrices[pos_of_last_record][i][j]+product_of_freq*ratio_matrices[pos_of_mat_nH][i-1][j];
+                   
                     for(j=0;j<max_N_binding_act;j++)
-                        ratio_matrices[pos_next_record][0][j]=BS_info[m].Kd*ratio_matrices[pos_of_last_record][0][j];     
+                        ratio_matrices[pos_next_record][0][j]=cache_Kd*ratio_matrices[pos_of_last_record][0][j];     
                 }
                 else
                 {
                     /*find matrix(n)*/
                     pos_of_last_record=pos_next_record-1;  
-                    for(i=0;i<max_N_binding_rep;i++)
-                    {
+                    for(i=0;i<max_N_binding_rep;i++)                  
                         for(j=0;j<max_N_binding_act;j++)
-                            ratio_matrices[pos_next_record][i][j]=BS_info[m].Kd*ratio_matrices[pos_of_last_record][i][j];                                                   
-                    }
+                            ratio_matrices[pos_next_record][i][j]=cache_Kd*ratio_matrices[pos_of_last_record][i][j];                                                   
+                   
                     ratio_matrices[pos_next_record][1][0]+=product_of_freq;
                 } 
                 break;
@@ -742,29 +724,20 @@ void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int gene_id)
     }
 
     sum=0.0;
-
-    for(i=0;i<max_N_binding_rep;i++)
-    {
-        for(j=0;j<max_N_binding_act;j++)
-//        for(j=0;j<((max_N_binding_act<max_unhindered_sites[0]+1-i)?max_N_binding_act:max_unhindered_sites[0]+1-i);j++)        
+    for(i=0;i<max_N_binding_rep;i++)    
+        for(j=0;j<max_N_binding_act;j++)     
             sum+=ratio_matrices[pos_next_record][i][j];
-    }   
-
+    
     temp=0.0;
-    for(i=0;i<max_N_binding_rep;i++)
-    {  
-        for(j=genotype->min_N_activator_to_transc[gene_id];j<max_N_binding_act;j++)
-//        for(;j<((max_N_binding_act<max_unhindered_sites[0]+1-i)?max_N_binding_act:max_unhindered_sites[0]+1-i);j++)        
-            temp+=ratio_matrices[pos_next_record][i][j];        
-    } 
+    for(i=0;i<max_N_binding_rep;i++)  
+        for(j=genotype->min_N_activator_to_transc[gene_id];j<max_N_binding_act;j++)   
+            temp+=ratio_matrices[pos_next_record][i][j];
     state->P_A[gene_id]=(float)(temp/sum);
     
     temp=0.0;
-    for(i=1;i<max_N_binding_rep;i++)
-    {
+    for(i=1;i<max_N_binding_rep;i++)  
         for(j=0;j<max_N_binding_act;j++)
-            temp+=ratio_matrices[pos_next_record][i][j];
-    }    
+            temp+=ratio_matrices[pos_next_record][i][j];  
     state->P_R[gene_id]=(float)(temp/sum);
    
 	temp=0.0;
@@ -820,15 +793,6 @@ static void update_protein_number_and_fitness( Genotype *genotype,
                                             state, 
                                             N_effector_molecules_bf_dt, 
                                             dt);  
-//    if(*end_state==0)
-//    /*use 0 to indicate abnormal behavior of the program. I expect rounding error to raise this flag.
-//    *In case this flag is raised, quit the current replicate of growth and rerun a replicate.*/
-//    {
-//        fperror=fopen(error_file,"a+");
-//        LOG("at mut step %d",mut_step);
-//        fclose(fperror);
-//        return;
-//    } 
     /* use the integrated growth rate to compute the cell size in the next timestep */
     state->cumulative_fitness += integrated_fitness;    
     /* update the instantaneous growth rate for the beginning of the next timestep */
@@ -878,7 +842,7 @@ static int Gillespie_event_mRNA_decay(GillespieRates *rates, CellState *state, G
     {
         /* decay mRNA in process of translation initialization */       
         mRNA_id = RngStream_RandInt(RS,0,state->mRNA_under_transl_delay_num[gene_id]-1);
-        /* delete this fixed event: this mRNA will never be translated */
+        /* delete this fixed event: this mRNA will never be translated */     
         delete_fixed_event(gene_id, mRNA_id, &(state->mRNA_transl_init_time_end_head), &(state->mRNA_transl_init_time_end_tail));       
         /* remove the mRNA from the count */
         (state->mRNA_under_transl_delay_num[gene_id])--; 
@@ -999,8 +963,7 @@ static void Gillespie_event_transcription_init(GillespieRates *rates, CellState 
  * Functions that handle each possible Gillespie event 
  */
 
-/* while there are fixed events
-     occuring in current t->dt window */
+/* do a fixed event that occurs in current t->dt window */
 static int do_fixed_event(Genotype *genotype, 
                     CellState *state, 
                     GillespieRates *rates, 
@@ -1056,7 +1019,7 @@ static int do_fixed_event(Genotype *genotype,
             state->protein_number[N_SIGNAL_TF-1]=test->external_signal[state->change_signal_strength_head->event_id];
             delete_fixed_event_from_head(&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
             break;     
-        case 8:
+        case 8: /* record expression levels*/
             *dt=state->sampling_point_end_head->time-state->t;
             update_protein_number_and_fitness(genotype, state, rates, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
@@ -1215,10 +1178,10 @@ static int does_fixed_event_end(CellState *state, float t)
  * end transcription: update the mRNAs ready for translation initiation
  * etc. accordingly and delete the event from the queue
  */
-static void fixed_event_end_transcription( float *dt,                                    
-                                    CellState *state,
-                                    GillespieRates *rates,
-                                    Genotype *genotype)
+static void fixed_event_end_transcription( float *dt,                                     
+                                            CellState *state,
+                                            GillespieRates *rates,
+                                            Genotype *genotype)
 {
     int gene_id;
     float concurrent;
@@ -1234,6 +1197,13 @@ static void fixed_event_end_transcription( float *dt,
     /* decrease the number of mRNAs undergoing transcription */
     (state->mRNA_under_transc_num[gene_id])--;
     /* delete the fixed even which has just occurred */
+    if(state->mRNA_transcr_time_end_head==NULL)
+    {
+#ifndef LOG_OFF
+        LOG("No transcription is going on\n");
+#endif
+        exit(-3);
+    }
     delete_fixed_event_from_head(&(state->mRNA_transcr_time_end_head), &(state->mRNA_transcr_time_end_tail));   
     /*add transcription initialization event*/ 
     endtime=state->t+*dt+(float)genotype->locus_length[gene_id]/TRANSLATION_ELONGATION_RATE+TRANSLATION_INITIATION_TIME;
@@ -1266,6 +1236,13 @@ static int fixed_event_end_translation_init(   Genotype *genotype,
     /* there is one less mRNA that is initializing translation */
     (state->mRNA_under_transl_delay_num[gene_id])--;  
     /* delete the event that just happened */
+    if(state->mRNA_transl_init_time_end_head==NULL)
+    {
+#ifndef LOG_OFF
+        LOG("No translation initiation going on!\n");
+#endif
+        exit(-3);
+    }
     delete_fixed_event_from_head(&(state->mRNA_transl_init_time_end_head), &(state->mRNA_transl_init_time_end_tail));    
     /* there is one more mRNA that produces protein */
     (state->mRNA_aft_transl_delay_num[gene_id])++;   

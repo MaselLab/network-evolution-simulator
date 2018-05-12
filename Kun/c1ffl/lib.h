@@ -16,8 +16,8 @@
 /* 
  * define macros for logging warning/errors 
  */
-#ifndef LOGGING_OFF
-  #define LOG(...) { FILE *fp; fp=fopen("error.txt","a+"); fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); fclose(fp);} 
+#ifndef LOG_OFF
+#define LOG(...) { FILE *fperror; fperror=fopen("error.txt","a+"); fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); fclose(fperror);} 
 #endif
 
 int add_fixed_event(int, float, FixedEvent **, FixedEvent **);

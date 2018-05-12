@@ -68,15 +68,14 @@ int add_fixed_event(int i,
                     FixedEvent **last)
 {
     FixedEvent *newtime;
-    int pos;
-    FILE *fp;
+    int pos;    
 
     newtime = malloc(sizeof*newtime);
     if (!newtime) 
-    {
-        fp=fopen("output.txt","a+");
-        fprintf(fp,"error in add_fixed_event\n");
-        fclose(fp); 
+    {   
+#ifndef LOG_OFF
+        LOG("Could not add fixed event \n");   
+#endif
         exit(1);
     }
     newtime->event_id = i;  
@@ -94,8 +93,7 @@ void delete_fixed_event(int gene_x,
                         FixedEvent **tail)
 {
     FixedEvent *info, *lastinfo=NULL;
-    int j, done;
-    FILE *fp;
+    int j, done;    
   
     j = -1;
     done = 0;
@@ -136,9 +134,9 @@ void delete_fixed_event(int gene_x,
     }
     if (done == 0) //if could not find mRNA y
     {
-        fp=fopen("output.txt","a+");
-        fprintf(fp,"error in delete_fixed_event\n");
-        fclose(fp);        
+#ifndef LOG_OFF
+        LOG("Could not find designated fixed event");       
+#endif
         exit(1);
     }
     free(info);

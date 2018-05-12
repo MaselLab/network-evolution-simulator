@@ -28,13 +28,13 @@ static const float MUT_cooperation=0.0;
 
 /*Mutational effect*/
 float miu_ACT_TO_INT_RATE=1.57;
-float miu_Kd=-5;       
+float miu_Kd=-5.0;       
 float miu_protein_syn_rate=0.021; 
 static const float sigma_ACT_TO_INT_RATE=0.773; 
 static const float sigma_mRNA_decay=0.396; 
 static const float sigma_protein_decay=0.739; 
 static const float sigma_protein_syn_rate=0.76; 
-static const float sigma_Kd=0.78;
+static const float sigma_Kd=0.776;
 static const float miu_mRNA_decay=-1.19;
 static const float miu_protein_decay=-1.88;
 static const float mutational_regression_rate=0.5;
@@ -797,14 +797,6 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
     tf_seq[which_nucleotide]=mut_record->nuc_diff[1];
     switch (tf_seq[which_nucleotide])
     {
-//        case 'g':
-//            tf_seq_rc[which_nucleotide]='c'; break;
-//        case 'c':
-//            tf_seq_rc[which_nucleotide]='g'; break;
-//        case 'a':
-//            tf_seq_rc[which_nucleotide]='t'; break;
-//        case 't':
-//            tf_seq_rc[which_nucleotide]='a'; break;
         case 'g':
             tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='c'; break;
         case 'c':

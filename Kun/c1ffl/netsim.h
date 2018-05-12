@@ -1,7 +1,7 @@
 /* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-  */
 /* 
  * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
+ * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe, Kun Xiong
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #ifndef FILE_NETSIM_SEEN
@@ -28,7 +28,6 @@
 #endif
 
 /*Runtime control*/ 
-#define MAX_MUTATIONS 1000000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
 #define N_REPLICATES 200
@@ -41,6 +40,9 @@
 /*Miscellaneous settings*/
 #define OUTPUT_RNG_SEEDS 1
 #define CAUTIOUS 0
+#ifndef VERBOSE
+#define VERBOSE 0
+#endif
 
 /*Biology and evolution settings*/
 #ifndef DIRECT_REG  //direct regulation can be enabled by adding -D DIRECT_REG in compilation command
@@ -53,6 +55,7 @@
 #define NO_REGULATION_COST 0
 #define NO_REGULATION 0 // this locks the state of TF genes to Rep
 #define RANDOM_COOPERATION_LOGIC 0 
+
 /******************************************************************************/
 /*DO NOT MODIFY THE FOLLOWING TWO PARAMETERS!!!
  *I had intended to model more than one signals, but gave it up due to the
@@ -61,12 +64,10 @@
 /******************************************************************************/
 #define N_SIGNAL_TF 1 // number of input signals
 #define RANDOMIZE_SIGNAL2 0
-/***********************************/
 
-/*Available modifications to network.
- *Enabled under mode MODIFICATION. 
- *Set the desired modification to 1 to enabled it.
- */
+
+/*Available modifications to network. Enabled under mode MODIFY*/
+/*Set the desired modification to 1 to enabled it*/
 #define DISABLE_AND_GATE 0 // change the logic of an effector gene
 #if DISABLE_OR_GATE
 #define FORCE_MASTER_CONTROLLED 0 // 1 for master TF controlled; 0 for aux. TF controlled 
@@ -93,13 +94,13 @@
 /*
  * enum for 'CellState'->transcriptional_state indices
  */
-
 enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_TF=-1};
 enum BOOLEAN {NA=-1, NO=0, YES=1};
 
 /*struct of a TF binding site*/
 typedef struct AllTFBindingSites AllTFBindingSites;
-struct AllTFBindingSites {
+struct AllTFBindingSites
+{
   int tf_id;         /*which TF */
   float Kd;
   int mis_match;     /* number of mismatched nuc */
@@ -194,7 +195,6 @@ struct Genotype {
     int N_rep_BS[MAX_GENES];                                   /* total number of binding sites of repressing TF */  
     AllTFBindingSites *all_binding_sites[MAX_GENES];   
     int N_allocated_elements;                               /* maximal number of AllTFBindingSites that have been allocated for each gene*/
-
     
     /*fitness related variable*/
     float avg_GR1;
@@ -238,7 +238,6 @@ struct Phenotype
     float *instantaneous_fitness;    
 };
 
-
 /*
  * global variables
  */
@@ -265,9 +264,9 @@ extern const float MAX_KD;
 extern const float MIN_KD;
 extern const int MAX_GENE_LENGTH;
 extern const int MIN_GENE_LENGTH;
+extern const float KD2APP_KD;
 
 /* global function prototypes */
-
 char set_base_pair(float);
 
 void initialize_genotype(Genotype *, int, int, int, int, RngStream) ;
@@ -281,8 +280,7 @@ void run_plotting(  Genotype *,
                     Mutation *,
                     Selection *,
                     int [MAX_GENES],
-                    float [MAX_GENES],
-                    int,
+                    float [MAX_GENES],                  
                     RngStream [N_THREADS]);
 
 void evolve_neutrally(  Genotype *,
@@ -295,7 +293,8 @@ void plot_alternative_fitness(  Genotype *,
                                 Mutation *,
                                 Selection *,
                                 int [MAX_GENES],
-                                float [MAX_GENES]);
+                                float [MAX_GENES],
+                                RngStream [N_THREADS]);
 
 void print_mutatable_parameters(Genotype*,int);
 

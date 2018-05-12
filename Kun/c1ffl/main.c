@@ -26,7 +26,7 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-    seed=87;
+    seed=18;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
@@ -35,8 +35,7 @@ int main()
     for(i=0;i<N_THREADS;i++)
         RS_parallel[i]=RngStream_CreateStream(""); 
     
-    /*make filenames*/    
-    snprintf(error_file,sizeof(char)*32,"errors_%i.txt",seed);
+    /*make filenames*/     
     snprintf(mutation_file,sizeof(char)*32,"MUT_%i.txt",seed);
     snprintf(output_file,sizeof(char)*32,"output_%i.txt",seed);
     snprintf(RuntimeSumm,sizeof(char)*32,"RuntimeSummary_%i.txt",seed);    
@@ -122,9 +121,9 @@ int main()
                 burn_in.temporary_SILENCING,
                 burn_in.temporary_N_tf_genes,
                 burn_in.temporary_N_effector_genes,
-            burn_in.temporary_miu_ACT_TO_INT_RATE,
-            burn_in.temporary_miu_Kd,
-            burn_in.temporary_miu_protein_syn_rate);
+                burn_in.temporary_miu_ACT_TO_INT_RATE,
+                burn_in.temporary_miu_Kd,
+                burn_in.temporary_miu_protein_syn_rate);
         fprintf(fp,"test weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
         fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
                 burn_in.test1_weight,
@@ -229,12 +228,10 @@ int main()
     
 #if NEUTRAL
     evolve_neutrally(&resident, &mutant, &mut_record, RS_main); 
-#elif REPLAY
-    int replay_N_steps;
-    replay_N_steps=MAX_MUT_STEP; //default
-    run_plotting(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, replay_N_steps,RS_parallel);
+#elif REPLAY    
+    run_plotting(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
 #elif MODIFY
-    plot_alternative_fitness(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein,RS_parallel); 
+    plot_alternative_fitness(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
 #else    
     init_run_pop(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
 #endif        

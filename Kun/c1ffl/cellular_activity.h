@@ -1,12 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 /* 
  * File:   expression_dynamics.h
- * Author: kunxi
+ * Author: kunxiong
  *
  * Created on April 30, 2018, 3:42 PM
  */
@@ -104,8 +98,6 @@ struct CellState {
                                                * deal with. */  
     float protein_synthesis_index[MAX_GENES];  /*this is N_mRNA*translation_rate/degradation rate.*/
     int transcriptional_state[MAX_GENES];       /*can be REPRESSED, INTERMEDIATE, or ACTIVE */
-    
-    int error;
 };
 
 void initialize_cell(Genotype *, CellState *, Test *, int [MAX_GENES], float [MAX_PROTEINS]);
