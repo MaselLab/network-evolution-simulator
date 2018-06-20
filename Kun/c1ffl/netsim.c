@@ -17,6 +17,10 @@
 
 #define INITIALIZATION -1
 #define DO_NOTHING -2
+#if DIRECT_REG
+#define CUT_OFF_MISMATCH_SIG2EFFECTOR 2
+#define CUT_OFF_MISMATCH_TF2EFFECTOR 2
+#endif
 #define CUT_OFF_MISMATCH_ON_EFFECTOR 2
 #define CUT_OFF_MISMATCH_SIGNAL_TO_TF 2
 #define CUT_OFF_MISMATCH_TF_TO_TF 2
@@ -2442,7 +2446,7 @@ void calc_avg_growth_rate(  Genotype *genotype,
         } 
         calc_all_binding_sites(&genotype_clone); 
 #if PLOT_ALTERNATIVE_FITNESS  /*modify motifs*/       
-        for(i=0;i<39;i++)
+        for(i=0;i<42;i++)
             genotype_clone.N_motifs[i]=genotype->N_motifs[i];
         for(i=0;i<NGENES;i++)
         {
@@ -3054,6 +3058,26 @@ void calc_avg_growth_rate_plotting( Genotype *genotype,
         fclose(fp1);
         fclose(fp2);
     }
+    
+//    for(l=0;l<genotype->ngenes;l++)
+//    {
+//        snprintf(filename1,sizeof(char)*32,"geneA_%i",l);
+//        snprintf(filename2,sizeof(char)*32,"geneB_%i",l);
+//        fp1=fopen(filename1,"w");
+//        fp2=fopen(filename2,"w");
+//        for(m=0;m<N_TIMP_POINTS;m++)
+//        {
+//            for(n=0;n<N_REPLICATES;n++)
+//            {
+//                fprintf(fp1,"%f ",phenotypeA[n][l][m]);
+//                fprintf(fp2,"%f ",phenotypeB[n][l][m]);
+//            }
+//            fprintf(fp1,"\n");
+//            fprintf(fp2,"\n");
+//        }
+//        fclose(fp1);
+//        fclose(fp2);
+//    }
     /*Output growth rate*/
     /*Each environment has its file: A is env1 and B env2*/
     /*In each file, columns are replicates, rows are timepoints*/
@@ -3306,26 +3330,26 @@ void run_plotting(  Genotype *genotype_ori,
 {      
     replay_mutations(genotype_ori, genotype_ori_copy, fp, mut_record, replay_N_steps,RS_parallel[0]); 
     calc_all_binding_sites(genotype_ori); 
-    print_mutatable_parameters(genotype_ori);
-    summarize_binding_sites(genotype_ori,1);   
-    exit(0);
+    print_mutatable_parameters(genotype_ori,1);
+    summarize_binding_sites(genotype_ori,replay_N_steps);   
+//    exit(0);
     /* conditions under which the phenotype and fitness is measured */    
     env1_t_development=90.1;
     env2_t_development=90.1;
-    env1_signal_strength=10000.0;
-    env2_signal_strength=10000.0;
+    env1_signal_strength=1000.0;
+    env2_signal_strength=0.0;
     duration_of_burn_in_growth_rate = 0.0; 
     env1_t_signal_on=200.0;     
     env1_t_signal_off=0.0;
-    env2_t_signal_on=10.0;
+    env2_t_signal_on=100.0;
     env2_t_signal_off=130.0;
     env1_initial_effect_of_effector='b';    
     env2_initial_effect_of_effector='d'; 
     env1_fixed_effector_effect=0;
     env2_fixed_effector_effect=1;
     recalc_new_fitness=1;
-    env1_occurence=0.4;
-    env2_occurence=0.6;            
+    env1_occurence=0.33;
+    env2_occurence=0.67;            
     calc_avg_growth_rate_plotting(  genotype_ori, 
                                     init_mRNA, 
                                     init_protein_number,
@@ -3351,8 +3375,8 @@ void plot_alternative_fitness(  Genotype *genotype_ori,
     env1_t_development=89.9;
     env2_t_development=89.9;
     duration_of_burn_in_growth_rate=0.0;
-    env1_signal_strength=10000.0;
-    env2_signal_strength=10000.0;
+    env1_signal_strength=1000.0;
+    env2_signal_strength=1000.0;
     env1_t_signal_on=200.0;    
     env1_t_signal_off=0.0;     
     env2_t_signal_on=10.0;
@@ -3380,9 +3404,9 @@ void plot_alternative_fitness(  Genotype *genotype_ori,
         reproduce_mutate(genotype_ori_copy,mut_record,NULL);        
         clone_genotype(genotype_ori_copy,genotype_ori);       
         fgets(buffer,600,fitness_record);
-        if(i>=41001)
+        if(i>=replay_N_steps-10000+1)
         {            
-            calc_all_binding_sites(genotype_ori);        
+            calc_all_binding_sites(genotype_ori); 
             find_ffl(genotype_ori); 
 #if DIRECT_REG
             if(genotype_ori->N_motifs[5]!=0 && genotype_ori->N_motifs[5]==genotype_ori->N_motifs[0])
@@ -3401,9 +3425,25 @@ void plot_alternative_fitness(  Genotype *genotype_ori,
                 genotype_ori->N_motifs[27]==0 &&
                 genotype_ori->N_motifs[36]==0 &&
                 genotype_ori->N_motifs[38]==0) 
-    #else //FORCE_OR_GATE. Networks contain only AND-gated double C1ffl   
-            if(genotype_ori->N_motifs[14]!=0 && genotype_ori->N_motifs[18]==0 && genotype_ori->N_motifs[14]==genotype_ori->N_motifs[9] && genotype_ori->N_motifs[27]==0) 
-    #endif        
+    #elif FORCE_OR_GATE 
+                //Networks contain only AND-gated single C1ffl   
+//            if(genotype_ori->N_motifs[14]!=0 && 
+//                genotype_ori->N_motifs[18]==0 && 
+//                genotype_ori->N_motifs[14]==genotype_ori->N_motifs[9] && 
+//                genotype_ori->N_motifs[27]==0 )
+//                
+//                contain only AND-gated double C1ffl
+//            if(genotype_ori->N_motifs[23]!=0 && 
+//                genotype_ori->N_motifs[9]==0 && 
+//                genotype_ori->N_motifs[23]==genotype_ori->N_motifs[18] && 
+//                genotype_ori->N_motifs[27]==0 )
+                
+                //contain only AND-gated diamond
+                if(genotype_ori->N_motifs[32]!=0 && 
+                genotype_ori->N_motifs[9]==0 && 
+                genotype_ori->N_motifs[27]==genotype_ori->N_motifs[32] && 
+                genotype_ori->N_motifs[18]==0 ) 
+    #endif
 #endif             
             {
                 for(j=0;j<recalc_new_fitness;j++)                    
@@ -3432,7 +3472,7 @@ void plot_alternative_fitness(  Genotype *genotype_ori,
                         sqrt(genotype_ori->sq_SE_GR1),
                         sqrt(genotype_ori->sq_SE_GR2));
                 fclose(alternative_fitness);
-                fputs(buffer,original_fitness);                
+                fputs(buffer,original_fitness);  
             }    
             for(j=0;j<NGENES;j++)
             {
@@ -4100,8 +4140,8 @@ int init_run_pop(unsigned long int seeds[6], int CONTINUE)
             env1_fixed_effector_effect=0;    
             env2_fixed_effector_effect=1; 
             recalc_new_fitness=5; 
-            env1_occurence=0.67;
-            env2_occurence=0.33;    
+            env1_occurence=0.33;
+            env2_occurence=0.67;    
             float GR1[recalc_new_fitness][N_REPLICATES],GR2[recalc_new_fitness][N_REPLICATES];
             /*Load external signal profile if there is one*/
             fp=fopen("noisy_signal.txt","r");
@@ -4217,7 +4257,7 @@ void print_core_c1ffls(Genotype *genotype)
 {
     FILE *fp; 
     fp=fopen("proportion_c1ffl.txt","a+");
-    fprintf(fp,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+    fprintf(fp,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
                                                                                                 genotype->N_motifs[0],
                                                                                                 genotype->N_motifs[1],
                                                                                                 genotype->N_motifs[2],
@@ -4261,7 +4301,10 @@ void print_core_c1ffls(Genotype *genotype)
                                                                                                 genotype->N_act_genes_reg_by_env,
                                                                                                 genotype->N_act_genes_not_reg_by_env,
                                                                                                 genotype->protein_pool[genotype->nproteins-1][0][0],
-                                                                                                genotype->ntfgenes-genotype->N_act_genes-N_SIGNAL_TF);
+                                                                                                genotype->ntfgenes-genotype->N_act_genes-N_SIGNAL_TF,
+                                                                                                genotype->N_motifs[39],
+                                                                                                genotype->N_motifs[40],
+                                                                                                genotype->N_motifs[41]);
         fclose(fp); 
 }
 
@@ -4455,15 +4498,20 @@ void summarize_binding_sites2(Genotype *genotype,int step_i)
 /*find subtypes of C1-FFLs, FFL-in-diamond, and diamonds*/
 void find_ffl(Genotype *genotype)
 {
-    int i,j,k,l,cluster_size;
-    int found_bs;
+    int i,j,k,l,m,cluster_size;
+    float r_master_TF_deg, r_aux_TF_deg;
+    int found_bs, is_reg_by_env;
     int gene_id,gene_id_copy,site_id,protein_id,N_copies,N_activators;
     int master_TF,aux_TF;
     int activators[NPROTEINS];
     int copies_reg_by_env[NGENES],copies_not_reg_by_env[NGENES],N_copies_reg_by_env,N_copies_not_reg_by_env;
     int hindrance[NPROTEINS][NPROTEINS];
     int pos_binding_sites_of_j[MAXELEMENTS],pos_binding_sites_of_k[MAXELEMENTS],N_binding_sites_of_j,N_binding_sites_of_k; 
-    int N_motifs;   
+    int N_motifs;  
+    int weak_interaction[NPROTEINS];
+    int weak_TFBSs_only;
+    int N_strong_BS[NPROTEINS][2][20];
+    int copies_reg_by_env2[NGENES], N_copies_reg_by_env2, activators_copy[NPROTEINS], protein_id2;
     
     /*record which genes and TFs form the motifs of interest. We use this information to perturb motifs*/
 #if PLOT_ALTERNATIVE_FITNESS
@@ -4477,7 +4525,7 @@ void find_ffl(Genotype *genotype)
     /*look for motifs only if the genotype contains non-signal activators*/
     if(genotype->N_act>N_SIGNAL_TF)
     {        
-        for(i=0;i<39;i++)
+        for(i=0;i<42;i++)
             genotype->N_motifs[i]=0; 
         /*loop through each cisreg_cluster. Genes in a cluster have the same binding sites*/
         i=0;   
@@ -4491,7 +4539,15 @@ void find_ffl(Genotype *genotype)
                 /*find how many genes in this cluster*/
                 cluster_size=0;
                 while(genotype->cisreg_cluster[i][cluster_size]!=NA)
-                    cluster_size++;        
+                    cluster_size++;  
+                /*reset table for recording strength of interaction*/
+                for(j=0;j<NPROTEINS;j++)
+                {
+                    weak_interaction[j]=0;
+                    N_strong_BS[j][0][0]=0;
+                    for(k=0;k<20;k++)
+                        N_strong_BS[j][1][k]=0;
+                }
                 /*reset table for recording activators that regulate effector gene*/
                 for(j=0;j<NPROTEINS;j++)
                     activators[j]=0;
@@ -4499,9 +4555,28 @@ void find_ffl(Genotype *genotype)
                 for(j=0;j<genotype->binding_sites_num[gene_id];j++)
                 {
                     protein_id=genotype->all_binding_sites[gene_id][j].tf_id;
+#if DIRECT_REG
+                    if(genotype->protein_identity[protein_id]==ACTIVATOR)
+                    {
+                        if(protein_id==N_SIGNAL_TF-1)
+                        {
+                            if(genotype->all_binding_sites[gene_id][j].mis_match<=CUT_OFF_MISMATCH_SIG2EFFECTOR)
+                                activators[protein_id]=1;
+                        }
+                        else
+                        {
+                            if(genotype->all_binding_sites[gene_id][j].mis_match<=CUT_OFF_MISMATCH_TF2EFFECTOR)
+                                activators[protein_id]=1;
+                        }                        
+                    }                    
+#else
                     if(genotype->protein_identity[protein_id]==ACTIVATOR && genotype->all_binding_sites[gene_id][j].mis_match<=CUT_OFF_MISMATCH_ON_EFFECTOR) // is a binding site of an activator 
                         activators[protein_id]=1;
+#endif
                 }
+                /*Make a copy of activators, to be used in counting long ffls*/                
+                for(j=0;j<genotype->nproteins-1;j++)                
+                    activators_copy[j]=activators[j];
                 /* move non-zeros entries in activators to the front. */
                 k=0; //marks the entry to which a record is copied
                 j=0;
@@ -4537,14 +4612,23 @@ void find_ffl(Genotype *genotype)
                     /*list the positions of all the binding sites of activator j*/
                     N_binding_sites_of_j=0;
                     gene_id=genotype->cisreg_cluster[i][0];
+                    weak_TFBSs_only=1;
                     for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
                     {
                         if(genotype->all_binding_sites[gene_id][site_id].tf_id==activators[j] && genotype->all_binding_sites[gene_id][site_id].mis_match<=CUT_OFF_MISMATCH_ON_EFFECTOR)
                         {
                             pos_binding_sites_of_j[N_binding_sites_of_j]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
-                            N_binding_sites_of_j++;
+                            N_binding_sites_of_j++;                        
+                            if(genotype->all_binding_sites[gene_id][site_id].mis_match<2)
+                            {
+                                weak_TFBSs_only=0;
+                                N_strong_BS[activators[j]][1][N_strong_BS[activators[j]][0][0]]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
+                                N_strong_BS[activators[j]][0][0]++;
+                            }
                         }
                     } 
+                    if(weak_TFBSs_only)
+                        weak_interaction[activators[j]]=1;
                     if(N_binding_sites_of_j==1 && genotype->min_N_activator_to_transc[gene_id_copy]==2) // there is only one binding site                     
                     {
                         hindrance[activators[j]][activators[j]]=1;
@@ -4605,7 +4689,7 @@ void find_ffl(Genotype *genotype)
                             found_bs=0;
                             for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
                             {
-                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==N_SIGNAL_TF-1 && genotype->all_binding_sites[gene_id][site_id].tf_id<=CUT_OFF_MISMATCH_SIGNAL_TO_TF)
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==N_SIGNAL_TF-1 && genotype->all_binding_sites[gene_id][site_id].mis_match<=CUT_OFF_MISMATCH_SIGNAL_TO_TF)
                                 {
                                     found_bs=1;
                                     break;
@@ -4624,7 +4708,33 @@ void find_ffl(Genotype *genotype)
                         }                        
                     }
                 } 
-
+                /*make a list of activators genes that do not regulate the effector but is regulated by the env*/
+                N_copies_reg_by_env2=0;
+                for(j=0;j<genotype->nproteins-1;j++)
+                {
+                    if(activators_copy[j]==0 && genotype->protein_identity[j]==ACTIVATOR)
+                    {
+                        for(k=0;k<genotype->protein_pool[j][0][0];k++)
+                        {
+                            gene_id=genotype->protein_pool[j][1][k];
+                            found_bs=0;
+                            for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
+                            {
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==N_SIGNAL_TF-1)
+                                {
+                                    found_bs=1;
+                                    break;
+                                }
+                            }
+                            if(found_bs)
+                            {
+                                copies_reg_by_env2[N_copies_reg_by_env2]=gene_id;
+                                N_copies_reg_by_env2++;
+                            }
+                        }
+                    }
+                }
+                
                 /*******************************count motifs ************************/                
 #if DIRECT_REG  
                 /*count c1-ffls formed by signal and one signal-regulated copy */
@@ -4679,7 +4789,65 @@ void find_ffl(Genotype *genotype)
                                 else
                                     genotype->N_motifs[8]+=cluster_size; // OR-gated
                             }
-                        }
+                        }                                        
+                    }
+                    /* count long FFL, in which the non-signal arm is relayed once*/
+                    /* find out which activators are regulated by which copy_reg_by_env*/
+                    for(j=0;j<N_copies_reg_by_env2;j++)
+                    {    
+                        protein_id=genotype->which_protein[copies_reg_by_env2[j]];
+                        for(k=0;k<N_copies_not_reg_by_env;k++)
+                        {
+                            found_bs=0;
+                            gene_id=copies_not_reg_by_env[k];
+                            for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
+                            {
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id)
+                                {
+                                    found_bs=1;
+                                    break;
+                                }
+                            }
+                            if(found_bs)
+                            {                                
+                                protein_id2=genotype->which_protein[gene_id];
+                                genotype->N_motifs[9]+=cluster_size;
+                                if(hindrance[N_SIGNAL_TF-1][protein_id2])
+                                {
+                                    if(hindrance[N_SIGNAL_TF-1][N_SIGNAL_TF-1])
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_motifs[10]+=cluster_size;
+                                        else
+                                            genotype->N_motifs[11]+=cluster_size;
+                                    }
+                                    else
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_motifs[12]+=cluster_size;
+                                        else
+                                            genotype->N_motifs[13]+=cluster_size;
+                                    }                                    
+                                }
+                                else
+                                {
+                                    if(hindrance[N_SIGNAL_TF-1][N_SIGNAL_TF-1])
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_motifs[14]+=cluster_size;
+                                        else
+                                            genotype->N_motifs[15]+=cluster_size;
+                                    }
+                                    else
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_motifs[16]+=cluster_size;
+                                        else
+                                            genotype->N_motifs[17]+=cluster_size;
+                                    }  
+                                }    
+                            }
+                        }        
                     }
                 } 
 #else
@@ -4746,27 +4914,86 @@ void find_ffl(Genotype *genotype)
                                             if(hindrance[aux_TF][aux_TF])
                                             {
                                                 genotype->N_motifs[14]+=cluster_size; //AND-gated 
+#if COUNT_NEAR_AND
+                                                /*calculate AND-gated motifs in which either arm is weak regulation*/
+                                                if(weak_interaction[master_TF]==1 || weak_interaction[aux_TF]==1)
+                                                    genotype->N_motifs[39]+=cluster_size;
+#endif
 #if FORCE_OR_GATE                                   
-                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1;
-#if FORCE_MASTER_CONTROLLED
+                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1; 
+#if FORCE_MASTER_CONTROLLED                                                                                              
                                                 genotype->TF_in_core_C1ffl[gene_id_copy][master_TF]=1;
 #else
                                                 genotype->TF_in_core_C1ffl[gene_id_copy][aux_TF]=1;
 #endif                                    
-//#elif FORCE_DIAMOND                                    
-//                                                genotype->gene_in_core_C1ffl[copies_not_reg_by_env[k]]=1;
-//                                                genotype->TF_in_core_C1ffl[copies_not_reg_by_env[k]][master_TF]=1;                                                          
+#elif FORCE_DIAMOND                                    
+                                                genotype->gene_in_core_C1ffl[copies_not_reg_by_env[k]]=1;
+                                                genotype->TF_in_core_C1ffl[copies_not_reg_by_env[k]][master_TF]=1;                                                          
 #endif
                                             }
-                                            else  
+                                            else 
+                                            {
                                                 genotype->N_motifs[15]+=cluster_size; //aux. TF controlled
+#if COUNT_NEAR_AND
+                                                /*count near-AND-gated motifs*/
+                                                if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                                if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                    genotype->N_motifs[0]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif                             
+                                            }
                                         }
                                         else
                                         {
                                             if(hindrance[aux_TF][aux_TF])
+                                            {
                                                 genotype->N_motifs[16]+=cluster_size; //master TF controlled
+#if COUNT_NEAR_AND
+                                                /*count near-AND-gated motifs*/
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                genotype->N_motifs[1]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif                                                
+                                            }
                                             else  
+                                            {
                                                 genotype->N_motifs[17]+=cluster_size; //OR-gated
+#if COUNT_NEAR_AND
+                                                /*count near-AND-gated motifs*/
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                        {
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                                )
+                                                                genotype->N_motifs[2]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                         }                                     
                                     } 
                                 }
@@ -4856,9 +5083,13 @@ void find_ffl(Genotype *genotype)
                                         {
                                             if(hindrance[aux_TF][aux_TF])
                                             {
-                                                genotype->N_motifs[23]+=cluster_size; //AND-gated
+                                                genotype->N_motifs[23]+=cluster_size; //AND-gated    
+#if COUNT_NEAR_AND
+                                                if(weak_interaction[master_TF]==1 || weak_interaction[aux_TF]==1)
+                                                    genotype->N_motifs[40]+=cluster_size;
+#endif
 #if FORCE_OR_GATE                                        
-                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1;
+                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1;                                               
 #if FORCE_MASTER_CONTROLLED
                                                 genotype->TF_in_core_C1ffl[gene_id_copy][master_TF]=1;
 #else
@@ -4872,22 +5103,87 @@ void find_ffl(Genotype *genotype)
 #endif 
                                             }
                                             else  
+                                            {
                                                 genotype->N_motifs[24]+=cluster_size; //aux. TF controlled
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                                if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                    genotype->N_motifs[3]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                         }
                                         else
                                         {
                                             if(hindrance[aux_TF][aux_TF])
+                                            {
                                                 genotype->N_motifs[25]+=cluster_size; //master TF controlled
-                                            else  
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                genotype->N_motifs[4]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
+                                            else 
+                                            {
                                                 genotype->N_motifs[26]+=cluster_size;  //OR-gated
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                        {
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                                )
+                                                                genotype->N_motifs[5]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                         }                                     
                                     }
                                 }
                                 else // k is not regulated by j either, then we've found a diamond:)
                                 {
                                     genotype->N_motifs[27]+=cluster_size;  //any logic
+                                    /*temperarily assign j and k to master and aux. TF*/
                                     master_TF=genotype->which_protein[copies_reg_by_env[j]];
                                     aux_TF=genotype->which_protein[copies_reg_by_env[k]];
+                                    /*check if the assignment is correct by comparing r_protein_deg*/
+                                    /*master TF should have larger r_protein_deg*/
+                                    r_master_TF_deg=1.0;
+                                    r_aux_TF_deg=1.0;
+                                    for(l=0;l<genotype->protein_pool[master_TF][0][0];l++)
+                                        r_master_TF_deg*=genotype->protein_decay_rate[genotype->protein_pool[master_TF][1][l]];
+                                    r_master_TF_deg=pow(r_master_TF_deg,1.0/(float)genotype->protein_pool[master_TF][0][0]);
+                                    for(l=0;l<genotype->protein_pool[aux_TF][0][0];l++)
+                                        r_aux_TF_deg*=genotype->protein_decay_rate[genotype->protein_pool[aux_TF][1][l]];
+                                    r_aux_TF_deg=pow(r_aux_TF_deg,1.0/(float)genotype->protein_pool[aux_TF][0][0]);
+                                    master_TF=(r_master_TF_deg>r_aux_TF_deg)?genotype->which_protein[copies_reg_by_env[j]]:genotype->which_protein[copies_reg_by_env[k]];
+                                    aux_TF=(r_master_TF_deg>r_aux_TF_deg)?genotype->which_protein[copies_reg_by_env[k]]:genotype->which_protein[copies_reg_by_env[j]];                                    
+                                    
                                     if(hindrance[master_TF][aux_TF])
                                     {
                                         if(hindrance[master_TF][master_TF])
@@ -4912,8 +5208,12 @@ void find_ffl(Genotype *genotype)
                                             if(hindrance[aux_TF][aux_TF])                                            
                                             {
                                                 genotype->N_motifs[32]+=cluster_size; //AND-gated
+#if COUNT_NEAR_AND
+                                                if(weak_interaction[master_TF]==1 || weak_interaction[aux_TF]==1)
+                                                    genotype->N_motifs[41]+=cluster_size;
+#endif
 #if FORCE_OR_GATE                                        
-                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1;
+                                                genotype->gene_in_core_C1ffl[gene_id_copy]=1; 
 #if FORCE_MASTER_CONTROLLED
                                                 genotype->TF_in_core_C1ffl[gene_id_copy][master_TF]=1;
 #else
@@ -4921,15 +5221,66 @@ void find_ffl(Genotype *genotype)
 #endif                             
 #endif 
                                             }
-                                            else  
+                                            else 
+                                            {
                                                 genotype->N_motifs[33]+=cluster_size; //Aux. TF controlled
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                         	if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                genotype->N_motifs[6]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif                                               
+                                            }
                                         }
                                         else
                                         {
                                             if(hindrance[aux_TF][aux_TF])
+                                            {
                                                 genotype->N_motifs[34]+=cluster_size; //master TF controlled
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                genotype->N_motifs[7]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                             else  
+                                            {
                                                 genotype->N_motifs[35]+=cluster_size; //OR-gated
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                        {
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                                )
+                                                                genotype->N_motifs[8]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                         }                                     
                                     } 
                                 }
@@ -4976,7 +5327,11 @@ void find_ffl(Genotype *genotype)
                                         {
                                             if(hindrance[aux_TF][aux_TF])
                                             {
-                                                genotype->N_motifs[23]+=cluster_size; //AND-gated
+                                                genotype->N_motifs[23]+=cluster_size; //AND-gated   
+#if COUNT_NEAR_AND
+                                                if(weak_interaction[master_TF]==1 || weak_interaction[aux_TF]==1)
+                                                    genotype->N_motifs[6]+=cluster_size;
+#endif
 #if FORCE_OR_GATE                                      
                                                 genotype->gene_in_core_C1ffl[gene_id_copy]=1;
 #if FORCE_MASTER_CONTROLLED
@@ -4992,14 +5347,65 @@ void find_ffl(Genotype *genotype)
 #endif
                                             }
                                             else  
-                                                genotype->N_motifs[24]+=cluster_size; //aux. TF controlled
+                                            {
+                                                genotype->N_motifs[24]+=cluster_size; //aux. TF controlled 
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                         	if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                genotype->N_motifs[3]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                         }
                                         else
                                         {
                                             if(hindrance[aux_TF][aux_TF])
+                                            {
                                                 genotype->N_motifs[25]+=cluster_size; //master controlled
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                            )
+                                                        {
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
+                                                                genotype->N_motifs[4]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                             else  
+                                            {
                                                 genotype->N_motifs[26]+=cluster_size; //OR-gated
+#if COUNT_NEAR_AND
+                                                if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
+                                                {
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                    {
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
+                                                        {
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
+                                                                )
+                                                                genotype->N_motifs[5]+=cluster_size;
+                                                        }
+                                                    }
+                                                }
+#endif
+                                            }
                                         }                                     
                                     }                                   
                                 }
@@ -5049,7 +5455,7 @@ void find_ffl(Genotype *genotype)
     }    
     else // if the genotype does not contain non-signal activator
     {
-        for(i=0;i<39;i++)        
+        for(i=0;i<42;i++)        
             genotype->N_motifs[i]=0;  
         genotype->N_act_genes=0; 
         genotype->N_act_genes_not_reg_by_env=0;
@@ -5122,14 +5528,18 @@ void add_binding_site(Genotype *genotype, int gene_id)
         {
             if(genotype->TF_in_core_C1ffl[gene_id][i]==1)
             {
-                temp=1.0;
+#if ADD_STRONG_TFBS
+                temp=1.0;                
                 for(j=0;j<genotype->binding_sites_num[gene_id];j++)
                 {
                     if(genotype->all_binding_sites[gene_id][j].tf_id==i) 
                         temp=(temp>genotype->all_binding_sites[gene_id][j].Kd)?genotype->all_binding_sites[gene_id][j].Kd:temp;  // find a strong binding site                      
                 }
-                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].tf_id = i;
-                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd = temp;                   
+                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd=temp;
+#else
+                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd = KD2APP_KD*genotype->Kd[i]*pow(NS_Kd/genotype->Kd[i],(float)(TF_ELEMENT_LEN-NMIN)/(TF_ELEMENT_LEN-NMIN+1));  
+#endif
+                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].tf_id = i;                                 
                 genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].BS_pos = (2+i)*CISREG_LEN;
                 genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].mis_match = 0;
                 genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].N_hindered = 0;
@@ -5195,7 +5605,7 @@ void remove_binding_sites(Genotype *genotype, int gene_id)
             {
 #elif FORCE_SINGLE_FFL        
             if(!(genotype->gene_in_core_C1ffl[gene_id]==1 && k==start_TF))       
-            {    
+            {                       
 #endif
             tf_seq=&(genotype->tf_seq[k][0]);
             tf_seq_rc=&(genotype->tf_seq_rc[k][0]);            

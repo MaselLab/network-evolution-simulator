@@ -12,15 +12,15 @@
 
 /*Simulation mode*/
 #define JUST_PLOTTING 0
-#define PLOT_ALTERNATIVE_FITNESS 0
+#define PLOT_ALTERNATIVE_FITNESS 1
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 1
+#define RUN_FULL_SIMULATION 0
 #define SKIP_INITIAL_GENOTYPE 0
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
 #define MAX_MUT_STEP 51000
-#define BURN_IN_I 1000
+#define BURN_IN_I 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
 #define N_THREADS 10
@@ -42,9 +42,11 @@
 
 /*Biology and evolution settings*/
 #define DIRECT_REG 0
-#define NO_PENALTY 1
-#define FORCE_OR_GATE 0
+#define NO_PENALTY 0
+#define COUNT_NEAR_AND 0
+#define FORCE_OR_GATE 1
 #if FORCE_OR_GATE
+#define ADD_STRONG_TFBS 1
 #define FORCE_MASTER_CONTROLLED 0
 #endif
 #define FORCE_DIAMOND 0
@@ -194,7 +196,7 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*Motifs related*/
-    int N_motifs[39];  
+    int N_motifs[42];  
     int TF_in_core_C1ffl[NGENES][NPROTEINS];
     int gene_in_core_C1ffl[NGENES];
     int N_act_genes; 
