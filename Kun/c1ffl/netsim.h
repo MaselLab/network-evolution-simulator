@@ -17,8 +17,8 @@
 #ifndef NEUTRAL
 #define NEUTRAL 0
 #endif
-#ifndef REPLAY
-#define REPLAY 0
+#ifndef PHENOTYPE
+#define PHENOTYPE 1
 #endif
 #ifndef MODIFY 
 #define MODIFY 0
@@ -40,9 +40,7 @@
 /*Miscellaneous settings*/
 #define OUTPUT_RNG_SEEDS 1
 #define CAUTIOUS 0
-#ifndef VERBOSE
-#define VERBOSE 0
-#endif
+#define COUNT_NEAR_AND 0
 
 /*Biology and evolution settings*/
 #ifndef DIRECT_REG  //direct regulation can be enabled by adding -D DIRECT_REG in compilation command
@@ -68,9 +66,11 @@
 
 /*Available modifications to network. Enabled under mode MODIFY*/
 /*Set the desired modification to 1 to enabled it*/
-#define DISABLE_AND_GATE 0 // change the logic of an effector gene
-#if DISABLE_OR_GATE
-#define FORCE_MASTER_CONTROLLED 0 // 1 for master TF controlled; 0 for aux. TF controlled 
+#define DISABLE_AND_GATE 1 // change the logic of an effector gene
+#if DISABLE_AND_GATE
+#define WHICH_MOTIF 1 //Only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
+#define ADD_STRONG_TFBS 1 //by default we add TFBS as strong as the strongest TFBS that already exists in the cis-reg
+#define FORCE_MASTER_CONTROLLED 1 // 1 for master TF controlled; 0 for aux. TF controlled 
 #endif
 #define FORCE_DIAMOND 0  // change an AND-gated FFL-in-diamond to diamond
 #define FORCE_SINGLE_FFL 0 // change an AND-gated FFL-in-diamond to isolated FFL
@@ -271,11 +271,11 @@ char set_base_pair(float);
 
 void initialize_genotype(Genotype *, int, int, int, int, RngStream) ;
 
-int init_run_pop(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream, RngStream [N_THREADS]);
+int evolve_under_selection(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream, RngStream [N_THREADS]);
 
 void initialize_cache(Genotype *);
 
-void run_plotting(  Genotype *,
+void show_phenotype( Genotype *,
                     Genotype *,
                     Mutation *,
                     Selection *,
@@ -285,16 +285,18 @@ void run_plotting(  Genotype *,
 
 void evolve_neutrally(  Genotype *,
                         Genotype *,                             
-                        Mutation *,                              
+                        Mutation *,
+                        Selection *,
+                        Selection *,
                         RngStream);
 
-void plot_alternative_fitness(  Genotype *,
-                                Genotype *,
-                                Mutation *,
-                                Selection *,
-                                int [MAX_GENES],
-                                float [MAX_GENES],
-                                RngStream [N_THREADS]);
+void modify_network(Genotype *,
+                    Genotype *,
+                    Mutation *,
+                    Selection *,
+                    int [MAX_GENES],
+                    float [MAX_GENES],
+                    RngStream [N_THREADS]);
 
 void print_mutatable_parameters(Genotype*,int);
 

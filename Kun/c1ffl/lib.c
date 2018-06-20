@@ -8,7 +8,7 @@
  * necessarily specific to the model, such as
  * maintaining the linked list data structures or file I/O
  *
- * Authors: Joanna Masel, Alex Lancaster
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
  * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
  */
 #include <stdlib.h>

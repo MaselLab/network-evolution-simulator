@@ -227,13 +227,13 @@ int main()
 #endif
     
 #if NEUTRAL
-    evolve_neutrally(&resident, &mutant, &mut_record, RS_main); 
+    evolve_neutrally(&resident, &mutant, &mut_record, &burn_in, &selection, RS_main); 
 #elif REPLAY    
-    run_plotting(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
+    show_phenotype(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
 #elif MODIFY
-    plot_alternative_fitness(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
+    modifying_network(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
 #else    
-    init_run_pop(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
+    evolve_under_selection(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
 #endif        
     release_memory(&resident, &mutant, &RS_main, RS_parallel);    
     return 0;

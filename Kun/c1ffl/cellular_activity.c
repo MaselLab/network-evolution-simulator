@@ -379,7 +379,7 @@ void do_single_timestep(Genotype *genotype,
         /*deal with rounding error*/
         if(dt<0.0)
         {  	
-#if VERBOSE // if enabled, error file can be huge, because this rounding error can happen very often            
+#ifndef LOG_OFF // if enabled, error file can be huge, because this rounding error can happen very often            
             LOG("Negative dt!\n");    
 #endif 
             dt=TIME_OFFSET; 
