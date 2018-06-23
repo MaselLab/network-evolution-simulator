@@ -12,14 +12,14 @@
 
 /*Simulation mode*/
 #define JUST_PLOTTING 0
-#define PLOT_ALTERNATIVE_FITNESS 1
+#define PLOT_ALTERNATIVE_FITNESS 0
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 0
+#define RUN_FULL_SIMULATION 1
 #define SKIP_INITIAL_GENOTYPE 0
 #define EXTERNAL_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 51000
+#define MAX_MUT_STEP 50000
 #define BURN_IN_I 0
 #define MAX_MUTATIONS 800000
 #define MAX_TRIALS 2000
@@ -41,12 +41,12 @@
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
-#define DIRECT_REG 0
+#define DIRECT_REG 1
 #define NO_PENALTY 0
 #define COUNT_NEAR_AND 0
-#define FORCE_OR_GATE 1
+#define FORCE_OR_GATE 0
 #if FORCE_OR_GATE
-#define ADD_STRONG_TFBS 1
+#define ADD_STRONG_TFBS 0
 #define FORCE_MASTER_CONTROLLED 0
 #endif
 #define FORCE_DIAMOND 0

@@ -93,7 +93,7 @@ const float MIN_ACT_TO_INT_RATE=0.59;
 const float MAX_MRNA_DECAY=0.54;
 const float MIN_MRNA_DECAY=7.5e-4;
 const float MAX_PROTEIN_DECAY=0.69;
-const float MIN_PROTEIN_DECAY=4.5e-6;
+const float MIN_PROTEIN_DECAY=3.0e-6;
 const float MAX_PROTEIN_SYN_RATE=61.4;
 const float MIN_PROTEIN_SYN_RATE=4.5e-3;
 const float MAX_KD=1.0e-5;
@@ -1617,7 +1617,7 @@ float calc_fitness(float *integrated_fitness,
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++)        
     {     
         total_translation_rate += (genotype->translation_rate[i]*(float)state->mRNA_aft_transl_delay_num[i]+
-                                    0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i])*(float)genotype->locus_length[i]/pow(10.0,MEAN_GENE_LENGTH);
+                                    0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i])*(float)genotype->locus_length[i]/236.0;
     } 
 #endif  
     cost_of_expression=total_translation_rate*c_transl;
@@ -3877,7 +3877,7 @@ int evolve_N_steps(Genotype *genotype_ori,
             /*do mutation on a copy of the current genotype*/
             clone_genotype(genotype_ori,genotype_ori_copy); 
             mutate(genotype_ori_copy,RS_main,mut_record);
-#if OUTPUT_MUTANT_DETAILS
+
             /*record every mutation*/
             fp=fopen("MUT_Detail.txt","a+");
             fprintf(fp,"%d %d %c %d %d '%s' %d %a\n",
@@ -3890,7 +3890,7 @@ int evolve_N_steps(Genotype *genotype_ori,
                     mut_record->kinetic_type,
                     mut_record->kinetic_diff);
             fclose(fp); 
-#endif
+
             calc_all_binding_sites(genotype_ori_copy);           
             MAXELEMENTS=genotype_ori_copy->N_allocated_elements;
             /*calculate the fitness of the mutant at low resolution*/
