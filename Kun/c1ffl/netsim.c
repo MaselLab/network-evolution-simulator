@@ -1,8 +1,11 @@
-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
- * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe, Kun Xiong
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Simulator of yeast transcriptional regulatory network evolution
+ * 
+ * This file contains functions to initialize simulation with specified 
+ * selection condition, and to output summary of genotypes and network structure.
+ * 
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2007-2009, 2013-2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +53,7 @@ const float MIN_ACT_TO_INT_RATE=0.59;
 const float MAX_MRNA_DECAY=0.54;
 const float MIN_MRNA_DECAY=7.5e-4;
 const float MAX_PROTEIN_DECAY=0.69;
-const float MIN_PROTEIN_DECAY=4.5e-6;
+const float MIN_PROTEIN_DECAY=3.0e-6;
 const float MAX_PROTEIN_SYN_RATE=61.4;
 const float MIN_PROTEIN_SYN_RATE=4.5e-3;
 const float MAX_KD=1.0e-5;

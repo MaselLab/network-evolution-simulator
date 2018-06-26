@@ -1,7 +1,11 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/* 
+ * Simulator of yeast transcriptional regulatory network evolution
+ * 
+ * This file contains the functions to simulate gene expression and
+ * instantaneous fitness during development. 
+ * 
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2007-2009, 2013-2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -509,7 +513,7 @@ static float calc_fitness(float *integrated_fitness,
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++)        
     {     
         total_translation_rate += (genotype->translation_rate[i]*(float)state->mRNA_aft_transl_delay_num[i]+
-                                    0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i])*(float)genotype->locus_length[i]/pow(10.0,MEAN_GENE_LENGTH);
+                                    0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i])*(float)genotype->locus_length[i]/236.0;
     } 
 #endif  
     cost_of_expression=total_translation_rate*c_transl;

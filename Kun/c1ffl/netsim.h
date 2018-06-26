@@ -1,8 +1,10 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-  */
 /* 
- * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe, Kun Xiong
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Simulator of yeast transcriptional regulatory network evolution
+ * 
+ * This file 
+ * 
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2007-2009, 2013-2018 Arizona Board of Regents (University of Arizona)
  */
 #ifndef FILE_NETSIM_SEEN
 #define FILE_NETSIM_SEEN
