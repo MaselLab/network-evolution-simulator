@@ -1,8 +1,4 @@
-/* 
- * Simulator of yeast transcriptional regulatory network evolution
- * 
- * This file 
- * 
+/*  
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
  * Copyright (c) 2007-2009, 2013-2018 Arizona Board of Regents (University of Arizona)
  */
@@ -20,10 +16,10 @@
 #define NEUTRAL 0
 #endif
 #ifndef PHENOTYPE
-#define PHENOTYPE 1
+#define PHENOTYPE 0
 #endif
 #ifndef MODIFY 
-#define MODIFY 0
+#define MODIFY 1
 #endif
 #ifndef EXTERNAL_SIGNAL
 #define EXTERNAL_SIGNAL 0

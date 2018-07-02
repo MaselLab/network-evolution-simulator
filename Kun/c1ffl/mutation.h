@@ -1,14 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
-/* 
- * File:   mutation.h
- * Author: Kun Xiong
- *
- * Created on March 5, 2018, 1:17 PM
+/*  
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 
 #ifndef MUTATION_H

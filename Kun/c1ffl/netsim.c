@@ -5,7 +5,7 @@
  * selection condition, and to output summary of genotypes and network structure.
  * 
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2009, 2013-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include <stdlib.h>

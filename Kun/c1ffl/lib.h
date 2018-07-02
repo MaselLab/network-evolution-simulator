@@ -1,9 +1,6 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
- * Yeast transcriptional network simulator
- *
- * Authors: Joanna Masel, Alex Lancaster
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #ifndef LIB_H
 #define LIB_H

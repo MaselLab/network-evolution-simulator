@@ -1,8 +1,6 @@
-/* 
- * File:   expression_dynamics.h
- * Author: kunxiong
- *
- * Created on April 30, 2018, 3:42 PM
+/*  
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 
 #ifndef CELLULAR_ACTIVITY_H
@@ -50,7 +48,7 @@ struct FixedEvent {
 };
 
 /*
- * CellState store the 
+ * CellState store the current cellular state, e.g. protein concentration
  */
 typedef struct CellState CellState;
 struct CellState { 

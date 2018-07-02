@@ -1,8 +1,7 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /*
- * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Simulator of yeast transcriptional regulatory network evolution
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -231,7 +230,7 @@ int main()
 #elif REPLAY    
     show_phenotype(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
 #elif MODIFY
-    modifying_network(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
+    modify_network(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
 #else    
     evolve_under_selection(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
 #endif        

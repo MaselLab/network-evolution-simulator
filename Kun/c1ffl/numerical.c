@@ -1,3 +1,11 @@
+/* 
+ * Simulator of yeast transcriptional regulatory network evolution
+ * 
+ * This file contains functions to generate random numbers of different distributions,
+ * and Newton-Raphson root-finding function.
+ * 
+ */
+
 #include <stdlib.h>
 #include <math.h>
 #include "RngStream.h" 

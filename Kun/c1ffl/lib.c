@@ -1,15 +1,12 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
- * Yeast transcriptional network simulator
+ * Simulator of yeast transcriptional regulatory network evolution
  *
- * lib.c
- * 
  * This file mainly contains helper/support functions which aren't
  * necessarily specific to the model, such as
  * maintaining the linked list data structures or file I/O
  *
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdlib.h>
 #include <stdio.h>
