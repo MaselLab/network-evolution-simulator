@@ -213,59 +213,27 @@ void calc_all_rates(Genotype *genotype,
      * and use it to update other rates*/
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
     {    
-        #if NO_REGULATION //if we manually turn off the expression of non-sensor TFs
-            if(genotype->protein_identity[genotype->which_protein[i]]==NON_TF) // we only calculate the binding configurations for effector genes
-            {
-                cluster_id=genotype->which_cluster[i];        
-                if(genotype->cisreg_cluster[cluster_id][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
-                {                
-                    state->P_A[i]=state->P_A[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
-                    state->P_R[i]=state->P_R[genotype->cisreg_cluster[cluster_id][0]];
-                    state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster[cluster_id][0]];
-                    state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster[cluster_id][0]];
-                }
-                else /* otherwise, we need to calc the ratio*/
-                {
-                    if(genotype->N_act_BS[i]!=0 || genotype->N_rep_BS[i]!=0)                
-                        calc_TF_dist_from_all_BS(genotype, state, i);
-                    else
-                    {
-                        state->P_A[i]=0.0;     
-                        state->P_R[i]=0.0;
-						state->P_A_no_R[i] = 0.0;
-                        state->P_NotA_no_R[i]=0.0;
-                    }
-                }
-            }
+        cluster_id=genotype->which_cluster[i];        
+        if(genotype->cisreg_cluster[cluster_id][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
+        {                
+            state->P_A[i]=state->P_A[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
+            state->P_R[i]=state->P_R[genotype->cisreg_cluster[cluster_id][0]];
+            state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster[cluster_id][0]];
+            state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster[cluster_id][0]];
+        }
+        else /* otherwise, we need to calc the ratio*/
+        {
+            if(genotype->N_act_BS[i]!=0 || genotype->N_rep_BS[i]!=0)                
+                calc_TF_dist_from_all_BS(genotype, state, i);
             else
             {
-               state->P_A[i]=0.0; 
-               state->P_R[i]=0.0;
-			   state->P_A_no_R[i] = 0.0;
-               state->P_NotA_no_R[i]=0.0;
+                state->P_A[i]=0.0;     
+                state->P_R[i]=0.0;
+                state->P_A_no_R[i] = 0.0;
+                state->P_NotA_no_R[i]=0.0;
             }
-        #else
-            cluster_id=genotype->which_cluster[i];        
-            if(genotype->cisreg_cluster[cluster_id][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
-            {                
-                state->P_A[i]=state->P_A[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
-                state->P_R[i]=state->P_R[genotype->cisreg_cluster[cluster_id][0]];
-                state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster[cluster_id][0]];
-                state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster[cluster_id][0]];
-            }
-            else /* otherwise, we need to calc the ratio*/
-            {
-                if(genotype->N_act_BS[i]!=0 || genotype->N_rep_BS[i]!=0)                
-                    calc_TF_dist_from_all_BS(genotype, state, i);
-                else
-                {
-                    state->P_A[i]=0.0;     
-                    state->P_R[i]=0.0;
-					state->P_A_no_R[i] = 0.0;
-                    state->P_NotA_no_R[i]=0.0;
-                }
-            }
-        #endif
+        }
+        
         /* calc other rates*/
         switch (state->transcriptional_state[i])
         {
@@ -502,20 +470,11 @@ static float calc_fitness(float *integrated_fitness,
        Ne+=number_of_selection_protein_bf_dt[i];
                       
     /* compute the total cost of translation across all genes  */
-#if NO_REGULATION_COST
-    for(i=N_SIGNAL_TF; i < genotype->ngenes; i++)        
-    {    
-        if(genotype->which_protein[i]==genotype->nproteins-1)           
-            total_translation_rate += genotype->translation_rate[i]*(float)state->mRNA_aft_transl_delay_num[i]+
-                                    0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i];
-    } 
-#else
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++)        
     {     
         total_translation_rate += (genotype->translation_rate[i]*(float)state->mRNA_aft_transl_delay_num[i]+
                                     0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i])*(float)genotype->locus_length[i]/236.0;
-    } 
-#endif  
+    }
     cost_of_expression=total_translation_rate*c_transl;
 
     switch (state->effect_of_effector)
@@ -566,7 +525,7 @@ static float calc_fitness(float *integrated_fitness,
             break;
     
         case 'd': /* effector is deleterious! */      
-#if !NO_PENALTY
+#ifndef NO_PENALTY
             if(Ne>Ne_next)//decrease in effector protein
             {
                 if(Ne_next>=Ne_saturate) //too many effector throughout

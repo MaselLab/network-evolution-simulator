@@ -1219,10 +1219,10 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
         case 's': //substitution in cis-reg       		
             mut_substitution(genotype,mut_record,RS);
             break;      
-        case 'w': // whole gene deletion.          
+        case 'd': // gene deletion.          
             mut_whole_gene_deletion(genotype,mut_record,RS);            
             break;
-        case 'd': // Whole gene duplication                  
+        case 'u': // gene duplication                  
             mut_duplication(genotype,mut_record,RS);            
             break;
         case 'c': //binding sequence 
@@ -1231,10 +1231,10 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
         case 'k': //mutations to kinetic constants        
             mut_kinetic_constant(genotype, mut_record,RS);           
             break;
-        case 'e': //activator to repressor or the reverse
+        case 'i': //activator to repressor or the reverse
             mut_identity(genotype, mut_record, RS);            
             break;
-        case 'f': //mutations to the Kd of a tf
+        case 'a': //mutations to the Kd of a tf
             mut_Kd(genotype,mut_record,RS);            
             break;
         case 'l': //mutate locus length
@@ -1251,22 +1251,22 @@ void reproduce_mutate(Genotype *genotype, Mutation *mut_record)
         case 's': //substitution        		
             reproduce_substitution(genotype,mut_record);
             break;        
-        case 'w': // whole gene deletion.         
+        case 'd': // gene deletion.         
             reproduce_whole_gene_deletion(genotype,mut_record);
             break;
-        case 'd': // Whole gene duplication                 
+        case 'u': // gene duplication                 
             reproduce_gene_duplication(genotype,mut_record);
             break;        
-        case 'c': //binding sequence        
+        case 'c': // consensus binding sequence        
             reproduce_mut_binding_sequence(genotype,mut_record);
             break;
         case 'k': //mutations in kinetic constants        
             reproduce_mut_kinetic_constant(genotype, mut_record);            
             break;
-        case 'e': //changing the identity of a TF
+        case 'i': //changing the identity of a TF
             reproduce_mut_identity(genotype, mut_record);
             break;
-        case 'f':
+        case 'a':
             reproduce_mut_Kd(genotype,mut_record);
             break;  
         case 'l':
@@ -1347,7 +1347,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
             random-=tot_subs_rate;
             if(random<= tot_dup_rate)
             {
-                *mut_type='d';                          /* gene duplication */
+                *mut_type='u';                          /* gene duplication */
                 break;
             }
             else
@@ -1355,7 +1355,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                 random-=tot_dup_rate;
                 if(random<=tot_sil_rate)
                 {
-                    *mut_type='w';                              /* gene deletion*/  
+                    *mut_type='d';                              /* gene deletion*/  
                     break;
                 }
                 else
@@ -1387,7 +1387,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                                 random-=tot_mut_binding_seq_rate;
                                 if(random<=tot_mut_koff_rate)
                                 {                                
-                                    *mut_type='f';          /* mut Kd*/
+                                    *mut_type='a';          /* mut Kd*/
                                     break;
                                 }                               
                                 else
@@ -1395,7 +1395,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                                     random-=tot_mut_koff_rate;
                                     if(random<=tot_mut_identity_rate)
                                     {
-                                        *mut_type='e';           /* mut identity of a TF */
+                                        *mut_type='i';           /* mut identity of a TF */
                                         break;
                                     }                                    
                                 }

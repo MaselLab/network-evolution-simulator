@@ -1,6 +1,6 @@
 /*  
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2009, 2013-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #ifndef FILE_NETSIM_SEEN
 #define FILE_NETSIM_SEEN
@@ -8,86 +8,89 @@
 #include <stdio.h>
 #include "RngStream.h"
 
-/*Simulate evolution under selection by default,
- *These are the alternative modes, which can be specified by add -D mode (e.g.
- * -D NEUTRAL) when compile the source code.
- */
-#ifndef NEUTRAL
-#define NEUTRAL 0
-#endif
-#ifndef PHENOTYPE
-#define PHENOTYPE 0
-#endif
-#ifndef MODIFY 
-#define MODIFY 1
-#endif
-#ifndef EXTERNAL_SIGNAL
-#define EXTERNAL_SIGNAL 0
-#endif
-
-/*Runtime control*/ 
-#define MAX_TRIALS 2000
-#define N_THREADS 10
-#define N_REPLICATES 200
-#define HI_RESOLUTION_RECALC 5
-#define OUTPUT_INTERVAL 10
-#define SAVING_INTERVAL 10
-#define OUTPUT_MUTANT_DETAILS 0
-#define N_TIMP_POINTS 90
-
-/*Miscellaneous settings*/
-#define OUTPUT_RNG_SEEDS 1
-#define CAUTIOUS 0
-#define COUNT_NEAR_AND 0
-
-/*Biology and evolution settings*/
-#ifndef DIRECT_REG  //direct regulation can be enabled by adding -D DIRECT_REG in compilation command
-#define DIRECT_REG 0
-#endif
-#ifndef NO_PENALTY
-#define NO_PENALTY 0
-#endif
-#define minimal_selection_coefficient 1.0e-8
-#define NO_REGULATION_COST 0
-#define NO_REGULATION 0 // this locks the state of TF genes to Rep
-#define RANDOM_COOPERATION_LOGIC 0 
-
 /******************************************************************************/
-/*DO NOT MODIFY THE FOLLOWING TWO PARAMETERS!!!
- *I had intended to model more than one signals, but gave it up due to the
- *complexity
- */
+/*                            Adjustable knobs                                */
 /******************************************************************************/
-#define N_SIGNAL_TF 1 // number of input signals
-#define RANDOMIZE_SIGNAL2 0
 
 
-/*Available modifications to network. Enabled under mode MODIFY*/
-/*Set the desired modification to 1 to enabled it*/
-#define DISABLE_AND_GATE 1 // change the logic of an effector gene
+/*1. Simulation mode*/
+/******************************************************************************/
+/*Set only one of NEUTRAL, PHENOTYPE, and PERTURB to 1 to enable
+ *the corresponding mode. If none of the three is enabled, the default mode is 
+ *evolving a TRN under the selection condition specified in main.c*/
+#define NEUTRAL 0 //run neutral evolution
+#define PHENOTYPE 0 //output the expression of genes over time
+#define PERTURB 0 //run perturbation analysis
+
+
+/*2. Runtime control*/ 
+/******************************************************************************/
+#define MAX_TRIALS 2000 //try at most 2000 mutants at an evolutionary step
+#define N_THREADS 10 //the number of parallel OpenMP threads
+#define N_REPLICATES 200 //calculate the fitness of a mutant with 200 replicates
+#define HI_RESOLUTION_RECALC 5 //calcualte the fitness of a resident with 5*N_REPLICATES replicates
+#define OUTPUT_INTERVAL 10 //output Summary_BS.txt every 10 evolutionary steps
+#define SAVING_INTERVAL 10 //make a saving point every 10 evoluationary steps
+#define OUTPUT_MUTANT_DETAILS 0 //output every mutant genotype and its fitness, whetehr the mutant is accepted
+#define OUTPUT_RNG_SEEDS 1 //output the state of random number generator every evolutionary step
+#define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
+
+/*3. Biology and evolution settings*/
+/******************************************************************************/
+#define DIRECT_REG 1 //set it to "1" to allow the signal to directly regulate the effector
+#define NO_PENALTY 0 //"1" to remove the penalty to fitness when effector is expressed under a wrong environment
+#define RANDOM_COOPERATION_LOGIC 0 //"1" to randomly set whether a gene (including TF genes) is AND-gated-capable at initialization 
+
+
+/*4. Perturbation options*/
+/******************************************************************************/
+#if PERTURB 
+#define DISABLE_AND_GATE 1 //change the logic of an effector gene
 #if DISABLE_AND_GATE
-#define WHICH_MOTIF 1 //Only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
+#define WHICH_MOTIF 1 //only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
 #define ADD_STRONG_TFBS 1 //by default we add TFBS as strong as the strongest TFBS that already exists in the cis-reg
 #define FORCE_MASTER_CONTROLLED 1 // 1 for master TF controlled; 0 for aux. TF controlled 
 #endif
 #define FORCE_DIAMOND 0  // change an AND-gated FFL-in-diamond to diamond
 #define FORCE_SINGLE_FFL 0 // change an AND-gated FFL-in-diamond to isolated FFL
+#endif
 
-/*Maximum number of genes*/          
+
+/*5. Analyzing weak TFBSs*/
+/******************************************************************************/
+/*We can exclude different weak TFBSs when scoring motifs. We recommend doing 
+ *this analysis under PHENOTYPE mode.
+ */
+#define CUT_OFF_MISMATCH_SIG2EFFECTOR 2 //the maximum number of mismatches in TFBSs of the signal in effector genes
+#define CUT_OFF_MISMATCH_TF2EFFECTOR 2 //the maximum number of mismatches in TFBSs of TFs in effector genes
+#define CUT_OFF_MISMATCH_SIGNAL_TO_TF 2 //the maximum number of mismatches in TFBSs of the signal in TF genes
+#define CUT_OFF_MISMATCH_TF_TO_TF 2 //the maximum number of mismatches in TFBSs of TFs in TF genes
+
+
+
+/*6. Default settings*/    
+/******************************************************************************/
 #define MAX_TF_GENES 20 
 #define MAX_EFFECTOR_GENES 5  
-#define MAX_GENES 25  /* total number of genes=effector genes + TF genes (including the signal) */     
+#define MAX_GENES 25  //total number of genes=effector genes + TF genes (including the signal)     
 #define MAX_PROTEINS 25
+#define CISREG_LEN 150        //length of cis-regulatory region in base-pairs 
+#define TF_ELEMENT_LEN 8      //length of binding element on TF */
+#define NMIN 6                //minimal number of nucleotide that matches the binding sequence of a TF in its binding site
+                              //DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake  
+#define HIND_LENGTH 3         //default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH
+#define MAX_BINDING 10  //MAX_BINDING is the max number of tf that can bind to a promoter plus 1*/
+/******************************************************************************/
+/*                          End of controlling knobs                          */
+/******************************************************************************/
 
-/*Cis-reg sequence and TF binding sequence*/
-#define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
-#define TF_ELEMENT_LEN 8      /* length of binding element on TF */
-#define NMIN 6                /* minimal number of nucleotide that matches the binding sequence of a TF in its binding site*/
-                              /* DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake*/  
-#define HIND_LENGTH 3         /* default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH */
-#define MAX_BINDING 10  /* MAX_MODE is the max number of tf that can bind to a promoter plus 1*/
 
 
+
+
+
+#define N_SIGNAL_TF 1 // number of input signals.
+#define RANDOMIZE_SIGNAL2 0 //
 
 /*
  * enum for 'CellState'->transcriptional_state indices
@@ -195,21 +198,19 @@ struct Genotype {
     int N_allocated_elements;                               /* maximal number of AllTFBindingSites that have been allocated for each gene*/
     
     /*fitness related variable*/
-    float avg_GR1;
-    float avg_GR2;
-    float sq_SE_GR1;
-    float sq_SE_GR2;
-    float fitness;
-    float sq_SE_fitness;
+    float avg_fitness;
+    float fitness1;
+    float fitness2; 
+    float sq_SE_avg_fitness;
+    float sq_SE_fitness1;
+    float sq_SE_fitness2;
     float fitness_measurement[HI_RESOLUTION_RECALC*N_REPLICATES];
     
     /*Motifs related*/
     int N_motifs[39];  
+    int N_near_AND_gated_motifs[9];
     int TF_in_core_C1ffl[MAX_GENES][MAX_PROTEINS];
-    int gene_in_core_C1ffl[MAX_GENES];
-    int N_act_genes; 
-    int N_act_genes_reg_by_env;
-    int N_act_genes_not_reg_by_env;    
+    int gene_in_core_C1ffl[MAX_GENES];    
 };
 
 /*A mutation is specified by its type, target, and mutant value*/
