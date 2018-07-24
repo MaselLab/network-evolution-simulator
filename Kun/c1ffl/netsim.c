@@ -5,7 +5,7 @@
  * selection condition, and to output summary of genotypes and network structure.
  * 
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,7 +78,7 @@ static float try_fixation(Genotype *, Genotype *, int, int, int *, RngStream);
 
 static void summarize_binding_sites(Genotype *,int);
 
-static void set_signal(CellState *, Environment *, RngStream, int);
+static void set_signal(CellState *, Test *, RngStream, int);
 
 static void output_genotype(Genotype *);
 
@@ -133,10 +133,10 @@ int evolve_under_selection(Genotype *resident,
     fp=fopen("saving_point.txt","r");   
     if(fp!=NULL) 
     {        
-        int replay_N_steps=0, int_buffer;       
-        fscanf(fp,"%d %d",&replay_N_steps,&int_buffer);
+        int replay_N_steps=0;       
+        fscanf(fp,"%d",&replay_N_steps);
         fclose(fp);
-        fp=fopen(setup_summary,"a+");
+        fp=fopen("sim_setup*","a+");
         fprintf(fp,"Continue simulation at step %d\n",replay_N_steps);
         fclose(fp);
         if(replay_N_steps!=0)                              
@@ -175,8 +175,8 @@ int evolve_under_selection(Genotype *resident,
         }
        
         /* make title of the output file*/
-        fp=fopen(evo_summary,"w");
-        fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
+        fp=fopen(output_file,"w");
+        fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mutn selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
         fprintf(fp,"0 0 0 0 na na %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d \n",  
                 resident->avg_fitness,               
                 resident->fitness1,
@@ -217,8 +217,8 @@ void evolve_neutrally(Genotype *resident, Genotype *mutant, Mutation *mut_record
     int i;    
     FILE *fp;    
     /*Create title for output files*/
-    fp=fopen(evo_summary,"a+");
-    fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
+    fp=fopen(output_file,"a+");
+    fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mutn selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
     fprintf(fp,"0 0 0 na na 0.0 0.0 0.0 0.0 0.0 0.0 0 0 0 0 \n");
     fclose(fp); 
     /*BURN-IN*/              
@@ -294,13 +294,13 @@ void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, 
     FILE *fp;
     
     /*load mutation record*/
-    fp=fopen(mutation_file,"r");    
+    fp=fopen("MUT.txt","r");    
     if(fp!=NULL)        
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
     else
     {
         printf("Loading mutation record failed! Quit program!");
-#if KEEP_LOG
+#if !LOG_OFF
         LOG("Loading mutation record failed!");
 #endif
         exit(-2);
@@ -313,26 +313,27 @@ void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, 
     /*output the evolved genotype*/
     calc_all_binding_sites(resident); 
     print_mutatable_parameters(resident,1);
-    summarize_binding_sites(resident,selection->MAX_STEPS); 
+    summarize_binding_sites(resident,selection->MAX_STEPS);   
+    //exit(0);    
     
     /*create threads*/
     omp_set_num_threads(N_THREADS);  
     
     /*collection interval is 1 minute by default*/    
-    selection->env1.t_development=90.1;
-    selection->env2.t_development=90.1;    
+    selection->test1.t_development=90.1;
+    selection->test2.t_development=90.1;    
     calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL,NULL);    
 }
 #endif
 
 #if PERTURB
-void perturbation_analysis(Genotype *resident,
-                            Genotype *mutant, 
-                            Mutation *mut_record,  
-                            Selection *selection,
-                            int init_mRNA[MAX_GENES],
-                            float init_protein[MAX_PROTEINS],
-                            RngStream RS_parallel[N_THREADS])
+void modify_network(Genotype *resident,
+                    Genotype *mutant, 
+                    Mutation *mut_record,  
+                    Selection *selection,
+                    int init_mRNA[MAX_GENES],
+                    float init_protein[MAX_PROTEINS],
+                    RngStream RS_parallel[N_THREADS])
 {
     int i,j,k;   
     char buffer[600],char_buffer;
@@ -342,20 +343,20 @@ void perturbation_analysis(Genotype *resident,
     FILE *file_mutation,*fitness_record,*f_aft_perturbation,*f_bf_perturbation;
     
     /*load mutation record*/
-    file_mutation=fopen(mutation_file,"r");    
+    file_mutation=fopen("all_mutations*.txt","r");    
     if(file_mutation!=NULL)        
         printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
     else
     {
         printf("Loading mutation record failed! Quit program!");
-#if KEEP_LOG
+#if !LOG_OFF
         LOG("Loading mutation record failed!");
 #endif
         exit(-2);
     } 
     
     /*skip first 2 rows of fitness_record*/
-    fitness_record=fopen(evo_summary,"r");
+    fitness_record=fopen("evo_summary*","r");
     fgets(buffer,600,fitness_record);
     fgets(buffer,600,fitness_record);
     
@@ -375,7 +376,7 @@ void perturbation_analysis(Genotype *resident,
                                                     mut_record->nuc_diff,               
                                                     &(mut_record->kinetic_type),
                                                     &(mut_record->kinetic_diff));
-        reproduce_mutate(mutant,mut_record);        
+        reproduce_mutate(resident,mut_record);        
         clone_genotype(mutant,resident);       
         
         fscanf(fitness_record,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d %d\n",
@@ -385,10 +386,10 @@ void perturbation_analysis(Genotype *resident,
                 &int_buffer,
                 &char_buffer,
                 &float_buffer,
-                &mean_overall_fitness,                
+                &mean_overall_fitness,
+                &se_overall_fitness,
                 &mean_fitness1,
                 &mean_fitness2,
-                &se_overall_fitness,
                 &se_fitness1,
                 &se_fitness2,
                 &int_buffer,
@@ -518,15 +519,15 @@ void initialize_genotype(Genotype *genotype, int init_TF_genes, int init_N_act, 
         genotype->TF_family_pool[i][1][0]=i;
     }
     initialize_sequence((char *)genotype->cisreg_seq, CISREG_LEN*MAX_GENES, genotype->ngenes, RS);  // initialize cis-reg sequence
-    initialize_sequence((char *)genotype->tf_seq, CONSENSUS_SEQ_LEN*MAX_TF_GENES, genotype->ntfgenes, RS);    //initialize binding sequence of TFs    
+    initialize_sequence((char *)genotype->tf_seq, TF_ELEMENT_LEN*MAX_TF_GENES, genotype->ntfgenes, RS);    //initialize binding sequence of TFs    
     /* We now generate the complementary sequence of BS that are on the non-template strand.
      * The complementary sequence is used to search for BS that on the non-template strand.  
      * We also assume that all the TFs can work on both strands, but can induce expression in one direction.*/  
     for(i=0;i< genotype->ntfgenes;i++)
     {        
-        for(k=0;k<CONSENSUS_SEQ_LEN;k++)
+        for(k=0;k<TF_ELEMENT_LEN;k++)
         {
-            switch (genotype->tf_seq[i][CONSENSUS_SEQ_LEN-k-1])
+            switch (genotype->tf_seq[i][TF_ELEMENT_LEN-k-1])
             {
                 case 'a': genotype->tf_seq_rc[i][k]='t'; break;
                 case 't': genotype->tf_seq_rc[i][k]='a'; break;
@@ -684,7 +685,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
     char *tf_seq_rc; 
     cis_seq=&(genotype->cisreg_seq[gene_id][0]); 
   
-    for(i=3; i < CISREG_LEN-CONSENSUS_SEQ_LEN-3; i++) /* scan promoter */
+    for(i=3; i < CISREG_LEN-TF_ELEMENT_LEN-3; i++) /* scan promoter */
     {  
         /*calc the number of BS within the hindrance range*/
         N_hindered_BS=0;        
@@ -692,7 +693,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
         {
             for(j=0;j<N_binding_sites;j++)
             {
-               if(genotype->all_binding_sites[gene_id][j].BS_pos> i-CONSENSUS_SEQ_LEN-2*HIND_LENGTH)
+               if(genotype->all_binding_sites[gene_id][j].BS_pos> i-TF_ELEMENT_LEN-2*HIND_LENGTH)
                     N_hindered_BS++;
             }
         }  
@@ -711,7 +712,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
             tf_seq_rc=&(genotype->tf_seq_rc[k][0]);            
             /*find BS on the template strand*/
             match=0;
-            for (j=i; j < i+CONSENSUS_SEQ_LEN; j++) /*calculate the number of nucleotides that match in each [i,i+CONSENSUS_SEQ_LEN] window. The window slides by 1 each time when scanning the promoter*/
+            for (j=i; j < i+TF_ELEMENT_LEN; j++) /*calculate the number of nucleotides that match in each [i,i+TF_ELEMENT_LEN] window. The window slides by 1 each time when scanning the promoter*/
                 if (cis_seq[j] == tf_seq[j-i]) match++; 
             if (match >= NMIN)
             {  
@@ -725,7 +726,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                         genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
                         if(!genotype->all_binding_sites[j]) 
                         {  
-#if KEEP_LOG
+#if !LOG_OFF
                             LOG("error in calc_all_binding_sites_copy\n");  
 #endif
                             exit(-1);                                       
@@ -733,9 +734,9 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                     }                    
                 }                
                 genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                      
-                genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(CONSENSUS_SEQ_LEN-match)/(CONSENSUS_SEQ_LEN-NMIN+1));
+                genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match)/(TF_ELEMENT_LEN-NMIN+1));
                 genotype->all_binding_sites[gene_id][N_binding_sites].BS_pos = i ; 
-                genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = CONSENSUS_SEQ_LEN-match;             
+                genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = TF_ELEMENT_LEN-match;             
                 genotype->all_binding_sites[gene_id][N_binding_sites].N_hindered = N_hindered_BS;
                 N_hindered_BS++;              
                 N_binding_sites++;
@@ -744,7 +745,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
             else /*find BS on the non-template strand.*/
             {
                 match_rc=0;
-                for (j=i; j < i+CONSENSUS_SEQ_LEN; j++)                
+                for (j=i; j < i+TF_ELEMENT_LEN; j++)                
                     if (cis_seq[j] == tf_seq_rc[j-i]) match_rc++;
                 if (match_rc >= NMIN)
                 {
@@ -759,7 +760,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                             genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
                             if(!genotype->all_binding_sites[j]) 
                             {
-#if KEEP_LOG
+#if !LOG_OFF
                                 LOG("error in calc_all_binding_sites_copy\n");
 #endif
                                 exit(-1);                                       
@@ -768,9 +769,9 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                     }
                     /************************************************************************************************************/
                     genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                                     
-                    genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(CONSENSUS_SEQ_LEN-match_rc)/(CONSENSUS_SEQ_LEN-NMIN+1));
+                    genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match_rc)/(TF_ELEMENT_LEN-NMIN+1));
                     genotype->all_binding_sites[gene_id][N_binding_sites].BS_pos = i;
-                    genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = CONSENSUS_SEQ_LEN-match_rc;
+                    genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = TF_ELEMENT_LEN-match_rc;
                     genotype->all_binding_sites[gene_id][N_binding_sites].N_hindered = N_hindered_BS;
                     N_hindered_BS++;                  
                     N_binding_sites++;  //two binding sites on different strands can also hinder each other                  
@@ -821,7 +822,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
     for(i=1;i<N_act_BS;i++) 
     {
         j=i-1;
-        while(j!=0 && genotype->all_binding_sites[gene_id][act_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][act_BS[j][0]].BS_pos<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)j--;
+        while(j!=0 && genotype->all_binding_sites[gene_id][act_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][act_BS[j][0]].BS_pos<TF_ELEMENT_LEN+2*HIND_LENGTH)j--;
         act_BS[i][1]=act_BS[j][1]+1;
     }
     /*calculate the maximum number of repressor binding sites that do not hinder each other*/
@@ -830,7 +831,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
     for(i=1;i<N_rep_BS;i++) 
     {
         j=i-1;
-        while(j!=0 && genotype->all_binding_sites[gene_id][rep_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][rep_BS[j][0]].BS_pos<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)j--;
+        while(j!=0 && genotype->all_binding_sites[gene_id][rep_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][rep_BS[j][0]].BS_pos<TF_ELEMENT_LEN+2*HIND_LENGTH)j--;
         rep_BS[i][1]=rep_BS[j][1]+1;
     }
     genotype->max_unhindered_sites[gene_id][1]=act_BS[N_act_BS-1][1];
@@ -863,52 +864,52 @@ void calc_all_binding_sites(Genotype *genotype)
 /*
  * Set how the environmental signal should change
  */
-static void set_signal(CellState *state, Environment *env, RngStream RS, int thread_ID)
+static void set_signal(CellState *state, Test *test, RngStream RS, int thread_ID)
 {
     float t=0.0;     
     char flag;   
     
-#if IRREG_SIGNAL
+#if EXTERNAL_SIGNAL
     int j;
     j=RngStream_RandInt(RS,0,99);
-    env->external_signal=&(signal_profile_matrix[thread_ID][j][0]);
+    test->external_signal=&(signal_profile_matrix[thread_ID][j][0]);
 #else
-    env->external_signal=NULL;             
+    test->external_signal=NULL;             
 #endif    
     
-    if(env->external_signal==NULL)   
+    if(test->external_signal==NULL)   
     {
         flag='o'; 
-        state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;    //always start with signal on
-#if N_SIGNAL_TF==2
+        state->protein_number[N_SIGNAL_TF-1]=test->signal_on_strength;    //always start with signal on
+    #if N_SIGNAL_TF==2
         state->protein_number[0]=background_signal_strength;
-#endif      
-        while(t<env->t_development)
+    #endif      
+        while(t<test->t_development)
         {
             if(flag=='o')
             {
-                add_fixed_event(-1,t+env->t_signal_on,&(state->signal_off_head),&(state->signal_off_tail));
+                add_fixed_event(-1,t+test->t_signal_on,&(state->signal_off_head),&(state->signal_off_tail));
                 flag='f';
-                t=t+env->t_signal_on;                    
+                t=t+test->t_signal_on;                    
             }    
             else
             {
-                add_fixed_event(-1,t+env->t_signal_off,&(state->signal_on_head),&(state->signal_on_tail));
+                add_fixed_event(-1,t+test->t_signal_off,&(state->signal_on_head),&(state->signal_on_tail));
                 flag='o';
-                t=t+env->t_signal_off;
+                t=t+test->t_signal_off;
             }
         } 
     }
     else
     {
         int time_point=1;
-        state->protein_number[N_SIGNAL_TF-1]=env->external_signal[0];
-        t=1.0;
-        while(t<env->t_development)
+        state->protein_number[N_SIGNAL_TF-1]=test->external_signal[0];
+        t=10.0;
+        while(t<test->t_development)
         {
             add_fixed_event(time_point,t,&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
             time_point++;
-            t+=1.0;
+            t+=10.0;
         } 
     }
 }
@@ -991,7 +992,7 @@ static void clone_genotype(Genotype *genotype_templet, Genotype *genotype_clone)
     /* copy binding sites' sequences*/  
     for(i=0; i < genotype_templet->ntfgenes; i++) 
     {          
-        for(j=0;j<CONSENSUS_SEQ_LEN;j++)
+        for(j=0;j<TF_ELEMENT_LEN;j++)
         {    
             genotype_clone->tf_seq[i][j]=genotype_templet->tf_seq[i][j];
             genotype_clone->tf_seq_rc[i][j]=genotype_templet->tf_seq_rc[i][j];
@@ -1027,15 +1028,15 @@ static void clone_genotype(Genotype *genotype_templet, Genotype *genotype_clone)
 /**
  *Calculate the fintess of a given genotype.
  *Essentially calling do_single_timestep until tdevelopment and calculate 
- *average fitness over tdevelopment.
+ *average growth rate over tdevelopment.
  */
-static void calc_avg_fitness(   Genotype *genotype,
-                                Selection *Selection,
-                                int init_mRNA[MAX_GENES],
-                                float init_protein_number[MAX_PROTEINS],
-                                RngStream RS_parallel[N_THREADS], 
-                                float Fitness1[N_REPLICATES],
-                                float Fitness2[N_REPLICATES])       
+static void calc_avg_fitness(  Genotype *genotype,
+                                    Selection *Selection,
+                                    int init_mRNA[MAX_GENES],
+                                    float init_protein_number[MAX_PROTEINS],
+                                    RngStream RS_parallel[N_THREADS], 
+                                    float GR1[N_REPLICATES],
+                                    float GR2[N_REPLICATES])       
 {   
     Phenotype timecourse1[N_REPLICATES], timecourse2[N_REPLICATES]; 
 #if PHENOTYPE     
@@ -1043,7 +1044,7 @@ static void calc_avg_fitness(   Genotype *genotype,
     /*alloc space and initialize values to 0.0*/
     for(i=0;i<N_REPLICATES;i++)
     {
-        timecourse1[i].total_time_points=(int)Selection->env1.t_development;
+        timecourse1[i].total_time_points=(int)Selection->test1.t_development;
         timecourse1[i].gene_specific_concentration=(float *)malloc(timecourse1[i].total_time_points*genotype->ngenes*sizeof(float));
         timecourse1[i].protein_concentration=(float *)malloc(timecourse1[i].total_time_points*genotype->nproteins*sizeof(float));
         timecourse1[i].instantaneous_fitness=(float *)malloc(timecourse1[i].total_time_points*sizeof(float));
@@ -1055,7 +1056,7 @@ static void calc_avg_fitness(   Genotype *genotype,
         for(j=0;j<timecourse1[i].total_time_points;j++)
             timecourse1[i].instantaneous_fitness[j]=0.0;
         /*do the same to timecourse2*/
-        timecourse2[i].total_time_points=(int)Selection->env2.t_development;
+        timecourse2[i].total_time_points=(int)Selection->test2.t_development;
         timecourse2[i].gene_specific_concentration=(float *)malloc(timecourse2[i].total_time_points*genotype->ngenes*sizeof(float));
         timecourse2[i].protein_concentration=(float *)malloc(timecourse2[i].total_time_points*genotype->nproteins*sizeof(float));
         timecourse2[i].instantaneous_fitness=(float *)malloc(timecourse2[i].total_time_points*sizeof(float));
@@ -1073,6 +1074,7 @@ static void calc_avg_fitness(   Genotype *genotype,
     #pragma omp parallel num_threads(N_THREADS) 
     {
         int thread_ID=omp_get_thread_num();
+//        int thread_ID=0;
         int i,j,k;
         int N_replicates_per_thread=N_REPLICATES/N_THREADS;  
         Genotype genotype_clone;
@@ -1080,13 +1082,13 @@ static void calc_avg_fitness(   Genotype *genotype,
         GillespieRates rate_clone;
         int init_mRNA_clone[MAX_GENES]; 
         float init_protein_number_clone[MAX_GENES];
-        float f1[N_replicates_per_thread],f2[N_replicates_per_thread];       
+        float gr1[N_replicates_per_thread],gr2[N_replicates_per_thread];       
         int mRNA[genotype->ngenes];
         float protein[genotype->ngenes];         
-        Environment Env1, Env2;
-              
+        Test Test1, Test2;
+
         /*initialize the clone*/
-        initialize_cache(&genotype_clone);        
+        initialize_cache(&genotype_clone);
         
         /*clone genotype and initial mRNA and protein numbers*/
         #pragma omp critical
@@ -1095,22 +1097,22 @@ static void calc_avg_fitness(   Genotype *genotype,
             genotype_clone.ntfgenes=genotype->ntfgenes;
             genotype_clone.nproteins=genotype->nproteins;
             clone_genotype(genotype, &genotype_clone);              
-            Env1.t_development=Selection->env1.t_development;
-            Env1.signal_on_strength=Selection->env1.signal_on_strength;
-            Env1.signal_off_strength=Selection->env1.signal_off_strength;
-            Env1.t_signal_on=Selection->env1.t_signal_on;
-            Env1.t_signal_off=Selection->env1.t_signal_off;
-            Env1.initial_effect_of_effector=Selection->env1.initial_effect_of_effector;
-            Env1.fixed_effector_effect=Selection->env1.fixed_effector_effect;
-            Env2.t_development=Selection->env2.t_development;
-            Env2.signal_on_strength=Selection->env2.signal_on_strength;
-            Env2.signal_off_strength=Selection->env2.signal_off_strength;
-            Env2.t_signal_on=Selection->env2.t_signal_on;
-            Env2.t_signal_off=Selection->env2.t_signal_off;
-            Env2.initial_effect_of_effector=Selection->env2.initial_effect_of_effector;
-            Env2.fixed_effector_effect=Selection->env2.fixed_effector_effect;
-            Env1.duration_of_burn_in_growth_rate=Selection->env1.duration_of_burn_in_growth_rate;
-            Env2.duration_of_burn_in_growth_rate=Selection->env2.duration_of_burn_in_growth_rate;
+            Test1.t_development=Selection->test1.t_development;
+            Test1.signal_on_strength=Selection->test1.signal_on_strength;
+            Test1.signal_off_strength=Selection->test1.signal_off_strength;
+            Test1.t_signal_on=Selection->test1.t_signal_on;
+            Test1.t_signal_off=Selection->test1.t_signal_off;
+            Test1.initial_effect_of_effector=Selection->test1.initial_effect_of_effector;
+            Test1.fixed_effector_effect=Selection->test1.fixed_effector_effect;
+            Test2.t_development=Selection->test2.t_development;
+            Test2.signal_on_strength=Selection->test2.signal_on_strength;
+            Test2.signal_off_strength=Selection->test2.signal_off_strength;
+            Test2.t_signal_on=Selection->test2.t_signal_on;
+            Test2.t_signal_off=Selection->test2.t_signal_off;
+            Test2.initial_effect_of_effector=Selection->test2.initial_effect_of_effector;
+            Test2.fixed_effector_effect=Selection->test2.fixed_effector_effect;
+            Test1.duration_of_burn_in_growth_rate=Selection->test1.duration_of_burn_in_growth_rate;
+            Test2.duration_of_burn_in_growth_rate=Selection->test2.duration_of_burn_in_growth_rate;
             for(j=0; j < MAX_GENES; j++) 
             {  
                 init_mRNA_clone[j] = init_mRNA[j];
@@ -1132,7 +1134,7 @@ static void calc_avg_fitness(   Genotype *genotype,
                 protein[genotype_clone.protein_pool[j][1][k]]=(float)init_protein_number_clone[j]/genotype_clone.protein_pool[j][0][0]; //split the initial protein number equally to different copies
                                                                                                                                         //this is to make sure all proteins have equal initial numbers
         }        
-        /* now calc fitness under the two environments*/
+        /* now calc fitness under the two tests*/
         /********************************************************************** 
          * 
          *                              TEST1 
@@ -1141,22 +1143,22 @@ static void calc_avg_fitness(   Genotype *genotype,
         for(i=0;i<N_replicates_per_thread;i++) /* env 1, usually a constant signal that matches env*/
         {
             /*initialize mRNA and protein numbers, and gene states etc.*/
-            initialize_cell(&genotype_clone, &state_clone, &Env1, mRNA, protein);
+            initialize_cell(&genotype_clone, &state_clone, &Test1, mRNA, protein);
             
             /*set how the signal should change during simulation*/
-            set_signal(&state_clone, &Env1, RS_parallel[thread_ID], thread_ID);
+            set_signal(&state_clone, &Test1, RS_parallel[thread_ID], thread_ID);
             
             /*calcualte the rates of cellular activity based on the initial cellular state*/
-            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Env1, INITIALIZATION);             
+            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Test1, INITIALIZATION);             
 #if PHENOTYPE
             timecourse1[thread_ID*N_replicates_per_thread+i].timepoint=0;
 #endif
-            /*run developmental simulation until tdevelopment or encounter an error*/
-            while(state_clone.t<Env1.t_development) 
-                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Env1, &(timecourse1[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);
+            /*run growth simulation until tdevelopment or encounter an error*/
+            while(state_clone.t<Test1.t_development) 
+                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Test1, &(timecourse1[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);
                       
-            /*calculate average instantaneous fitness of tdevelopment*/
-            f1[i]=(state_clone.cumulative_fitness-state_clone.cumulative_fitness_after_burn_in)/(Env1.t_development-Env1.duration_of_burn_in_growth_rate); 
+            /*calculate average growth rate*/
+            gr1[i]=(state_clone.cumulative_fitness-state_clone.cumulative_fitness_after_burn_in)/(Test1.t_development-Test1.duration_of_burn_in_growth_rate); 
 #if PHENOTYPE
             timecourse1[thread_ID*N_replicates_per_thread+i].timepoint++;
 #endif          
@@ -1171,16 +1173,16 @@ static void calc_avg_fitness(   Genotype *genotype,
          *********************************************************************/
         for(i=0;i<N_replicates_per_thread;i++) 
         {       
-            initialize_cell(&genotype_clone, &state_clone, &Env2, mRNA, protein);
-            set_signal(&state_clone, &Env2, RS_parallel[thread_ID], thread_ID);
-            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Env2, INITIALIZATION); 
+            initialize_cell(&genotype_clone, &state_clone, &Test2, mRNA, protein);
+            set_signal(&state_clone, &Test2, RS_parallel[thread_ID], thread_ID);
+            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Test2, INITIALIZATION); 
 #if PHENOTYPE
             timecourse2[thread_ID*N_replicates_per_thread+i].timepoint=0;
 #endif            
-            while(state_clone.t<Env2.t_development) 
-                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Env2, &(timecourse2[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);            
+            while(state_clone.t<Test2.t_development) 
+                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Test2, &(timecourse2[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);            
         
-            f2[i]=(state_clone.cumulative_fitness-state_clone.cumulative_fitness_after_burn_in)/(Env2.t_development-Env2.duration_of_burn_in_growth_rate);
+            gr2[i]=(state_clone.cumulative_fitness-state_clone.cumulative_fitness_after_burn_in)/(Test2.t_development-Test2.duration_of_burn_in_growth_rate);
 #if PHENOTYPE
             timecourse2[thread_ID*N_replicates_per_thread+i].timepoint++;
 #endif           
@@ -1190,14 +1192,14 @@ static void calc_avg_fitness(   Genotype *genotype,
         for(j=0;j<MAX_GENES;j++)
             free(genotype_clone.all_binding_sites[j]);
 #if !PHENOTYPE       
-        /*pool fitness from each thread*/
+        /*pool growth rates from each thread*/
         #pragma omp critical
         {
             j=0;
             for(i=thread_ID*N_replicates_per_thread;i<(thread_ID+1)*N_replicates_per_thread;i++)
             {
-                Fitness1[i]=f1[j];
-                Fitness2[i]=f2[j];
+                GR1[i]=gr1[j];
+                GR2[i]=gr2[j];
                 j++;
             }
         } 
@@ -1329,7 +1331,7 @@ void initialize_cache(Genotype *genotype)
         genotype->all_binding_sites[j] = malloc(MAXELEMENTS*sizeof(AllTFBindingSites));
         if (!(genotype->all_binding_sites[j])) 
         {  
-#if KEEP_LOG
+#if !LOG_OFF
             LOG("Failed to allocate space\n");                  
 #endif
             exit(-1);
@@ -1521,7 +1523,7 @@ static void continue_simulation(Genotype *resident,
     FILE *fp;
     
     /*delete the incomplete lines in the output files*/
-    tidy_output_files(evo_summary,mutation_file);
+    tidy_output_files(output_file,mutation_file);
     
     /* set genotype based on previous steps*/
     fp=fopen(mutation_file,"r");
@@ -1529,7 +1531,7 @@ static void continue_simulation(Genotype *resident,
         replay_mutations(resident, mutant, mut_record, fp, replay_N_steps);
     else
     {   
-#if KEEP_LOG
+#if !LOG_OFF
         LOG("cannot open mutation_file\n"); 
 #endif
         exit(-2);
@@ -1561,7 +1563,7 @@ static void continue_simulation(Genotype *resident,
     }
     else
     {   
-#if KEEP_LOG
+#if !LOG_OFF
         LOG("cannot open RngSeeds.txt\n");     
 #endif
         exit(-2);
@@ -1588,7 +1590,7 @@ static void continue_simulation(Genotype *resident,
     }
     else
     {   
-#if KEEP_LOG
+#if !LOG_OFF
         LOG("cannot open precise_fitness.txt\n");       
 #endif
         exit(-2);
@@ -1631,7 +1633,7 @@ static void calc_fitness_stats( Genotype *genotype,
 
             avg_f1+=f1[i][j];
             avg_f2+=f2[i][j];          
-            genotype->fitness_measurement[counter]=selection->env1_weight*f1[i][j]+selection->env2_weight*f2[i][j];
+            genotype->fitness_measurement[counter]=selection->test1_weight*f1[i][j]+selection->test2_weight*f2[i][j];
             counter++;
         }
     }
@@ -1646,7 +1648,7 @@ static void calc_fitness_stats( Genotype *genotype,
             diff_f2=f2[i][j]-avg_f2;
             sum_sq_diff_f1+=pow(diff_f1,2.0);
             sum_sq_diff_f2+=pow(diff_f2,2.0);
-            sum_sq_diff_mean_f+=pow(diff_f1*selection->env1_weight+diff_f2*selection->env2_weight,2.0);
+            sum_sq_diff_mean_f+=pow(diff_f1*selection->test1_weight+diff_f2*selection->test2_weight,2.0);
         }
     }
     sq_SE_f1=sum_sq_diff_f1/(N_recalc_fitness*N_REPLICATES*(N_recalc_fitness*N_REPLICATES-1));
@@ -1655,7 +1657,7 @@ static void calc_fitness_stats( Genotype *genotype,
     genotype->fitness2=avg_f2;
     genotype->sq_SE_fitness1=sq_SE_f1*N_recalc_fitness*N_REPLICATES;
     genotype->sq_SE_fitness2=sq_SE_f2*N_recalc_fitness*N_REPLICATES;     
-    genotype->avg_fitness=selection->env1_weight*avg_f1+selection->env2_weight*avg_f2;
+    genotype->avg_fitness=selection->test1_weight*avg_f1+selection->test2_weight*avg_f2;
     genotype->sq_SE_avg_fitness=sum_sq_diff_mean_f/(N_recalc_fitness*N_REPLICATES-1)/(N_recalc_fitness*N_REPLICATES); 
 }
 
@@ -1689,17 +1691,15 @@ static int evolve_N_steps(  Genotype *resident,
             (*N_tot_trials)++;
             if(N_trials>MAX_TRIALS) /*Tried too many mutation in one step.*/
             {
-                fp=fopen(evo_summary,"a+");                              
+                fp=fopen(output_file,"a+");                              
                 fprintf(fp,"Tried %d mutations, yet none could fix\n",MAX_TRIALS);
                 fclose(fp); 
                 summarize_binding_sites(resident,i);
                 return -1;
             }
-
             /*do mutation on a copy of the current genotype*/
-            clone_genotype(resident,mutant);
+            clone_genotype(resident,mutant); 
             mutate(mutant,RS_main,mut_record);
-
 #if OUTPUT_MUTANT_DETAILS
             /*record every mutation*/
             fp=fopen("all_mutations.txt","a+");
@@ -1716,11 +1716,9 @@ static int evolve_N_steps(  Genotype *resident,
 #endif
             calc_all_binding_sites(mutant);           
             MAXELEMENTS=mutant->N_allocated_elements;
-
             /*calculate the fitness of the mutant at low resolution*/
             calc_avg_fitness(mutant, selection, init_mRNA, init_protein, RS_parallel, fitness1[0], fitness2[0]);
             calc_fitness_stats(mutant, selection, &(fitness1[0]), &(fitness2[0]), 1); // calc fitness at low resolution
-
 #if OUTPUT_MUTANT_DETAILS
             /*record low-resolution fitness*/
             fp=fopen("fitness_all_mutants.txt","a+");
@@ -1732,7 +1730,7 @@ static int evolve_N_steps(  Genotype *resident,
             /*If yes, record relevant info*/
             if(fixation==1)
             {                    
-                fp=fopen(evo_summary,"a+");
+                fp=fopen(output_file,"a+");
                 fprintf(fp,"%d %d %d %d %c %f ",i, *N_tot_trials, N_trials,mut_record->N_hit_bound,mut_record->mut_type,score);
                 fclose(fp);
                 fp=fopen(mutation_file,"a+");
@@ -1746,11 +1744,9 @@ static int evolve_N_steps(  Genotype *resident,
                 break;
             }
         }
-        
         /*replace the current genotype by overwriting it*/
-        clone_genotype(mutant,resident);        
+        clone_genotype(mutant,resident);
         calc_all_binding_sites(resident); 
-     
         /*calculate mutant fitness at high resolution*/ 
         /*If we are at the last step of BURN_IN, 
          * we should calculate the fitness under the post-burn-in condition, 
@@ -1758,14 +1754,12 @@ static int evolve_N_steps(  Genotype *resident,
         if(!(i==selection->MAX_STEPS && flag_burn_in)) 
         {
             for(j=1;j<HI_RESOLUTION_RECALC;j++)  
-                calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, fitness1[j],fitness2[j]);              
-            calc_fitness_stats(resident, selection, &(fitness1[0]), &(fitness2[0]), HI_RESOLUTION_RECALC);            
+                calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, fitness1[j],fitness2[j]);  
+            calc_fitness_stats(resident, selection, &(fitness1[0]), &(fitness2[0]), HI_RESOLUTION_RECALC); 
         }
-      
         /*calculate the number of c1-ffls every step*/
-        find_motifs(resident);        
+        find_motifs(resident); 
         print_motifs(resident); 
-       
         /*output network topology every OUTPUT_INTERVAL steps*/
         if(i%OUTPUT_INTERVAL==0 && i!=0) 
             summarize_binding_sites(resident,i);        
@@ -1788,11 +1782,11 @@ static int evolve_N_steps(  Genotype *resident,
             fprintf(fp,"\n");
             fclose(fp);
         }
-#endif       
+#endif
         /*output precise hi-resolution fitness*/
         if(!(i==selection->MAX_STEPS && flag_burn_in))
         {
-            fp=fopen("precise_fitness.txt","a+");           
+            fp=fopen("precise_fitness.txt","a+");
             fprintf(fp,"%d %d %a %a %a %a %a %a\n",*N_tot_trials, 
                                                 mut_record->N_hit_bound,
                                                 resident->avg_fitness,                                                
@@ -1800,16 +1794,15 @@ static int evolve_N_steps(  Genotype *resident,
                                                 resident->fitness2,
                                                 resident->sq_SE_avg_fitness,
                                                 resident->sq_SE_fitness1,
-                                                resident->sq_SE_fitness2); 
-            fclose(fp); 
-            
+                                                resident->sq_SE_fitness2);
+            fclose(fp);        
             /* marks the last step at which all state of the program has been output*/
             if(i%SAVING_INTERVAL==0)
             {
                 fp=fopen("saving_point.txt","w");
-                fprintf(fp,"%d %d\n",i,*N_tot_trials);
+                fprintf(fp,"%d\n",i);
                 fclose(fp);
-            }    
+            }
         }
     } 
     *init_step=i;
@@ -1819,7 +1812,7 @@ static int evolve_N_steps(  Genotype *resident,
 static void output_genotype(Genotype *genotype)
 {
     FILE *OUTPUT;
-    OUTPUT=fopen(evo_summary,"a+");
+    OUTPUT=fopen(output_file,"a+");
     fprintf(OUTPUT,"%.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d \n",  
             genotype->avg_fitness,            
             genotype->fitness1,
@@ -1927,17 +1920,15 @@ static void find_motifs(Genotype *genotype)
 {
     int i,j,k,l,cluster_size;
     int found_bs;
-    int gene_id,gene_id_copy,site_id,protein_id,N_copies,N_activators;   
+    int gene_id,gene_id_copy,site_id,protein_id,N_copies,N_activators;
+    int master_TF,aux_TF;
     int activators[MAX_PROTEINS];
     int copies_reg_by_env[MAX_GENES],copies_not_reg_by_env[MAX_GENES],N_copies_reg_by_env,N_copies_not_reg_by_env;
     int hindrance[MAX_PROTEINS][MAX_PROTEINS];
     int pos_binding_sites_of_j[MAXELEMENTS],pos_binding_sites_of_k[MAXELEMENTS],N_binding_sites_of_j,N_binding_sites_of_k; 
     int N_motifs;  
     int N_strong_BS[MAX_PROTEINS][2][20];
-#if !DIRECT_REG
-    int master_TF,aux_TF;
     float r_master_TF_deg, r_aux_TF_deg;
-#endif
     
     /*record which genes and TFs form the motifs of interest. We use this information to perturb motifs*/
 #if PERTURB
@@ -2046,13 +2037,11 @@ static void find_motifs(Genotype *genotype)
                                 {
                                     pos_binding_sites_of_j[N_binding_sites_of_j]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
                                     N_binding_sites_of_j++;
-#if COUNT_NEAR_AND
-                                    if(genotype->all_binding_sites[gene_id][site_id].mis_match<(CONSENSUS_SEQ_LEN-NMIN))
+                                    if(genotype->all_binding_sites[gene_id][site_id].mis_match<(TF_ELEMENT_LEN-NMIN))
                                     {                                
                                         N_strong_BS[activators[j]][1][N_strong_BS[activators[j]][0][0]]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
                                         N_strong_BS[activators[j]][0][0]++;
                                     }
-#endif
                                 }
                             }
                             else
@@ -2061,13 +2050,11 @@ static void find_motifs(Genotype *genotype)
                                 {
                                     pos_binding_sites_of_j[N_binding_sites_of_j]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
                                     N_binding_sites_of_j++;
-#if COUNT_NEAR_AND
-                                    if(genotype->all_binding_sites[gene_id][site_id].mis_match<(CONSENSUS_SEQ_LEN-NMIN))
+                                    if(genotype->all_binding_sites[gene_id][site_id].mis_match<(TF_ELEMENT_LEN-NMIN))
                                     {                                
                                         N_strong_BS[activators[j]][1][N_strong_BS[activators[j]][0][0]]=genotype->all_binding_sites[gene_id][site_id].BS_pos;
                                         N_strong_BS[activators[j]][0][0]++;
                                     }
-#endif
                                 }
                             }                                
                         }
@@ -2079,7 +2066,7 @@ static void find_motifs(Genotype *genotype)
                     else
                     {
                         /*if the first bs hinders the last bs, we can be sure at most one binding site of j can be bound by TF j */
-                        if(pos_binding_sites_of_j[N_binding_sites_of_j-1]-pos_binding_sites_of_j[0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)                     
+                        if(pos_binding_sites_of_j[N_binding_sites_of_j-1]-pos_binding_sites_of_j[0]<TF_ELEMENT_LEN+2*HIND_LENGTH)                     
                             hindrance[activators[j]][activators[j]]=1;
                         else
                             hindrance[activators[j]][activators[j]]=0;
@@ -2116,8 +2103,8 @@ static void find_motifs(Genotype *genotype)
                             } 
                         }  
                         /*determine the relation between j and j+1, ...*/
-                        if(abs(pos_binding_sites_of_j[N_binding_sites_of_j-1]-pos_binding_sites_of_k[0])>= CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                            abs(pos_binding_sites_of_k[N_binding_sites_of_k-1]-pos_binding_sites_of_j[0])>= CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                        if(abs(pos_binding_sites_of_j[N_binding_sites_of_j-1]-pos_binding_sites_of_k[0])>= TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                            abs(pos_binding_sites_of_k[N_binding_sites_of_k-1]-pos_binding_sites_of_j[0])>= TF_ELEMENT_LEN+2*HIND_LENGTH)
                         {
                             hindrance[activators[j]][activators[k]]=0; 
                             hindrance[activators[k]][activators[j]]=0;
@@ -2303,13 +2290,13 @@ static void find_motifs(Genotype *genotype)
                                                 /*count near-AND-gated motifs*/
                                                 if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                                if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                                if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                     genotype->N_near_AND_gated_motifs[0]+=cluster_size;
                                                         }
                                                     }
@@ -2326,13 +2313,13 @@ static void find_motifs(Genotype *genotype)
                                                 /*count near-AND-gated motifs*/
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                 genotype->N_near_AND_gated_motifs[1]+=cluster_size;
                                                         }
                                                     }
@@ -2346,12 +2333,12 @@ static void find_motifs(Genotype *genotype)
                                                 /*count near-AND-gated motifs*/
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                         {
-                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                                 )
                                                                 genotype->N_near_AND_gated_motifs[2]+=cluster_size;
                                                         }
@@ -2469,13 +2456,13 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                                if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                                if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                     genotype->N_near_AND_gated_motifs[3]+=cluster_size;
                                                         }
                                                     }
@@ -2491,13 +2478,13 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                 genotype->N_near_AND_gated_motifs[4]+=cluster_size;
                                                         }
                                                     }
@@ -2510,12 +2497,12 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                         {
-                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                                 )
                                                                 genotype->N_near_AND_gated_motifs[5]+=cluster_size;
                                                         }
@@ -2586,13 +2573,13 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                         	if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                         	if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                 genotype->N_near_AND_gated_motifs[6]+=cluster_size;
                                                         }
                                                     }
@@ -2608,13 +2595,13 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                 genotype->N_near_AND_gated_motifs[7]+=cluster_size;
                                                         }
                                                     }
@@ -2627,12 +2614,12 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                         {
-                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                                 )
                                                                 genotype->N_near_AND_gated_motifs[8]+=cluster_size;
                                                         }
@@ -2707,13 +2694,13 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[aux_TF][0][0]!=0 && N_strong_BS[master_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                         	if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                         	if(N_strong_BS[master_TF][0][0]==1 || N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                 genotype->N_near_AND_gated_motifs[3]+=cluster_size;
                                                         }
                                                     }
@@ -2729,13 +2716,13 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                        if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                            abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                             )
                                                         {
-                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)   
+                                                         	if(N_strong_BS[aux_TF][0][0]==1 || N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)   
                                                                 genotype->N_near_AND_gated_motifs[4]+=cluster_size;
                                                         }
                                                     }
@@ -2748,12 +2735,12 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
                                                 if(N_strong_BS[master_TF][0][0]!=0 && N_strong_BS[aux_TF][0][0]!=0)
                                                 {
-                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                    if(N_strong_BS[master_TF][0][0]==1 ||N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1]-N_strong_BS[master_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                     {
-                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)
+                                                        if(N_strong_BS[aux_TF][0][0]==1 ||N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[aux_TF][1][0]<TF_ELEMENT_LEN+2*HIND_LENGTH)
                                                         {
-                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH ||
-                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=CONSENSUS_SEQ_LEN+2*HIND_LENGTH 
+                                                            if(abs(N_strong_BS[aux_TF][1][0]-N_strong_BS[master_TF][1][N_strong_BS[master_TF][0][0]-1])>=TF_ELEMENT_LEN+2*HIND_LENGTH ||
+                                                                abs(N_strong_BS[aux_TF][1][N_strong_BS[aux_TF][0][0]-1]-N_strong_BS[master_TF][1][0])>=TF_ELEMENT_LEN+2*HIND_LENGTH 
                                                                 )
                                                                 genotype->N_near_AND_gated_motifs[5]+=cluster_size;
                                                         }
@@ -2821,7 +2808,7 @@ static void add_binding_site(Genotype *genotype, int gene_id)
             genotype->all_binding_sites[i] = realloc(genotype->all_binding_sites[i], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
             if (!genotype->all_binding_sites[i]) 
             {
-#if KEEP_LOG                
+#if !LOG_OFF                
                 LOG("error in calc_all_binding_sites_copy\n");     
 #endif
                 exit(-1);                                       
@@ -2865,7 +2852,7 @@ static void add_binding_site(Genotype *genotype, int gene_id)
                 }
                 genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd=temp;
 #else
-                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd = KD2APP_KD*genotype->Kd[i]*pow(NS_Kd/genotype->Kd[i],(float)(CONSENSUS_SEQ_LEN-NMIN)/(CONSENSUS_SEQ_LEN-NMIN+1));  
+                genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd = KD2APP_KD*genotype->Kd[i]*pow(NS_Kd/genotype->Kd[i],(float)(TF_ELEMENT_LEN-NMIN)/(TF_ELEMENT_LEN-NMIN+1));  
 #endif                
                 genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].tf_id = i;
                 genotype->all_binding_sites[gene_id][genotype->binding_sites_num[gene_id]].Kd = temp;                   
@@ -2899,7 +2886,7 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
     char *tf_seq_rc; 
     cis_seq=&(genotype->cisreg_seq[gene_id][0]); 
   
-    for(i=3; i < CISREG_LEN-CONSENSUS_SEQ_LEN-3; i++) /* scan promoter */
+    for(i=3; i < CISREG_LEN-TF_ELEMENT_LEN-3; i++) /* scan promoter */
     {  
         /*calc the number of BS within the hindrance range*/
         N_hindered_BS=0;        
@@ -2907,7 +2894,7 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
         {
             for(j=0;j<N_binding_sites;j++)
             {
-               if(genotype->all_binding_sites[gene_id][j].BS_pos> i-CONSENSUS_SEQ_LEN-2*HIND_LENGTH)
+               if(genotype->all_binding_sites[gene_id][j].BS_pos> i-TF_ELEMENT_LEN-2*HIND_LENGTH)
                     N_hindered_BS++;
             }
         }  
@@ -2940,14 +2927,14 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
             tf_seq_rc=&(genotype->tf_seq_rc[k][0]);            
             /*find BS on the template strand*/
             match=0;
-            for (j=i;j<i+CONSENSUS_SEQ_LEN;j++) 
+            for (j=i;j<i+TF_ELEMENT_LEN;j++) 
                 if (cis_seq[j] == tf_seq[j-i]) match++; 
             if (match >= NMIN)
             {                              
                 genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                      
-                genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(CONSENSUS_SEQ_LEN-match)/(CONSENSUS_SEQ_LEN-NMIN+1));
+                genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match)/(TF_ELEMENT_LEN-NMIN+1));
                 genotype->all_binding_sites[gene_id][N_binding_sites].BS_pos = i ; 
-                genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = CONSENSUS_SEQ_LEN-match;             
+                genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = TF_ELEMENT_LEN-match;             
                 genotype->all_binding_sites[gene_id][N_binding_sites].N_hindered = N_hindered_BS;
                 N_hindered_BS++;              
                 N_binding_sites++;
@@ -2956,14 +2943,14 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
             else /*find BS on the non-template strand.*/
             {
                 match_rc=0;
-                for (j=i; j < i+CONSENSUS_SEQ_LEN; j++)                
+                for (j=i; j < i+TF_ELEMENT_LEN; j++)                
                     if (cis_seq[j] == tf_seq_rc[j-i]) match_rc++;
                 if (match_rc >= NMIN)
                 {                   
                     genotype->all_binding_sites[gene_id][N_binding_sites].tf_id = k;                                     
-                    genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(CONSENSUS_SEQ_LEN-match_rc)/(CONSENSUS_SEQ_LEN-NMIN+1));
+                    genotype->all_binding_sites[gene_id][N_binding_sites].Kd=KD2APP_KD*genotype->Kd[k]*pow(NS_Kd/genotype->Kd[k],(float)(TF_ELEMENT_LEN-match_rc)/(TF_ELEMENT_LEN-NMIN+1));
                     genotype->all_binding_sites[gene_id][N_binding_sites].BS_pos = i;
-                    genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = CONSENSUS_SEQ_LEN-match_rc;
+                    genotype->all_binding_sites[gene_id][N_binding_sites].mis_match = TF_ELEMENT_LEN-match_rc;
                     genotype->all_binding_sites[gene_id][N_binding_sites].N_hindered = N_hindered_BS;
                     N_hindered_BS++;                  
                     N_binding_sites++;                 
@@ -3009,7 +2996,7 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
     for(i=1;i<N_act_BS;i++) 
     {
         j=i-1;
-        while(j!=0 && genotype->all_binding_sites[gene_id][act_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][act_BS[j][0]].BS_pos<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)j--;
+        while(j!=0 && genotype->all_binding_sites[gene_id][act_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][act_BS[j][0]].BS_pos<TF_ELEMENT_LEN+2*HIND_LENGTH)j--;
         act_BS[i][1]=act_BS[j][1]+1;
     } 
     rep_BS[0][0]=-1;
@@ -3017,7 +3004,7 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
     for(i=1;i<N_rep_BS;i++) 
     {
         j=i-1;
-        while(j!=0 && genotype->all_binding_sites[gene_id][rep_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][rep_BS[j][0]].BS_pos<CONSENSUS_SEQ_LEN+2*HIND_LENGTH)j--;
+        while(j!=0 && genotype->all_binding_sites[gene_id][rep_BS[i][0]].BS_pos - genotype->all_binding_sites[gene_id][rep_BS[j][0]].BS_pos<TF_ELEMENT_LEN+2*HIND_LENGTH)j--;
         rep_BS[i][1]=rep_BS[j][1]+1;
     }
     genotype->max_unhindered_sites[gene_id][1]=act_BS[N_act_BS-1][1];
@@ -3029,12 +3016,12 @@ static void remove_binding_sites(Genotype *genotype, int gene_id)
 
 static void tidy_output_files(char *file_genotype_summary, char *file_mutations)
 {
-    int i,replay_N_steps,N_tot_mutations;
+    int i,replay_N_steps;
     char buffer[600];    
     FILE *fp1,*fp2;
     
     fp1=fopen("saving_point.txt","r");
-    fscanf(fp1,"%d %d",&replay_N_steps,&N_tot_mutations);
+    fscanf(fp1,"%d",&replay_N_steps);
     fclose(fp1);
     
     /*Basically delete the last line of the file if it is not complete*/
@@ -3074,7 +3061,7 @@ static void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     remove("N_motifs.txt");
     rename("temp","N_motifs.txt");
 #if OUTPUT_MUTANT_DETAILS 
-    fp1=fopen("all_mutations.txt","r");
+    fp1=fopen("MUT_Detail.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<N_tot_mutations;i++)
     {
@@ -3083,10 +3070,10 @@ static void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     }
     fclose(fp1);
     fclose(fp2);
-    remove("all_mutations.txt");
-    rename("temp","all_mutations.txt");
+    remove("MUT_Detail.txt");
+    rename("temp","MUT_Detail.txt");
     
-    fp1=fopen("fitness_all_mutants.txt","r");
+    fp1=fopen("Mut_detail_fitness.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<N_tot_mutations;i++)
     {
@@ -3095,8 +3082,8 @@ static void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     }
     fclose(fp1);
     fclose(fp2);
-    remove("fitness_all_mutants.txt");
-    rename("temp","fitness_all_mutants.txt");
+    remove("Mut_detail_fitness.txt");
+    rename("temp","Mut_detail_fitness.txt");
 #endif
     fp1=fopen("precise_fitness.txt","r");
     fp2=fopen("temp","w");

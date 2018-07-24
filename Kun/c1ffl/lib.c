@@ -6,7 +6,7 @@
  * maintaining the linked list data structures or file I/O
  *
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -70,7 +70,7 @@ int add_fixed_event(int i,
     newtime = malloc(sizeof*newtime);
     if (!newtime) 
     {   
-#if KEEP_LOG
+#ifndef LOG_OFF
         LOG("Could not add fixed event \n");   
 #endif
         exit(1);
@@ -131,7 +131,7 @@ void delete_fixed_event(int gene_x,
     }
     if (done == 0) //if could not find mRNA y
     {
-#if KEEP_LOG
+#ifndef LOG_OFF
         LOG("Could not find designated fixed event");       
 #endif
         exit(1);

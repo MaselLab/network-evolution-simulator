@@ -1,6 +1,6 @@
 /*  
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #ifndef FILE_NETSIM_SEEN
 #define FILE_NETSIM_SEEN
@@ -20,7 +20,7 @@
  *evolving a TRN under the selection condition specified in main.c*/
 #define NEUTRAL 0 //run neutral evolution
 #define PHENOTYPE 0 //output the expression of genes over time
-#define PERTURB 0//run perturbation analysis
+#define PERTURB 0 //run perturbation analysis
 
 
 /*2. Runtime control*/ 
@@ -34,10 +34,6 @@
 #define OUTPUT_MUTANT_DETAILS 0 //output every mutant genotype and its fitness, whetehr the mutant is accepted
 #define OUTPUT_RNG_SEEDS 1 //output the state of random number generator every evolutionary step
 #define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
-#define KEEP_LOG 0 //generate error log
-#if KEEP_LOG
-#define LOG(...) { FILE *fperror; fperror=fopen("error.txt","a+"); fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); fclose(fperror);} 
-#endif
 
 /*3. Biology and evolution settings*/
 /******************************************************************************/
@@ -71,26 +67,18 @@
 #define CUT_OFF_MISMATCH_TF_TO_TF 2 //the maximum number of mismatches in TFBSs of TFs in TF genes
 
 
-/*6. Use an irregular signal in selection condition*/
-/*****************************************************************************/
-/*An irregular signal can be specified with an external file that describe the signal (see main.c)*/
-#define IRREG_SIGNAL 0
-#if IRREG_SIGNAL
-float signal_profile_matrix[N_THREADS][100][90];
-#endif
 
-
-/*7. Other default settings*/    
+/*6. Default settings*/    
 /******************************************************************************/
 #define MAX_TF_GENES 20 
 #define MAX_EFFECTOR_GENES 5  
 #define MAX_GENES 25  //total number of genes=effector genes + TF genes (including the signal)     
 #define MAX_PROTEINS 25
 #define CISREG_LEN 150        //length of cis-regulatory region in base-pairs 
-#define CONSENSUS_SEQ_LEN 8      //length of binding element on TF */
+#define TF_ELEMENT_LEN 8      //length of binding element on TF */
 #define NMIN 6                //minimal number of nucleotide that matches the binding sequence of a TF in its binding site
-                              //DO NOT MAKE NMIN<CONSENSUS_SEQ_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake  
-#define HIND_LENGTH 3         //default length of hindrance on each side of the binding site,i.e. a tf occupies CONSENSUS_SEQ_LEN+2*HIND_LENGTH
+                              //DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake  
+#define HIND_LENGTH 3         //default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH
 #define MAX_BINDING 10  //MAX_BINDING is the max number of tf that can bind to a promoter plus 1*/
 /******************************************************************************/
 /*                          End of controlling knobs                          */
@@ -122,12 +110,12 @@ struct AllTFBindingSites
 };
 
 /*
- * Selection contains two envs; each env states the signal whether 
+ * Selection contains two tests; each test states the signal whether 
  * expressing the effector is beneficial
  */
 typedef struct Selection Selection;
-typedef struct Environment Environment;
-struct Environment
+typedef struct Test Test;
+struct Test
 {
     float t_development;
     float signal_on_strength;
@@ -142,10 +130,10 @@ struct Environment
 
 struct Selection
 {
-    Environment env1;
-    Environment env2;
-    float env1_weight;
-    float env2_weight;
+    Test test1;
+    Test test2;
+    float test1_weight;
+    float test2_weight;
     float temporary_miu_ACT_TO_INT_RATE;
     float temporary_miu_protein_syn_rate;
     float temporary_miu_Kd;
@@ -178,8 +166,8 @@ struct Genotype {
     int N_act;                                              /* number of activators*/ 
     int N_rep;                                              /* number of repressors*/ 
     int protein_identity[MAX_PROTEINS];                        /* 1 for activator, 0 for repressor, -1 for non-tf */ 
-    char tf_seq[MAX_PROTEINS][CONSENSUS_SEQ_LEN];                 /* concensus binding sequences*/
-    char tf_seq_rc[MAX_PROTEINS][CONSENSUS_SEQ_LEN];              /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+    char tf_seq[MAX_PROTEINS][TF_ELEMENT_LEN];                 /* concensus binding sequences*/
+    char tf_seq_rc[MAX_PROTEINS][TF_ELEMENT_LEN];              /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int protein_pool[MAX_PROTEINS][2][MAX_GENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
     int TF_family_pool[MAX_PROTEINS][2][MAX_PROTEINS];                            
     float Kd[MAX_PROTEINS]; // Kd needs to be changed to locus specific.
@@ -254,8 +242,9 @@ struct Phenotype
  */
 /*output files. Initialized in main.c*/
 extern char mutation_file[32];
-extern char setup_summary[32];
-extern char evo_summary[32];
+extern char RuntimeSumm[32];
+extern char output_file[32];
+extern float signal_profile_matrix[N_THREADS][200][15];
 
 /*Initialized in netsim.c */
 extern int MAXELEMENTS;
@@ -300,13 +289,13 @@ void evolve_neutrally(  Genotype *,
                         Selection *,
                         RngStream);
 
-void perturbation_analysis(Genotype *,
-                            Genotype *,
-                            Mutation *,
-                            Selection *,
-                            int [MAX_GENES],
-                            float [MAX_GENES],
-                            RngStream [N_THREADS]);
+void modify_network(Genotype *,
+                    Genotype *,
+                    Mutation *,
+                    Selection *,
+                    int [MAX_GENES],
+                    float [MAX_GENES],
+                    RngStream [N_THREADS]);
 
 void print_mutatable_parameters(Genotype*,int);
 
