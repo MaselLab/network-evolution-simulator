@@ -4,7 +4,7 @@
  * This file contains functions to generate mutations and maintain data structure 
  * 
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdlib.h>
 #include <math.h>
@@ -367,15 +367,15 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
         {            
             /* shift the tf_reg array to overwrite the binding sequence to be deleted */
             temp=&genotype->tf_seq[protein_id][0];
-            offset=TF_ELEMENT_LEN;
-            for(i=0;i<TF_ELEMENT_LEN*(genotype->nproteins-protein_id-1);i++)
+            offset=CONSENSUS_SEQ_LEN;
+            for(i=0;i<CONSENSUS_SEQ_LEN*(genotype->nproteins-protein_id-1);i++)
             {
                 *temp=*(temp+offset);
                 temp++;
             }
             /* shift the tf_reg_rc array to overwrite the binding sequence to be deleted */    
             temp=&genotype->tf_seq_rc[protein_id][0];
-            for(i=0;i<TF_ELEMENT_LEN*(genotype->nproteins-protein_id-1);i++)
+            for(i=0;i<CONSENSUS_SEQ_LEN*(genotype->nproteins-protein_id-1);i++)
             {
                 *temp=*(temp+offset);
                 temp++;
@@ -471,14 +471,14 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
         if(genotype->protein_pool[protein_id][0][0]==1) 
         {  
             temp=&genotype->tf_seq[protein_id][0];
-            offset=TF_ELEMENT_LEN;
-            for(i=0;i<TF_ELEMENT_LEN*(genotype->nproteins-protein_id-1);i++)
+            offset=CONSENSUS_SEQ_LEN;
+            for(i=0;i<CONSENSUS_SEQ_LEN*(genotype->nproteins-protein_id-1);i++)
             {
                 *temp=*(temp+offset);
                 temp++;
             }            
             temp=&genotype->tf_seq_rc[protein_id][0];
-            for(i=0;i<TF_ELEMENT_LEN*(genotype->nproteins-protein_id-1);i++)
+            for(i=0;i<CONSENSUS_SEQ_LEN*(genotype->nproteins-protein_id-1);i++)
             {
                 *temp=*(temp+offset);
                 temp++;
@@ -654,7 +654,7 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
         temp1=&genotype->tf_seq[genotype->nproteins-1][0];
         temp2=&genotype->tf_seq_rc[genotype->nproteins-1][0];
         /*copy the binding sequences to empty slots*/
-        for(i=0;i<TF_ELEMENT_LEN;i++)
+        for(i=0;i<CONSENSUS_SEQ_LEN;i++)
         {
             *temp1++=*tf_seq++;
             *temp2++=*tf_seq_rc++;
@@ -672,7 +672,7 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     }
     /*mutate the binding sequence*/
     /*mutation only changes one nucleotide in the binding sequence*/
-    which_nucleotide=RngStream_RandInt(RS,0,TF_ELEMENT_LEN-1);
+    which_nucleotide=RngStream_RandInt(RS,0,CONSENSUS_SEQ_LEN-1);
     nucleotide=set_base_pair(RngStream_RandU01(RS));        
     while (nucleotide == tf_seq[which_nucleotide])
         nucleotide=set_base_pair(RngStream_RandU01(RS));
@@ -685,13 +685,13 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     switch (nucleotide)
     {
         case 'g':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='c'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='c'; break;
         case 'c':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='g'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='g'; break;
         case 'a':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='t'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='t'; break;
         case 't':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='a'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='a'; break;
     }  
     /* The binding sites on every promoter needs recalculation */
     for(i=0;i<genotype->ngenes;i++)    
@@ -782,7 +782,7 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
         tf_seq_rc=&genotype->tf_seq_rc[protein_id][0];
         temp1=&genotype->tf_seq[genotype->nproteins-1][0];
         temp2=&genotype->tf_seq_rc[genotype->nproteins-1][0];
-        for(i=0;i<TF_ELEMENT_LEN;i++)
+        for(i=0;i<CONSENSUS_SEQ_LEN;i++)
         {
             *temp1++=*tf_seq++;
             *temp2++=*tf_seq_rc++;
@@ -801,13 +801,13 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
     switch (tf_seq[which_nucleotide])
     {
         case 'g':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='c'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='c'; break;
         case 'c':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='g'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='g'; break;
         case 'a':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='t'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='t'; break;
         case 't':
-            tf_seq_rc[TF_ELEMENT_LEN-which_nucleotide-1]='a'; break;
+            tf_seq_rc[CONSENSUS_SEQ_LEN-which_nucleotide-1]='a'; break;
     }     
     for(i=0;i<genotype->ngenes;i++)
         genotype->recalc_TFBS[i]=YES;
@@ -1067,7 +1067,7 @@ void mut_identity(Genotype *genotype, Mutation *mut_record, RngStream RS)
         tf_seq_rc=&genotype->tf_seq_rc[protein_id][0];
         temp1=&genotype->tf_seq[genotype->nproteins-1][0];
         temp2=&genotype->tf_seq_rc[genotype->nproteins-1][0];
-        for(i=0;i<TF_ELEMENT_LEN;i++)
+        for(i=0;i<CONSENSUS_SEQ_LEN;i++)
         {
             *temp1++=*tf_seq++;
             *temp2++=*tf_seq_rc++;
@@ -1107,7 +1107,7 @@ void reproduce_mut_identity(Genotype *genotype, Mutation *mut_record)
         tf_seq_rc=&genotype->tf_seq_rc[protein_id][0];
         temp1=&genotype->tf_seq[genotype->nproteins-1][0];
         temp2=&genotype->tf_seq_rc[genotype->nproteins-1][0];
-        for(i=0;i<TF_ELEMENT_LEN;i++)
+        for(i=0;i<CONSENSUS_SEQ_LEN;i++)
         {
             *temp1++=*tf_seq++;
             *temp2++=*tf_seq_rc++;
@@ -1158,7 +1158,7 @@ void mut_Kd(Genotype *genotype, Mutation *mut_record, RngStream RS)
         tf_seq_rc=&genotype->tf_seq_rc[protein_id][0];
         temp1=&genotype->tf_seq[genotype->nproteins-1][0];
         temp2=&genotype->tf_seq_rc[genotype->nproteins-1][0];
-        for(i=0;i<TF_ELEMENT_LEN;i++)
+        for(i=0;i<CONSENSUS_SEQ_LEN;i++)
         {
             *temp1++=*tf_seq++;
             *temp2++=*tf_seq_rc++;
@@ -1190,7 +1190,7 @@ void reproduce_mut_Kd(Genotype *genotype, Mutation *mut_record)
         tf_seq_rc=&genotype->tf_seq_rc[protein_id][0];
         temp1=&genotype->tf_seq[genotype->nproteins-1][0];
         temp2=&genotype->tf_seq_rc[genotype->nproteins-1][0];
-        for(i=0;i<TF_ELEMENT_LEN;i++)
+        for(i=0;i<CONSENSUS_SEQ_LEN;i++)
         {
             *temp1++=*tf_seq++;
             *temp2++=*tf_seq_rc++;
