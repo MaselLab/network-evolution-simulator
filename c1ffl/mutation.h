@@ -1,14 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
-/* 
- * File:   mutation.h
- * Author: Kun Xiong
- *
- * Created on March 5, 2018, 1:17 PM
+/*  
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 
 #ifndef MUTATION_H
@@ -24,7 +16,7 @@ void update_protein_pool(Genotype *, int, int, char);
 void update_protein_pool2(Genotype *, int, int, char);
 
 /*Maintain loci-cisreg_sequence relation*/
-void update_cisreg_cluster(Genotype *, int, char, int [NGENES][NGENES], int, int);
+void update_cisreg_cluster(Genotype *, int, char, int [MAX_GENES][MAX_GENES], int, int);
 
 /*Wrapper of mutation functions*/
 void mutate(Genotype *, RngStream, Mutation *);

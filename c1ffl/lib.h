@@ -1,9 +1,8 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
  * Yeast transcriptional network simulator
  *
  * Authors: Joanna Masel, Alex Lancaster
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include "netsim.h" 
