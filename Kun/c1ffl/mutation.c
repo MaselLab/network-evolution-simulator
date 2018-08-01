@@ -1,7 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/* 
+ * Simulator of yeast transcriptional regulatory network evolution
+ * 
+ * This file contains functions to generate mutations and maintain data structure 
+ * 
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents (University of Arizona)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -656,8 +659,8 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     for(i=0;i<genotype->ngenes;i++)    
         genotype->recalc_TFBS[i]=YES;
     /*decide whether to update cisreg clusters. Mutation to binding seq may differ bs distributions among genes in a cluster*/       
-    int new_clusters[NGENES][NGENES]; // 
-    int genes_in_cluster[NGENES];
+    int new_clusters[MAX_GENES][MAX_GENES]; // 
+    int genes_in_cluster[MAX_GENES];
     int N_genes_in_cluster,no_difference,reference_gene,gene_to_be_sorted;
     int N_new_clusters,N_genes_in_new_cluster,j,k;
     calc_all_binding_sites(genotype); 
@@ -666,9 +669,9 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
     {        
         N_new_clusters=0;
         N_genes_in_cluster=0;
-        for(j=0;j<NGENES;j++)
+        for(j=0;j<MAX_GENES;j++)
         {
-            for(k=0;k<NGENES;k++)
+            for(k=0;k<MAX_GENES;k++)
                 new_clusters[j][k]=NA;
         }    
         while(genotype->cisreg_cluster[i][N_genes_in_cluster]!=NA)
@@ -779,7 +782,7 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
     for(i=0;i<genotype->ngenes;i++)
         genotype->recalc_TFBS[i]=YES;
     calc_all_binding_sites(genotype);
-    int new_clusters[NGENES][NGENES],genes_in_cluster[NGENES];
+    int new_clusters[MAX_GENES][MAX_GENES],genes_in_cluster[MAX_GENES];
     int N_genes_in_cluster,no_difference,reference_gene,gene_to_be_sorted;
     int N_new_clusters,N_genes_in_new_cluster,j,k;
     i=N_SIGNAL_TF;
@@ -787,9 +790,9 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
     {        
         N_new_clusters=0;
         N_genes_in_cluster=0;
-        for(j=0;j<NGENES;j++)
+        for(j=0;j<MAX_GENES;j++)
         {
-            for(k=0;k<NGENES;k++)
+            for(k=0;k<MAX_GENES;k++)
                 new_clusters[j][k]=NA;
         }  
         while(genotype->cisreg_cluster[i][N_genes_in_cluster]!=NA)
@@ -1219,10 +1222,10 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
         case 's': //substitution in cis-reg       		
             mut_substitution(genotype,mut_record,RS);
             break;      
-        case 'w': // whole gene deletion.          
+        case 'd': // whole gene deletion.          
             mut_whole_gene_deletion(genotype,mut_record,RS);            
             break;
-        case 'd': // Whole gene duplication                  
+        case 'u': // Whole gene duplication                  
             mut_duplication(genotype,mut_record,RS);            
             break;
         case 'c': //binding sequence 
@@ -1231,10 +1234,10 @@ void mutate(Genotype *genotype, RngStream RS, Mutation *mut_record)
         case 'k': //mutations to kinetic constants        
             mut_kinetic_constant(genotype, mut_record,RS);           
             break;
-        case 'e': //activator to repressor or the reverse
+        case 'i': //activator to repressor or the reverse
             mut_identity(genotype, mut_record, RS);            
             break;
-        case 'f': //mutations to the Kd of a tf
+        case 'a': //mutations to the Kd of a tf
             mut_Kd(genotype,mut_record,RS);            
             break;
         case 'l': //mutate locus length
@@ -1251,10 +1254,10 @@ void reproduce_mutate(Genotype *genotype, Mutation *mut_record,RngStream RS)
         case 's': //substitution        		
             reproduce_substitution(genotype,mut_record);
             break;        
-        case 'w': // whole gene deletion.         
+        case 'd': // whole gene deletion.         
             reproduce_whole_gene_deletion(genotype,mut_record);
             break;
-        case 'd': // Whole gene duplication                 
+        case 'u': // Whole gene duplication                 
             reproduce_gene_duplication(genotype,mut_record);
             break;        
         case 'c': //binding sequence        
@@ -1263,10 +1266,10 @@ void reproduce_mutate(Genotype *genotype, Mutation *mut_record,RngStream RS)
         case 'k': //mutations in kinetic constants        
             reproduce_mut_kinetic_constant(genotype, mut_record);            
             break;
-        case 'e': //changing the identity of a TF
+        case 'i': //changing the identity of a TF
             reproduce_mut_identity(genotype, mut_record);
             break;
-        case 'f':
+        case 'a':
             reproduce_mut_Kd(genotype,mut_record);
             break;  
         case 'l':
@@ -1347,7 +1350,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
             random-=tot_subs_rate;
             if(random<= tot_dup_rate)
             {
-                *mut_type='d';                          /* gene duplication */
+                *mut_type='u';                          /* gene duplication */
                 break;
             }
             else
@@ -1355,7 +1358,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                 random-=tot_dup_rate;
                 if(random<=tot_sil_rate)
                 {
-                    *mut_type='w';                              /* gene deletion*/  
+                    *mut_type='d';                              /* gene deletion*/  
                     break;
                 }
                 else
@@ -1387,7 +1390,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                                 random-=tot_mut_binding_seq_rate;
                                 if(random<=tot_mut_koff_rate)
                                 {                                
-                                    *mut_type='f';          /* mut Kd*/
+                                    *mut_type='a';          /* mut Kd*/
                                     break;
                                 }                               
                                 else
@@ -1395,7 +1398,7 @@ void draw_mutation(Genotype *genotype, char *mut_type, RngStream RS)
                                     random-=tot_mut_koff_rate;
                                     if(random<=tot_mut_identity_rate)
                                     {
-                                        *mut_type='e';           /* mut identity of a TF */
+                                        *mut_type='i';           /* mut identity of a TF */
                                         break;
                                     }                                    
                                 }
@@ -1709,7 +1712,7 @@ void update_protein_pool(Genotype *genotype, int which_protein, int which_gene, 
  *binding sites, therefore we need to check whether a gene copy is still in the original cis-reg cluster 
  *after mutation.We use cisreg_cluster and which_cluster to track the bi-way relation between a gene and 
  *a cis-reg cluster.*/
-void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, int new_clusters[NGENES][NGENES], int N_new_clusters, int original_cluster_id)
+void update_cisreg_cluster(Genotype *genotype, int which_gene, char mut_type, int new_clusters[MAX_GENES][MAX_GENES], int N_new_clusters, int original_cluster_id)
 {
     /*In a cis-reg cluster, gene copies are ordered ascendingly by their ids. There are no empty slots in the list 
      *of gene copies. Empty slots after the list are marked by -1. We do not track the number of gene copies in a
