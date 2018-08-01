@@ -1,1 +1,0 @@
-This folder contains the scripts to test hypotheses about I1FFLs. The scripts are almost the same as those used to test C1FFLs, but the selection condition (including fitness) and the model of transcriptional regulation are revised for I1FFLs. 
