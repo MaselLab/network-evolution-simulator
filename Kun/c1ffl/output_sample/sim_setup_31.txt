@@ -1,0 +1,6 @@
+Max simulation steps=50000, max trials=2000
+TF_ELEMENT_LEN=8, NMIN=6, HIND_LENGTH=3, MAX_MODE=10
+max effector gene number=5, max tf gene number=20
+c_transl=0.000002, penalty=0.000000
+initial TF number=6, initial ACT number=3, initial REP number=3
+minimal activators to transcribe selection gene: 0
