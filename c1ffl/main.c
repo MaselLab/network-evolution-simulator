@@ -23,7 +23,7 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-    seed=20;
+    seed=5;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
@@ -93,7 +93,7 @@ int main()
     selection.env1.t_development=89.9; //minutes
     selection.env2.t_development=89.9;
     
-    /*The code below creates signals under env1 and env2. The signal is consecutive "ons" and "offs" and always starts with "on". 
+    /*The code below creates signals under env1 and env2. The signal is consecutive "ONs" and "OFFs" and always starts with "ON". 
      *Use t_signal_on and t_signal_off to specify the duration of "on" and "off"*/ 
     selection.env1.signal_on_strength=1000.0;    
     selection.env1.signal_off_strength=0.0;
@@ -149,7 +149,7 @@ int main()
     selection.env2.duration_of_burn_in_growth_rate=0.0;  
     
     /*Maximum evolutionary steps*/
-    selection.MAX_STEPS=1000; //set it to 51000 if DIRECT_REG=0
+    selection.MAX_STEPS=50000; 
     
     /*Default values of */
     selection.temporary_DUPLICATION=1.5e-7;
@@ -200,9 +200,7 @@ int main()
         fclose(fp);
     }
     else
-        fclose(saving_point);
-    
-
+        fclose(saving_point);  
     
     /*setting burn-in evolution is similar to setting selection condition*/
     Selection burn_in;         

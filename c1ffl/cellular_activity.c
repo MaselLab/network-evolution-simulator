@@ -156,7 +156,7 @@ void initialize_cell(   Genotype *genotype,
     else
         add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));                
     /*plot protein concentration and fitness vs time*/
-    #if RUN_PLOTTING 
+    #if PHENOTYPE
         float t;
         int N_data_points; 
         t=0.0+TIME_OFFSET;

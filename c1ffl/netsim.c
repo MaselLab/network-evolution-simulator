@@ -137,7 +137,7 @@ int evolve_under_selection(Genotype *resident,
         fscanf(fp,"%d %d",&replay_N_steps,&int_buffer);
         fclose(fp);
         fp=fopen(setup_summary,"a+");
-        fprintf(fp,"Continue simulation at step %d\n",replay_N_steps);
+        fprintf(fp,"Continue simulation from step %d\n",replay_N_steps);
         fclose(fp);
         if(replay_N_steps!=0)                              
             continue_simulation(resident, 
@@ -300,7 +300,7 @@ void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, 
     else
     {
         printf("Loading mutation record failed! Quit program!");
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("Loading mutation record failed!");
 #endif
         exit(-2);
@@ -319,7 +319,7 @@ void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, 
     omp_set_num_threads(N_THREADS);  
     
     /*collection interval is 1 minute by default*/    
-    selection->env1.t_development=90.1;
+    selection->env1.t_development=90.1; //to make 90 data points
     selection->env2.t_development=90.1;    
     calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL,NULL);    
 }
@@ -348,7 +348,7 @@ void perturbation_analysis(Genotype *resident,
     else
     {
         printf("Loading mutation record failed! Quit program!");
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("Loading mutation record failed!");
 #endif
         exit(-2);
@@ -725,7 +725,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                         genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
                         if(!genotype->all_binding_sites[j]) 
                         {  
-#if KEEP_LOG
+#if MAKE_LOG
                             LOG("error in calc_all_binding_sites_copy\n");  
 #endif
                             exit(-1);                                       
@@ -759,7 +759,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
                             genotype->all_binding_sites[j] = realloc(genotype->all_binding_sites[j], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
                             if(!genotype->all_binding_sites[j]) 
                             {
-#if KEEP_LOG
+#if MAKE_LOG
                                 LOG("error in calc_all_binding_sites_copy\n");
 #endif
                                 exit(-1);                                       
@@ -1329,7 +1329,7 @@ void initialize_cache(Genotype *genotype)
         genotype->all_binding_sites[j] = malloc(MAXELEMENTS*sizeof(AllTFBindingSites));
         if (!(genotype->all_binding_sites[j])) 
         {  
-#if KEEP_LOG
+#if MAKE_LOG
             LOG("Failed to allocate space\n");                  
 #endif
             exit(-1);
@@ -1361,14 +1361,13 @@ static float try_fixation(Genotype *resident, Genotype *mutant, int N_measuremen
 static void replay_mutations(Genotype *resident, Genotype *mutant, Mutation *mut_record, FILE *file_mutation, int replay_N_steps)
 {
     int i;
-    remove("proportion_c1ffl.txt"); 
-    remove("summary_BS.txt");  
+   
+    /*remove the old file*/
+    remove("networks.txt");  
     
     calc_all_binding_sites(resident);
-    summarize_binding_sites(resident,0); 
-    find_motifs(resident);
-    print_motifs(resident);   
-    
+    summarize_binding_sites(resident,0); //make new networks.
+       
     for(i=0;i<replay_N_steps;i++)
     {        
         clone_genotype(resident,mutant);
@@ -1382,9 +1381,7 @@ static void replay_mutations(Genotype *resident, Genotype *mutant, Mutation *mut
         clone_genotype(mutant,resident); 
         calc_all_binding_sites(resident);
         if(i%OUTPUT_INTERVAL==0)
-            summarize_binding_sites(resident,i); 
-        find_motifs(resident);
-        print_motifs(resident);   
+            summarize_binding_sites(resident,i);         
     }
     printf("Reproduce mutations successfully!\n");
 }
@@ -1529,7 +1526,7 @@ static void continue_simulation(Genotype *resident,
         replay_mutations(resident, mutant, mut_record, fp, replay_N_steps);
     else
     {   
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("cannot open mutation_file\n"); 
 #endif
         exit(-2);
@@ -1561,7 +1558,7 @@ static void continue_simulation(Genotype *resident,
     }
     else
     {   
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("cannot open RngSeeds.txt\n");     
 #endif
         exit(-2);
@@ -1588,7 +1585,7 @@ static void continue_simulation(Genotype *resident,
     }
     else
     {   
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("cannot open precise_fitness.txt\n");       
 #endif
         exit(-2);
@@ -1850,6 +1847,13 @@ static void print_motifs(Genotype *genotype)
     fprintf(fp,"\n");    
     fclose(fp);
 #endif
+#if COUNT_LONG_ARM
+    fp=fopen("N_long_arm_c1ffls.txt","a+");
+    for(i=0;i<9;i++)    
+        fprintf(fp,"%d ",genotype->N_long_arm_c1ffls[i]);
+    fprintf(fp,"\n");    
+    fclose(fp);
+#endif
 }
 
 static void summarize_binding_sites(Genotype *genotype, int step_i)
@@ -1938,6 +1942,9 @@ static void find_motifs(Genotype *genotype)
     int master_TF,aux_TF;
     float r_master_TF_deg, r_aux_TF_deg;
 #endif
+#if COUNT_LONG_ARM
+    int copies_reg_by_env2[MAX_GENES], N_copies_reg_by_env2, activators_copy[MAX_PROTEINS], protein_id2;
+#endif
     
     /*record which genes and TFs form the motifs of interest. We use this information to perturb motifs*/
 #if PERTURB
@@ -1957,6 +1964,10 @@ static void find_motifs(Genotype *genotype)
 #if COUNT_NEAR_AND
         for(i=0;i<9;i++)
             genotype->N_near_AND_gated_motifs[i]=0;
+#endif
+#if COUNT_LONG_ARM
+        for(i=0;i<9;i++)
+            genotype->N_long_arm_c1ffls[i]=0;
 #endif
         /*loop through each cisreg_cluster. Genes in a cluster have the same binding sites*/
         i=0;   
@@ -2001,6 +2012,11 @@ static void find_motifs(Genotype *genotype)
                         }                        
                     }    
                 }
+#if COUNT_LONG_ARM
+                /*Make a copy of activators, to be used in counting long ffls*/                
+                for(j=0;j<genotype->nproteins-1;j++)                
+                    activators_copy[j]=activators[j];
+#endif
                 /* move non-zeros entries in activators to the front. */
                 k=0; //marks the entry to which a record is copied
                 j=0;
@@ -2165,7 +2181,36 @@ static void find_motifs(Genotype *genotype)
                         }                        
                     }
                 } 
-
+                
+#if COUNT_LONG_ARM
+                /*make a list of activators genes that do not regulate the effector but is regulated by the env*/
+                N_copies_reg_by_env2=0;
+                for(j=0;j<genotype->nproteins-1;j++)
+                {
+                    if(activators_copy[j]==0 && genotype->protein_identity[j]==ACTIVATOR)
+                    {
+                        for(k=0;k<genotype->protein_pool[j][0][0];k++)
+                        {
+                            gene_id=genotype->protein_pool[j][1][k];
+                            found_bs=0;
+                            for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
+                            {
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==N_SIGNAL_TF-1)
+                                {
+                                    found_bs=1;
+                                    break;
+                                }
+                            }
+                            if(found_bs)
+                            {
+                                copies_reg_by_env2[N_copies_reg_by_env2]=gene_id;
+                                N_copies_reg_by_env2++;
+                            }
+                        }
+                    }
+                }
+#endif
+                
                 /*******************************count motifs ************************/                
 #if DIRECT_REG  
                 /*count c1-ffls formed by signal and one signal-regulated copy */
@@ -2222,6 +2267,66 @@ static void find_motifs(Genotype *genotype)
                             }
                         }
                     }
+#if COUNT_LONG_ARM
+                    /* count long FFL, in which the non-signal arm is relayed once*/
+                    /* find out which activators are regulated by which copy_reg_by_env*/
+                    for(j=0;j<N_copies_reg_by_env2;j++)
+                    {    
+                        protein_id=genotype->which_protein[copies_reg_by_env2[j]];
+                        for(k=0;k<N_copies_not_reg_by_env;k++)
+                        {
+                            found_bs=0;
+                            gene_id=copies_not_reg_by_env[k];
+                            for(site_id=0;site_id<genotype->binding_sites_num[gene_id];site_id++)
+                            {
+                                if(genotype->all_binding_sites[gene_id][site_id].tf_id==protein_id)
+                                {
+                                    found_bs=1;
+                                    break;
+                                }
+                            }
+                            if(found_bs)
+                            {                                
+                                protein_id2=genotype->which_protein[gene_id];
+                                genotype->N_long_arm_c1ffls[0]+=cluster_size;
+                                if(hindrance[N_SIGNAL_TF-1][protein_id2])
+                                {
+                                    if(hindrance[N_SIGNAL_TF-1][N_SIGNAL_TF-1])
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_long_arm_c1ffls[1]+=cluster_size;
+                                        else
+                                            genotype->N_long_arm_c1ffls[2]+=cluster_size;
+                                    }
+                                    else
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_long_arm_c1ffls[3]+=cluster_size;
+                                        else
+                                            genotype->N_long_arm_c1ffls[4]+=cluster_size;
+                                    }                                    
+                                }
+                                else
+                                {
+                                    if(hindrance[N_SIGNAL_TF-1][N_SIGNAL_TF-1])
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_long_arm_c1ffls[5]+=cluster_size;
+                                        else
+                                            genotype->N_long_arm_c1ffls[6]+=cluster_size;
+                                    }
+                                    else
+                                    {
+                                        if(hindrance[protein_id2][protein_id2])
+                                            genotype->N_long_arm_c1ffls[7]+=cluster_size;
+                                        else
+                                            genotype->N_long_arm_c1ffls[8]+=cluster_size;
+                                    }  
+                                }    
+                            }
+                        }        
+                    }
+#endif
                 } 
 #else
                 /*count c1-ffl formed by one env-regulated copy and one unregulated copy*/
@@ -2821,7 +2926,7 @@ static void add_binding_site(Genotype *genotype, int gene_id)
             genotype->all_binding_sites[i] = realloc(genotype->all_binding_sites[i], genotype->N_allocated_elements*sizeof(AllTFBindingSites));
             if (!genotype->all_binding_sites[i]) 
             {
-#if KEEP_LOG                
+#if MAKE_LOG                
                 LOG("error in calc_all_binding_sites_copy\n");     
 #endif
                 exit(-1);                                       

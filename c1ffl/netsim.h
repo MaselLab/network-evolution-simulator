@@ -20,7 +20,7 @@
  *evolving a TRN under the selection condition specified in main.c*/
 #define NEUTRAL 0 //run neutral evolution
 #define PHENOTYPE 0 //output the expression of genes over time
-#define PERTURB 0//run perturbation analysis
+#define PERTURB 1//run perturbation analysis
 
 
 /*2. Runtime control*/ 
@@ -33,11 +33,11 @@
 #define SAVING_INTERVAL 10 //make a saving point every 10 evoluationary steps
 #define OUTPUT_MUTANT_DETAILS 0 //output every mutant genotype and its fitness, whetehr the mutant is accepted
 #define OUTPUT_RNG_SEEDS 1 //output the state of random number generator every evolutionary step
-#define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
-#define KEEP_LOG 0 //generate error log
-#if KEEP_LOG
+#define MAKE_LOG 0 //generate error log
+#if MAKE_LOG
 #define LOG(...) { FILE *fperror; fperror=fopen("error.txt","a+"); fprintf(fperror, "%s: ", __func__); fprintf (fperror, __VA_ARGS__) ; fflush(fperror); fclose(fperror);} 
 #endif
+
 
 /*3. Biology and evolution settings*/
 /******************************************************************************/
@@ -60,7 +60,13 @@
 #endif
 
 
-/*5. Analyzing weak TFBSs*/
+/*5. Count additional motifs*/
+/******************************************************************************/
+#define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
+#define COUNT_LONG_ARM 0 //count long-arm C1FFLs
+
+
+/*6. Analyzing weak TFBSs*/
 /******************************************************************************/
 /*We can exclude different weak TFBSs when scoring motifs. We recommend doing 
  *this analysis under PHENOTYPE mode.
@@ -71,7 +77,7 @@
 #define CUT_OFF_MISMATCH_TF_TO_TF 2 //the maximum number of mismatches in TFBSs of TFs in TF genes
 
 
-/*6. Use an irregular signal in selection condition*/
+/*7. Use an irregular signal in selection condition*/
 /*****************************************************************************/
 /*An irregular signal can be specified with an external file that describe the signal (see main.c)*/
 #define IRREG_SIGNAL 0
@@ -80,7 +86,7 @@ float signal_profile_matrix[N_THREADS][100][90];
 #endif
 
 
-/*7. Other default settings*/    
+/*8. Other default settings*/    
 /******************************************************************************/
 #define MAX_TF_GENES 20 
 #define MAX_EFFECTOR_GENES 5  
@@ -221,6 +227,7 @@ struct Genotype {
     /*Motifs related*/
     int N_motifs[39];  
     int N_near_AND_gated_motifs[9];
+    int N_long_arm_c1ffls[9];
     int TF_in_core_C1ffl[MAX_GENES][MAX_PROTEINS];
     int gene_in_core_C1ffl[MAX_GENES];    
 };
