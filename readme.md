@@ -124,29 +124,23 @@ Example 2: convert AND-gated FFL-in-diamonds to AND-gated isolated diamonds
 Because the program needs to measure the fitness of many TRNs, it is recommended to run the program with multiple CPUs. See **readme_output.pdf** in folder **output_sample** for the output files.
 
 # Additional settings
-1. Change random number seed
+## 1. Change random number seed
 Random number seed is set at line 26 of main.c. It mainly controls the initial genotypes.
 
-2. Change the number of parallel threads
+## 2. Change the number of parallel threads
 By default, the program runs on 10 threads. To change, modify line 29 of netsim.h. Note that N_REPLICATES (line 30 of netsim.h) must be divisible by N_THREADS! 
 
-3. Direct regulation of signal to effector
+## 3. Direct regulation of signal to effector
 By default, the program allows the signal to evolve to directly regulate the effector. To disable this, change line 44 of netsim.h to 1. Burn-in is recommended if direct regulation is not allowed.
 
-4. Penalty of undesirable effector
+## 4. Penalty of undesirable effector
 By default, the effector is harmful if expressed in a wrong environment. To remove the harm (the cost of expressing the effector still applies), set line 45 of netsim.h to 1
 
-5. Count near-AND-gated motifs
-Line 65 of netsim.h
-Default value: 0 (do not count)
-Other: works only when DIRECT_REG = 0 and PHENOTYPE = 1
+## 5. Count near-AND-gated motifs
+By default, near-AND-gated motifs are not counted. Set line 65 of netsim.h to count them. Note that counting near-AND-gated motifs is available only when DIRECT_REG = 0 and PHENOTYPE = 1.
 
-6. Count long-arm C1-FFLs
-Line 66 of netsim.h
-Default value: 0 (do not count)
-Other: works only when DIRECT_REG = 1 
+## 6. Count long-arm C1-FFLs
+By default, long-arm C1-FFLs are not counted. Set line 66 of netsim.h to count them. Note that counting long-arm C1-FFLs is available only when DIRECT_REG = 1.
 
-7. Excluding weak TFBSs when scoring motifs
-Line 69 – 72 of netsim.h
-Default values: 2 (include weak TFBS)
-
+## 7. Excluding weak TFBSs when scoring motifs
+By default, TFBSs with up to 2 mismatches are included when scoring motifs. Line 69 - 72 of netsim.h set the maximum number of mismatches in a TFBS.
