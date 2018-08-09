@@ -64,9 +64,9 @@ static void Gillespie_event_active_to_intermediate(Genotype *, CellState *, Gill
 
 static void Gillespie_event_transcription_init(GillespieRates *, CellState *, Genotype *, float, RngStream);
 
-static int fixed_event_end_translation_init(Genotype *, CellState *, GillespieRates *, float *);
+static int fixed_event_end_translation_init(Genotype *, CellState *, GillespieRates *, Environment *, float *);
 
-static void fixed_event_end_transcription(float *, CellState *, GillespieRates *, Genotype *);
+static void fixed_event_end_transcription(float *, CellState *, GillespieRates *, Genotype *, Environment *);
 
 static int does_fixed_event_end(CellState*, float);
 
@@ -97,9 +97,33 @@ void initialize_cell(   Genotype *genotype,
 {
     int i, j;
     state->t=0.0;
-    state->cumulative_fitness = 0.0;     
-    state->cumulative_fitness_after_burn_in = 0.0;   
-    state->instantaneous_fitness = 0.0; 
+    state->sensitivity[0] = 0.0;	
+	state->cumulative_cost = 0.0;
+    state->Duration_pulse=0.0;
+    state->T_pulse_on=tdevelopment;
+    state->T_pulse_off=0.0;
+    state->Pulse_is_on=0;
+    state->first_pulse=1;
+    state->N_samples=0;
+    state->cumulative_advanced_benefit=0.0;
+    state->cumulative_basal_benefit=0.0;
+    state->cumulative_cost=0.0;
+    state->cumulative_damage=0.0;  
+    state->recording_basal_response=0;
+    state->found_gradient=0;
+    state->position=0;
+    state->cumulative_t_in_bias=0;    
+    state->moving=0;
+    state->cumulative_benefit=0.0;
+    
+    for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
+    {
+        state->cumulative_fitness[i] = 0.0;     
+        state->cumulative_fitness_after_burn_in[i] = 0.0;   
+        state->instantaneous_fitness[i] = 0.0; 
+        state->threshold_response_to_bias[i]=0.0;
+        state->basal_response[i]=0.0;
+    }
     state->effect_of_effector=env->initial_effect_of_effector;
 
     /* initialize linked tables*/
@@ -156,17 +180,30 @@ void initialize_cell(   Genotype *genotype,
     else
         add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));                
     /*plot protein concentration and fitness vs time*/
-    #if PHENOTYPE
-        float t;
-        int N_data_points; 
-        t=0.0+TIME_OFFSET;
-        N_data_points=(int)env->t_development;
-        for(i=0;i<N_data_points;i++)
-        {
-            add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
-            t+=1.0;            
-        } 
-    #endif    
+#if !PHENOTYPE
+#if PEAK_SEARCH
+    float t;
+    int N_data_points; 
+    t=env->t_signal_on+TIME_OFFSET;
+    N_data_points=(int)((env->t_development-env->t_signal_on)/sampling_interval);
+    for(i=0;i<N_data_points;i++)
+    {
+        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
+        t+=sampling_interval;            
+    } 
+#elif CHEMOTAXIS
+    add_fixed_event(-1,env->t_signal_on-1.0,&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
+#endif 
+    float t;
+    int N_data_points; 
+    t=env->t_signal_on+TIME_OFFSET;
+    N_data_points=(int)((env->t_development-env->t_signal_on)/sampling_interval);
+    for(i=0;i<N_data_points;i++)
+    {
+        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
+        t+=sampling_interval;            
+    } 
+#endif    
 }
 
 /*
@@ -380,6 +417,11 @@ void do_single_timestep(Genotype *genotype,
         update_protein_number_and_fitness(genotype, state, rates, dt);
         /* advance to end of development (this exits the outer while loop) */
         state->t = env->t_development;
+#if SELECT_SENSITIVITY_AND_PRECISION
+        state->t = env->tdevelopment;
+		state->sensitivity[2] = state->sensitivity[0];
+		state->precision[2] = state->precision[0];
+#endif
     }
 }
 
@@ -395,33 +437,32 @@ void do_single_timestep(Genotype *genotype,
  * compute t' factor used in the integration of fitness
  * t' is the time the effector protein increases or decreases to a given amount
  */
-static float calc_tprime(Genotype *genotype, CellState* state, float *number_of_selection_protein_bf_dt, float dt, float given_amount, int protein_id) 
-{
-    int n_copies;
-    int i;          
-    n_copies=genotype->protein_pool[protein_id][0][0];
+static float calc_tprime(Genotype *genotype, CellState* state, float *number_of_selection_protein_bf_dt[MAX_GENES], float dt, float given_amount, int gene_ids[MAX_GENES], int start, int n_copies) 
+{    
+    int i;      
     float protein_synthesis_rate[n_copies],protein_decay_rate[n_copies];
-    for(i=0;i<n_copies;i++)
+    
+    for(i=start;i<start+n_copies;i++)
     {
-        protein_decay_rate[i]=genotype->protein_decay_rate[genotype->protein_pool[protein_id][1][i]];
-        protein_synthesis_rate[i]=state->protein_synthesis_index[genotype->protein_pool[protein_id][1][i]]*protein_decay_rate[i];
+        protein_decay_rate[i]=genotype->protein_decay_rate[gene_ids[i]];
+        protein_synthesis_rate[i]=state->protein_synthesis_index[gene_ids[i]]*protein_decay_rate[i];
     }       
-    return rtsafe(&calc_fx_dfx, n_copies, given_amount, number_of_selection_protein_bf_dt, protein_synthesis_rate, protein_decay_rate, 0.0, dt); 
+    return rtsafe(&calc_fx_dfx, n_copies, given_amount, number_of_selection_protein_bf_dt, protein_synthesis_rate, protein_decay_rate, 0.0, dt,start); 
 }
 
 /*
  * calculate f(x)-Pp_s and f'(x),
  * f(x) is the number of effector protein molecules at time x
  */
-static void calc_fx_dfx(float x, int n_copies, float given_amount, float *intial_protein_number, float *protein_synthesis_rate, float *protein_decay_rate,float *fx, float *dfx)
+static void calc_fx_dfx(float x, int n_copies, float given_amount, float *intial_protein_number, float *protein_synthesis_rate, float *protein_decay_rate,float *fx, float *dfx, int start)
 {
     int i;    
     *fx=0;
     *dfx=0;    
     for(i=0;i<n_copies;i++)
     {
-        *fx+=(intial_protein_number[i]-protein_synthesis_rate[i]/protein_decay_rate[i])*exp(-protein_decay_rate[i]*x)+protein_synthesis_rate[i]/protein_decay_rate[i];
-        *dfx+=(protein_synthesis_rate[i]-protein_decay_rate[i]*intial_protein_number[i])*exp(-protein_decay_rate[i]*x);
+        *fx+=(intial_protein_number[i+start]-protein_synthesis_rate[i]/protein_decay_rate[i])*exp(-protein_decay_rate[i]*x)+protein_synthesis_rate[i]/protein_decay_rate[i];
+        *dfx+=(protein_synthesis_rate[i]-protein_decay_rate[i]*intial_protein_number[i+start])*exp(-protein_decay_rate[i]*x);
     }
     *fx-=given_amount;    
 }
@@ -430,16 +471,12 @@ static void calc_fx_dfx(float x, int n_copies, float given_amount, float *intial
  * calculate F(delta_t)/Ne_sat. F(x) is the integral of f(x) over delta_t.
  * f(x) is the number of effector protein molecules at time x
  */
-static float calc_integral(Genotype *genotype, CellState *state, float *initial_protein_number, float dt, float saturate_protein_number)
+static float calc_integral(Genotype *genotype, CellState *state, float initial_protein_number[MAX_OUTPUT_GENES], float dt, float saturate_protein_number, int gene_ids[MAX_OUTPUT_GENES], int start, int n_copies)
 {
-    int i,n_copies,gene_ids[MAX_PROTEINS];
-    float integral=0.0,ect_minus_one;    
-   
-    n_copies=genotype->protein_pool[genotype->nproteins-1][0][0];
-    for(i=0;i<n_copies;i++)
-        gene_ids[i]=genotype->protein_pool[genotype->nproteins-1][1][i];
+    int i;
+    float integral=0.0,ect_minus_one;     
         
-    for(i=0;i<n_copies;i++)
+    for(i=start;i<start+n_copies;i++)
     {
         ect_minus_one=exp(-genotype->protein_decay_rate[gene_ids[i]]*dt)-1.0;    
         integral+=(state->protein_synthesis_index[gene_ids[i]]*ect_minus_one/genotype->protein_decay_rate[gene_ids[i]]-
@@ -453,21 +490,31 @@ static float calc_integral(Genotype *genotype, CellState *state, float *initial_
  * return the instantaneous fitness given the current cell state and environment,
  * also return the integrated fitness
  */
-static float calc_fitness(float *integrated_fitness,
+static void calc_fitness(float *integrated_fitness,
                             Genotype *genotype,
                             CellState *state,
-                            float* number_of_selection_protein_bf_dt,
+                            Selection *env,
+                            float number_of_selection_protein_bf_dt[MAX_OUTPUT_GENES],
                             float dt)
 {
-    int i;
-    float instantaneous_fitness=0.0;  /* this is returned from the function */
-    float total_translation_rate = 0.0;    
-    float dt_prime;   
+    int i,j,protein_id,counter;
+    int N_output;
+    int gene_copy_id[MAX_OUTPUT_GENES],N_gene_copies[MAX_OUTPUT_PROTEINS];
+    float dt_prime, dt_rest, t_on, t_off, t_on_copy,t_off_copy;   
+    float penalty=bmax/Ne_saturate;   
     float cost_of_expression;     
-    float Ne_next=state->protein_number[genotype->nproteins-1];   
-    float Ne=0.0;
-    for(i=0;i<genotype->protein_pool[genotype->nproteins-1][0][0];i++) 
-       Ne+=number_of_selection_protein_bf_dt[i];
+    float Ne, Ne_next;   
+    int concurrent;
+    float endtime;  
+    
+//    float instantaneous_fitness=0.0;  /* this is returned from the function */
+    float total_translation_rate = 0.0;    
+//    float dt_prime;   
+//    float cost_of_expression;     
+//    float Ne_next=state->protein_number[genotype->nproteins-1];   
+//    float Ne=0.0;
+//    for(i=0;i<genotype->protein_pool[genotype->nproteins-1][0][0];i++) 
+//       Ne+=number_of_selection_protein_bf_dt[i];
                       
     /* compute the total cost of translation across all genes  */
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++)        
@@ -476,107 +523,450 @@ static float calc_fitness(float *integrated_fitness,
                                     0.5*genotype->translation_rate[i]*(float)state->mRNA_under_transl_delay_num[i])*(float)genotype->locus_length[i]/236.0;
     }
     cost_of_expression=total_translation_rate*c_transl;
+    state->cumulative_cost+=cost_of_expression*dt;
+    
+    /*list the genes that encode effectors*/
+    counter=0;
+    for(i=0;i<genotype->n_output_proteins;i++)
+    {        
+        protein_id=genotype->output_protein_id[i];            
+        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
+        {
+            gene_copy_id[counter]=genotype->protein_pool[protein_id][1][j];
+            counter++;
+        }
+    }    
+#if POOL_EFFECTORS 
+    N_output=1;
+    N_gene_copies[0]=genotype->n_output_genes;    
+#else
+    N_output=genotype->n_output_proteins;
+    for(i=0;i<genotype->n_output_proteins;i++)     
+        N_gene_copies[i]=genotype->protein_pool[genotype->output_protein_id[i]][0][0];    
+#endif
+    
+#if SELECT_SENSITIVITY_AND_PRECISION
+	state->sensitivity[0] = (Ne > Ne_next) ? Ne : Ne_next;
 
-    switch (state->effect_of_effector)
+	if (effect_of_effector=='d') //calculate precision		
+		state->precision[0] = (Ne > Ne_next) ? Ne_next : Ne;	
+		
+#elif SELECT_ON_DURATION
+    /*Ne increases over Ne_sat*/
+    t_on=state->T_pulse_on;
+    t_off=state->T_pulse_off;
+    if (Ne <= Ne_saturate && Ne_next>=Ne_saturate)
+    {
+        t_on= calc_tprime(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate);
+        t_on+=state->t;
+        state->Pulse_is_on = 1;
+        if(state->first_pulse)
+        {
+            state->T_pulse_on=t_on;
+            state->first_pulse=0;
+        }
+    }
+    /*Ne decreases over Ne_sat*/
+    if (Ne >= Ne_saturate && Ne_next <= Ne_saturate && state->Pulse_is_on)
+    {
+        t_off = calc_tprime(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate);
+        t_off+=state->t;
+        state->Pulse_is_on = 0;
+        if (state->Duration_pulse < t_off - t_on)
+        {
+            state->T_pulse_on = t_on;
+            state->T_pulse_off = t_off;
+            state->Duration_pulse = t_off - t_on;
+        }
+    }
+    /*Ne never decreases over Ne_sat*/
+    if(state->Pulse_is_on && state->t+dt>=tdevelopment)
+    {
+        t_off=tdevelopment;
+        state->Pulse_is_on=0;
+        if (state->Duration_pulse < t_off - t_on)
+        {
+            state->T_pulse_on = t_on;
+            state->T_pulse_off = t_off;
+            state->Duration_pulse = t_off - t_on;
+        }
+    }
+    
+#elif REALLY_COMPLETECATE
+    switch (effect_of_effector)/* effector is beneficial!*/
     {
         case 'b': /* effector is beneficial!*/
             if(Ne>Ne_next)//decrease in effector protein
             {
                 if(Ne_next>=Ne_saturate) //too many effector throughout
-                {
-                    *integrated_fitness =dt*(bmax-cost_of_expression);
+                {   
+                    state->cumulative_advanced_benefit +=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0);
                 }
                 else if(Ne<=Ne_saturate) // not enough effector throughout
                 {
-                    *integrated_fitness = bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
-                                            -cost_of_expression*dt;
+                    state->cumulative_basal_benefit += calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0);
                 }
                 else // bf dt_prime, the benefit saturates
                 {
-                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
-                    *integrated_fitness = bmax*dt_prime+bmax*(calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)-
-                                                  calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate))-
-                                                    cost_of_expression*dt;                    
+                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate); 
+                    state->cumulative_advanced_benefit+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, 1.0);                
+                    state->cumulative_basal_benefit+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0)-
+                                                      calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, 1.0);
                 }                    
             }
             else // increase in effector protein
             {
                 if(Ne>=Ne_saturate) //too many effector throughout
                 {
-                    *integrated_fitness =dt*(bmax-cost_of_expression);
+                    state->cumulative_advanced_benefit+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0);
                 }   
                 else if(Ne_next<=Ne_saturate)// not enough effector throughout
                 {
-                    *integrated_fitness = bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
-                                                    -cost_of_expression*dt;
+                    state->cumulative_basal_benefit+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0);
                 }
                 else //Aft dt_prime, the benefit saturates
                 {
-                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
-                    *integrated_fitness = bmax*(dt-dt_prime)+bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate)-
-                                                    cost_of_expression*dt;
+                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate); 
+                    state->cumulative_basal_benefit+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, 1.0);                
+                    state->cumulative_advanced_benefit+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0)-
+                                                      calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, 1.0);
+                    if(state->first_pulse==1) //start the onset of the pulse
+                    {
+                        endtime=state->t+dt_prime+opt_pulse_duration;
+                        concurrent=check_concurrence(   endtime,
+                                                        state->mRNA_transl_init_time_end_head,
+                                                        state->mRNA_transcr_time_end_head,
+                                                        state->signal_on_head,
+                                                        state->signal_off_head,
+                                                        state->burn_in_growth_rate_head,
+                                                        state->->last_P_NotA_no_R,
+                                                        state->change_signal_strength_head);
+                        while(concurrent)//if the time to update overlaps with existing events, add a tiny offset
+                        {
+                            endtime+=TIME_OFFSET;
+                            concurrent=check_concurrence(   endtime,
+                                                            state->mRNA_transl_init_time_end_head,
+                                                            state->mRNA_transcr_time_end_head,
+                                                            state->signal_on_head,
+                                                            state->signal_off_head,
+                                                            state->burn_in_growth_rate_head,
+                                                            state->->last_P_NotA_no_R,
+                                                            state->change_signal_strength_head);        
+                        }  
+                        add_fixed_event(-1,endtime,&(state->signal_off_head),&(state->signal_off_tail)); // mark when the pulse should be turned off
+                        state->first_pulse=0;
+                    }
                 }                
             } 
-            /* compute instantaneous fitness at t */
-            if (Ne_next < Ne_saturate)
-                instantaneous_fitness = bmax*Ne_next/Ne_saturate;
-            else
-                instantaneous_fitness = bmax;
             break;
     
-        case 'd': /* effector is deleterious! */      
-#if !NO_PENALTY
+        case 'd': /* effector is deleterious! */            
             if(Ne>Ne_next)//decrease in effector protein
             {
                 if(Ne_next>=Ne_saturate) //too many effector throughout
                 {
-                    *integrated_fitness =0.0-dt*cost_of_expression;
-                }
-                else if(Ne<=Ne_saturate) // not enough effector throughout
+                    state->cumulative_damage+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0);
+                }                
+                else if(Ne>=Ne_saturate) // 
                 {
-                    *integrated_fitness = bmax*dt-bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
-                                                    -cost_of_expression*dt;
-                }
-                else // aft dt_prime, the benefit becomes positive
-                {
-                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
-                    *integrated_fitness = bmax*(dt-dt_prime)-bmax*(calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)-
-                                                  calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate))-
-                                                    cost_of_expression*dt;                    
+                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate); 
+                    state->cumulative_damage+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0)-
+                                              calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, 1.0);                    
                 }                    
             }
             else // increase in effector protein
             {
                 if(Ne>=Ne_saturate) //too many effector throughout
                 {
-                    *integrated_fitness =0.0-dt*cost_of_expression;
+                    state->cumulative_damage+=calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, 1.0);
                 }   
-                else if(Ne_next<=Ne_saturate)// not enough effector throughout
-                {
-                    *integrated_fitness = bmax*dt-bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
-                                                    -cost_of_expression*dt;
-                }
-                else //Aft dt_prime, the benefit becomes zero
-                {
-                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
-                    *integrated_fitness = bmax*dt_prime-bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate)-
-                                                    cost_of_expression*dt;
+                else if(Ne_next>=Ne_saturate)// not enough effector throughout
+                {                    
+                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate); 
+                    state->cumulative_damage+= calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, 1.0);
                 }                
-            } 
-            if(Ne_next<Ne_saturate)
-                instantaneous_fitness = bmax - bmax/Ne_saturate*Ne_next;
-            else
-                instantaneous_fitness = 0.0;            
-#else
-            *integrated_fitness=(bmax-cost_of_expression)*dt;
-            instantaneous_fitness=bmax;            
-#endif
-            break; 
+            }   
+            break;
     } 
-    /* and instantaneous integrated rate */
-    instantaneous_fitness -= cost_of_expression;
-    /* return the instantaneous fitness */
-    return instantaneous_fitness;
+#elif CHEMOTAXIS    
+    counter=0;
+    for(i=0;i<N_output;i++)        
+    {    
+        Ne=0.0;
+        Ne_next=0.0;
+        for(j=counter;j<counter+N_gene_copies[i];j++)
+        {            
+            Ne_next+=number_of_selection_protein_aft_dt[j];
+            Ne+=number_of_selection_protein_bf_dt[j];
+        } 
+        /*calculate the cumulative level of the effector protein during the 
+         *1 minute before the gradient is found*/        
+        if(state->recording_basal_response)
+            state->basal_response[i]+=calc_integral(state,number_of_selection_protein_bf_dt,dt,1.0,gene_copy_id,counter,N_gene_copies[i]);
+        
+        /*calculate if moving upstream of the gradient*/
+        if(state->found_gradient)
+        {    
+            switch (state->position)
+            {
+                case 0: //still in poor media
+                    if(Ne_next>=state->threshold_response_to_bias[i]) //expression increases
+                    {
+                        dt_prime=calc_tprime(state,number_of_selection_protein_bf_dt,dt,state->threshold_response_to_bias[i],gene_copy_id,counter,N_gene_copies[i]); 
+                        state->cumulative_benefit+=dt_prime*benefit1;
+                        state->position=1; //moving to rich media
+                        state->cumulative_benefit+=(dt-dt_prime)*benefit2;
+                    }
+                    else
+                        state->cumulative_benefit+=dt*benefit1;                        
+                    break;
+                case 1: //in rich media
+//                    switch (state->moving)
+//                    {
+//                        case 0:
+//                            break;
+//                        case 1:
+//                            break;
+//                    }
+                    
+                    if(Ne>Ne_next)//decrease in effector protein
+                    {
+                        if(Ne_next>=state->threshold_response_to_bias[i]) //too many effector throughout                   
+                            state->cumulative_t_in_bias+=dt; 
+                        else if(Ne>state->threshold_response_to_bias[i]) // bf dt_prime, the benefit saturates 
+                            state->cumulative_t_in_bias+=calc_tprime(state,number_of_selection_protein_bf_dt,dt,state->threshold_response_to_bias[i],gene_copy_id,counter,N_gene_copies[i]);  
+                    }
+                    else // increase in effector protein
+                    {
+                        if(Ne>=state->threshold_response_to_bias[i]) //too many effector throughout                
+                            state->cumulative_t_in_bias+=dt;
+                        else if(Ne_next>state->threshold_response_to_bias[i]) //Aft dt_prime, the benefit saturates
+                            state->cumulative_t_in_bias+=dt-calc_tprime(state,number_of_selection_protein_bf_dt,dt,state->threshold_response_to_bias[i],gene_copy_id,counter,N_gene_copies[i]);  
+                    }                     
+                    
+                    /*swimming in bias for too long?*/
+                    if(state->cumulative_t_in_bias>max_t_bias)//Yes. 
+                    {
+                        state->cumulative_benefit+=benefit2*(max_t_bias-(state->cumulative_t_in_bias-dt));
+                        state->position=2; //Then back to poor media
+                        state->cumulative_benefit+=benefit1*(state->cumulative_t_in_bias-max_t_bias);
+                    }
+                    else                    
+                        state->cumulative_benefit+=dt*benefit2;
+                    
+                    break;
+                case 2: //back to poor media
+                    state->cumulative_benefit+=dt*benefit1;
+                    break;
+            }      
+        }      
+        else        
+            state->cumulative_benefit+=dt*benefit1;        
+        counter+=N_gene_copies[i];
+    }     
+#elif !PEAK_SEARCH  
+    counter=0;
+    for(i=0;i<N_output;i++)        
+    {    
+        Ne=0.0;
+        Ne_next=0.0;
+        for(j=counter;j<counter+N_gene_copies[i];j++)
+        {            
+            Ne_next+=number_of_selection_protein_aft_dt[j];
+            Ne+=number_of_selection_protein_bf_dt[j];
+        }        
+        switch (effect_of_effector)
+        {
+            case 'b': /* effector is beneficial!*/
+                if(Ne>Ne_next)//decrease in effector protein
+                {
+                    if(Ne_next>=Ne_saturate) //too many effector throughout
+                    {
+                        state->cumulative_fitness[i]+=dt*bmax;
+                    }
+                    else if(Ne<=Ne_saturate) // not enough effector throughout
+                    {
+                        state->cumulative_fitness[i]+= bmax*calc_integral(state,number_of_selection_protein_bf_dt,dt,Ne_saturate,gene_copy_id,counter,N_gene_copies[i]);                                            
+                    }
+                    else // bf dt_prime, the benefit saturates
+                    {
+                        dt_prime=calc_tprime(state,number_of_selection_protein_bf_dt,dt,Ne_saturate,gene_copy_id,counter,N_gene_copies[i]); 
+                        state->cumulative_fitness[i]+=bmax*dt_prime+bmax*(calc_integral(state, number_of_selection_protein_bf_dt, dt, Ne_saturate,gene_copy_id,counter,N_gene_copies[i])-
+                                                      calc_integral(state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate,gene_copy_id,counter,N_gene_copies[i]));
+                    }                    
+                }
+                else // increase in effector protein
+                {
+                    if(Ne>=Ne_saturate) //too many effector throughout
+                    {
+                        state->cumulative_fitness[i]+=dt*bmax;
+                    }   
+                    else if(Ne_next<=Ne_saturate)// not enough effector throughout
+                    {
+                        state->cumulative_fitness[i]+=bmax*calc_integral(state, number_of_selection_protein_bf_dt, dt, Ne_saturate,gene_copy_id,counter,N_gene_copies[i]);                                                   
+                    }
+                    else //Aft dt_prime, the benefit saturates
+                    {
+                        dt_prime=calc_tprime(state,number_of_selection_protein_bf_dt,dt,Ne_saturate,gene_copy_id,counter,N_gene_copies[i]); 
+                        state->cumulative_fitness[i]+=bmax*(dt-dt_prime)+bmax*calc_integral(state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate,gene_copy_id,counter,N_gene_copies[i]);                                                   
+                    }                
+                } 
+                /* compute instantaneous growth rate at t */
+                if (Ne_next < Ne_saturate)
+                    state->instantaneous_fitness[i] = bmax*Ne_next/Ne_saturate;
+                else
+                    state->instantaneous_fitness[i] = bmax;            
+                break;
+
+            case 'd': /* effector is deleterious! */      
+        #if !NO_PENALTY
+                if(Ne>Ne_next)//decrease in effector protein
+                {
+                    if(Ne_next>=Ne_saturate) //too many effector throughout
+                    {
+                        state->cumulative_fitness[i]+=0.0;
+                    }
+                    else if(Ne<=Ne_saturate) // not enough effector throughout
+                    {
+                        state->cumulative_fitness[i]+=bmax*dt-penalty*calc_integral(state, number_of_selection_protein_bf_dt, dt, 1.0,gene_copy_id,counter,N_gene_copies[i]);                                                    
+                    }
+                    else // aft dt_prime, the benefit becomes positive
+                    {
+                        dt_prime=calc_tprime(state,number_of_selection_protein_bf_dt,dt,Ne_saturate,gene_copy_id,counter,N_gene_copies[i]); 
+                        state->cumulative_fitness[i]+=bmax*(dt-dt_prime)-penalty*(calc_integral(state, number_of_selection_protein_bf_dt, dt, 1.0,gene_copy_id,counter,N_gene_copies[i])-
+                                                      calc_integral(state, number_of_selection_protein_bf_dt, dt_prime, 1.0,gene_copy_id,counter,N_gene_copies[i]));                                                                     
+                    }                    
+                }
+                else // increase in effector protein
+                {
+                    if(Ne>=Ne_saturate) //too many effector throughout
+                    {
+                        state->cumulative_fitness[i]+=0.0;
+                    }   
+                    else if(Ne_next<=Ne_saturate)// not enough effector throughout
+                    {
+                        state->cumulative_fitness[i]+=bmax*dt-penalty*calc_integral(state, number_of_selection_protein_bf_dt, dt, 1.0,gene_copy_id,counter,N_gene_copies[i]);
+                    }
+                    else //Aft dt_prime, the benefit becomes zero
+                    {
+                        dt_prime=calc_tprime(state,number_of_selection_protein_bf_dt,dt,Ne_saturate,gene_copy_id,counter,N_gene_copies[i]); 
+                        state->cumulative_fitness[i]+=bmax*dt_prime-penalty*calc_integral(state, number_of_selection_protein_bf_dt, dt_prime, 1.0,gene_copy_id,counter,N_gene_copies[i]);
+                    }                
+                } 
+                if(Ne_next<Ne_saturate)
+                    state->instantaneous_fitness[i] = bmax - penalty*Ne_next;
+                else
+                    state->instantaneous_fitness[i] = 0.0;
+                break; 
+        #else
+                state->cumulative_fitness[i] +=bmax*dt;
+                state->instantaneous_fitness[i]=bmax;            
+        #endif
+        }
+        counter+=N_gene_copies[i];
+    } 
+#endif     
+    
+//    switch (state->effect_of_effector)
+//    {
+//        case 'b': /* effector is beneficial!*/
+//            if(Ne>Ne_next)//decrease in effector protein
+//            {
+//                if(Ne_next>=Ne_saturate) //too many effector throughout
+//                {
+//                    *integrated_fitness =dt*(bmax-cost_of_expression);
+//                }
+//                else if(Ne<=Ne_saturate) // not enough effector throughout
+//                {
+//                    *integrated_fitness = bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
+//                                            -cost_of_expression*dt;
+//                }
+//                else // bf dt_prime, the benefit saturates
+//                {
+//                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
+//                    *integrated_fitness = bmax*dt_prime+bmax*(calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)-
+//                                                  calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate))-
+//                                                    cost_of_expression*dt;                    
+//                }                    
+//            }
+//            else // increase in effector protein
+//            {
+//                if(Ne>=Ne_saturate) //too many effector throughout
+//                {
+//                    *integrated_fitness =dt*(bmax-cost_of_expression);
+//                }   
+//                else if(Ne_next<=Ne_saturate)// not enough effector throughout
+//                {
+//                    *integrated_fitness = bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
+//                                                    -cost_of_expression*dt;
+//                }
+//                else //Aft dt_prime, the benefit saturates
+//                {
+//                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
+//                    *integrated_fitness = bmax*(dt-dt_prime)+bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate)-
+//                                                    cost_of_expression*dt;
+//                }                
+//            } 
+//            /* compute instantaneous fitness at t */
+//            if (Ne_next < Ne_saturate)
+//                instantaneous_fitness = bmax*Ne_next/Ne_saturate;
+//            else
+//                instantaneous_fitness = bmax;
+//            break;
+//    
+//        case 'd': /* effector is deleterious! */      
+//#if !NO_PENALTY
+//            if(Ne>Ne_next)//decrease in effector protein
+//            {
+//                if(Ne_next>=Ne_saturate) //too many effector throughout
+//                {
+//                    *integrated_fitness =0.0-dt*cost_of_expression;
+//                }
+//                else if(Ne<=Ne_saturate) // not enough effector throughout
+//                {
+//                    *integrated_fitness = bmax*dt-bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
+//                                                    -cost_of_expression*dt;
+//                }
+//                else // aft dt_prime, the benefit becomes positive
+//                {
+//                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
+//                    *integrated_fitness = bmax*(dt-dt_prime)-bmax*(calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)-
+//                                                  calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate))-
+//                                                    cost_of_expression*dt;                    
+//                }                    
+//            }
+//            else // increase in effector protein
+//            {
+//                if(Ne>=Ne_saturate) //too many effector throughout
+//                {
+//                    *integrated_fitness =0.0-dt*cost_of_expression;
+//                }   
+//                else if(Ne_next<=Ne_saturate)// not enough effector throughout
+//                {
+//                    *integrated_fitness = bmax*dt-bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt, Ne_saturate)
+//                                                    -cost_of_expression*dt;
+//                }
+//                else //Aft dt_prime, the benefit becomes zero
+//                {
+//                    dt_prime=calc_tprime(genotype,state,number_of_selection_protein_bf_dt,dt,Ne_saturate,genotype->nproteins-1); 
+//                    *integrated_fitness = bmax*dt_prime-bmax*calc_integral(genotype, state, number_of_selection_protein_bf_dt, dt_prime, Ne_saturate)-
+//                                                    cost_of_expression*dt;
+//                }                
+//            } 
+//            if(Ne_next<Ne_saturate)
+//                instantaneous_fitness = bmax - bmax/Ne_saturate*Ne_next;
+//            else
+//                instantaneous_fitness = 0.0;            
+//#else
+//            *integrated_fitness=(bmax-cost_of_expression)*dt;
+//            instantaneous_fitness=bmax;            
+//#endif
+//            break; 
+//    } 
+//    /* and instantaneous integrated rate */
+//    instantaneous_fitness -= cost_of_expression;
+//    /* return the instantaneous fitness */
+//    return instantaneous_fitness;
 }
 
 /*Calculate probability of binding configurations*/
@@ -720,19 +1110,27 @@ static void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int g
  * 
  */
 static void update_protein_number_and_fitness( Genotype *genotype,
-                                        CellState *state,                                   
-                                        GillespieRates *rates,
-                                        float dt)
+                                                CellState *state,                                   
+                                                GillespieRates *rates,
+                                                Selection *env,
+                                                float dt)
 {
-    int i,j;
+    int i,j,protein_id,counter;
     float ct, ect, one_minus_ect;
-    float N_effector_molecules_bf_dt[genotype->protein_pool[genotype->nproteins-1][0][0]];
-    float instantaneous_fitness = 0.0;
-    float integrated_fitness = 0.0;
+    float N_output_molecules_bf_dt[MAX_OUTPUT_GENES];  
+    float N_output_molecules_aft_dt[MAX_OUTPUT_GENES];  
   
     /* store the numbers of the effector proteins encoded by each copy of gene before updating*/   
-    for(i=0;i<genotype->protein_pool[genotype->nproteins-1][0][0];i++)
-        N_effector_molecules_bf_dt[i]=state->gene_specific_protein_number[genotype->protein_pool[genotype->nproteins-1][1][i]];
+    counter=0;
+    for(i=0;i<genotype->n_output_proteins;i++)
+    {        
+        protein_id=genotype->output_protein_id[i];            
+        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
+        {
+            N_output_molecules_bf_dt[counter]=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
+            counter++;
+        }
+    }
     /* update protein numbers*/
     for (i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
     {     
@@ -749,17 +1147,30 @@ static void update_protein_number_and_fitness( Genotype *genotype,
         state->protein_number[i]=0.0;        
         for(j=0;j<genotype->protein_pool[i][0][0];j++)
             state->protein_number[i]+=state->gene_specific_protein_number[genotype->protein_pool[i][1][j]];
-    }   
+    } 
+    /*store the numbers of the effector proteins encoded by each copy of gene after updating*/
+    counter=0;
+    for(i=0;i<genotype->n_output_proteins;i++)
+    {        
+        protein_id=genotype->output_protein_id[i];            
+        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
+        {
+            N_output_molecules_aft_dt[counter]=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
+            counter++;
+        }
+    }    
     /* now find out the protein numbers at end of dt interval and compute instantaneous and cumulative fitness */   
     instantaneous_fitness = calc_fitness(&integrated_fitness, 
                                             genotype, 
                                             state, 
+                                            env,
                                             N_effector_molecules_bf_dt, 
+                                            N_output_molecules_aft_dt,
                                             dt);  
-    /* update cumulative fitness at the end of dt*/
-    state->cumulative_fitness += integrated_fitness;    
-    /* update the instantaneous fitness at the end of dt */
-    state->instantaneous_fitness = instantaneous_fitness;      
+//    /* update cumulative fitness at the end of dt*/
+//    state->cumulative_fitness += integrated_fitness;    
+//    /* update the instantaneous fitness at the end of dt */
+//    state->instantaneous_fitness = instantaneous_fitness;      
 }
 
 /*
@@ -796,9 +1207,9 @@ static int Gillespie_event_mRNA_decay(GillespieRates *rates, CellState *state, G
         (state->mRNA_aft_transl_delay_num[gene_id])--;  
         /*update protein synthesis rate*/
         state->protein_synthesis_index[gene_id] = (float)state->mRNA_aft_transl_delay_num[gene_id]*genotype->translation_rate[gene_id]/genotype->protein_decay_rate[gene_id];
-        if(genotype->which_protein[gene_id]==genotype->nproteins-1)
-        	return DO_NOTHING;
-    	else // an mRNA of transcription factor is degraded, which can cause fluctuation in transcription factor concentrations.
+//        if(genotype->which_protein[gene_id]==genotype->nproteins-1)
+//        	return DO_NOTHING;
+//    	else // an mRNA of transcription factor is degraded, which can cause fluctuation in transcription factor concentrations.
         	return gene_id;    
     } 
     else 
@@ -928,70 +1339,98 @@ static void Gillespie_event_transcription_init(GillespieRates *rates, CellState 
 
 /* do a fixed event that occurs in current t->dt window */
 static int do_fixed_event(Genotype *genotype, 
-                    CellState *state, 
-                    GillespieRates *rates, 
-                    Environment *env,
-                    Phenotype *timecourse,
-                    float *dt,                           
-                    int event)
+                            CellState *state, 
+                            GillespieRates *rates, 
+                            Environment *env,
+                            Phenotype *timecourse,
+                            float *dt,                           
+                            int event)
 {     
     int i, return_value;
     return_value=DO_NOTHING;
     switch (event) 
     {
         case 1:     /* a transcription event ends */
-            fixed_event_end_transcription(dt, state, rates, genotype); 
+            fixed_event_end_transcription(dt, state, rates, genotype, env); 
             break;
         case 2:     /* a translation initialization event ends */ 
-            return_value=fixed_event_end_translation_init(genotype, state, rates, dt);
+            return_value=fixed_event_end_translation_init(genotype, state, rates, env, dt);
             state->cell_activated=1;
             break;
         case 3:     /* turn signal off*/ 
             *dt = state->signal_off_head->time - state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, *dt); 
+            update_protein_number_and_fitness(genotype, state, rates, env, *dt); 
             delete_fixed_event_from_head(&(state->signal_off_head),&(state->signal_off_tail));
-            if(env->fixed_effector_effect)
-                state->effect_of_effector=env->initial_effect_of_effector;
-            else
-                state->effect_of_effector='d';
-            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;         
+#if SELECT_SENSITIVITY_AND_PRECISION
+			state->precision[0] = state->protein_number[genotype->nproteins - 1]; //reset running precision
+#endif
+//            if(env->fixed_effector_effect)
+//                state->effect_of_effector=env->initial_effect_of_effector;
+//            else
+//                state->effect_of_effector='d';
+//            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;         
             break;
         case 4:     /*turn signal on*/
             *dt = state->signal_on_head->time - state->t;   
-            update_protein_number_and_fitness(genotype, state, rates, *dt);  
+            update_protein_number_and_fitness(genotype, state, rates, env, *dt);  
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
             state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
-            if(env->fixed_effector_effect)                               
-                state->effect_of_effector=env->initial_effect_of_effector;            
-            else                 
-                state->effect_of_effector='b';            
+            state->recording_basal_response=0;
+            state->found_gradient=1;
+#if POOL_EFFECTORS
+            state->threshold_response_to_bias[0]=(env->minimal_peak_response>state->basal_response[0]*env->response_amplification)?env->minimal_peak_response:state->basal_response[0]*env->response_amplification;
+#endif 
+#if SELECT_SENSITIVITY_AND_PRECISION
+			state->precision[1] = state->precision[0]; //record the max precision to signal change 1
+			state->sensitivity[1] = state->sensitivity[0]; //record the max sensitivity to signal change 1
+			state->sensitivity[0] = 0.0;	// reset running sensitivity
+#endif
+//            if(env->fixed_effector_effect)                               
+//                state->effect_of_effector=env->initial_effect_of_effector;            
+//            else                 
+//                state->effect_of_effector='b';            
             break;	
         case 5: /* finishing burn-in developmental simulation*/
             *dt=env->duration_of_burn_in_growth_rate-state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, *dt);
-            state->cumulative_fitness_after_burn_in=state->cumulative_fitness;           
+            update_protein_number_and_fitness(genotype, state, rates, env, *dt);
+            for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
+                state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
             break;
         case 6: /* mandatorily updating Pact and Prep*/
             *dt=state->t_to_update_probability_of_binding-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt);          
+            update_protein_number_and_fitness(genotype, state, rates, env, *dt);          
             break;
         case 7: /* update signal strength */
             *dt=state->change_signal_strength_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt);
+            update_protein_number_and_fitness(genotype, state, rates, env, *dt);
             state->protein_number[N_SIGNAL_TF-1]=env->external_signal[state->change_signal_strength_head->event_id];
             delete_fixed_event_from_head(&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
             break;     
         case 8: /* record expression levels*/
             *dt=state->sampling_point_end_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, *dt);
+            update_protein_number_and_fitness(genotype, state, rates, env, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
+#if PHENOTYPE
             for(i=0;i<genotype->nproteins;i++)
                 timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->protein_number[i];
             for(i=0;i<genotype->ngenes;i++)
                 timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
             timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
             timecourse->timepoint++;   
+#endif 
+#if CHEMOTAXIS
+            state->recording_basal_response=1;
+#else
+            state->sampled_response[state->N_samples]=0.0;
+            for(i=0;i<genotype->n_output_proteins;i++)
+            {                
+                protein_id=genotype->output_protein_id[i];            
+                for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
+                    state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
+            } 
+            state->N_samples++;   
+#endif
             break;
     }  
     return return_value;
@@ -1001,10 +1440,10 @@ static int do_fixed_event(Genotype *genotype,
  *Gillespie events
  */
 static int do_Gillespie_event(Genotype *genotype,
-                        CellState *state,
-                        GillespieRates *rates,
-                        float dt,                        
-                        RngStream RS)
+                                CellState *state,
+                                GillespieRates *rates,
+                                float dt,                        
+                                RngStream RS)
 {
     float x; 
     int return_value;
@@ -1146,7 +1585,8 @@ static int does_fixed_event_end(CellState *state, float t)
 static void fixed_event_end_transcription( float *dt,                                     
                                             CellState *state,
                                             GillespieRates *rates,
-                                            Genotype *genotype)
+                                            Genotype *genotype,
+                                            Environment *env)
 {
     int gene_id;
     float concurrent;
@@ -1154,7 +1594,7 @@ static void fixed_event_end_transcription( float *dt,
     /* recompute the delta-t based on difference between now and the time of transcription end */
     *dt = state->mRNA_transcr_time_end_head->time - state->t;   
     /* update fitness and protein concentration during dt*/
-    update_protein_number_and_fitness(genotype, state, rates, *dt);
+    update_protein_number_and_fitness(genotype, state, rates, env, *dt);
     /* get the gene which is ending transcription */
     gene_id = state->mRNA_transcr_time_end_head->event_id;    
     /* increase number of mRNAs that are initializing translation*/
@@ -1164,7 +1604,7 @@ static void fixed_event_end_transcription( float *dt,
     /* delete the fixed even which has just occurred */
     if(state->mRNA_transcr_time_end_head==NULL)
     {
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("No transcription is going on\n");
 #endif
         exit(-3);
@@ -1186,10 +1626,11 @@ static void fixed_event_end_transcription( float *dt,
 /*
  * end translation initiation
  */
-static int fixed_event_end_translation_init(   Genotype *genotype, 
-                                        CellState *state, 
-                                        GillespieRates *rates, 
-                                        float *dt)
+static int fixed_event_end_translation_init(Genotype *genotype, 
+                                            CellState *state, 
+                                            GillespieRates *rates, 
+                                            Environment *env,
+                                            float *dt)
 {
     int gene_id;    
     /* calc the remaining time till translation initiation ends */
@@ -1203,7 +1644,7 @@ static int fixed_event_end_translation_init(   Genotype *genotype,
     /* delete the event that just happened */
     if(state->mRNA_transl_init_time_end_head==NULL)
     {
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("No translation initiation going on!\n");
 #endif
         exit(-3);
@@ -1215,8 +1656,8 @@ static int fixed_event_end_translation_init(   Genotype *genotype,
     state->protein_synthesis_index[gene_id]= (float)state->mRNA_aft_transl_delay_num[gene_id]*genotype->translation_rate[gene_id]/genotype->protein_decay_rate[gene_id];
     
     if(genotype->which_protein[gene_id]==genotype->nproteins-1)//if the mRNA encodes a non-sensor TF, there could be a huge change in TF concentration
-        return DO_NOTHING;
-    else
+//        return DO_NOTHING;
+//    else
         return gene_id; //so update Pact and reset updating interval to MIN_INTERVAL_TO_UPDATE_PACT
 }
 
@@ -1227,25 +1668,23 @@ static void calc_leaping_interval(Genotype *genotype, CellState *state, float *m
     float N_proteins_cause_change,Kd,N_at_end_of_simulation;
     float overall_rate;
     float P_binding;
-    float t_remaining;
-    float N_proteins_at_now[genotype->ntfgenes];
-    int gene_id; 
+    float t_remaining;    
+    int gene_ids[j]; 
     float ct, ect, one_minus_ect;
     
     t_remaining=t_unreachable-state->t;
     dt=t_unreachable;  
  	protein_id=genotype->which_protein[which_gene];
     Kd=KD2APP_KD*genotype->Kd[protein_id];
-    P_binding=state->protein_number[protein_id]/(state->protein_number[protein_id]+Kd);        
+    P_binding=state->protein_number[protein_id]/(state->protein_number[protein_id]+Kd);
+    for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
+        gene_ids[j]=genotype->protein_pool[protein_id][1][j];
 
     /*determine whether the protein tends to increase or decrease concentration*/
     overall_rate=0.0;
     for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
-    {
-        gene_id=genotype->protein_pool[protein_id][1][j];
-        overall_rate+=(state->protein_synthesis_index[gene_id]-state->gene_specific_protein_number[gene_id])*genotype->protein_decay_rate[gene_id];
-    }
-
+        overall_rate+=(state->protein_synthesis_index[gene_ids[j]]-state->gene_specific_protein_number[gene_ids[j]])*genotype->protein_decay_rate[gene_ids[j]];
+    
     if(overall_rate>0.0) //tend to increase
     {            
         if(P_binding>=(1.0-MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING)) //concentration already very high
@@ -1257,25 +1696,17 @@ static void calc_leaping_interval(Genotype *genotype, CellState *state, float *m
             /* calc N_protein at the end of simulation*/
             N_at_end_of_simulation=0.0;
             for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
-            {  
-                gene_id=genotype->protein_pool[protein_id][1][j];
-                ct=genotype->protein_decay_rate[gene_id]*t_remaining;
+            {                  
+                ct=genotype->protein_decay_rate[gene_ids[j]]*t_remaining;
                 ect = exp(-ct);
                 if (fabs(ct)<EPSILON) one_minus_ect=ct;
                 else one_minus_ect = 1.0-ect;   
-                N_at_end_of_simulation+=ect*state->gene_specific_protein_number[gene_id]+state->protein_synthesis_index[gene_id]*one_minus_ect;        
+                N_at_end_of_simulation+=ect*state->gene_specific_protein_number[gene_ids[j]]+state->protein_synthesis_index[gene_ids[j]]*one_minus_ect;        
             }               
             if(N_at_end_of_simulation<N_proteins_cause_change)
                dt=t_unreachable; 
             else /*We need to solve an equation*/
-            {                    
-                for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
-                {
-                    gene_id=genotype->protein_pool[protein_id][1][j];
-                    N_proteins_at_now[j]=state->gene_specific_protein_number[gene_id];
-                }
-                dt=calc_tprime(genotype,state,N_proteins_at_now,t_remaining,N_proteins_cause_change,protein_id); 
-            }
+                dt=calc_tprime(genotype,state,state->gene_specific_protein_number,t_remaining,N_proteins_cause_change,gene_ids,0,genotype->protein_pool[protein_id][0][0]); 
         }
         *minimal_interval=(*minimal_interval<dt)?*minimal_interval:dt; 
     }
@@ -1291,24 +1722,16 @@ static void calc_leaping_interval(Genotype *genotype, CellState *state, float *m
             N_at_end_of_simulation=0.0;
             for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
             {  
-                gene_id=genotype->protein_pool[protein_id][1][j];
-                ct=genotype->protein_decay_rate[gene_id]*t_remaining;
+                ct=genotype->protein_decay_rate[gene_ids[j]]*t_remaining;
                 ect = exp(-ct);
                 if (fabs(ct)<EPSILON) one_minus_ect=ct;
                 else one_minus_ect = 1.0-ect;   
-                N_at_end_of_simulation+=ect*state->gene_specific_protein_number[gene_id]+state->protein_synthesis_index[gene_id]*one_minus_ect;        
+                N_at_end_of_simulation+=ect*state->gene_specific_protein_number[gene_ids[j]]+state->protein_synthesis_index[gene_ids[j]]*one_minus_ect;        
             }               
             if(N_at_end_of_simulation>N_proteins_cause_change)
                dt=t_unreachable; 
             else
-            {
-                for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)
-                {
-                    gene_id=genotype->protein_pool[protein_id][1][j];
-                    N_proteins_at_now[j]=state->gene_specific_protein_number[gene_id];
-                }
-                dt=calc_tprime(genotype,state,N_proteins_at_now,t_remaining,N_proteins_cause_change,protein_id); 
-            }
+               dt=calc_tprime(genotype,state,state->gene_specific_protein_number,t_remaining,N_proteins_cause_change,gene_ids,0,genotype->protein_pool[protein_id][0][0]);
         }
         *minimal_interval=(*minimal_interval<dt)?*minimal_interval:dt;  
     }
