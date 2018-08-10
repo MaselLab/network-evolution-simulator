@@ -95,7 +95,7 @@ struct CellState {
     float gene_specific_protein_number[MAX_GENES]; /* stores the "protein" number for each gene.
                                                * can be considered temporary data. Make muation easier to
                                                * deal with. */  
-    float protein_synthesis_index[MAX_GENES];  /*this is N_mRNA*translation_rate/degradation rate.*/
+    float protein_synthesis_index[MAX_GENES];  /*this is N_mRNA*protein_syn_rate/degradation rate.*/
     int transcriptional_state[MAX_GENES];       /*can be REPRESSED, INTERMEDIATE, or ACTIVE */
     
     /*measurement of pulse*/   
