@@ -1,32 +1,25 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* 
- * Yeast transcriptional network simulator
- *
- * Authors: Joanna Masel, Alex Lancaster
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
  */
+#ifndef LIB_H
+#define LIB_H
+
 #include <stdio.h>
 #include "netsim.h" 
+#include "cellular_activity.h"
+#include "netsim.h"
 
+int add_fixed_event(int, float, FixedEvent **, FixedEvent **);
 
-extern void delete_queues(CellState *state);
-extern void free_mem_CellState(CellState *state);
-extern int sls_store(FixedEvent *i, 
-		     FixedEvent **start, 
-		      FixedEvent **last);
-extern void delete_time_course(TimeCourse *start2);
-extern void display(FixedEvent *start);
-extern void display2(TimeCourse *start);
-extern void sls_store_end(FixedEvent *i, 
-			  FixedEvent **start, 
-			  FixedEvent **last);
-extern void sls_store_end2(TimeCourse *i, 
-			   TimeCourse **start, 
-			   TimeCourse **last);
-extern void remove_from_array(int,
-                              int,
-                              int [],
-                              int *,
-                              int );
-extern void create_output_directory(char *);
-extern void create_output_file(char [80], char *, FILE **, int);
+void delete_fixed_event(int, int, FixedEvent **, FixedEvent **);
+
+void delete_fixed_event_from_head(FixedEvent **, FixedEvent **);
+
+int check_concurrence(CellState *, float);
+
+void free_fixedevent(CellState *);
+
+void release_memory(Genotype*, Genotype *, RngStream *, RngStream[N_THREADS]);
+
+#endif
