@@ -115,7 +115,7 @@ Example 2: convert AND-gated FFL-in-diamonds to AND-gated isolated diamonds
 #define FORCE_DIAMOND 1  
 #define FORCE_SINGLE_FFL 0 
 ```
-3. Copy *accepted_mutations_5.txt* file and *evo_summary_5.txt* to result. 
+3. Copy *accepted_mutations_5.txt* file and *evo_summary_x.txt* to result. 
 
 4. By default, the program tries to perturb TRNs at the last 10,000 evolutionary steps. Line 152 of main.c specifies the last evolutionary step to modify, and line 399 of netsim.c specifies the number of evolutionary steps to modify. 
 
