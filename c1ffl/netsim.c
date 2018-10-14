@@ -3716,7 +3716,7 @@ int evolve_N_steps(Genotype *genotype_ori,
             /*do mutation on a copy of the current genotype*/
             clone_genotype(genotype_ori,genotype_ori_copy); 
             mutate(genotype_ori_copy,RS_main,mut_record);
-
+#if OUTPUT_MUTANT_DETAILS
             /*record every mutation*/
             fp=fopen("all_mutations.txt","a+");
             fprintf(fp,"%d %d %c %d %d '%s' %d %a\n",
@@ -3729,7 +3729,7 @@ int evolve_N_steps(Genotype *genotype_ori,
                     mut_record->kinetic_type,
                     mut_record->kinetic_diff);
             fclose(fp); 
-
+#endif
             calc_all_binding_sites(genotype_ori_copy);           
             MAXELEMENTS=genotype_ori_copy->N_allocated_elements;
             /*calculate the fitness of the mutant at low resolution*/
@@ -5468,7 +5468,7 @@ void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     remove("N_motifs.txt");
     rename("temp","N_motifs.txt");
     
-
+#if OUTPUT_MUTANT_DETAILS  
     fp1=fopen("all_mutations.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<N_tot_mutations;i++)
@@ -5481,7 +5481,7 @@ void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     remove("MUT_Detail.txt");
     rename("temp","MUT_Detail.txt");
     
-#if OUTPUT_MUTANT_DETAILS     
+   
     fp1=fopen("fitness_all_mutants.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<N_tot_mutations;i++)
