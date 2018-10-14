@@ -12,7 +12,7 @@
 /*Simulation mode*/
 #define PHENOTYPE 0
 #define POOL_VARIANTS 1
-#define PERTURB 1
+#define PERTURB 0
 #define NEUTRAL 0
 #define RUN_FULL_SIMULATION 1
 #define SKIP_INITIAL_GENOTYPE 0
