@@ -32,7 +32,7 @@
  *evolving a TRN under the selection condition specified in main.c*/
 #define NEUTRAL 0 //run neutral evolution
 #define PHENOTYPE 0 //output the expression of genes over time
-#define PERTURB 1//run perturbation analysis
+#define PERTURB 0//run perturbation analysis
 
 
 /*2. Runtime control*/ 
