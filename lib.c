@@ -80,7 +80,7 @@ int add_fixed_event(int i,
     newtime = malloc(sizeof*newtime);
     if (!newtime) 
     {   
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("Could not add fixed event \n");   
 #endif
         exit(1);
@@ -141,7 +141,7 @@ void delete_fixed_event(int gene_x,
     }
     if (done == 0) //if could not find mRNA y
     {
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("Could not find designated fixed event");       
 #endif
         exit(1);

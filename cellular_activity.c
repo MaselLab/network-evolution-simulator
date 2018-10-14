@@ -364,7 +364,7 @@ void do_single_timestep(Genotype *genotype,
         /*deal with rounding error*/
         if(dt<0.0)
         {  	
-#if KEEP_LOG // if enabled, error file can be huge, because this rounding error can happen very often            
+#if MAKE_LOG // if enabled, error file can be huge, because this rounding error can happen very often            
             LOG("Negative dt!\n");    
 #endif 
             dt=TIME_OFFSET; 
@@ -1177,7 +1177,7 @@ static void fixed_event_end_transcription( float *dt,
     /* delete the fixed even which has just occurred */
     if(state->mRNA_transcr_time_end_head==NULL)
     {
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("No transcription is going on\n");
 #endif
         exit(-3);
@@ -1216,7 +1216,7 @@ static int fixed_event_end_translation_init(   Genotype *genotype,
     /* delete the event that just happened */
     if(state->mRNA_transl_init_time_end_head==NULL)
     {
-#if KEEP_LOG
+#if MAKE_LOG
         LOG("No translation initiation going on!\n");
 #endif
         exit(-3);
