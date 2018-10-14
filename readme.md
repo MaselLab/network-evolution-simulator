@@ -1,36 +1,40 @@
-The program is written in C and is provided as source files. The source files must be compiled to produce the simulation program. We mainly used Intel C compiler (icc, version 16.0.4), but the GNU C compiler (gcc) will also work (although the outcome of a simulation will change due to different optimization to numerical calculations). 
+﻿The program is written in C and is provided as source files. The source files must be compiled to produce the simulation program. We mainly used Intel C compiler (icc, version 16.0.4), but the GNU C compiler (gcc) will also work (although the outcome of a simulation will change due to different optimization to numerical calculations). 
 
-We revised the code to make it easy to understand. When a high optimization level (-O3) is enabled during compilation, the revised code and the original code used in the article produce different results for the same random number seed. The difference is caused by unsafe optimization to numerical computations during compilation. When safe optimization options (-fp-model source -fp-model precise) are turned on, the revised code and the original code produce identical results. We also provided the original code in branch **manuscript-version** for users who want to reproduce the results in our paper.   
+We provide two versions of the source files: the original, which was used to generate all results in the manuscript, and the revised, which is restructured to make it easier to understand. When a high optimization level (-O3) is enabled during compilation, the two versions produce different simulation results when the same random number seed is used. The difference is caused by unsafe optimization to numerical computations during compilation, therefore should only change the quantitative results of individual simulation replicates, but not the conclusion of our research. When safe optimization options (-fp-model source -fp-model precise) are turned on, the two versions produce identical results. Users who want to reproduce the exact results in our paper can find the original version in branch **manuscript-version**. The original version comes with its own readme and a list of random number seeds we used. This readme aims to explain the revised version.  
 
-# Run the default mode
-By default, the program evolves TRNs under selection for filtering out a short spurious signal, and allows the signal to regulate the effector directly. The program runs on 10 CPUs, and takes 1-2 days. 
+# Installation (Run the default mode)
+By default, the program evolves TRNs under selection for filtering out a short spurious signal, and allows the signal to regulate the effector directly. The program runs on 10 CPU cores (Haswell V3 28 core processor), and takes 1-2 days. 
 
-To run the program in the default mode, follow these steps:
+We suggest using a Linux system to facilitate the installation. To run the program in the default mode, follow these steps:
 
-1. Download all source files to one directory. 
+1. Copy all source files (files with suffix .c and .h, and the *makefile*) to one directory. 
 
 2. Under the same directory, create a folder and name it **result**. The folder will be used to to hold output files.
 
-3. Compile source files using command
+3. Change directory into the directory that contains the source file. Compile source files using the command
 ```
     make simulator CC=icc
 ```
-This command will create several files with suffix .o and an executable program named simulator. “CC=icc” compiles the source files with icc; change it to “CC=gcc” to compile with gcc. 
-
-4. Execute simulator to start simulation. On UNIX systems, this is done with the following command
+This command will create several files with suffix .o and an executable program named simulator. “CC=icc” compiles the source files with icc; change it to “CC=gcc” to compile with gcc. To minimize the impact of hardware difference on results, modify line 2 of the *makefile* to
+```
+CFLAGS = -O3 -fp-model source -fp-model precise
+```
+if icc compiler is used. 
+4. Execute simulator to start. On Linux, this is done with the following command
 ```
 ./simulator
 ```
 # Output 
-Samples of output files and a description to their content can be found in folder **output_sample**.
+The simulation will generate several files when it begins to run. The size of some files, e.g. evolutionar_summary_5.txt, will keep increasing. Samples of output files and a description to their content can be found in folder **output_sample**.
 
+# *The following settings are different for the original version of the code; please refer to different readme to set the original code.*
 # Run neutral evolution
 
-Neutral evolution is simulated with one CPU, and finishes in minutes. To enable this mode, modify line 21 of netsim.h to
+Neutral evolution is simulated with one CPU and finishes in minutes. To enable this mode, modify line 21 of netsim.h to
 ```c
 #define NEUTRAL 1
 ```
-Then compile the source file and run simulator.
+Then compile the source file and run the simulator.
 
 # Make selection condition for signal recognition
 The selection condition is specified in main.c. By default, the program selects for filtering out a short spurious signal. To create selection for signal recognition, modify line 98 – 105 of main.c to 
@@ -65,7 +69,7 @@ burn_in.env2.t_signal_off=200.0;
 ```
 # Output expression levels of genes over time
 
-This mode samples the concentration of proteins over time. It uses the accepted_mutations_x.txt file of a previous simulation to replay evolution, and reproduce the genotype at a given evolutionary step. To enabled this mode, following these steps:
+This mode samples the concentration of proteins over time. It uses the accepted_mutations_x.txt file of a previous simulation to replay evolution, and reproduce the genotype at a given evolutionary step. To enable this mode, following these steps:
 
 1. Modify line 22 of netsim.h to
 ```c
@@ -79,13 +83,13 @@ selection.MAX_STEPS=n;
 ```
 The network that evolves at evolutionary step n will be reproduced.
 
-4. Compile the source code and run simulator
+4. Compile the source code and run the simulator
 
-This mode can be run on one or multiple CPUs, and finishes in minutes. The program runs replicates of developmental simulation under environment A and B, and samples instantaneous fitness and protein concentrations during simulation. The default sampling interval is 1 minute in developmental time. See **readme_output.pdf** in folder **output_sample** for the output files. 
+This mode can be run on one or multiple CPUs and finishes in minutes. The program runs replicate of developmental simulation under environment A and B, and samples instantaneous fitness and protein concentrations during simulation. The default sampling interval is 1 minute in developmental time. See **readme_output.pdf** in folder **output_sample** for the output files. 
 
 # Run perturbation analysis 
 
-In this mode, the program also replay mutation, and attempt perturbation on TRNs at the given evolutionary steps. The program will exclude a TRN if it is not suitable for the perturbation. If a TRN can be perturbed, the program calculates the fitness before and after the perturbation. To enable the perturbation mode, following these steps:
+In this mode, the program replays mutation and attempt perturbation on TRNs at the given evolutionary steps. The program will exclude a TRN if it is not suitable for the perturbation. If a TRN can be perturbed, the program calculates the fitness before and after the perturbation. To enable the perturbation mode, following these steps:
 
 1. Modify line 23 of netsim.h to 
 ```c
@@ -115,7 +119,7 @@ Example 2: convert AND-gated FFL-in-diamonds to AND-gated isolated diamonds
 #define FORCE_DIAMOND 1  
 #define FORCE_SINGLE_FFL 0 
 ```
-3. Copy *accepted_mutations_5.txt* file and *evo_summary_x.txt* to result. 
+3. Copy *accepted_mutations_x.txt* file and *evo_summary_x.txt* to result. 
 
 4. By default, the program tries to perturb TRNs at the last 10,000 evolutionary steps. Line 152 of main.c specifies the last evolutionary step to modify, and line 399 of netsim.c specifies the number of evolutionary steps to modify. 
 
