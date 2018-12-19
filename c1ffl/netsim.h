@@ -10,11 +10,11 @@
 #include "RngStream.h"
 
 /*Simulation mode*/
-#define PHENOTYPE 0
+#define PHENOTYPE 1
 #define POOL_VARIANTS 1
 #define PERTURB 0
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 1
+#define RUN_FULL_SIMULATION 0
 #define SKIP_INITIAL_GENOTYPE 0
 #define EXTERNAL_SIGNAL 0
 
@@ -27,8 +27,8 @@
 #define N_REPLICATES 200
 #define OUTPUT_INTERVAL 10
 #define SAVING_INTERVAL 10
-#define OUTPUT_MUTANT_DETAILS 0
-#define N_TIMP_POINTS 90
+#define OUTPUT_MUTANT_DETAILS 1
+#define N_TIMP_POINTS 120
 
 
 /*Miscellaneous settings*/
@@ -57,11 +57,11 @@
 #define FORCE_NON_AND_GATE 0
 #if FORCE_NON_AND_GATE
 #define WHICH_MOTIF 1 //only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
-#define ADD_STRONG_TFBS 0
+#define ADD_STRONG_TFBS 1
 #define FORCE_FAST_TF_CONTROLLED 0 // 1 for fast TF or signal controlled; 0 for slow TF controlled 
 #endif
 #define FORCE_DIAMOND 0
-#define FORCE_SINGLE_FFL 0
+#define FORCE_ISOLATED_FFL 0
 #define COUNT_NEAR_AND 0
 #define COUNT_LONG_ARM 0
 #define CUT_OFF_MISMATCH_SIG2EFFECTOR 2 //the maximum number of mismatches in TFBSs of the signal in effector genes
@@ -598,7 +598,7 @@ int check_concurrence(  float ,
                         float,
                         FixedEvent *);
 
-void set_signal(CellState *, float, float, float *, float,float);
+void set_signal(CellState *, float, float, float, float *, float,float);
 
 void output_genotype(Genotype *, int);
 

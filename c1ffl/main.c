@@ -14,7 +14,7 @@ int main()
     int buffer1,buffer2;
     FILE *fp1, *fp2;	
     /*make rng seed*/
-	seed=31;
+	seed=54;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     /*make filenames*/    
