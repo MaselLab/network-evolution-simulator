@@ -11,19 +11,12 @@
 #include "RngStream.h"
 
 /*Simulation mode*/
-#define JUST_PLOTTING 0
-#define PLOT_ALTERNATIVE_FITNESS 0
+#define PHENOTYPE 0
+#define PERTURB 1
 #define NEUTRAL 0
-#define RUN_FULL_SIMULATION 1
-#define SKIP_INITIAL_GENOTYPE 0
-#define QUICK_BURN_IN 0
-#define EXTERNAL_SIGNAL 0
-//#define sampling_interval 1.0
+#define IRREG_SIGNAL 0
 
 /*Runtime control*/  
-#define MAX_MUT_STEP 50000
-#define BURN_IN_I 0
-#define BURN_IN_II 0
 #define MAX_MUTATIONS 1600000
 #define MAX_TRIALS 2000
 #define HI_RESOLUTION_RECALC 5
@@ -35,16 +28,16 @@
 #define OUTPUT_MUTANT_DETAILS 0
 
 /*Miscellaneous settings*/
-//#define MAXIT 100          /* maximum number of iterations for Newtown-Raphson */
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
-//#define RT_SAFE_EPSILON 1e-6
 #define OUTPUT_RNG_SEEDS 1
 #define TIME_INFINITY 9.99e10
 #define TIME_OFFSET 0.01
 #define CAUTIOUS 0
 
 /*Biology and evolution settings*/
+#define EFFECTOR_NOT_TF 0
 #define POOL_EFFECTORS 1
+#define FAST_SS 0
 #define SELECT_SENSITIVITY_AND_PRECISION 0
 #define SELECT_ON_DURATION 0
 #define REALLY_COMPLETECATE 0
@@ -52,6 +45,12 @@
 #define CHEMOTAXIS 0
 #define DIRECT_REG 1
 #define NO_PENALTY 0
+#define IGNORE_BS 1
+#define RM_PF 0
+#define RM_I1FFL 0
+#define RM_NFBL 0
+#define RM_PF_NFBL 1
+#define MERGE_PROTEIN 0
 #define ADD_2_PATHWAYS 0
 #define FORCE_OR_GATE 0
 #define RANDOM_COOPERATION_LOGIC 0
@@ -67,22 +66,23 @@
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
 //#ifndef MAX_NON_OUTPUT_GENES             /* number of genes encoding TFs */
-#define MAX_NON_OUTPUT_GENES 21         /* the initial value is set in initiate_genotype*/
+#define MIN_NON_OUTPUT_GENES 2         /* the initial value is set in initiate_genotype*/
+#define MAX_COPIES_PER_NON_OUTPUT_GENE 4
 //#endif
 //#ifndef MAX_NON_OUTPUT_PROTEINS
-#define MAX_NON_OUTPUT_PROTEINS 21
+//#define MIN_NON_OUTPUT_PROTEINS 4
 //#endif
 //#ifndef MAX_OUTPUT_GENES
-#define MAX_OUTPUT_GENES 10  /* this is the upper limit of effector gene copies*/
+#define MAX_OUTPUT_GENES 4  /* this is the upper limit of effector gene copies*/
 //#endif
 //#ifndef MAX_OUTPUT_PROTEINS
-#define MAX_OUTPUT_PROTEINS 10
+#define MAX_OUTPUT_PROTEINS 4
 //#endif
 //#ifndef MAX_GENES
-#define MAX_GENES MAX_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
+#define MAX_GENES 26//MIN_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1+N_SIGNAL_TF  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
 //#endif
 //#ifndef MAX_PROTEINS           
-#define MAX_PROTEINS MAX_NON_OUTPUT_PROTEINS+MAX_OUTPUT_PROTEINS+1
+#define MAX_PROTEINS 26//MIN_NON_OUTPUT_GENES+MAX_OUTPUT_PROTEINS+1+N_SIGNAL_TF
 //#endif
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
@@ -98,16 +98,15 @@
 /* 
  * define macros for logging warning/errors 
  */
-#ifndef LOGGING_OFF
+#define MAKE_LOG 0
+#if MAKE_LOG
   #define LOG(...) { fprintf(fperrors, "%s: ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); } 
-#else
-  #define LOG 
 #endif
 
 /*
  * primary data structures for model
  */
-enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_OUTPUT_PROTEIN=-1,NON_TF=-2};
+enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_OUTPUT_PROTEIN=-1,OUTPUT_PROTEIN=-2,NON_TF=-3};
 enum BOOLEAN {NA=-1, NO=0, YES=1};
 
 typedef struct AllTFBindingSites AllTFBindingSites;
@@ -136,10 +135,20 @@ struct Environment
     int fixed_effector_effect;  
     float *external_signal;
     float duration_of_burn_in_growth_rate;
-    float benefit;
+//    float benefit;
     float response_amplification;
     float minimal_peak_response;
-    float max_t_in_bias;    
+    float opt_pulse_amplitude_fold;
+//    float max_t_in_bias;    
+    float opt_pulse_duration;
+    float fitness_factor_of_duration;
+    float fitness_factor_of_amplitude;
+    float opt_ss_response;
+    float fitness_factor_of_ss_response;
+    float fitness_factor_of_diff_in_ss;
+    float opt_peak_response;
+    float fitness_factor_of_peak_response;    
+    int window_size;
 };
 
 struct Selection
@@ -164,9 +173,9 @@ struct Genotype {
     int ngenes;                                             /* the number of loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
-    int n_output_genes;
-    int n_output_proteins;
-    int nTF_families;
+    int n_output_genes;    
+    int N_node_families;
+    int N_cisreg_clusters;
     int which_protein[MAX_GENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */ 
     
     char cisreg_seq[MAX_GENES][CISREG_LEN];    
@@ -174,22 +183,25 @@ struct Genotype {
     /*these apply to protein, not loci*/
     int N_act;                                              /* number of activators*/
     int N_rep;                                              /* number of repressors*/    
-    int protein_identity[MAX_PROTEINS][2];                     /* entry 1 marks activator (1) or repressor (0); */
-                                                            /* entry 2 marks output protein (id in output_protein_id) or
-                                                             * non-output protein (-1) */
-    int output_protein_id[MAX_OUTPUT_PROTEINS];
+    int protein_identity[MAX_PROTEINS];                  /* entry 1 marks activator (1) or repressor (0)*/        
     char tf_binding_seq[MAX_PROTEINS][TF_ELEMENT_LEN];
-    char tf_binding_seq_rc[MAX_PROTEINS][TF_ELEMENT_LEN];                /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
-    int protein_pool[MAX_PROTEINS][2][MAX_GENES];                 /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
-    int which_TF_family[MAX_PROTEINS];                         /* We consider mutation to Kd does not create a new TF (matters when counting motifs), 
-                                                             * but the calculation of TF binding distribution demands tfs with different Kd
-                                                             * to be treated differently. We call tfs that differ only in Kd a tf family.
-                                                             * We use this array and TF_family_pool to track which TF belongs which TF family.
-                                                             */
-    int TF_family_pool[MAX_PROTEINS][2][MAX_PROTEINS];                            
+    char tf_binding_seq_rc[MAX_PROTEINS][TF_ELEMENT_LEN];       /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
+    int protein_pool[MAX_PROTEINS][2][MAX_GENES];               /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
     float Kd[MAX_PROTEINS];
     
+    /*group genes into node family*/
+    int which_node_family[MAX_GENES];                          /* motifs must be made of genes from different node family.
+                                                                * In a node family, genes
+                                                                * are either all activators or all repressors
+                                                                * are either all output protein or non-output protein
+                                                                * have identical TFBS (but not necessarily same Kd)  
+                                                                */
+    int node_family_pool[MAX_GENES][2][MAX_GENES];                            
+    
+    
     /*these apply to loci*/
+    int output_protein_ids[MAX_OUTPUT_GENES];
+    int is_output[MAX_GENES];                                   /*is an output protein (id in output_protein_id) or non-output protein (-1)   */
     int locus_length[MAX_GENES];
     int total_loci_length;
     float mRNA_decay_rate[MAX_GENES];                                /* kinetic rates*/
@@ -200,7 +212,7 @@ struct Genotype {
     int locus_specific_TF_behavior[MAX_GENES][MAX_PROTEINS];      /* whether a TF behaves as activator or repressor depends on locus*/
     
     /* binding sites related data, applying to loci*/   
-    int cisreg_cluster[MAX_GENES+1][MAX_GENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
+    int cisreg_cluster_pool[MAX_GENES][2][MAX_GENES];                     /* For genes having the same cis-reg, tf distribution can be shared.
                                                              * Genes having the same cis-reg are clustered.
                                                                1st dim stores cluster ids, 2nd dim stores gene_ids in a cluster.
                                                                cisreg_cluster works with which_cluster*/
@@ -224,7 +236,7 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*measurement of network topology*/
-    int N_motifs[11]; 
+    int N_motifs[17]; 
     int TF_in_core_C1ffl[MAX_GENES][MAX_PROTEINS];
     int gene_in_core_C1ffl[MAX_GENES];
     int N_act_genes;  
@@ -233,11 +245,13 @@ struct Genotype {
 
 typedef struct Phenotype Phenotype;
 struct Phenotype
-{
-  float concentration;
-  float time;
-  Phenotype *next;
-};    
+{ 
+    int timepoint;
+    int total_time_points;
+    float *protein_concentration;
+    float *gene_specific_concentration;
+    float *instantaneous_fitness;    
+};   
 
 typedef struct Mutation Mutation;
 struct Mutation
@@ -252,67 +266,45 @@ struct Mutation
     int N_hit_bound;
 };
 
-/* global variables: output files*/
-char error_file[32];
-char mutation_file[32];
-char RuntimeSumm[32];
-char output_file[32];
-FILE *fperrors;
 
-/*mutation*/
-float SUBSTITUTION; 
-float DUPLICATION;   
-float SILENCING;      
-float MUT_Kd;
-float MUT_ACT_to_INT;
-float MUT_mRNA_decay;
-float MUT_protein_decay;
-float MUT_protein_syn_rate;
-float MUT_identity;
-float MUT_binding_seq;
-float MUT_LOCUS_LENGTH_RATE;
-float MUT_cooperation;
-float MUT_effector_to_TF;
-float MUT_locus_specific_tf_behavior;
-float mutational_regression_rate;
-float sigma_ACT_TO_INT_RATE; 
-float sigma_mRNA_decay; 
-float sigma_protein_decay; 
-float sigma_protein_syn_rate; 
-float sigma_Kd;
-float miu_ACT_TO_INT_RATE;
-float miu_mRNA_decay;
-float miu_protein_decay;
-float miu_protein_syn_rate;
-float miu_Kd;
-const float MAX_ACT_TO_INT_RATE;
-const float MIN_ACT_TO_INT_RATE;
-const float MAX_MRNA_DECAY;
-const float MIN_MRNA_DECAY;
-const float MAX_PROTEIN_DECAY;
-const float MIN_PROTEIN_DECAY;
-const float MAX_PROTEIN_SYN_RATE;
-const float MIN_PROTEIN_SYN_RATE;
-const float MAX_KD;
-const float MIN_KD;
-const float NS_Kd;
-const int MAX_GENE_LENGTH;
-const int MIN_GENE_LENGTH;
+/*output files. Initialized in main.c*/
+extern char mutation_file[32];
+extern char setup_summary[32];
+extern char evo_summary[32];
+extern float signal_profile_matrix[N_THREADS][200][15];
+
+/*Initialized in netsim.c */
+extern int MAXELEMENTS;
+extern const float MEAN_GENE_LENGTH;
+extern int N_EFFECTOR_GENES;
+extern int N_TF_GENES;
+extern const float MAX_ACT_TO_INT_RATE;
+extern const float MIN_ACT_TO_INT_RATE;
+extern const float MAX_MRNA_DECAY;
+extern const float MIN_MRNA_DECAY;
+extern const float MAX_PROTEIN_DECAY;
+extern const float MIN_PROTEIN_DECAY;
+extern const float MAX_PROTEIN_SYN_RATE;
+extern const float MIN_PROTEIN_SYN_RATE;
+extern const float MAX_KD;
+extern const float MIN_KD;
+extern const int MAX_GENE_LENGTH;
+extern const int MIN_GENE_LENGTH;
 extern const float KD2APP_KD;
 extern const float sampling_interval;
 
 /* function prototypes */
 char set_base_pair(float);
 
-void initialize_genotype(Genotype *, RngStream) ;
+void initialize_genotype(Genotype *, int, int, int, int, RngStream) ;
 
 void calc_all_binding_sites_copy(Genotype *, int);
 
-void calc_all_binding_sites(Genotype *);
-  
-int init_run_pop(unsigned long int [6], int);
+void calc_all_binding_sites(Genotype *); 
 
 void initialize_cache(Genotype *);
+
+int evolve_under_selection(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream, RngStream [N_THREADS]);
 
 void show_phenotype( Genotype *,
                     Genotype *,

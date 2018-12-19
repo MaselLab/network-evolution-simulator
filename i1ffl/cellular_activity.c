@@ -181,29 +181,43 @@ void initialize_cell(   Genotype *genotype,
     else
         add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));                
     /*plot protein concentration and fitness vs time*/
+    
 #if !PHENOTYPE
 #if PEAK_SEARCH
     float t;
     int N_data_points; 
-    t=env->t_signal_on+TIME_OFFSET;
-    N_data_points=(int)((env->t_development-env->t_signal_on)/sampling_interval);
+    t=env->t_signal_off+TIME_OFFSET;
+    N_data_points=(int)((env->t_development-env->t_signal_off)/sampling_interval);
     for(i=0;i<N_data_points;i++)
     {
         add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
         t+=sampling_interval;            
     } 
+    state->sampled_response=(float*)calloc(N_data_points,sizeof(float)); 
+#elif FAST_SS
+    float t;
+    int N_data_points; 
+    t=env->t_signal_off+TIME_OFFSET;
+    N_data_points=(int)((env->t_development-env->t_signal_off)/sampling_interval);
+    for(i=0;i<N_data_points;i++)
+    {
+        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
+        t+=sampling_interval;            
+    } 
+    state->sampled_response=(float*)calloc(N_data_points,sizeof(float)); 
 #elif CHEMOTAXIS
     add_fixed_event(-1,env->t_signal_on-1.0,&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
 #endif 
-//    float t;
-//    int N_data_points; 
-//    t=env->t_signal_on+TIME_OFFSET;
-//    N_data_points=(int)((env->t_development-env->t_signal_on)/sampling_interval);
-//    for(i=0;i<N_data_points;i++)
-//    {
-//        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
-//        t+=sampling_interval;            
-//    } 
+#else
+    float t;
+    int N_data_points; 
+    t=0.0+TIME_OFFSET;
+    N_data_points=(int)(env->t_development/sampling_interval);
+    for(i=0;i<N_data_points;i++)
+    {
+        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
+        t+=sampling_interval;            
+    } 
 #endif    
 }
 
@@ -252,12 +266,12 @@ void calc_all_rates(Genotype *genotype,
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
     {    
         cluster_id=genotype->which_cluster[i];        
-        if(genotype->cisreg_cluster[cluster_id][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
+        if(genotype->cisreg_cluster_pool[cluster_id][1][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
         {                
-            state->P_A[i]=state->P_A[genotype->cisreg_cluster[cluster_id][0]]; /* copy TF distribution from elsewhere*/
-            state->P_R[i]=state->P_R[genotype->cisreg_cluster[cluster_id][0]];
-            state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster[cluster_id][0]];
-            state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster[cluster_id][0]];
+            state->P_A[i]=state->P_A[genotype->cisreg_cluster_pool[cluster_id][1][0]]; /* copy TF distribution from elsewhere*/
+            state->P_R[i]=state->P_R[genotype->cisreg_cluster_pool[cluster_id][1][0]];
+            state->P_A_no_R[i]=state->P_A_no_R[genotype->cisreg_cluster_pool[cluster_id][1][0]];
+            state->P_NotA_no_R[i]=state->P_NotA_no_R[genotype->cisreg_cluster_pool[cluster_id][1][0]];
         }
         else /* otherwise, we need to calc the ratio*/
         {
@@ -311,11 +325,10 @@ void calc_all_rates(Genotype *genotype,
     /*Check if Pact needs to be updated more or less often*/ 
     if(UPDATE_WHAT!=INITIALIZATION && state->cell_activated==1)
     {  
-        diff_max=0.0;
-        cluster_id=1;    
-        while(genotype->cisreg_cluster[cluster_id][0]!=NA) //check if Pact changes too much
+        diff_max=0.0;          
+        for(cluster_id=N_SIGNAL_TF;i<genotype->N_cisreg_clusters;cluster_id++) //check if Pact changes too much
         {
-            gene_id=genotype->cisreg_cluster[cluster_id][0];
+            gene_id=genotype->cisreg_cluster_pool[cluster_id][1][0];
             diff_PA=fabs(state->P_A[gene_id]-state->last_P_A[gene_id]);            
             diff_PAnoR=fabs(state->P_A_no_R[gene_id]-state->last_P_A_no_R[gene_id]); 
             diff_PnotAnoR=fabs(state->P_NotA_no_R[gene_id]-state->last_P_NotA_no_R[gene_id]);  
@@ -323,8 +336,7 @@ void calc_all_rates(Genotype *genotype,
             diff_max=(diff_max>diff_PA)?diff_max:diff_PA;
             diff_max=(diff_max>diff_PR)?diff_max:diff_PR;
             diff_max=(diff_max>diff_PAnoR)?diff_max:diff_PAnoR;
-            diff_max=(diff_max>diff_PnotAnoR)?diff_max:diff_PnotAnoR;
-            cluster_id++;
+            diff_max=(diff_max>diff_PnotAnoR)?diff_max:diff_PnotAnoR;           
         }
         if(diff_max<EPSILON)
             interval_to_update_probability_of_binding=DEFAULT_UPDATE_INTERVAL;
@@ -501,7 +513,8 @@ static void calc_fitness(float *integrated_fitness,
 {
     int i,j,protein_id,counter;
     int N_output;
-    int gene_copy_id[MAX_OUTPUT_GENES],N_gene_copies[MAX_OUTPUT_PROTEINS];
+    int gene_copy_id[MAX_OUTPUT_GENES];
+    int N_gene_copies[MAX_OUTPUT_PROTEINS];
 //    float dt_prime, dt_rest, t_on, t_off, t_on_copy,t_off_copy;   
 //    float penalty=bmax/Ne_saturate;   
     float cost_of_expression;     
@@ -529,22 +542,22 @@ static void calc_fitness(float *integrated_fitness,
     
     /*list the genes that encode effectors*/
     counter=0;
-    for(i=0;i<genotype->n_output_proteins;i++)
-    {        
-        protein_id=genotype->output_protein_id[i];            
-        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
-        {
-            gene_copy_id[counter]=genotype->protein_pool[protein_id][1][j];
-            counter++;
-        }
-    }    
+//    for(i=0;i<genotype->n_output_proteins;i++)
+//    {        
+//        protein_id=genotype->output_protein_ids[i];            
+//        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
+//        {
+//            gene_copy_id[counter]=genotype->protein_pool[protein_id][1][j];
+//            counter++;
+//        }
+//    }    
 #if POOL_EFFECTORS 
     N_output=1;
     N_gene_copies[0]=genotype->n_output_genes;    
 #else
     N_output=genotype->n_output_proteins;
     for(i=0;i<genotype->n_output_proteins;i++)     
-        N_gene_copies[i]=genotype->protein_pool[genotype->output_protein_id[i]][0][0];    
+        N_gene_copies[i]=genotype->protein_pool[genotype->output_protein_ids[i]][0][0];    
 #endif
     
 #if SELECT_SENSITIVITY_AND_PRECISION
@@ -766,7 +779,8 @@ static void calc_fitness(float *integrated_fitness,
             state->cumulative_benefit+=dt*benefit1;        
         counter+=N_gene_copies[i];
     }     
-#elif !PEAK_SEARCH  
+#elif PEAK_SEARCH  
+#elif !FAST_SS
     counter=0;
     for(i=0;i<N_output;i++)        
     {    
@@ -1004,7 +1018,7 @@ static void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int g
     pos_next_record=0; //where in the ratio_matrices to put the next record
     ratio_matrices[pos_next_record][0][0]=BS_info[0].Kd;   
     /*calculate distribution based on the first BS*/
-    if(genotype->protein_identity[BS_info[0].tf_id][0]==1) // if a activator binds to BS 0   
+    if(genotype->locus_specific_TF_behavior[gene_id][BS_info[0].tf_id]==ACTIVATOR)// if a activator binds to BS 0  
         ratio_matrices[pos_next_record][0][1]=protein_number[BS_info[0].tf_id];
     else    
         ratio_matrices[pos_next_record][1][0]=protein_number[BS_info[0].tf_id]; 
@@ -1021,10 +1035,10 @@ static void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int g
         }
         cache_Kd=BS_info[m].Kd;
         /*Check whether m is a site of activator or repressor*/
-        switch(genotype->protein_identity[BS_info[m].tf_id][0])
+        switch(genotype->locus_specific_TF_behavior[gene_id][BS_info[m].tf_id])
         {
             case ACTIVATOR: // a BS of activators              
-               if(m-BS_info[m].N_hindered!=0)//if binding of m does not block all of the BS evaluated before
+                if(m-BS_info[m].N_hindered!=0)//if binding of m does not block all of the BS evaluated before
                 {      
                     /*find matrix(n-H)*/
                     pos_of_mat_nH=pos_next_record-BS_info[m].N_hindered-1; 
@@ -1117,7 +1131,7 @@ static void update_protein_number_and_fitness( Genotype *genotype,
                                                 Environment *env,                                                
                                                 float dt)
 {
-    int i,j,protein_id,counter;
+    int i,j,counter;
     float ct, ect, one_minus_ect;  
     float integrated_fitness;
     float N_output_molecules_bf_dt[MAX_OUTPUT_GENES];
@@ -1125,14 +1139,10 @@ static void update_protein_number_and_fitness( Genotype *genotype,
   
     /* store the numbers of the effector proteins encoded by each copy of gene before updating*/   
     counter=0;
-    for(i=0;i<genotype->n_output_proteins;i++)
-    {        
-        protein_id=genotype->output_protein_id[i];            
-        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
-        {
-            N_output_molecules_bf_dt[counter]=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
-            counter++;
-        }
+    for(i=0;i<genotype->n_output_genes;i++)
+    {      
+        N_output_molecules_bf_dt[counter]=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
+        counter++;        
     }
     /* update protein numbers*/
     for (i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
@@ -1153,14 +1163,10 @@ static void update_protein_number_and_fitness( Genotype *genotype,
     } 
     /*store the numbers of the effector proteins encoded by each copy of gene after updating*/
     counter=0;
-    for(i=0;i<genotype->n_output_proteins;i++)
-    {        
-        protein_id=genotype->output_protein_id[i];            
-        for(j=0;j<genotype->protein_pool[protein_id][0][0];j++)         
-        {
-            N_output_molecules_aft_dt[counter]=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
-            counter++;
-        }
+    for(i=0;i<genotype->n_output_genes;i++)
+    { 
+        N_output_molecules_aft_dt[counter]=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
+        counter++;        
     }    
     /* now find out the protein numbers at end of dt interval and compute instantaneous and cumulative fitness */   
     calc_fitness(&integrated_fitness, 
@@ -1378,6 +1384,7 @@ static int do_fixed_event(Genotype *genotype,
             update_protein_number_and_fitness(genotype, state, rates, env, *dt);  
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
             state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
+            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
             state->recording_basal_response=0;
             state->found_gradient=1;
 #if POOL_EFFECTORS
@@ -1415,24 +1422,24 @@ static int do_fixed_event(Genotype *genotype,
             update_protein_number_and_fitness(genotype, state, rates, env, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
 #if PHENOTYPE
-            for(i=0;i<genotype->nproteins;i++)
-                timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->protein_number[i];
-            for(i=0;i<genotype->ngenes;i++)
-                timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
-            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
+            for(i=0;i<genotype->N_node_families;i++)
+            {                
+                for(j=0;j<genotype->node_family_pool[i][0][0];j++)
+                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->node_family_pool[i][1][j]];
+            }
+//            for(i=0;i<genotype->ngenes;i++)
+//                timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
+//            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
             timecourse->timepoint++;   
-#endif 
+#else
 #if CHEMOTAXIS
             state->recording_basal_response=1;
 #else
             state->sampled_response[state->N_samples]=0.0;
-            for(i=0;i<genotype->n_output_proteins;i++)
-            {                
-                protein_id=genotype->output_protein_id[i];            
-                for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
-                    state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->protein_pool[protein_id][1][j]];
-            } 
+            for(i=0;i<genotype->n_output_genes;i++)
+                state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
             state->N_samples++;   
+#endif
 #endif
             break;
     }  
@@ -1672,7 +1679,7 @@ static void calc_leaping_interval(Genotype *genotype, CellState *state, float *m
     float overall_rate;
     float P_binding;
     float t_remaining;    
-    int gene_ids[j]; 
+    int gene_ids[genotype->ngenes]; 
     float ct, ect, one_minus_ect;
     
     t_remaining=t_unreachable-state->t;

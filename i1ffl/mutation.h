@@ -18,13 +18,17 @@
 #include "RngStream.h"
 #include "netsim.h"
 
-/*Maintain loci-protein relation in case of mutation*/
-void update_protein_pool(Genotype *, int, int, char);
+#define SIMPLE_SUBSTITUTION 1
 
-void update_protein_pool2(Genotype *, int, int, char);
+/*mutation rate*/
+extern float DUPLICATION;   
+extern float SILENCING;  
 
-/*Maintain loci-cisreg_sequence relation*/
-void update_cisreg_cluster(Genotype *, int, char, int [NGENES][NGENES], int, int);
+/*mutation effect*/
+extern float miu_ACT_TO_INT_RATE;
+extern float miu_protein_syn_rate;
+extern float miu_Kd;
+
 
 /*Wrapper of mutation functions*/
 void mutate(Genotype *, RngStream, Mutation *);
@@ -59,14 +63,11 @@ void mut_effector2TF(Genotype *, Mutation *, RngStream );
 /*mutate the locus-specific identity of a tf*/
 void mut_locus_specific_tf_behavior(Genotype *, Mutation *, RngStream);
 
-/*generate value of a mutant parameter*/
-float mut_make_new_value(float, float, float, float, float, RngStream, Mutation *, int);
-
 /*activator to repressor or the reverse*/
 void mut_identity(Genotype *, Mutation *, RngStream);
 
 /* Below are functions used to replay mutations*/
-void reproduce_mutate(Genotype *, Mutation *,RngStream);
+void reproduce_mutate(Genotype *, Mutation *);
 
 void reproduce_substitution(Genotype *, Mutation *);
 
