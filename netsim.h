@@ -41,9 +41,9 @@
 #define N_THREADS 10 //the number of parallel OpenMP threads
 #define N_REPLICATES 200 //calculate the fitness of a mutant with 200 replicates
 #define HI_RESOLUTION_RECALC 5 //calcualte the fitness of a resident with 5*N_REPLICATES replicates
-#define OUTPUT_INTERVAL 10 //output Summary_BS.txt every 10 evolutionary steps
-#define SAVING_INTERVAL 10 //make a saving point every 10 evoluationary steps
-#define OUTPUT_MUTANT_DETAILS 0 //output every mutant genotype and its fitness, whetehr the mutant is accepted
+#define OUTPUT_INTERVAL 20 //output Summary_BS.txt every 10 evolutionary steps
+#define SAVING_INTERVAL 20 //make a saving point every 10 evoluationary steps
+#define OUTPUT_MUTANT_DETAILS 1 //output every mutant genotype and its fitness, whetehr the mutant is accepted
 #define OUTPUT_RNG_SEEDS 1 //output the state of random number generator every evolutionary step
 #define MAKE_LOG 0 //generate error log
 #if MAKE_LOG
@@ -53,29 +53,25 @@
 
 /*3. Biology and evolution settings*/
 /******************************************************************************/
-#define DIRECT_REG 1 //set it to "1" to allow the signal to directly regulate the effector
-#define NO_PENALTY 0 //"1" to remove the penalty to fitness when effector is expressed under a wrong environment
+#define DIRECT_REG 0 //set it to "1" to allow the signal to directly regulate the effector
 #define RANDOM_COOPERATION_LOGIC 0 //"1" to randomly set whether a gene (including TF genes) is AND-gated-capable at initialization 
 
 
 /*4. Perturbation options*/
 /******************************************************************************/
 #if PERTURB 
-#define DISABLE_AND_GATE 1 //change the logic of an effector gene
-#if DISABLE_AND_GATE
-#define WHICH_MOTIF 1 //only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
+#define WHICH_MOTIF 2 //only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
+#define WHICH_CIS_TARGET 0 //0 for effector gene, 1 for fast TF gene, 2 for slow TF gene
+#define WHICH_TRANS_TARGET 2//0 for signal, 1 for fast TF, 2 for slow TF
+#define ADD_TFBS 0 // 1 for adding a TFBS of the trans target to the regulatory sequence of the cis target, 
+                   // 0 for removing ALL TFBSs of the trans target from the cis target 
 #define ADD_STRONG_TFBS 1 //by default we add TFBS as strong as the strongest TFBS that already exists in the cis-reg
-#define FORCE_MASTER_CONTROLLED 1 // 1 for master TF controlled; 0 for aux. TF controlled 
-#endif
-#define FORCE_DIAMOND 0  // change an AND-gated FFL-in-diamond to diamond
-#define FORCE_SINGLE_FFL 0 // change an AND-gated FFL-in-diamond to isolated FFL
 #endif
 
 
 /*5. Count additional motifs*/
 /******************************************************************************/
 #define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
-#define COUNT_LONG_ARM 0 //count long-arm C1FFLs
 
 
 /*6. Analyzing weak TFBSs*/
@@ -85,8 +81,8 @@
  */
 #define CUT_OFF_MISMATCH_SIG2EFFECTOR 2 //the maximum number of mismatches in TFBSs of the signal in effector genes
 #define CUT_OFF_MISMATCH_TF2EFFECTOR 2 //the maximum number of mismatches in TFBSs of TFs in effector genes
-#define CUT_OFF_MISMATCH_SIGNAL_TO_TF 2 //the maximum number of mismatches in TFBSs of the signal in TF genes
-#define CUT_OFF_MISMATCH_TF_TO_TF 2 //the maximum number of mismatches in TFBSs of TFs in TF genes
+#define CUT_OFF_MISMATCH_SIGNAL2TF 2 //the maximum number of mismatches in TFBSs of the signal in TF genes
+#define CUT_OFF_MISMATCH_TF2TF 2 //the maximum number of mismatches in TFBSs of TFs in TF genes
 
 
 /*7. Use an irregular signal in selection condition*/
@@ -153,9 +149,12 @@ struct Environment
     float t_signal_on;
     float t_signal_off;
     char initial_effect_of_effector;
+    char effect_of_effector_aft_burn_in;
+    int signal_on_aft_burn_in;
     int fixed_effector_effect;  
     float *external_signal;
-    float duration_of_burn_in_growth_rate;
+    float max_duration_of_burn_in_growth_rate;    
+    float avg_duration_of_burn_in_growth_rate;
 };
 
 struct Selection
@@ -231,17 +230,16 @@ struct Genotype {
     float avg_fitness;
     float fitness1;
     float fitness2; 
-    float sq_SE_avg_fitness;
-    float sq_SE_fitness1;
-    float sq_SE_fitness2;
+    float SE_avg_fitness;
+    float SE_fitness1;
+    float SE_fitness2;
     float fitness_measurement[HI_RESOLUTION_RECALC*N_REPLICATES];
     
     /*Motifs related*/
-    int N_motifs[39];  
-    int N_near_AND_gated_motifs[9];
-    int N_long_arm_c1ffls[9];
-    int TF_in_core_C1ffl[MAX_GENES][MAX_PROTEINS];
-    int gene_in_core_C1ffl[MAX_GENES];    
+    int N_motifs[36];  
+    int N_near_AND_gated_motifs[12];
+    int trans_target_to_be_perturbed[MAX_GENES][MAX_PROTEINS];
+    int cis_target_to_be_perturbed[MAX_GENES];    
 };
 
 /*A mutation is specified by its type, target, and mutant value*/
@@ -266,6 +264,36 @@ struct Phenotype
     float *protein_concentration;
     float *gene_specific_concentration;
     float *instantaneous_fitness;    
+    float max_change_in_probability_of_binding;
+};
+
+/*output buffer*/
+typedef struct Output_buffer Output_buffer;
+struct Output_buffer
+{    
+    int step;
+    int n_tot_mut;
+    int n_mut_at_the_step;
+    int n_hit_bound;
+    float selection_coefficient;
+    float avg_f;
+    float f1;
+    float f2;
+    float se_avg_f;
+    float se_f1;
+    float se_f2;
+    int n_gene;
+    int n_effector_genes;
+    int n_act;
+    int n_rep;    
+    char mut_type;
+    int which_gene;
+    int which_nuc;
+    char new_nuc[3];
+    int which_kinetic;
+    float new_kinetic;   
+    int n_motifs[36];
+    int n_near_AND_gated_motifs[12];    
 };
 
 /*
@@ -328,6 +356,10 @@ void perturbation_analysis(Genotype *,
                             RngStream [N_THREADS]);
 
 void print_mutatable_parameters(Genotype*,int);
+
+//void print_mutatable_parameters2(Genotype*, int, int, char, int, RngStream);
+
+//void replay_mutations(Genotype *, Genotype *, Mutation *, int, RngStream);
 
 void calc_all_binding_sites_copy(Genotype *, int);
 
