@@ -182,7 +182,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     calc_all_binding_sites_copy(genotype,which_gene);    
     if(N_BS_bf_mutation!=genotype->binding_sites_num[which_gene])
     {
-        update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1);  
+        update_cisreg_cluster(genotype,which_gene,'s',NULL,NA,NA);  
     }
     else
     {
@@ -200,7 +200,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
             }
         }
         if(flag_difference==1)
-           update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
+           update_cisreg_cluster(genotype,which_gene,'s',NULL,NA,NA); 
     }
     free(container);
     /*record mutation info*/
@@ -237,7 +237,7 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
     calc_all_binding_sites_copy(genotype,which_gene);    
     if(N_BS_bf_mutation!=genotype->binding_sites_num[which_gene])
     {
-        update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1);  
+        update_cisreg_cluster(genotype,which_gene,'s',NULL,NA,NA);  
     }
     else
     {
@@ -253,7 +253,7 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
             }
         }
         if(flag_difference==1)
-           update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
+           update_cisreg_cluster(genotype,which_gene,'s',NULL,NA,NA); 
     }
     free(container);    
     genotype->recalc_TFBS[which_gene]=YES;  /*recalc TFBS*/
@@ -410,7 +410,7 @@ void mut_whole_gene_deletion(Genotype *genotype, Mutation *mut_record, RngStream
         genotype->ntfgenes--;  
     /* now change protein_pool and cisreg_cluster*/   
     update_protein_pool(genotype,protein_id,which_gene,'w'); 
-    update_cisreg_cluster(genotype,which_gene,'w',NULL,-1,-1);  
+    update_cisreg_cluster(genotype,which_gene,'w',NULL,NA,NA);  
     genotype->ngenes--;
 }
 
@@ -512,7 +512,7 @@ void reproduce_whole_gene_deletion(Genotype *genotype, Mutation *mut_record) // 
     if(protein_id!=genotype->nproteins-1)    
         genotype->ntfgenes--;          
     update_protein_pool(genotype,protein_id,which_gene,'w'); 
-    update_cisreg_cluster(genotype,which_gene,'w',NULL,-1,-1);
+    update_cisreg_cluster(genotype,which_gene,'w',NULL,NA,NA);
     genotype->ngenes--;   
 }
 
@@ -590,7 +590,7 @@ void mut_duplication(Genotype *genotype, Mutation *mut_record, RngStream RS)
     protein_id=genotype->which_protein[which_gene];    
     update_protein_pool(genotype,protein_id,which_gene,'d'); 
     /* update cisreg_cluster*/    
-    update_cisreg_cluster(genotype,which_gene,'d',NULL,-1,-1);
+    update_cisreg_cluster(genotype,which_gene,'d',NULL,NA,NA);
     /* update gene numbers*/  
     if(protein_id<genotype->nproteins-1)//note duplication do not change nproteins              
         genotype->ntfgenes++;          
@@ -634,7 +634,7 @@ void reproduce_gene_duplication(Genotype *genotype, Mutation *mut_record) //any 
     genotype->total_loci_length+=genotype->locus_length[which_gene_copy];
     protein_id=genotype->which_protein[which_gene];
     update_protein_pool(genotype,protein_id,which_gene,'d');     
-    update_cisreg_cluster(genotype,which_gene,'d',NULL,-1,-1);
+    update_cisreg_cluster(genotype,which_gene,'d',NULL,NA,NA);
     if(protein_id<genotype->nproteins-1)//note duplication do not change nproteins              
         genotype->ntfgenes++;           
     genotype->ngenes++;     
@@ -772,7 +772,7 @@ void mut_binding_sequence(Genotype *genotype, Mutation *mut_record, RngStream RS
             N_new_clusters++;
         }
         if(N_new_clusters!=1)//if the original cluster turns into multiple clusters
-            update_cisreg_cluster(genotype,-1,'c',new_clusters,N_new_clusters,i);
+            update_cisreg_cluster(genotype,NA,'c',new_clusters,N_new_clusters,i);
         i++;
     }
     /* Calling calc_all_binding_sites reset recalc_TFBS to 0, so we need to turn them on again */
@@ -879,7 +879,7 @@ void reproduce_mut_binding_sequence(Genotype *genotype, Mutation *mut_record)
             N_new_clusters++;
         }
         if(N_new_clusters!=1)
-            update_cisreg_cluster(genotype,-1,'c',new_clusters,N_new_clusters,i);
+            update_cisreg_cluster(genotype,NA,'c',new_clusters,N_new_clusters,i);
         i++;
     }    
     for(i=0;i<genotype->ngenes;i++)
@@ -945,7 +945,7 @@ void mut_kinetic_constant(Genotype *genotype, Mutation *mut_record, RngStream RS
                     genotype->min_N_activator_to_transc[which_gene]=1;
                 mut_record->kinetic_type=4;
                 mut_record->kinetic_diff=(float)genotype->min_N_activator_to_transc[which_gene];
-                update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
+                update_cisreg_cluster(genotype,which_gene,'s',NULL,NA,NA); 
                 break;
             }
             else
@@ -1019,7 +1019,7 @@ void reproduce_mut_kinetic_constant(Genotype *genotype, Mutation *mut_record)
             break;
         case 4: /* mut cooperation */
             genotype->min_N_activator_to_transc[which_gene]=(int)mut_record->kinetic_diff;
-            update_cisreg_cluster(genotype,which_gene,'s',NULL,-1,-1); 
+            update_cisreg_cluster(genotype,which_gene,'s',NULL,NA,NA); 
     }
 }
 
