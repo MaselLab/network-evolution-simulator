@@ -32,16 +32,19 @@ int main()
     
     /*make rng seed*/
     unsigned long int seeds[6];
-    int i, seed; 
+    int i, j, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-    seed=5;
+    seed=481;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
     RS_main=RngStream_CreateStream("Main");
-    /*create rng streams*/    
-    for(i=0;i<N_THREADS;i++)
-        RS_parallel[i]=RngStream_CreateStream(""); 
+    /*create rng streams*/ 
+    for(j=0;j<1;j++)
+    {
+        for(i=0;i<N_THREADS;i++)
+            RS_parallel[i]=RngStream_CreateStream(""); 
+    }
     
     /*make filenames*/     
     snprintf(mutation_file,sizeof(char)*32,"accepted_mutation_%i.txt",seed);
@@ -104,17 +107,24 @@ int main()
     selection.env1.t_development=89.9; //minutes
     selection.env2.t_development=89.9;
     
+    /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
+    selection.env1.avg_duration_of_burn_in_growth_rate=10.0;
+    selection.env2.avg_duration_of_burn_in_growth_rate=10.0;
+    selection.env1.max_duration_of_burn_in_growth_rate=30.0;
+    selection.env2.max_duration_of_burn_in_growth_rate=30.0;
+    
     /*The code below creates signals under env1 and env2. The signal is consecutive "ONs" and "OFFs" and always starts with "ON". 
      *Use t_signal_on and t_signal_off to specify the duration of "on" and "off"*/ 
     selection.env1.signal_on_strength=1000.0;    
     selection.env1.signal_off_strength=0.0;
     selection.env2.signal_on_strength=1000.0;
     selection.env2.signal_off_strength=0.0;
+    selection.env1.signal_on_aft_burn_in=1; //turn on signal after burn-in growth
+    selection.env2.signal_on_aft_burn_in=1;
     selection.env1.t_signal_on=200.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
     selection.env1.t_signal_off=0.0; 
     selection.env2.t_signal_on=10.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
-    selection.env2.t_signal_off=200.0; //after being "on" for the initial 10 minutes, the signal is off for 200 minutes, i.e. remains off in env2.
-    
+    selection.env2.t_signal_off=200.0; //after being "on" for the initial 10 minutes, the signal is off for 200 minutes, i.e. remains off in env2.   
     /*Alternatively, an irregular signal can be specified with an extra file*/    
 #if IRREG_SIGNAL
     int j,k;  
@@ -146,23 +156,21 @@ int main()
 #endif    
     
     /*Set when the effector is beneficial and when it is deleterious*/
-    selection.env1.initial_effect_of_effector='b'; //effector is beneficial in the beginning of env1
-    selection.env2.initial_effect_of_effector='d'; //deleterious in the beginning of env2 
+    selection.env1.initial_effect_of_effector='d'; //deleterious in the beginning of env2 
+    selection.env2.initial_effect_of_effector='d'; 
+    selection.env1.effect_of_effector_aft_burn_in='b'; //effector is beneficial in env1, after the initial delay 
+    selection.env2.effect_of_effector_aft_burn_in='d'; //deleterious in env2, after the initial delay 
     selection.env1.fixed_effector_effect=1; //the effector maintains the initial fitness effect. Making it 0 allows effector to be beneficial when signal is on and deleterious when signal is off
     selection.env2.fixed_effector_effect=1;
     
     /*how to average fitness under env1 and fitness under env2*/
     selection.env1_weight=0.33;
-    selection.env2_weight=0.67;
-    
-    /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
-    selection.env1.duration_of_burn_in_growth_rate=0.0; //zero means do not burn-in developmental simulation
-    selection.env2.duration_of_burn_in_growth_rate=0.0;  
+    selection.env2_weight=0.67;   
     
     /*Maximum evolutionary steps*/
-    selection.MAX_STEPS=50000; 
+    selection.MAX_STEPS=51000; 
     
-    /*Default values of */
+    /*Default values of mutation parameters*/
     selection.temporary_DUPLICATION=1.5e-7;
     selection.temporary_SILENCING=1.5e-7;
     selection.temporary_N_effector_genes=MAX_EFFECTOR_GENES;
@@ -187,26 +195,36 @@ int main()
                 selection.temporary_miu_ACT_TO_INT_RATE,
                 selection.temporary_miu_Kd,
                 selection.temporary_miu_protein_syn_rate);
-        fprintf(fp,"env weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
-        fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
+        fprintf(fp,"env weight dev_time avg_burn_in_t max_burn_in_t signal_aft_burn_in t_sig_on t_sig_off avg_t_burn_in max_t_burn_in s_sig_on s_sig_off init_effect effect_aft_burn_in fixed_effect\n");
+        fprintf(fp,"1 %.2f %.1f %.1f %.1f %d %.1f %.1f %.1f %.1f %.1f %.1f %c %c %d\n",
                 selection.env1_weight,
                 selection.env1.t_development,
-                selection.env1.duration_of_burn_in_growth_rate,
+                selection.env1.avg_duration_of_burn_in_growth_rate,
+                selection.env1.max_duration_of_burn_in_growth_rate,
+                selection.env1.signal_on_aft_burn_in,
                 selection.env1.t_signal_on,
                 selection.env1.t_signal_off,
+                selection.env1.avg_duration_of_burn_in_growth_rate,
+                selection.env1.max_duration_of_burn_in_growth_rate,
                 selection.env1.signal_on_strength,
                 selection.env1.signal_off_strength,
                 selection.env1.initial_effect_of_effector,
+                selection.env1.effect_of_effector_aft_burn_in,
                 selection.env1.fixed_effector_effect);
-        fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
+        fprintf(fp,"2 %.2f %.1f %.1f %.1f %d %.1f %.1f %.1f %.1f %.1f %.1f %c %c %d\n\n\n",
                 selection.env2_weight,
-                selection.env2.t_development,
-                selection.env2.duration_of_burn_in_growth_rate,
+                selection.env2.t_development, 
+                selection.env2.avg_duration_of_burn_in_growth_rate,
+                selection.env2.max_duration_of_burn_in_growth_rate,
+                selection.env2.signal_on_aft_burn_in,
                 selection.env2.t_signal_on,
                 selection.env2.t_signal_off,
+                selection.env2.avg_duration_of_burn_in_growth_rate,
+                selection.env2.max_duration_of_burn_in_growth_rate,
                 selection.env2.signal_on_strength,
                 selection.env2.signal_off_strength,
                 selection.env2.initial_effect_of_effector,
+                selection.env2.effect_of_effector_aft_burn_in,
                 selection.env2.fixed_effector_effect);   
         fclose(fp);
     }
@@ -217,23 +235,29 @@ int main()
     Selection burn_in;         
     burn_in.env1.t_development=89.9;
     burn_in.env2.t_development=89.9;
+    burn_in.env1.avg_duration_of_burn_in_growth_rate=10.0;
+    burn_in.env2.avg_duration_of_burn_in_growth_rate=10.0;
+    burn_in.env1.max_duration_of_burn_in_growth_rate=30.0;
+    burn_in.env2.max_duration_of_burn_in_growth_rate=30.0; 
     burn_in.env1.signal_on_strength=1000.0;  
     burn_in.env1.signal_off_strength=0.0;
     burn_in.env2.signal_on_strength=1000.0;
     burn_in.env2.signal_off_strength=0.0;
+    burn_in.env1.signal_on_aft_burn_in=1; 
+    burn_in.env2.signal_on_aft_burn_in=1;
     burn_in.env1.t_signal_on=200.0;    
     burn_in.env1.t_signal_off=0.0;
     burn_in.env2.t_signal_on=10.0;
-    burn_in.env2.t_signal_off=200.0;
-    burn_in.env1.initial_effect_of_effector='b';
+    burn_in.env2.t_signal_off=200.0;   
+    burn_in.env1.initial_effect_of_effector='d';
     burn_in.env2.initial_effect_of_effector='d';
+    burn_in.env1.effect_of_effector_aft_burn_in='b'; 
+    burn_in.env2.effect_of_effector_aft_burn_in='d'; 
     burn_in.env1.fixed_effector_effect=1;
     burn_in.env2.fixed_effector_effect=1;
     burn_in.env1_weight=0.67;
     burn_in.env2_weight=0.33;   
-    burn_in.env1.duration_of_burn_in_growth_rate=0.0;
-    burn_in.env2.duration_of_burn_in_growth_rate=0.0;
-    burn_in.MAX_STEPS=0; // set it to 1000 if DIRECT_REG=0    
+    burn_in.MAX_STEPS=1000; // set it to 1000 if DIRECT_REG=0    
     burn_in.temporary_DUPLICATION=5.25e-9;
     burn_in.temporary_SILENCING=5.25e-9;
     burn_in.temporary_N_effector_genes=2;
@@ -259,26 +283,36 @@ int main()
                     burn_in.temporary_miu_ACT_TO_INT_RATE,
                     burn_in.temporary_miu_Kd,
                     burn_in.temporary_miu_protein_syn_rate);
-            fprintf(fp,"env weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
-            fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
+            fprintf(fp,"env weight dev_time avg_burn_in_t max_burn_in_t signal_aft_burn_in t_sig_on t_sig_off avg_t_burn_in max_t_burn_in s_sig_on s_sig_off init_effect effect_aft_burn_in fixed_effect\n");
+            fprintf(fp,"1 %.2f %.1f %.1f %.1f %d %.1f %.1f %.1f %.1f %.1f %.1f %c %c %d\n",
                     burn_in.env1_weight,
-                    burn_in.env1.t_development,
-                    burn_in.env1.duration_of_burn_in_growth_rate,
+                    burn_in.env1.t_development,  
+                    burn_in.env2.avg_duration_of_burn_in_growth_rate,
+                    burn_in.env2.max_duration_of_burn_in_growth_rate,
+                    burn_in.env1.signal_on_aft_burn_in,
                     burn_in.env1.t_signal_on,
                     burn_in.env1.t_signal_off,
+                    burn_in.env1.avg_duration_of_burn_in_growth_rate,
+                    burn_in.env1.max_duration_of_burn_in_growth_rate,
                     burn_in.env1.signal_on_strength,
                     burn_in.env1.signal_off_strength,
                     burn_in.env1.initial_effect_of_effector,
+                    burn_in.env1.effect_of_effector_aft_burn_in, 
                     burn_in.env1.fixed_effector_effect);
-            fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
+            fprintf(fp,"2 %.2f %.1f %.1f %.1f %d %.1f %.1f %.1f %.1f %.1f %.1f %c %c %d\n\n\n",
                     burn_in.env2_weight,
-                    burn_in.env2.t_development,
-                    burn_in.env2.duration_of_burn_in_growth_rate,
+                    burn_in.env2.t_development,   
+                    burn_in.env2.avg_duration_of_burn_in_growth_rate,
+                    burn_in.env2.max_duration_of_burn_in_growth_rate,
+                    burn_in.env2.signal_on_aft_burn_in,
                     burn_in.env2.t_signal_on,
                     burn_in.env2.t_signal_off,
+                    burn_in.env2.avg_duration_of_burn_in_growth_rate,
+                    burn_in.env2.max_duration_of_burn_in_growth_rate,
                     burn_in.env2.signal_on_strength,
                     burn_in.env2.signal_off_strength,
                     burn_in.env2.initial_effect_of_effector,
+                    burn_in.env2.effect_of_effector_aft_burn_in, 
                     burn_in.env2.fixed_effector_effect);   
             fclose(fp);
         }    
