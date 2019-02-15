@@ -1,0 +1,24 @@
+Rng seed: 481
+Max effector gene number=5, max tf gene number=20
+initial TF number=6, initial ACT number=3, initial REP number=3
+
+
+Selection condition:
+steps dup_rate del_rate max_N_tf max_N_effector miu_A2I miu_Kd miu_protein_syn
+51000 1.50e-07 1.50e-07 20 5 1.570 -5.000 0.021
+
+env weight dev_time signal_aft_burn_in t_sig_on t_sig_off avg_t_burn_in max_t_burn_in s_sig_on s_sig_off init_effect effect_aft_burn_in fixed_effect
+1 0.33 89.9 1 200.0 0.0 10.0 30.0 1000.0 0.0 d b 1
+2 0.67 89.9 1 10.0 200.0 10.0 30.0 1000.0 0.0 d d 1
+
+
+Burn-in evolution enabled!steps dup_rate del_rate max_N_tf max_N_effector miu_A2I miu_Kd miu_protein_syn
+1000 5.25e-09 5.25e-09 9 2 0.762 -7.500 0.814
+
+env weight dev_time signal_aft_burn_in t_sig_on t_sig_off avg_t_burn_in max_t_burn_in s_sig_on s_sig_off init_effect effect_aft_burn_in fixed_effect
+1 0.67 89.9 1 200.0 0.0 10.0 30.0 1000.0 0.0 d b 1
+2 0.33 89.9 1 10.0 200.0 10.0 30.0 1000.0 0.0 d d 1
+
+
+Continue simulation from step 26820
+Continue simulation from step 30840
