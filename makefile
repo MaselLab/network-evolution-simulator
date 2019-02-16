@@ -1,5 +1,5 @@
 #compiling option
-CFLAGS = -O3 #the default is performance release 
+CFLAGS = -O3 -fp-model source -fp-model precise #the default is performance release, and accurate arithematics on floating numbers 
 
 #simulation mode
 #CPPFLAGS #the default is full simulation.   
