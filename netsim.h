@@ -41,8 +41,7 @@
 #define N_THREADS 10 //the number of parallel OpenMP threads
 #define N_REPLICATES 200 //calculate the fitness of a mutant with 200 replicates
 #define HI_RESOLUTION_RECALC 5 //calcualte the fitness of a resident with 5*N_REPLICATES replicates
-#define OUTPUT_INTERVAL 20 //output Summary_BS.txt every 10 evolutionary steps
-#define SAVING_INTERVAL 20 //make a saving point every 10 evoluationary steps
+#define OUTPUT_INTERVAL 20 //pool results from evolutionary steps before writing to disk
 #define OUTPUT_MUTANT_DETAILS 1 //output every mutant genotype and its fitness, whetehr the mutant is accepted
 #define OUTPUT_RNG_SEEDS 1 //output the state of random number generator every evolutionary step
 #define MAKE_LOG 0 //generate error log
@@ -55,6 +54,7 @@
 /******************************************************************************/
 #define DIRECT_REG 0 //set it to "1" to allow the signal to directly regulate the effector
 #define RANDOM_COOPERATION_LOGIC 0 //"1" to randomly set whether a gene (including TF genes) is AND-gated-capable at initialization 
+
 
 /*4. Phenotype options*/
 /******************************************************************************/
@@ -75,12 +75,13 @@
 /*5. Perturbation options*/
 /******************************************************************************/
 #if PERTURB 
+#define START_STEP_OF_PERTURBATION 41001// perturb networks in start step and afterwards
 #define WHICH_MOTIF 2 //only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
 #define WHICH_CIS_TARGET 0 //0 for effector gene, 1 for fast TF gene, 2 for slow TF gene
 #define WHICH_TRANS_TARGET 2//0 for signal, 1 for fast TF, 2 for slow TF
 #define ADD_TFBS 0 // 1 for adding a TFBS of the trans target to the regulatory sequence of the cis target, 
                    // 0 for removing ALL TFBSs of the trans target from the cis target 
-#define ADD_STRONG_TFBS 1 //by default we add TFBS as strong as the strongest TFBS that already exists in the cis-reg
+#define ADD_STRONG_TFBS 1 //by default, we add TFBSs with high binding affinity to change topology and/or logic
 #endif
 
 
@@ -344,23 +345,20 @@ int evolve_under_selection(Genotype *, Genotype *, Mutation *, Selection *, Sele
 
 void initialize_cache(Genotype *);
 
-void show_phenotype( Genotype *,
-                    Genotype *,
+void show_phenotype( Genotype *,                   
                     Mutation *,
                     Selection *,
                     int [MAX_GENES],
                     float [MAX_GENES],                  
                     RngStream [N_THREADS]);
 
-void evolve_neutrally(  Genotype *,
-                        Genotype *,                             
+void evolve_neutrally(  Genotype *,                                              
                         Mutation *,
                         Selection *,
                         Selection *,
                         RngStream);
 
-void perturbation_analysis(Genotype *,
-                            Genotype *,
+void perturbation_analysis(Genotype *,                           
                             Mutation *,
                             Selection *,
                             int [MAX_GENES],

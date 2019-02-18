@@ -322,11 +322,11 @@ int main()
     
     /*Different simulation mode can be enabled from netsim.h*/
 #if NEUTRAL //netural evolution
-    evolve_neutrally(&resident, &mutant, &mut_record, &burn_in, &selection, RS_main); 
+    evolve_neutrally(&resident, &mut_record, &burn_in, &selection, RS_main); 
 #elif PHENOTYPE //output timecourse of expression levels of genes    
-    show_phenotype(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
+    show_phenotype(&resident, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
 #elif PERTURB //pertubation analysis
-    perturbation_analysis(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
+    perturbation_analysis(&resident, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
 #else //the default is to evolve a network under selection conditions specfied above   
     evolve_under_selection(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
 #endif        

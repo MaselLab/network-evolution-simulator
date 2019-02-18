@@ -98,7 +98,7 @@ static void run_simulation(Genotype *, Genotype *, Mutation *, Selection *, Sele
 
 static void continue_simulation(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int, int [MAX_GENES], float [MAX_PROTEINS], RngStream, RngStream [N_THREADS]);
 
-static void replay_mutations(Genotype *, Genotype *, Mutation *, int);
+static void replay_mutations(Genotype *, Mutation *, int);
 
 static void find_motifs(Genotype *);
 
@@ -249,47 +249,57 @@ int evolve_under_selection(Genotype *resident,
 }
 
 #if NEUTRAL
-void evolve_neutrally(Genotype *resident, Genotype *mutant, Mutation *mut_record, Selection *burn_in, Selection *selection, RngStream RS_main)
+void evolve_neutrally(Genotype *resident, Mutation *mut_record, Selection *burn_in, Selection *selection, RngStream RS_main)
 {
-    int i;    
+    int i, output_counter=0;
     FILE *fp;    
+    Output_buffer resident_info[OUTPUT_INTERVAL];
+    
+    /*Set resident fitness to 0*/
+    resident->fitness1=0.0;
+    resident->fitness2=0.0;
+    resident->avg_fitness=0.0;
+    resident->SE_avg_fitness=0.0;
+    resident->SE_fitness1=0.0;
+    resident->SE_fitness2=0.0;
+    
     /*Create title for output files*/
     fp=fopen(evo_summary,"a+");
     fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
     fprintf(fp,"0 0 0 na na 0.0 0.0 0.0 0.0 0.0 0.0 0 0 0 0 \n");
     fclose(fp); 
-    /*BURN-IN*/              
+    
+    /*record the initial network*/
+    calc_all_binding_sites(resident);
+    summarize_binding_sites(resident,0);
+    
+    /*set BURN-IN conditions*/              
     DUPLICATION=burn_in->temporary_DUPLICATION;                 
     SILENCING=burn_in->temporary_SILENCING;
     N_EFFECTOR_GENES=burn_in->temporary_N_effector_genes;
     N_TF_GENES=burn_in->temporary_N_tf_genes; 
     miu_ACT_TO_INT_RATE=burn_in->temporary_miu_ACT_TO_INT_RATE; 
     miu_Kd=burn_in->temporary_miu_Kd;       
-    miu_protein_syn_rate=burn_in->temporary_miu_protein_syn_rate;     
-    for(i=0;i<burn_in->MAX_STEPS;i++)
-    {       
-        clone_genotype(resident,mutant);
-        mutate(mutant,RS_main,mut_record);   
-        fp=fopen(mutation_file,"a+");
-        fprintf(fp,"%c %d %d '%s' %d %a\n",
-                mut_record->mut_type,    
-                mut_record->which_gene,
-                mut_record->which_nucleotide,
-                mut_record->nuc_diff,
-                mut_record->kinetic_type,
-                mut_record->kinetic_diff);
-        fclose(fp);        
-        clone_genotype(mutant,resident);         
+    miu_protein_syn_rate=burn_in->temporary_miu_protein_syn_rate; 
+    
+    /*burn in*/
+    for(i=1;i<=burn_in->MAX_STEPS;i++)
+    {  
+        mutate(resident,RS_main,mut_record);  
         calc_all_binding_sites(resident);
-        find_motifs(resident); 
-        print_motifs(resident);        
+        find_motifs(resident);       
+        store_resident_info(resident, mut_record, &(resident_info[output_counter]), i, 1, i, 0.0, 1); //magic number 1 means store everything
+        output_counter++;
         /*output network topology every OUTPUT_INTERVAL steps*/ 
-        if(i%OUTPUT_INTERVAL==0 && i!=0)
-            summarize_binding_sites(resident,i);        
-        /*output a summary of simulation every step*/
-        output_genotype(resident);
+        if(i%OUTPUT_INTERVAL==0)
+        {
+            summarize_binding_sites(resident,i);
+            output_resident_info(resident_info,output_counter,1); //magic number 1 means to output everything
+            output_counter=0;
+        }       
     } 
     
+    /*set post burn-in condition*/
     DUPLICATION=selection->temporary_DUPLICATION;                 
     SILENCING=selection->temporary_SILENCING;
     N_EFFECTOR_GENES=selection->temporary_N_effector_genes;
@@ -298,35 +308,27 @@ void evolve_neutrally(Genotype *resident, Genotype *mutant, Mutation *mut_record
     miu_Kd=selection->temporary_miu_Kd;       
     miu_protein_syn_rate=selection->temporary_miu_protein_syn_rate;      
     
-    for(;i<selection->MAX_STEPS;i++)
-    {
-        clone_genotype(resident,mutant);
-        mutate(mutant,RS_main,mut_record);   
-        fp=fopen(mutation_file,"a+");
-        fprintf(fp,"%c %d %d '%s' %d %a\n",
-                mut_record->mut_type,    
-                mut_record->which_gene,
-                mut_record->which_nucleotide,
-                mut_record->nuc_diff,
-                mut_record->kinetic_type,
-                mut_record->kinetic_diff);
-        fclose(fp);        
-        clone_genotype(mutant,resident);         
+    for(;i<=selection->MAX_STEPS;i++)
+    {       
+        mutate(resident,RS_main,mut_record);   
         calc_all_binding_sites(resident);
-        find_motifs(resident); 
-        print_motifs(resident);        
-        /*output network topology every OUTPUT_INTERVAL steps*/ 
-        if(i%OUTPUT_INTERVAL==0 && i!=0)
-            summarize_binding_sites(resident,i);        
-        /*output a summary of simulation every step*/
-        output_genotype(resident);
+        find_motifs(resident);            
+        store_resident_info(resident, mut_record, &(resident_info[output_counter]), i, 1, i, 0.0, 1); //magic number 1 means store everything
+        output_counter++;
+        /*output network topology every OUTPUT_INTERVAL steps*/        
+        if(i%OUTPUT_INTERVAL==0 && i!=burn_in->MAX_STEPS)
+        {
+            summarize_binding_sites(resident,i);
+            output_resident_info(resident_info,output_counter,1); //magic number 1 means to output everything
+            output_counter=0;
+        } 
     }
     print_mutatable_parameters(resident,1);    
 }
 #endif
 
 #if PHENOTYPE
-void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, Selection *selection, int init_mRNA[MAX_GENES], float init_protein[MAX_GENES], RngStream RS_parallel[N_THREADS])
+void show_phenotype(Genotype *resident, Mutation *mut_record, Selection *selection, int init_mRNA[MAX_GENES], float init_protein[MAX_GENES], RngStream RS_parallel[N_THREADS])
 {
     /*sampling parameters of network motifs*/
     if(SAMPLE_PARAMETERS)
@@ -335,7 +337,7 @@ void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, 
     /*replay mutations, output N_motifs.txt and networks.txt*/   
     if(REPRODUCE_GENOTYPES || SAMPLE_GENE_EXPRESSION)
     {        
-        replay_mutations(resident, mutant, mut_record, selection->MAX_STEPS);    
+        replay_mutations(resident, mut_record, selection->MAX_STEPS);    
         /*output the evolved genotype*/
         calc_all_binding_sites(resident); 
         print_mutatable_parameters(resident,1);
@@ -580,8 +582,7 @@ void sample_parameters(Genotype *genotype, int step, RngStream RS)
 #endif
 
 #if PERTURB
-void perturbation_analysis(Genotype *resident,
-                            Genotype *mutant, 
+void perturbation_analysis(Genotype *resident,                           
                             Mutation *mut_record,  
                             Selection *selection,
                             int init_mRNA[MAX_GENES],
@@ -618,17 +619,14 @@ void perturbation_analysis(Genotype *resident,
     
     /*begin*/
     for(i=1;i<=selection->MAX_STEPS;i++)
-    {               
-        clone_genotype(resident,mutant);
+    { 
         fscanf(file_mutation,"%c %d %d %s %d %a\n",&(mut_record->mut_type),
                                                     &(mut_record->which_gene),
                                                     &(mut_record->which_nucleotide), 
                                                     mut_record->nuc_diff,               
                                                     &(mut_record->kinetic_type),
                                                     &(mut_record->kinetic_diff));
-        reproduce_mutate(mutant,mut_record);        
-        clone_genotype(mutant,resident);       
-        
+        reproduce_mutate(resident,mut_record);
         fscanf(fitness_record,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d %d\n",
                 &step,
                 &int_buffer,
@@ -647,7 +645,7 @@ void perturbation_analysis(Genotype *resident,
                 &int_buffer,
                 &int_buffer);
       
-        if(i>=selection->MAX_STEPS-9999)
+        if(i>=START_STEP_OF_PERTURBATION)
         {            
             calc_all_binding_sites(resident);        
             find_motifs(resident);
@@ -1634,7 +1632,7 @@ static void try_replacement(Genotype *resident, Genotype *mutant, int *flag_repl
 }
 
 
-static void replay_mutations(Genotype *resident, Genotype *mutant, Mutation *mut_record, int replay_N_steps)
+static void replay_mutations(Genotype *resident, Mutation *mut_record, int replay_N_steps)
 {
     int i, output_counter;
     Output_buffer resident_info[OUTPUT_INTERVAL];
@@ -1660,16 +1658,14 @@ static void replay_mutations(Genotype *resident, Genotype *mutant, Mutation *mut
     
     output_counter=0;   
     for(i=1;i<=replay_N_steps;i++)
-    {        
-        clone_genotype(resident,mutant);
+    {  
         fscanf(fp,"%c %d %d %s %d %a\n",&(mut_record->mut_type),
                                                     &(mut_record->which_gene),
                                                     &(mut_record->which_nucleotide), 
                                                     mut_record->nuc_diff,               
                                                     &(mut_record->kinetic_type),
                                                     &(mut_record->kinetic_diff));
-        reproduce_mutate(mutant,mut_record);        
-        clone_genotype(mutant,resident);        
+        reproduce_mutate(resident,mut_record); 
         calc_all_binding_sites(resident);
         find_motifs(resident); 
         store_resident_info(resident,NULL,&(resident_info[output_counter]),NA,NA,NA,(float)NA,-1);  
@@ -1831,13 +1827,13 @@ static void continue_simulation(Genotype *resident,
     tidy_output_files(evo_summary,mutation_file);
     
     /* set genotype based on previous steps*/   
-    replay_mutations(resident, mutant, mut_record, replay_N_steps); 
+    replay_mutations(resident, mut_record, replay_N_steps); 
 
     /* load random number seeds*/
     fp=fopen("RngSeeds.txt","r");
     if(fp!=NULL)
     {
-        for(i=0;i<replay_N_steps/SAVING_INTERVAL;i++)
+        for(i=0;i<replay_N_steps/OUTPUT_INTERVAL;i++)
         {
             for(j=0;j<N_THREADS;j++)        
             {
@@ -2089,7 +2085,7 @@ static int evolve_N_steps(  Genotype *resident,
         /*output precise hi-resolution fitness*/
         if(!(i==selection->MAX_STEPS && flag_burn_in))
         {
-            if(i%SAVING_INTERVAL==0)
+            if(i%OUTPUT_INTERVAL==0)
             {
                 fp=fopen("saving_point.txt","w");
                 fprintf(fp,"%d %d\n",i,*N_tot_trials);
@@ -3058,7 +3054,7 @@ static void tidy_output_files(char *file_genotype_summary, char *file_mutations)
     /*Basically delete the last line of the file if it is not complete*/
     fp1=fopen("RngSeeds.txt","r");
     fp2=fopen("temp","w");
-    for(i=0;i<(replay_N_steps/SAVING_INTERVAL);i++)
+    for(i=0;i<(replay_N_steps/OUTPUT_INTERVAL);i++)
     {
         fgets(buffer,2000,fp1);
         fputs(buffer,fp2);
