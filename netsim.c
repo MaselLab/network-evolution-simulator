@@ -130,7 +130,12 @@ static void output_mutant_info(Output_buffer *, int);
 
 static void output_resident_info(Output_buffer [OUTPUT_INTERVAL], int, int);
 
-#if PERTURB
+static void sample_motifs(Genotype *, Mutation *, int, RngStream);
+
+static void sample_parameters(Genotype *, int, RngStream);
+
+static void mark_genes_for_sampling(Genotype *, int, int, int, char);
+
 static void mark_genes_to_be_perturbed(Genotype *, int, int, int, int, int);
 
 static void modify_topology(Genotype *, Genotype *);
@@ -138,7 +143,7 @@ static void modify_topology(Genotype *, Genotype *);
 static void add_binding_site(Genotype *, int);
 
 static void remove_binding_sites(Genotype *, int);
-#endif
+
 /***************************************************************************** 
  * 
  *                              Global functions
@@ -323,25 +328,254 @@ void evolve_neutrally(Genotype *resident, Genotype *mutant, Mutation *mut_record
 #if PHENOTYPE
 void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, Selection *selection, int init_mRNA[MAX_GENES], float init_protein[MAX_GENES], RngStream RS_parallel[N_THREADS])
 {
-    /*replay mutations*/    
-    replay_mutations(resident, mutant, mut_record, selection->MAX_STEPS);    
-    /*output the evolved genotype*/
-    calc_all_binding_sites(resident); 
-    print_mutatable_parameters(resident,1);
-    summarize_binding_sites(resident,selection->MAX_STEPS); 
+    /*sampling parameters of network motifs*/
+    if(SAMPLE_PARAMETERS)
+        sample_motifs(resident, mut_record, selection->MAX_STEPS, RS_parallel[0]);
     
-//    exit(0);
+    /*replay mutations, output N_motifs.txt and networks.txt*/   
+    if(REPRODUCE_GENOTYPES || SAMPLE_GENE_EXPRESSION)
+    {        
+        replay_mutations(resident, mutant, mut_record, selection->MAX_STEPS);    
+        /*output the evolved genotype*/
+        calc_all_binding_sites(resident); 
+        print_mutatable_parameters(resident,1);
+        summarize_binding_sites(resident,selection->MAX_STEPS);  
+    }
     
-    /*create threads*/
-    omp_set_num_threads(N_THREADS);  
+    if(SAMPLE_GENE_EXPRESSION)
+    {
+        /*create threads*/
+        omp_set_num_threads(N_THREADS); 
+        /*collection interval is 1 minute by default*/    
+        selection->env1.t_development=91.1; //to make 90 data points
+        selection->env2.t_development=91.1; 
+        calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL, NULL);  
+    }
+}
+
+/*randomly sampling motifs*/
+static void sample_motifs(Genotype *genotype_ori,                                             
+                            Mutation *mut_record,
+                            int max_step,                           
+                            RngStream RS)
+{
+    int i,N_samples,which_step;    
+    Genotype genotype_copy1, genotype_copy2;
+    initialize_cache(&genotype_copy1); 
+    initialize_cache(&genotype_copy2);
+    FILE *fp;
+    int buffer_int;
+    float buffer_float;
+    char buffer_char;
+    char buffer_string[3];
     
-    /*collection interval is 1 minute by default*/    
-    selection->env1.t_development=91.1; //to make 90 data points
-    selection->env2.t_development=91.1;    
-    float f1[0][N_REPLICATES],f2[0][N_REPLICATES];
-    calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, f1[0],f2[0]);  
-    calc_fitness_stats(resident,selection,&(f1[0]),&(f2[0]),1);
-    printf("%f %f %f\n",resident->avg_fitness,resident->fitness1,resident->fitness2);
+    /*load mutation record*/
+    fp=fopen(mutation_file,"r");    
+    if(fp!=NULL)        
+        printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
+    else
+    {
+        printf("Loading mutation record failed! Quit program!");
+#if MAKE_LOG
+        LOG("Loading mutation record failed!");
+#endif
+        exit(-2);
+    }
+    /*Don't modify genotype_ori because it will be used elsewhere*/
+    clone_genotype(genotype_ori,&genotype_copy1);
+    
+    /*Only the last x steps will be repeated sampled. Let's keep a copy of 
+     *the genotype at the last (x-1)th step, so re-sampling can alway start here.
+     */
+    for(i=0;i<START_STEP_OF_SAMPLING-1;i++)
+    {    
+        fscanf(fp,"%c %d %d %s %d %a\n",&(mut_record->mut_type),
+                                        &(mut_record->which_gene),
+                                        &(mut_record->which_nucleotide), 
+                                        mut_record->nuc_diff,               
+                                        &(mut_record->kinetic_type),
+                                        &(mut_record->kinetic_diff));
+        reproduce_mutate(&genotype_copy1,mut_record);  
+    }
+    /*close mutation_file*/    
+    fclose(fp);  
+    /*reset N_samples*/
+    N_samples=0;    
+    /*sampling repeatedly*/
+    while(N_samples<SAMPLE_SIZE)
+    {
+        /*Keep the genotype at the last (x-1)th step intact*/
+        clone_genotype(&genotype_copy1,&genotype_copy2);  
+        which_step=RngStream_RandInt(RS,1,max_step-START_STEP_OF_SAMPLING+1);
+        /*open mutation record and skip the entries before start_step*/
+        fp=fopen(mutation_file,"r");
+        for(i=0;i<START_STEP_OF_SAMPLING-1;i++)
+            fscanf(fp,"%c %d %d %s %d %a\n",&buffer_char,&buffer_int,&buffer_int,&(buffer_string[0]),&buffer_int, &buffer_float);
+        /*reproduce the genotype at which_step*/
+        for(i=0;i<which_step;i++)
+        { 
+            fscanf(fp,"%c %d %d %s %d %a\n",&(mut_record->mut_type),
+                                                        &(mut_record->which_gene),
+                                                        &(mut_record->which_nucleotide), 
+                                                        mut_record->nuc_diff,               
+                                                        &(mut_record->kinetic_type),
+                                                        &(mut_record->kinetic_diff));
+            reproduce_mutate(&genotype_copy2,mut_record); 
+        } 
+        /*score motifs*/
+		calc_all_binding_sites(&genotype_copy2); 
+        find_motifs(&genotype_copy2); 
+        /*does the target motif exist*/
+        switch(TARGET_MOTIF) 
+        {
+            case 0:
+                    sample_parameters(&genotype_copy2,i,RS);
+                    N_samples++;
+                    break;
+            case 1:
+                    if(genotype_copy2.N_motifs[5]!=0)
+                    {
+                        sample_parameters(&genotype_copy2,i,RS);
+                        N_samples++;
+                    }
+                    break;
+            case 2:
+                    if(genotype_copy2.N_motifs[14]!=0)
+                    {
+                        sample_parameters(&genotype_copy2,i,RS);
+                        N_samples++;
+                    }
+                    break;
+            case 3:
+                    if(genotype_copy2.N_motifs[32]!=0)
+                    {
+                        sample_parameters(&genotype_copy2,i,RS);
+                        N_samples++;
+                    }                
+        }      
+        /*close mutation record*/
+        fclose(fp);   
+    }
+    printf("Sampling parameters successfully!\n");
+}
+
+void mark_genes_for_sampling(Genotype *genotype, int effector_gene_id, int fast_TF, int slow_TF, char which_motif)
+{
+    int mark_genes;    
+    /*set the flag to 0*/
+    mark_genes=0;    
+    /*raise the flag if which_motif is the target motif*/
+    switch(which_motif)
+    {
+        case 'D':           
+                if(TARGET_MOTIF==1)
+                    mark_genes=1;
+                    break;
+        case 'C':            
+                if(TARGET_MOTIF==2)
+                    mark_genes=1;
+                    break;        
+        case 'I':            
+                if(TARGET_MOTIF==3)
+                    mark_genes=1;         
+    }
+    /*mark genes*/
+    if(mark_genes)
+    {
+        genotype->cis_target_to_be_perturbed[effector_gene_id]=YES;
+        genotype->trans_target_to_be_perturbed[effector_gene_id][fast_TF]=YES;
+        genotype->slow_TF[effector_gene_id][slow_TF]=YES;            
+    }
+}
+
+/*output parameters of network motifs*/
+void sample_parameters(Genotype *genotype, int step, RngStream RS)
+{
+    int gene_id,protein_id,cluster_id,effector_gene_id;
+    FILE *fp;
+    
+    /*make output file*/        
+    fp=fopen("parameters.txt","a+");
+    
+    /*output the Kd of the signal*/
+    fprintf(fp,"%d 0 0.0 0.0 0.0 0.0 0.0 %f\n",step,log10(genotype->Kd[0]));
+    
+    /*sampling an effector gene*/
+    while(1)
+    {
+        gene_id=RngStream_RandInt(RS,1,genotype->ngenes-1);        
+        /*if sample a neutral network*/
+        if(TARGET_MOTIF==0)
+        {
+            /*then just pick an effector gene*/
+            if(genotype->which_protein[gene_id]==genotype->nproteins-1)
+                break;
+        }
+        else
+        {
+            cluster_id=genotype->which_cluster[gene_id];
+            /*otherwise, need to pick an effector gene that's in the target motif*/
+            if(genotype->cis_target_to_be_perturbed[genotype->cisreg_cluster[cluster_id][0]]==1)       
+                break;
+        }
+    }
+    fprintf(fp,"%d -1 %f %f %f %f %f 0.0\n",step,log10(genotype->active_to_intermediate_rate[gene_id]),
+                                                log10(genotype->mRNA_decay_rate[gene_id]),
+                                                log10(genotype->translation_rate[gene_id]),
+                                                log10(genotype->protein_decay_rate[gene_id]),
+                                                (float)genotype->locus_length[gene_id]); 
+    
+    /*sample a fast-TF gene from the motif that contain the chosen effector gene*/
+    effector_gene_id=genotype->cisreg_cluster[cluster_id][0]; 
+    if(TARGET_MOTIF!=1) //under direct regulation, the signal is the fast TF
+    {       
+        while(1)
+        {
+            gene_id=RngStream_RandInt(RS,1,genotype->ngenes-1);
+            protein_id=genotype->which_protein[gene_id];
+            /*if sample a neutral network*/
+            if(TARGET_MOTIF==0)
+            {        
+                /*then just pick a TF protein*/
+                if(protein_id!=genotype->nproteins-1)
+                    break;
+            }
+            else
+            {   /*otherwise need to pick a TF that's in the target motif*/
+                if(genotype->trans_target_to_be_perturbed[effector_gene_id][protein_id]==1)
+                    break;
+            }
+        }
+    }
+    else
+    {
+        gene_id=N_SIGNAL_TF-1;    
+        protein_id=N_SIGNAL_TF-1;
+    }    
+    fprintf(fp,"%d 1 %f %f %f %f %f %f\n",step,log10(genotype->active_to_intermediate_rate[gene_id]),
+                                            log10(genotype->mRNA_decay_rate[gene_id]),
+                                            log10(genotype->translation_rate[gene_id]),
+                                            log10(genotype->protein_decay_rate[gene_id]),
+                                            (float)genotype->locus_length[gene_id],
+                                            log10(genotype->Kd[protein_id])); 
+    /*sample a slow-TF gene*/
+    if(TARGET_MOTIF!=0) //no need to sample another TF in a neutral network, 
+    {
+        while(1)
+        {
+            gene_id=RngStream_RandInt(RS,1,genotype->ngenes-1);
+            protein_id=genotype->which_protein[gene_id];          
+            if(genotype->slow_TF[effector_gene_id][protein_id]==1)
+                break;
+        }
+    }
+    fprintf(fp,"%d 1 %f %f %f %f %f %f\n",step,log10(genotype->active_to_intermediate_rate[gene_id]),
+                                            log10(genotype->mRNA_decay_rate[gene_id]),
+                                            log10(genotype->translation_rate[gene_id]),
+                                            log10(genotype->protein_decay_rate[gene_id]),
+                                            (float)genotype->locus_length[gene_id],
+                                            log10(genotype->Kd[protein_id]));
+    fclose(fp);
 }
 #endif
 
@@ -431,9 +665,9 @@ void perturbation_analysis(Genotype *resident,
             resident->N_motifs[23]==resident->N_motifs[18] && 
             resident->N_motifs[27]==0 )
     #else // disturb diamond
-        if(resident->N_motifs[34]!=0 && 
+        if(resident->N_motifs[32]!=0 && 
             resident->N_motifs[9]==0 && 
-            resident->N_motifs[27]==resident->N_motifs[34] && 
+            resident->N_motifs[27]==resident->N_motifs[32] && 
             resident->N_motifs[18]==0 )
     #endif      
 #endif             
@@ -1309,12 +1543,12 @@ static void calc_avg_fitness(   Genotype *genotype,
     } 
    
     /*output the maximum change in the probabilities of TF binding*/
-    fp=fopen("max_change_in_binding_probability_A","w");
+    fp=fopen("max_change_in_binding_probability_A.txt","w");
     for(i=0;i<N_REPLICATES;i++)
         fprintf(fp,"%f\n",timecourse1[i].max_change_in_probability_of_binding);
     fclose(fp);
     
-    fp=fopen("max_change_in_binding_probability_B","w");
+    fp=fopen("max_change_in_binding_probability_B.txt","w");
     for(i=0;i<N_REPLICATES;i++)
         fprintf(fp,"%f\n",timecourse2[i].max_change_in_probability_of_binding);
     fclose(fp);      
@@ -2005,6 +2239,16 @@ static void find_motifs(Genotype *genotype)
         for(j=0;j<MAX_PROTEINS;j++)
             genotype->trans_target_to_be_perturbed[i][j]=0;
     }
+#elif SAMPLE_PARAMETERS
+    for(i=0;i<MAX_GENES;i++)
+    {
+        genotype->cis_target_to_be_perturbed[i]=0;
+        for(j=0;j<MAX_PROTEINS;j++)
+        {
+            genotype->trans_target_to_be_perturbed[i][j]=0;
+            genotype->slow_TF[i][j]=0;
+        }
+    }
 #endif
 #if COUNT_NEAR_AND
         for(i=0;i<12;i++)
@@ -2046,11 +2290,11 @@ static void find_motifs(Genotype *genotype)
                 {                    
                     for(j=0;j<N_copies_reg_by_env;j++)
                     {
-                        protein_id=genotype->which_protein[copies_reg_by_env[j]];
+                        slow_TF=genotype->which_protein[copies_reg_by_env[j]];
                         determine_motif_logic(genotype, 
                                                 hindrance, 
                                                 N_SIGNAL_TF-1, 
-                                                protein_id, 
+                                                slow_TF, 
                                                 cluster_size, 
                                                 'D', // "D"iret regulation
                                                 strong_BS_pos,
@@ -2472,6 +2716,9 @@ static void determine_motif_logic(Genotype *genotype,
             if(hindrance[slow_TF][slow_TF])
             {
                 genotype->N_motifs[start_entry_in_N_motifs+5]+=n_motifs; // AND-gated 
+#if SAMPLE_PARAMETERS
+                mark_genes_for_sampling(genotype, effector_gene_id, fast_TF, slow_TF, motif_name);               
+#endif
 #if COUNT_NEAR_AND
                 determine_near_AND_logic(genotype, strong_BS_pos, fast_TF, slow_TF, n_motifs, motif_name, 0);              
 #endif   
@@ -2529,8 +2776,7 @@ static void determine_near_AND_logic(Genotype *genotype,
             start_entry_in_N_near_AND=4;
             break;
         case 'I':            
-            start_entry_in_N_near_AND=8;
-            
+            start_entry_in_N_near_AND=8;            
     }
     
     /* For a non-AND gate to be counted as near-AND gate, fast TF and slow TF each 
@@ -3047,7 +3293,7 @@ static void output_resident_info(Output_buffer resident_info[OUTPUT_INTERVAL], i
     fflush(fp);
     fclose(fp); 
 #if COUNT_NEAR_AND
-    fp=fopen("N_near_AND_gate_motifs.txt","a+");
+    fp=fopen("N_near_AND_gated_motifs.txt","a+");
     for(j=0;j<output_counter;j++)
     {
         for(i=0;i<12;i++)    

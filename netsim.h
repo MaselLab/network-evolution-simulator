@@ -56,8 +56,23 @@
 #define DIRECT_REG 0 //set it to "1" to allow the signal to directly regulate the effector
 #define RANDOM_COOPERATION_LOGIC 0 //"1" to randomly set whether a gene (including TF genes) is AND-gated-capable at initialization 
 
+/*4. Phenotype options*/
+/******************************************************************************/
+#if PHENOTYPE
+#define SAMPLE_PARAMETERS 1 //randomly sample parameters of networks motifs
+#define SAMPLE_SIZE 100 //number of samples to take
+#define START_STEP_OF_SAMPLING 41001 //sample from the genotypes at the start step and afterwards 
+#define TARGET_MOTIF 2 // 0 means sampling genes regardless of motifs
+                       // 1 samples from c1-FFLs under direction regulation
+                       // 2 samples from isolated AND-gated C1-FFLs
+                       // 3 samples from isolated AND-gated FFL-in-diamonds
+#define REPRODUCE_GENOTYPES 0 // output N_motifs and networks of all accepted mutations, 
+                              // can be used together with options in section 6
+#define SAMPLE_GENE_EXPRESSION 0 //output expression of genes
+#endif
 
-/*4. Perturbation options*/
+
+/*5. Perturbation options*/
 /******************************************************************************/
 #if PERTURB 
 #define WHICH_MOTIF 2 //only one type of motif can be disturbed at a time: 0 for C1-FFL, 1 for FFL-in-diamond, 2 for diamond
@@ -69,16 +84,12 @@
 #endif
 
 
-/*5. Count additional motifs*/
-/******************************************************************************/
-#define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
-
-
 /*6. Analyzing weak TFBSs*/
 /******************************************************************************/
 /*We can exclude different weak TFBSs when scoring motifs. We recommend doing 
  *this analysis under PHENOTYPE mode.
  */
+#define COUNT_NEAR_AND 0 //count near-AND-gated motifs.
 #define CUT_OFF_MISMATCH_SIG2EFFECTOR 2 //the maximum number of mismatches in TFBSs of the signal in effector genes
 #define CUT_OFF_MISMATCH_TF2EFFECTOR 2 //the maximum number of mismatches in TFBSs of TFs in effector genes
 #define CUT_OFF_MISMATCH_SIGNAL2TF 2 //the maximum number of mismatches in TFBSs of the signal in TF genes
@@ -239,6 +250,7 @@ struct Genotype {
     int N_motifs[36];  
     int N_near_AND_gated_motifs[12];
     int trans_target_to_be_perturbed[MAX_GENES][MAX_PROTEINS];
+    int slow_TF[MAX_GENES][MAX_PROTEINS];
     int cis_target_to_be_perturbed[MAX_GENES];    
 };
 
@@ -356,10 +368,6 @@ void perturbation_analysis(Genotype *,
                             RngStream [N_THREADS]);
 
 void print_mutatable_parameters(Genotype*,int);
-
-//void print_mutatable_parameters2(Genotype*, int, int, char, int, RngStream);
-
-//void replay_mutations(Genotype *, Genotype *, Mutation *, int, RngStream);
 
 void calc_all_binding_sites_copy(Genotype *, int);
 
