@@ -569,7 +569,7 @@ void sample_parameters(Genotype *genotype, int step, RngStream RS)
                 break;
         }
     }
-    fprintf(fp,"%d 1 %f %f %f %f %f %f\n",step,log10(genotype->active_to_intermediate_rate[gene_id]),
+    fprintf(fp,"%d 2 %f %f %f %f %f %f\n",step,log10(genotype->active_to_intermediate_rate[gene_id]),
                                             log10(genotype->mRNA_decay_rate[gene_id]),
                                             log10(genotype->translation_rate[gene_id]),
                                             log10(genotype->protein_decay_rate[gene_id]),
