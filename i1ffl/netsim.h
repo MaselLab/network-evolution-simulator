@@ -12,7 +12,7 @@
 
 /*Simulation mode*/
 #define PHENOTYPE 0
-#define PERTURB 1
+#define PERTURB 0
 #define NEUTRAL 0
 #define IRREG_SIGNAL 0
 
@@ -131,7 +131,9 @@ struct Environment
     float signal_off_strength;
     float t_signal_on;
     float t_signal_off;
+    int signal_on_aft_burn_in;
     char initial_effect_of_effector;
+    char effect_of_effector_aft_burn_in;
     int fixed_effector_effect;  
     float *external_signal;
     float duration_of_burn_in_growth_rate;
@@ -149,6 +151,8 @@ struct Environment
     float opt_peak_response;
     float fitness_factor_of_peak_response;    
     int window_size;
+    float max_duration_of_burn_in_growth_rate;    
+    float avg_duration_of_burn_in_growth_rate;
 };
 
 struct Selection
@@ -229,14 +233,15 @@ struct Genotype {
     /*statistics of fitness*/
     float fitness1;
     float fitness2;
-    float sq_SE_fitness1;
-    float sq_SE_fitness2;
+    float SE_fitness1;
+    float SE_fitness2;
     float avg_fitness;
-    float sq_SE_avg_fitness;
+    float SE_avg_fitness;
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*measurement of network topology*/
     int N_motifs[17]; 
+    int N_near_AND_gated_motifs[12];
     int TF_in_core_C1ffl[MAX_GENES][MAX_PROTEINS];
     int gene_in_core_C1ffl[MAX_GENES];
     int N_act_genes;  
@@ -250,7 +255,8 @@ struct Phenotype
     int total_time_points;
     float *protein_concentration;
     float *gene_specific_concentration;
-    float *instantaneous_fitness;    
+    float *instantaneous_fitness;   
+    float max_change_in_probability_of_binding;
 };   
 
 typedef struct Mutation Mutation;
@@ -264,6 +270,35 @@ struct Mutation
     int kinetic_type;    /*0 for pic_disassembly, 1 for mRNA_decay, 2 for translation, 3 for protein_decay*/
     float kinetic_diff;
     int N_hit_bound;
+};
+
+/*output buffer*/
+typedef struct Output_buffer Output_buffer;
+struct Output_buffer
+{    
+    int step;
+    int n_tot_mut;
+    int n_mut_at_the_step;
+    int n_hit_bound;
+    float selection_coefficient;
+    float avg_f;
+    float f1;
+    float f2;
+    float se_avg_f;
+    float se_f1;
+    float se_f2;
+    int n_gene;
+    int n_output_genes;
+    int n_act;
+    int n_rep;    
+    char mut_type;
+    int which_gene;
+    int which_nuc;
+    char new_nuc[3];
+    int which_kinetic;
+    float new_kinetic;   
+    int n_motifs[36];
+    int n_near_AND_gated_motifs[12];    
 };
 
 

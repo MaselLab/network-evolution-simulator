@@ -124,11 +124,11 @@ struct CellState {
     float precision[3];  
 };
 
-void initialize_cell(Genotype *, CellState *, Environment *, int [MAX_GENES], float [MAX_PROTEINS]);
+void initialize_cell(Genotype *, CellState *, Environment *, float, int [MAX_GENES], float [MAX_PROTEINS]);
 
-void do_single_timestep(Genotype *, CellState *, GillespieRates *, Environment *, Phenotype *, RngStream) ;
+void do_single_timestep(Genotype *, CellState *, GillespieRates *, Environment *, float, Phenotype *, RngStream) ;
 
-void calc_all_rates(Genotype *, CellState *, GillespieRates *, Environment *, int);
+void calc_all_rates(Genotype *, CellState *, GillespieRates *, Environment *, Phenotype *, float, int);
 
 #endif /* EXPRESSION_DYNAMICS_H */
 

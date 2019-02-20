@@ -24,7 +24,7 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-	seed=2;
+	seed=1;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
@@ -96,12 +96,20 @@ int main()
     selection.env1.t_development=119.9; //minutes
     selection.env2.t_development=119.9;
     
+    /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
+    selection.env1.avg_duration_of_burn_in_growth_rate=10.0;
+    selection.env2.avg_duration_of_burn_in_growth_rate=10.0;
+    selection.env1.max_duration_of_burn_in_growth_rate=0.0;
+    selection.env2.max_duration_of_burn_in_growth_rate=0.0;
+    
     /*The code below creates signals under env1 and env2. The signal is consecutive "ONs" and "OFFs" and always starts with "ON". 
      *Use t_signal_on and t_signal_off to specify the duration of "on" and "off"*/ 
-    selection.env1.signal_on_strength=10000.0;    
-    selection.env1.signal_off_strength=10.0;
-    selection.env2.signal_on_strength=100000.0;
-    selection.env2.signal_off_strength=100.0;    
+    selection.env1.signal_on_strength=500.0;    
+    selection.env1.signal_off_strength=50.0;
+    selection.env2.signal_on_strength=500.0;
+    selection.env2.signal_off_strength=50.0;    
+    selection.env1.signal_on_aft_burn_in=0; //turn on signal after burn-in growth
+    selection.env2.signal_on_aft_burn_in=0;
     selection.env1.t_signal_on=200.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
     selection.env1.t_signal_off=60.0; 
     selection.env2.t_signal_on=200.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
@@ -234,10 +242,16 @@ int main()
     Selection burn_in;         
     burn_in.env1.t_development=89.9;
     burn_in.env2.t_development=89.9;
+    burn_in.env1.avg_duration_of_burn_in_growth_rate=10.0;
+    burn_in.env2.avg_duration_of_burn_in_growth_rate=10.0;
+    burn_in.env1.max_duration_of_burn_in_growth_rate=30.0;
+    burn_in.env2.max_duration_of_burn_in_growth_rate=30.0; 
     burn_in.env1.signal_on_strength=1000.0;  
     burn_in.env1.signal_off_strength=0.0;
     burn_in.env2.signal_on_strength=1000.0;
     burn_in.env2.signal_off_strength=0.0;
+    burn_in.env1.signal_on_aft_burn_in=0; 
+    burn_in.env2.signal_on_aft_burn_in=0;
     burn_in.env1.t_signal_on=200.0;    
     burn_in.env1.t_signal_off=0.0;
     burn_in.env2.t_signal_on=10.0;

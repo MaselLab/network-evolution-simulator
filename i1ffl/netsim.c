@@ -21,7 +21,8 @@
 
 #define INITIALIZATION -1
 
-int MAXELEMENTS=100; 
+int MAX_TFBS_NUMBER=100; 
+
 static const float PROB_ACTIVATING=0.62;
 static const float MEAN_PROTEIN_DECAY_RATE=-1.88;
 static const float SD_PROTEIN_DECAY_RATE=0.56;
@@ -40,6 +41,7 @@ static const float NS_Kd=1.0e-5;
 const float KD2APP_KD=1.8e10;
 const float MEAN_GENE_LENGTH=2.568; //log10(aa)
 
+static const float MIN_SELECTION_COEFFICIENT=1.0e-8;
 /*Bounds*/
 const float MAX_ACT_TO_INT_RATE=64.6;
 const float MIN_ACT_TO_INT_RATE=0.59;
@@ -89,15 +91,15 @@ static void calc_avg_fitness(Genotype *, Selection *, int [MAX_GENES], float [MA
 
 static void clone_genotype(Genotype *, Genotype *);
 
-static float try_fixation(Genotype *, Genotype *, int, int, int *, RngStream);
+static void try_replacement(Genotype *, Genotype *, int *, float*);
 
 static void summarize_binding_sites(Genotype *,int);
 
-static void set_signal(CellState *, Environment *, RngStream, int);
+static void set_signal(CellState *, Environment *, float, RngStream, int);
 
 static void output_genotype(Genotype *);
 
-static int evolve_N_steps(Genotype *, Genotype *,  Mutation *, Selection *, int *, int *, int [MAX_GENES], float [MAX_PROTEINS], RngStream, RngStream [N_THREADS], int);
+static int evolve_N_steps(Genotype *, Genotype *,  Mutation *, Selection *, Output_buffer [OUTPUT_INTERVAL], int *, int *, int [MAX_GENES], float [MAX_PROTEINS], RngStream, RngStream [N_THREADS], int);
 
 static void run_simulation(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int [MAX_GENES], float [MAX_PROTEINS], int, int, RngStream, RngStream [N_THREADS]);
 
@@ -107,13 +109,21 @@ static void calc_fitness_stats(Genotype *, Selection *, float (*)[N_REPLICATES],
 
 static float calc_replicate_fitness(CellState *, Environment *, int);
 
-static void replay_mutations(Genotype *, Genotype *, Mutation *, FILE*, int);
+static void replay_mutations(Genotype *, Mutation *, int);
 
 static void find_motifs(Genotype *);
 
-static void tidy_evo_summaries(char*, char*);
+static void tidy_output_files(char*, char*);
 
 static void print_motifs(Genotype *);
+
+static void store_mutant_info(Genotype *, Mutation *, Output_buffer *, int, int);
+
+static void store_resident_info(Genotype *, Mutation *, Output_buffer *, int , int, int, float, int);
+
+static void output_mutant_info(Output_buffer *, int);
+
+static void output_resident_info(Output_buffer [OUTPUT_INTERVAL], int, int);
 
 static void who_regulates_effector(Genotype *, int , int [MAX_PROTEINS], int [MAX_PROTEINS], int *, int *);
 
@@ -153,11 +163,11 @@ int evolve_under_selection(Genotype *resident,
     fp=fopen("saving_point.txt","r");   
     if(fp!=NULL) 
     {        
-        int replay_N_steps=0;       
-        fscanf(fp,"%d",&replay_N_steps);
+        int replay_N_steps=0, int_buffer;       
+        fscanf(fp,"%d %d",&replay_N_steps,&int_buffer);
         fclose(fp);
         fp=fopen(setup_summary,"a+");
-        fprintf(fp,"Continue simulation at step %d\n",replay_N_steps);
+        fprintf(fp,"Continue simulation from step %d\n",replay_N_steps);
         fclose(fp);
         if(replay_N_steps!=0)                              
             continue_simulation(resident, 
@@ -196,14 +206,14 @@ int evolve_under_selection(Genotype *resident,
        
         /* make title of the output file*/
         fp=fopen(evo_summary,"w");
-        fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mutn selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
+        fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
         fprintf(fp,"0 0 0 0 na na %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d \n",  
                 resident->avg_fitness,               
                 resident->fitness1,
                 resident->fitness2,
-                sqrt(resident->sq_SE_avg_fitness),
-                sqrt(resident->sq_SE_fitness1),
-                sqrt(resident->sq_SE_fitness2),
+                resident->SE_avg_fitness,
+                resident->SE_fitness1,
+                resident->SE_fitness2,
                 resident->ngenes,
                 resident->nproteins,
                 resident->N_act,
@@ -232,77 +242,79 @@ int evolve_under_selection(Genotype *resident,
 }
 
 #if NEUTRAL
-void evolve_neutrally(Genotype *resident, Genotype *mutant, Mutation *mut_record, Selection *burn_in, Selection *selection, RngStream RS_main)
+void evolve_neutrally(Genotype *resident, Mutation *mut_record, Selection *burn_in, Selection *selection, RngStream RS_main)
 {
-    int i;    
+    int i, output_counter=0;
     FILE *fp;    
+    Output_buffer resident_info[OUTPUT_INTERVAL];
+    
+    /*Set resident fitness to 0*/
+    resident->fitness1=0.0;
+    resident->fitness2=0.0;
+    resident->avg_fitness=0.0;
+    resident->SE_avg_fitness=0.0;
+    resident->SE_fitness1=0.0;
+    resident->SE_fitness2=0.0;
+    
     /*Create title for output files*/
     fp=fopen(evo_summary,"a+");
-    fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mutn selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
+    fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
     fprintf(fp,"0 0 0 na na 0.0 0.0 0.0 0.0 0.0 0.0 0 0 0 0 \n");
     fclose(fp); 
-    /*BURN-IN*/              
+    
+    /*record the initial network*/
+    calc_all_binding_sites(resident);
+    summarize_binding_sites(resident,0);
+    
+    /*set BURN-IN conditions*/              
     DUPLICATION=burn_in->temporary_DUPLICATION;                 
     SILENCING=burn_in->temporary_SILENCING;
-    N_EFFECTOR_GENES=burn_in->temporary_N_effector_genes;
-    N_TF_GENES=burn_in->temporary_N_tf_genes; 
+//    N_EFFECTOR_GENES=burn_in->temporary_N_effector_genes;
+//    N_TF_GENES=burn_in->temporary_N_tf_genes; 
     miu_ACT_TO_INT_RATE=burn_in->temporary_miu_ACT_TO_INT_RATE; 
     miu_Kd=burn_in->temporary_miu_Kd;       
-    miu_protein_syn_rate=burn_in->temporary_miu_protein_syn_rate;     
-    for(i=0;i<burn_in->MAX_STEPS;i++)
-    {       
-        clone_genotype(resident,mutant);
-        mutate(mutant,RS_main,mut_record);   
-        fp=fopen(mutation_file,"a+");
-        fprintf(fp,"%c %d %d '%s' %d %a\n",
-                mut_record->mut_type,    
-                mut_record->which_gene,
-                mut_record->which_nucleotide,
-                mut_record->nuc_diff,
-                mut_record->kinetic_type,
-                mut_record->kinetic_diff);
-        fclose(fp);        
-        clone_genotype(mutant,resident);         
+    miu_protein_syn_rate=burn_in->temporary_miu_protein_syn_rate; 
+    
+    /*burn in*/
+    for(i=1;i<=burn_in->MAX_STEPS;i++)
+    {  
+        mutate(resident,RS_main,mut_record);  
         calc_all_binding_sites(resident);
-        find_motifs(resident); 
-        print_motifs(resident);        
+        find_motifs(resident);       
+        store_resident_info(resident, mut_record, &(resident_info[output_counter]), i, 1, i, 0.0, 1); //magic number 1 means store everything
+        output_counter++;
         /*output network topology every OUTPUT_INTERVAL steps*/ 
-        if(i%OUTPUT_INTERVAL==0 && i!=0)
-            summarize_binding_sites(resident,i);        
-        /*output a summary of simulation every step*/
-        output_genotype(resident);
+        if(i%OUTPUT_INTERVAL==0)
+        {
+            summarize_binding_sites(resident,i);
+            output_resident_info(resident_info,output_counter,1); //magic number 1 means to output everything
+            output_counter=0;
+        }       
     } 
     
+    /*set post burn-in condition*/
     DUPLICATION=selection->temporary_DUPLICATION;                 
     SILENCING=selection->temporary_SILENCING;
-    N_EFFECTOR_GENES=selection->temporary_N_effector_genes;
-    N_TF_GENES=selection->temporary_N_tf_genes; 
+//    N_EFFECTOR_GENES=selection->temporary_N_effector_genes;
+//    N_TF_GENES=selection->temporary_N_tf_genes; 
     miu_ACT_TO_INT_RATE=selection->temporary_miu_ACT_TO_INT_RATE; 
     miu_Kd=selection->temporary_miu_Kd;       
     miu_protein_syn_rate=selection->temporary_miu_protein_syn_rate;      
     
-    for(;i<selection->MAX_STEPS;i++)
-    {
-        clone_genotype(resident,mutant);
-        mutate(mutant,RS_main,mut_record);   
-        fp=fopen(mutation_file,"a+");
-        fprintf(fp,"%c %d %d '%s' %d %a\n",
-                mut_record->mut_type,    
-                mut_record->which_gene,
-                mut_record->which_nucleotide,
-                mut_record->nuc_diff,
-                mut_record->kinetic_type,
-                mut_record->kinetic_diff);
-        fclose(fp);        
-        clone_genotype(mutant,resident);         
+    for(;i<=selection->MAX_STEPS;i++)
+    {       
+        mutate(resident,RS_main,mut_record);   
         calc_all_binding_sites(resident);
-        find_motifs(resident); 
-        print_motifs(resident);        
-        /*output network topology every OUTPUT_INTERVAL steps*/ 
-        if(i%OUTPUT_INTERVAL==0 && i!=0)
-            summarize_binding_sites(resident,i);        
-        /*output a summary of simulation every step*/
-        output_genotype(resident);
+        find_motifs(resident);            
+        store_resident_info(resident, mut_record, &(resident_info[output_counter]), i, 1, i, 0.0, 1); //magic number 1 means store everything
+        output_counter++;
+        /*output network topology every OUTPUT_INTERVAL steps*/        
+        if(i%OUTPUT_INTERVAL==0 && i!=burn_in->MAX_STEPS)
+        {
+            summarize_binding_sites(resident,i);
+            output_resident_info(resident_info,output_counter,1); //magic number 1 means to output everything
+            output_counter=0;
+        } 
     }
     print_mutatable_parameters(resident,1);    
 }
@@ -311,80 +323,67 @@ void evolve_neutrally(Genotype *resident, Genotype *mutant, Mutation *mut_record
 #if PHENOTYPE
 void show_phenotype(Genotype *resident, Genotype *mutant, Mutation *mut_record, Selection *selection, int init_mRNA[MAX_GENES], float init_protein[MAX_GENES], RngStream RS_parallel[N_THREADS])
 {   
-    FILE *fp;
+    /*sampling parameters of network motifs*/
+    if(SAMPLE_PARAMETERS)
+        sample_motifs(resident, mut_record, selection->MAX_STEPS, RS_parallel[0]);
     
-    /*load mutation record*/
-    fp=fopen(mutation_file,"r");    
-    if(fp!=NULL)        
-        printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
-    else
-    {
-        printf("Loading mutation record failed! Quit program!");
-#if LOG
-        LOG("Loading mutation record failed!");
-#endif
-        exit(-2);
+    /*replay mutations, output N_motifs.txt and networks.txt*/   
+    if(REPRODUCE_GENOTYPES || SAMPLE_GENE_EXPRESSION)
+    {        
+        replay_mutations(resident, mut_record, selection->MAX_STEPS);    
+        /*output the evolved genotype*/
+        calc_all_binding_sites(resident); 
+        print_mutatable_parameters(resident,1);
+        summarize_binding_sites(resident,selection->MAX_STEPS);  
     }
     
-    /*replay mutations*/    
-    replay_mutations(resident, mutant, mut_record, fp, selection->MAX_STEPS); 
-    fclose(fp);
-    
-    find_motifs(resident);   
-    
-    /*output the evolved genotype*/
-    calc_all_binding_sites(resident); 
-    print_mutatable_parameters(resident,1);
-    summarize_binding_sites(resident,selection->MAX_STEPS);   
-    exit(0);    
-    
-    /*create threads*/
-    omp_set_num_threads(N_THREADS);  
-    
-    int i,j;
-    float fold_change[10]={10.0,20.0,30.0,40.0,50.0,60.0,70.0,80.0,90.0,100.0};
-    float init_sig_strength[4]={10.0,40.0,160.0,640.0};
-    char fold_name[32];
-
-    for(i=0;i<10;i++)
+    if(SAMPLE_GENE_EXPRESSION)
     {
-        snprintf(fold_name,sizeof(char)*32,"%i",(int)fold_change[i]);
+        /*create threads*/
+        omp_set_num_threads(N_THREADS);  
 
-        mkdir(fold_name,0700);
-        chdir(fold_name);
+        int i,j;
+        float fold_change[10]={10.0,20.0,30.0,40.0,50.0,60.0,70.0,80.0,90.0,100.0};
+        float init_sig_strength[4]={10.0,40.0,160.0,640.0};
+        char fold_name[32];
 
-        for(j=0;j<4;j++)
+        for(i=0;i<10;i++)
         {
-            snprintf(fold_name,sizeof(char)*32,"%i",(int)init_sig_strength[j]);
+            snprintf(fold_name,sizeof(char)*32,"%i",(int)fold_change[i]);
+
             mkdir(fold_name,0700);
             chdir(fold_name);
-            /*collection interval is 1 minute by default*/   
-            selection->env1.t_development=359.9; //minutes
-            selection->env2.t_development=359.9;
-            selection->env1.signal_on_strength=init_sig_strength[j]*fold_change[i];    
-            selection->env1.signal_off_strength=init_sig_strength[j];
-            selection->env2.signal_on_strength=init_sig_strength[j]*fold_change[i]*2.0;
-            selection->env2.signal_off_strength=init_sig_strength[j]*2.0;    
-            selection->env1.t_signal_on=200.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
-            selection->env1.t_signal_off=180.0; 
-            selection->env2.t_signal_on=200.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
-            selection->env2.t_signal_off=180.0;
 
-            selection->env1.t_development+=0.2;
-            selection->env2.t_development+=0.2;    
-            calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL,NULL);   
+            for(j=0;j<4;j++)
+            {
+                snprintf(fold_name,sizeof(char)*32,"%i",(int)init_sig_strength[j]);
+                mkdir(fold_name,0700);
+                chdir(fold_name);
+                /*collection interval is 1 minute by default*/   
+                selection->env1.t_development=359.9; //minutes
+                selection->env2.t_development=359.9;
+                selection->env1.signal_on_strength=init_sig_strength[j]*fold_change[i];    
+                selection->env1.signal_off_strength=init_sig_strength[j];
+                selection->env2.signal_on_strength=init_sig_strength[j]*fold_change[i]*2.0;
+                selection->env2.signal_off_strength=init_sig_strength[j]*2.0;    
+                selection->env1.t_signal_on=200.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
+                selection->env1.t_signal_off=180.0; 
+                selection->env2.t_signal_on=200.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
+                selection->env2.t_signal_off=180.0;
+
+                selection->env1.t_development+=0.2;
+                selection->env2.t_development+=0.2;    
+                calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL,NULL);   
+                chdir("..");
+            }    
             chdir("..");
-        }    
-        chdir("..");
-    }
+        }
 
-    
-    
-    
-    /*collection interval is 1 minute by default*/    
-//    selection->env1.t_development+=0.2;
-//    selection->env2.t_development+=0.2;    
-//    calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL,NULL);    
+        /*collection interval is 1 minute by default*/    
+    //    selection->env1.t_development+=0.2;
+    //    selection->env2.t_development+=0.2;    
+    //    calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, NULL,NULL);    
+    }
 }
 #endif
 
@@ -483,9 +482,9 @@ void modify_network(Genotype *resident,
                         resident->avg_fitness,                        
                         resident->fitness1,
                         resident->fitness2,
-                        sqrt(resident->sq_SE_avg_fitness),
-                        sqrt(resident->sq_SE_fitness1),
-                        sqrt(resident->sq_SE_fitness2));
+                        sqrt(resident->SE_avg_fitness),
+                        sqrt(resident->SE_fitness1),
+                        sqrt(resident->SE_fitness2));
                 fclose(f_aft_perturbation);
                 fprintf(f_bf_perturbation,"%d %.10f %.10f %.10f %.10f %.10f %.10f\n",
                         step,
@@ -529,8 +528,7 @@ char set_base_pair(float x)
  */
 void initialize_cache(Genotype *genotype)
 {
-    int j,k;
-    FILE *fperror;  
+    int j,k; 
     /*Initialize variables that applies to loci*/
     for(j=0;j<MAX_GENES;j++)
     {
@@ -564,7 +562,7 @@ void initialize_cache(Genotype *genotype)
     for(j=0;j<MAX_OUTPUT_PROTEINS;j++)        
         genotype->output_protein_ids[j]=NA;
     /* alloc space for binding sites*/
-    genotype->N_allocated_elements=MAXELEMENTS;
+    genotype->N_allocated_elements=MAX_TFBS_NUMBER;
     for(j=0;j<MAX_GENES;j++)
     {
         genotype->all_binding_sites[j] = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
@@ -830,7 +828,7 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
     /* calculate max_unhindered_sites */
     /* max_unhindered_sites is maximum number of TFs that can bind to a cis-reg sequence at the same time*/
     /* We use it to faciliate the calculation of Pact and Prep. See calc_TF_dist_from_all_BS for its usage.*/
-    int act_BS[MAXELEMENTS][2],rep_BS[MAXELEMENTS][2];
+    int act_BS[MAX_TFBS_NUMBER][2],rep_BS[MAX_TFBS_NUMBER][2];
     int N_act_BS,N_rep_BS;    
     N_act_BS=1;
     N_rep_BS=1;
@@ -883,11 +881,11 @@ void calc_all_binding_sites_copy(Genotype *genotype, int gene_id)
 void calc_all_binding_sites(Genotype *genotype)
 {    
     int gene_id;
-    if(genotype->N_allocated_elements<MAXELEMENTS)
+    if(genotype->N_allocated_elements<MAX_TFBS_NUMBER)
     {
         for(gene_id=0;gene_id<MAX_GENES;gene_id++)
-            genotype->all_binding_sites[gene_id]=realloc(genotype->all_binding_sites[gene_id], MAXELEMENTS*sizeof(AllTFBindingSites));
-        genotype->N_allocated_elements=MAXELEMENTS;
+            genotype->all_binding_sites[gene_id]=realloc(genotype->all_binding_sites[gene_id], MAX_TFBS_NUMBER*sizeof(AllTFBindingSites));
+        genotype->N_allocated_elements=MAX_TFBS_NUMBER;
     }
     
     for(gene_id=N_SIGNAL_TF;gene_id < genotype->ngenes;gene_id++)
@@ -1050,43 +1048,51 @@ static void initialize_genotype_fixed(Genotype *genotype,
 /*
  * Set how the environmental signal should change
  */
-static void set_signal(CellState *state, 
-                        Environment *env,
-                        RngStream RS,
-                        int thread_ID)
+static void set_signal(CellState *state, Environment *env, float t_burn_in, RngStream RS, int thread_ID)
 {
     float t=0.0;     
-    char flag;  
+    char flag;   
     
-#if EXTERNAL_SIGNAL
+#if IRREG_SIGNAL
     int j;
     j=RngStream_RandInt(RS,0,99);
     env->external_signal=&(signal_profile_matrix[thread_ID][j][0]);
 #else
     env->external_signal=NULL;             
-#endif 
+#endif    
     
     if(env->external_signal==NULL)   
     {
-        flag='f'; 
+        /*always start a burn-in with signal off*/       
         state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength; 
-        state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;
-        #if N_SIGNAL_TF==2
-            state->protein_number[0]=background_signal_strength;
-        #endif      
-        while(t<env->t_development)
+        if(t_burn_in!=0.0)
+            t=t+t_burn_in; //the completion of burn_in is a fixed event, which is added in initialize_cell       
+        /*after burn-in, signal should be turned "o"n*/
+        flag='f'; 
+#if N_SIGNAL_TF==2
+        state->protein_number[0]=background_signal_strength;
+#endif      
+        while(t<env->t_development+t_burn_in)
         {
             if(flag=='o')
-            {
-                add_fixed_event(-1,t+env->t_signal_on,&(state->signal_off_head),&(state->signal_off_tail));
-                flag='f';
-                t=t+env->t_signal_on;                    
+            {                
+                if(env->t_signal_on!=0.0) 
+                {
+                    /*add a fixed event to TURN OFF signal.*/
+                    add_fixed_event(-1,t+env->t_signal_on,&(state->signal_off_head),&(state->signal_off_tail));
+                    t=t+env->t_signal_on; 
+                }
+                flag='f';                                  
             }    
             else
             {
-                add_fixed_event(-1,t+env->t_signal_off,&(state->signal_on_head),&(state->signal_on_tail));
-                flag='o';
-                t=t+env->t_signal_off;
+                if(env->t_signal_off!=0.0)
+                {
+                    /*add when to TURN ON signal*/
+                    add_fixed_event(-1,t+env->t_signal_off,&(state->signal_on_head),&(state->signal_on_tail));
+                    t=t+env->t_signal_off;
+                }
+                flag='o';                
             }
         } 
     }
@@ -1094,12 +1100,12 @@ static void set_signal(CellState *state,
     {
         int time_point=1;
         state->protein_number[N_SIGNAL_TF-1]=env->external_signal[0];
-        t=10.0;
+        t=1.0;
         while(t<env->t_development)
         {
             add_fixed_event(time_point,t,&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
             time_point++;
-            t+=10.0;
+            t+=1.0;
         } 
     }
 }
@@ -1234,8 +1240,8 @@ static void calc_avg_fitness(   Genotype *genotype,
                                 int init_mRNA[MAX_GENES],
                                 float init_protein_number[MAX_PROTEINS],
                                 RngStream RS_parallel[N_THREADS],           
-                                float GR1[N_REPLICATES],
-                                float GR2[N_REPLICATES])       
+                                float Fitness1[N_REPLICATES],
+                                float Fitness2[N_REPLICATES])         
 { 
     Phenotype timecourse1[N_REPLICATES], timecourse2[N_REPLICATES]; 
 #if PHENOTYPE     
@@ -1266,6 +1272,8 @@ static void calc_avg_fitness(   Genotype *genotype,
             timecourse2[i].protein_concentration[j]=0.0;
         for(j=0;j<timecourse2[i].total_time_points;j++)
             timecourse2[i].instantaneous_fitness[j]=0.0;
+        timecourse1[i].max_change_in_probability_of_binding=0.0;
+        timecourse2[i].max_change_in_probability_of_binding=0.0;
     }        
 #endif
     
@@ -1273,15 +1281,15 @@ static void calc_avg_fitness(   Genotype *genotype,
     #pragma omp parallel num_threads(N_THREADS) 
     {
         int thread_ID=omp_get_thread_num();
-//        int thread_ID=0;
         int i,j,k;
         int N_replicates_per_thread=N_REPLICATES/N_THREADS;  
         Genotype genotype_clone;
         CellState state_clone;
         GillespieRates rate_clone;
-        int init_mRNA_clone[MAX_GENES]; 
+        int init_mRNA_clone[MAX_GENES];
+        float t_burn_in;
         float init_protein_number_clone[MAX_GENES];
-        float gr1[N_replicates_per_thread],gr2[N_replicates_per_thread];       
+        float f1[N_replicates_per_thread],f2[N_replicates_per_thread];        
         int mRNA[genotype->ngenes];
         float protein[genotype->ngenes];         
         Environment Env1, Env2;
@@ -1304,7 +1312,10 @@ static void calc_avg_fitness(   Genotype *genotype,
             Env1.t_signal_on=Selection->env1.t_signal_on;
             Env1.t_signal_off=Selection->env1.t_signal_off;
             Env1.initial_effect_of_effector=Selection->env1.initial_effect_of_effector;
+            Env1.effect_of_effector_aft_burn_in=Selection->env1.effect_of_effector_aft_burn_in;
             Env1.fixed_effector_effect=Selection->env1.fixed_effector_effect;
+            Env1.max_duration_of_burn_in_growth_rate=Selection->env1.max_duration_of_burn_in_growth_rate;
+            Env1.avg_duration_of_burn_in_growth_rate=Selection->env1.avg_duration_of_burn_in_growth_rate;
             Env1.opt_pulse_duration=Selection->env1.opt_pulse_duration;
             Env1.fitness_factor_of_duration=Selection->env1.fitness_factor_of_duration;
             Env1.minimal_peak_response=Selection->env1.minimal_peak_response;
@@ -1324,7 +1335,10 @@ static void calc_avg_fitness(   Genotype *genotype,
             Env2.t_signal_on=Selection->env2.t_signal_on;
             Env2.t_signal_off=Selection->env2.t_signal_off;
             Env2.initial_effect_of_effector=Selection->env2.initial_effect_of_effector;
-            Env2.fixed_effector_effect=Selection->env2.fixed_effector_effect;                   
+            Env2.effect_of_effector_aft_burn_in=Selection->env2.effect_of_effector_aft_burn_in;
+            Env2.fixed_effector_effect=Selection->env2.fixed_effector_effect;
+            Env2.max_duration_of_burn_in_growth_rate=Selection->env2.max_duration_of_burn_in_growth_rate;
+            Env2.avg_duration_of_burn_in_growth_rate=Selection->env2.avg_duration_of_burn_in_growth_rate;                   
             Env2.opt_pulse_duration=Selection->env2.opt_pulse_duration;
             Env2.fitness_factor_of_duration=Selection->env2.fitness_factor_of_duration;
             Env2.minimal_peak_response=Selection->env2.minimal_peak_response;
@@ -1338,9 +1352,6 @@ static void calc_avg_fitness(   Genotype *genotype,
             Env2.fitness_factor_of_peak_response=Selection->env2.fitness_factor_of_peak_response;
             Env2.window_size=Selection->env2.window_size;
             
-            Env1.duration_of_burn_in_growth_rate=Selection->env1.duration_of_burn_in_growth_rate;
-            Env2.duration_of_burn_in_growth_rate=Selection->env2.duration_of_burn_in_growth_rate;    
-            
             for(j=0; j < MAX_GENES; j++) 
             {  
                 init_mRNA_clone[j] = init_mRNA[j];
@@ -1351,7 +1362,6 @@ static void calc_avg_fitness(   Genotype *genotype,
         
 #if PERTURB 
         modify_topology(genotype, &genotype_clone);
-//        summarize_binding_sites(&genotype_clone,44010);
 #endif
         /*Set initial mRNA and protein number using given values*/
         for(j=N_SIGNAL_TF; j < genotype_clone.ngenes; j++)        
@@ -1370,23 +1380,29 @@ static void calc_avg_fitness(   Genotype *genotype,
          *
          *********************************************************************/
         for(i=0;i<N_replicates_per_thread;i++) /* env 1, usually a constant signal that matches env*/
-        {            
+        {  
+            /*make a t_burn_in before turning on signal*/
+//            do
+//                t_burn_in=Env1.avg_duration_of_burn_in_growth_rate*expdev(RS_parallel[thread_ID]);
+//            while(t_burn_in>Env1.max_duration_of_burn_in_growth_rate);            
+            t_burn_in=0.0;
             /*initialize mRNA and protein numbers, and gene states etc.*/
-            initialize_cell(&genotype_clone, &state_clone, &Env1, mRNA, protein);
+            initialize_cell(&genotype_clone, &state_clone, &Env1, t_burn_in, mRNA, protein);
             
             /*set how the signal should change during simulation*/
-            set_signal(&state_clone, &Env1, RS_parallel[thread_ID], thread_ID);
+            set_signal(&state_clone, &Env1, t_burn_in, RS_parallel[thread_ID], thread_ID);
             
             /*calcualte the rates of cellular activity based on the initial cellular state*/
-            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Env1, INITIALIZATION); 
+            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Env1, &(timecourse1[thread_ID*N_replicates_per_thread+i]), t_burn_in, INITIALIZATION);             
 #if PHENOTYPE
             timecourse1[thread_ID*N_replicates_per_thread+i].timepoint=0;
 #endif
-            /*run growth simulation until tdevelopment or encounter an error*/
-            while(state_clone.t<Env1.t_development) 
-                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Env1, &(timecourse1[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);            
+             /*run developmental simulation until tdevelopment or encounter an error*/
+            while(state_clone.t<Env1.t_development+t_burn_in) 
+                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Env1, t_burn_in, &(timecourse1[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);            
+
 #if !PHENOTYPE                                     
-            gr1[i]=calc_replicate_fitness(&state_clone,&Env1,genotype_clone.n_output_genes);        
+            f1[i]=calc_replicate_fitness(&state_clone,&Env1,genotype_clone.n_output_genes);        
             /*free linked tables*/
 #if PEAK_SEARCH
             free(state_clone.sampled_response);
@@ -1403,17 +1419,21 @@ static void calc_avg_fitness(   Genotype *genotype,
          *********************************************************************/
         for(i=0;i<N_replicates_per_thread;i++) 
         { 
-            initialize_cell(&genotype_clone, &state_clone, &Env2, mRNA, protein);
-            set_signal(&state_clone, &Env2, RS_parallel[thread_ID], thread_ID);
-            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Env2, INITIALIZATION); 
+//            do
+//                t_burn_in=Env2.avg_duration_of_burn_in_growth_rate*expdev(RS_parallel[thread_ID]);
+//            while(t_burn_in>Env2.max_duration_of_burn_in_growth_rate); 
+            t_burn_in=0.0;
+            initialize_cell(&genotype_clone, &state_clone, &Env2, t_burn_in, mRNA, protein);
+            set_signal(&state_clone, &Env2, t_burn_in, RS_parallel[thread_ID], thread_ID);
+            calc_all_rates(&genotype_clone, &state_clone, &rate_clone, &Env2, &(timecourse2[thread_ID*N_replicates_per_thread+i]), t_burn_in, INITIALIZATION); 
 #if PHENOTYPE
             timecourse2[thread_ID*N_replicates_per_thread+i].timepoint=0;
 #endif            
-            while(state_clone.t<Env2.t_development) 
-                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Env2, &(timecourse2[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);  
-           
+            while(state_clone.t<Env2.t_development+t_burn_in) 
+                do_single_timestep(&genotype_clone, &state_clone, &rate_clone, &Env2, t_burn_in, &(timecourse2[thread_ID*N_replicates_per_thread+i]), RS_parallel[thread_ID]);            
+        
 #if !PHENOTYPE           
-            gr2[i]=calc_replicate_fitness(&state_clone,&Env2,genotype_clone.n_output_genes);                      
+            f2[i]=calc_replicate_fitness(&state_clone,&Env2,genotype_clone.n_output_genes);                      
 #if PEAK_SEARCH
             free(state_clone.sampled_response);
 #elif FAST_SS
@@ -1425,19 +1445,18 @@ static void calc_avg_fitness(   Genotype *genotype,
         /*free linked tables*/
         for(j=0;j<MAX_GENES;j++)
             free(genotype_clone.all_binding_sites[j]);
-        #if !PHENOTYPE       
-        /*pool growth rates from each thread*/
+                 
+        /*pool fitness from each thread*/
         #pragma omp critical
         {
             j=0;
             for(i=thread_ID*N_replicates_per_thread;i<(thread_ID+1)*N_replicates_per_thread;i++)
             {
-                GR1[i]=gr1[j];
-                GR2[i]=gr2[j];
+                Fitness1[i]=f1[j];
+                Fitness2[i]=f2[j];
                 j++;
             }
-        } 
-#endif
+        }
     }     
 #if PHENOTYPE
     /*output timecourse*/
@@ -1526,6 +1545,27 @@ static void calc_avg_fitness(   Genotype *genotype,
 //        }
 //        fclose(fp);
 //    } 
+    
+    /*output the maximum change in the probabilities of TF binding*/
+    fp=fopen("max_change_in_binding_probability_A.txt","w");
+    for(i=0;i<N_REPLICATES;i++)
+        fprintf(fp,"%f\n",timecourse1[i].max_change_in_probability_of_binding);
+    fclose(fp);
+    
+    fp=fopen("max_change_in_binding_probability_B.txt","w");
+    for(i=0;i<N_REPLICATES;i++)
+        fprintf(fp,"%f\n",timecourse2[i].max_change_in_probability_of_binding);
+    fclose(fp);      
+    
+    for(i=0;i<N_THREADS;i++)
+    {
+        free(timecourse1[i].gene_specific_concentration);
+        free(timecourse2[i].gene_specific_concentration);
+        free(timecourse1[i].instantaneous_fitness);
+        free(timecourse2[i].instantaneous_fitness);
+        free(timecourse1[i].protein_concentration);
+        free(timecourse2[i].protein_concentration);
+    }
     
     for(i=0;i<N_THREADS;i++)
     {
@@ -1682,45 +1722,67 @@ static float calc_replicate_fitness(CellState *state, Environment *env, int N_ou
 /**
  * Given the fitness of the resident and a mutant, decide whether the mutant can replace the resident
  */
-static float try_fixation(Genotype *resident, Genotype *mutant, int N_measurement_resident, int N_measurement_mutant, int *fixation, RngStream RS)
-{  
-    float s;
-	s = (mutant->avg_fitness - resident->avg_fitness) / fabs(resident->avg_fitness);
-    if(s>=minimal_selection_coefficient)
-        *fixation=1;
+static void try_replacement(Genotype *resident, Genotype *mutant, int *flag_replaced, float *selection_coefficient)
+{     
+    *selection_coefficient=(mutant->avg_fitness-resident->avg_fitness)/fabs(resident->avg_fitness);
+    if(*selection_coefficient>=MIN_SELECTION_COEFFICIENT)
+        *flag_replaced=1;
     else          
-        *fixation=0;  
-
-    return s;
+        *flag_replaced=0;    
 }
 
-static void replay_mutations(Genotype *resident, Genotype *mutant, Mutation *mut_record, FILE *mutation, int replay_N_steps)
+static void replay_mutations(Genotype *resident, Mutation *mut_record, int replay_N_steps)
 {
-    int i,j;    
-   
-    remove("networks.txt"); 
-    calc_all_binding_sites(resident);
-    summarize_binding_sites(resident,0);   
-    
-    for(i=1;i<=replay_N_steps;i++)
-    {    
-        clone_genotype(resident,mutant);
-        fscanf(mutation,"%c %d %d %d %s %d %a\n",&(mut_record->mut_type),
-                                            &(mut_record->which_gene),
-                                            &(mut_record->which_nucleotide), 
-                                            &(mut_record->which_protein),
-                                            mut_record->nuc_diff,               
-                                            &(mut_record->kinetic_type),
-                                            &(mut_record->kinetic_diff));
-         reproduce_mutate(mutant,mut_record); 
-        clone_genotype(mutant,resident); 
-        calc_all_binding_sites(resident);
-        find_motifs(resident);
-        print_motifs(resident);
-        if(i%OUTPUT_INTERVAL==0)
-            summarize_binding_sites(resident,i);   
+    int i, output_counter;
+    Output_buffer resident_info[OUTPUT_INTERVAL];
+    FILE *fp;
+    /*load mutation record*/
+    fp=fopen(mutation_file,"r");    
+    if(fp!=NULL)        
+        printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
+    else
+    {
+        printf("Loading mutation record failed! Quit program!");
+#if MAKE_LOG
+        LOG("Loading mutation record failed!");
+#endif
+        exit(-2);
     }
-    printf("Reproduce mutations successfully!\n");   
+   
+    /*remove the old file*/
+    remove("networks.txt");  
+    remove("N_motifs.txt");
+    calc_all_binding_sites(resident);
+    summarize_binding_sites(resident,0); //make new file and record initial network
+    
+    output_counter=0;   
+    for(i=1;i<=replay_N_steps;i++)
+    {  
+        fscanf(fp,"%c %d %d %s %d %a\n",&(mut_record->mut_type),
+                                                    &(mut_record->which_gene),
+                                                    &(mut_record->which_nucleotide), 
+                                                    mut_record->nuc_diff,               
+                                                    &(mut_record->kinetic_type),
+                                                    &(mut_record->kinetic_diff));
+        reproduce_mutate(resident,mut_record); 
+        calc_all_binding_sites(resident);
+        find_motifs(resident); 
+        store_resident_info(resident,NULL,&(resident_info[output_counter]),NA,NA,NA,(float)NA,-1);  
+        output_counter++;
+        if(i%OUTPUT_INTERVAL==0)
+        {
+            summarize_binding_sites(resident,i);
+            output_resident_info(resident_info, output_counter,-1);
+            output_counter=0;
+        }        
+    }
+    
+    /*call output_resident_info again, just in case buffer stores less than OUTPUT_INTERVAL cycles*/
+    if(output_counter<OUTPUT_INTERVAL && output_counter!=0)
+        output_resident_info(resident_info, output_counter, -1);
+    
+    printf("Reproduce mutations successfully!\n");
+    fclose(fp);
 }
 
 static void run_simulation( Genotype *resident, 
@@ -1738,6 +1800,7 @@ static void run_simulation( Genotype *resident,
     FILE *fp;
     int i;
     int flag_burn_in,N_tot_trials,first_step; 
+    Output_buffer resident_info[OUTPUT_INTERVAL];
     first_step=init_step;
     N_tot_trials=init_N_tot_mutations;
     
@@ -1754,24 +1817,27 @@ static void run_simulation( Genotype *resident,
         miu_protein_syn_rate=burn_in->temporary_miu_protein_syn_rate; 
         float fitness1[HI_RESOLUTION_RECALC][N_REPLICATES],fitness2[HI_RESOLUTION_RECALC][N_REPLICATES];
         
-        evolve_N_steps( resident, 
-                        mutant,
-                        mut_record, 
-                        burn_in,
-                        &first_step,                     
-                        &N_tot_trials, 
-                        init_mRNA, 
-                        init_protein,
-                        RS_main,
-                        RS_parallel,
-                        flag_burn_in);    
+        if(evolve_N_steps(  resident, 
+                            mutant,
+                            mut_record, 
+                            burn_in,
+                            resident_info,
+                            &first_step,                     
+                            &N_tot_trials, 
+                            init_mRNA, 
+                            init_protein,
+                            RS_main,
+                            RS_parallel,
+                            flag_burn_in)==-1)   
+            
+            return;     
         
         /*Calculate fitness of the current genotype under post burn_in condition*/
         /*The "if" is always true when the simulation is run from the beginning,
          *i.e. when init_step=0. But when continuing a simulation from a saving  
          *point after the burn-in, the "if" is always false*/
-        if(init_step==burn_in->MAX_STEPS)
-        {            
+        if(init_step<burn_in->MAX_STEPS)
+        {  
             for(i=0;i<HI_RESOLUTION_RECALC;i++) 
                 calc_avg_fitness(   resident, 
                                     selection,
@@ -1781,7 +1847,20 @@ static void run_simulation( Genotype *resident,
                                     fitness1[i],
                                     fitness2[i]); 
             calc_fitness_stats(resident,selection,&(fitness1[0]),&(fitness2[0]),HI_RESOLUTION_RECALC);   
-            output_genotype(resident);
+            /*calculate the number of c1-ffls*/
+            find_motifs(resident);
+            /*save resident status to output buffer*/                  
+            store_resident_info(resident, 
+                                NULL, 
+                                &(resident_info[OUTPUT_INTERVAL-1]), 
+                                NA, 
+                                NA, 
+                                NA,
+                                (float)NA,
+                                0);      //magic number 0 means to store only fitness and number of motifs
+            
+            output_resident_info(resident_info, OUTPUT_INTERVAL, 1); //magic number 1 means to output everything
+            
 #if OUTPUT_RNG_SEEDS
             unsigned long seeds[6];      
             RngStream_GetState(RS_main,seeds);
@@ -1794,21 +1873,10 @@ static void run_simulation( Genotype *resident,
             }
             fprintf(fp,"\n");
             fclose(fp);        
-#endif
-            /*output precise fitness*/        
-            fp=fopen("precise_fitness.txt","a+");
-            fprintf(fp,"%d %d %a %a %a %a %a %a\n",N_tot_trials, 
-                                                mut_record->N_hit_bound,
-                                                resident->avg_fitness,                                                
-                                                resident->fitness1,
-                                                resident->fitness2,
-                                                resident->sq_SE_avg_fitness,
-                                                resident->sq_SE_fitness1,
-                                                resident->sq_SE_fitness2);
-            fclose(fp);        
+#endif            
             /* marks the last step at which all state of the program has been output*/
             fp=fopen("saving_point.txt","w");
-            fprintf(fp,"%d\n",burn_in->MAX_STEPS);
+            fprintf(fp,"%d %d\n",burn_in->MAX_STEPS,N_tot_trials);
             fclose(fp);
         }
     }    
@@ -1823,19 +1891,19 @@ static void run_simulation( Genotype *resident,
     miu_Kd=selection->temporary_miu_Kd;       
     miu_protein_syn_rate=selection->temporary_miu_protein_syn_rate; 
     
-    evolve_N_steps(resident, 
-                    mutant,
-                    mut_record, 
-                    selection,
-                    &first_step,                   
-                    &N_tot_trials,   
-                    init_mRNA,
-                    init_protein,
-                    RS_main,
-                    RS_parallel,
-                    flag_burn_in); 
-    calc_all_binding_sites(resident);
-    summarize_binding_sites(resident,selection->MAX_STEPS); /*snapshot of the final distribution binding sites */
+    if(evolve_N_steps(  resident, 
+                        mutant,
+                        mut_record, 
+                        selection,
+                        resident_info,
+                        &first_step,                   
+                        &N_tot_trials,   
+                        init_mRNA,
+                        init_protein,
+                        RS_main,
+                        RS_parallel,
+                        flag_burn_in)==-1);     
+    return;
 }
 
 
@@ -1856,20 +1924,10 @@ static void continue_simulation(Genotype *resident,
     FILE *fp;
 
     /*delete the incomplete lines in the output files*/
-    tidy_evo_summaries(evo_summary,mutation_file);
+    tidy_output_files(evo_summary,mutation_file);
     
-    /* set genotype based on previous steps*/
-    fp=fopen(mutation_file,"r");
-    if(fp!=NULL)
-        replay_mutations(resident, mutant, mut_record, fp, replay_N_steps);
-    else
-    {
-#if MAKE_LOG
-        LOG("cannot open mutation_file\n"); 
-#endif
-        exit(-2);
-    }
-    fclose(fp);
+    /* set genotype based on previous steps*/   
+    replay_mutations(resident, mut_record, replay_N_steps); 
 
     /* set random number seeds*/
     fp=fopen("RngSeeds.txt","r");
@@ -1919,9 +1977,9 @@ static void continue_simulation(Genotype *resident,
                                             &(resident->avg_fitness),                                            
                                             &(resident->fitness1),
                                             &(resident->fitness2),
-                                            &(resident->sq_SE_avg_fitness),
-                                            &(resident->sq_SE_fitness1),
-                                            &(resident->sq_SE_fitness2));
+                                            &(resident->SE_avg_fitness),
+                                            &(resident->SE_fitness1),
+                                            &(resident->SE_fitness2));
     }
     else
     {
@@ -1989,16 +2047,17 @@ static void calc_fitness_stats(Genotype *genotype,
     sq_SE_f2=sum_sq_diff_f2/(N_recalc_fitness*N_REPLICATES*(N_recalc_fitness*N_REPLICATES-1));     
     genotype->fitness1=avg_f1;
     genotype->fitness2=avg_f2;
-    genotype->sq_SE_fitness1=sq_SE_f1*N_recalc_fitness*N_REPLICATES;
-    genotype->sq_SE_fitness2=sq_SE_f2*N_recalc_fitness*N_REPLICATES;     
+    genotype->SE_fitness1=sqrt(sq_SE_f1);
+    genotype->SE_fitness2=sqrt(sq_SE_f2);     
     genotype->avg_fitness=selection->env1_weight*avg_f1+selection->env2_weight*avg_f2;
-    genotype->sq_SE_avg_fitness=sum_sq_diff_mean_f/(N_recalc_fitness*N_REPLICATES-1)/(N_recalc_fitness*N_REPLICATES); 
+    genotype->SE_avg_fitness=sqrt(sum_sq_diff_mean_f/(N_recalc_fitness*N_REPLICATES-1)/(N_recalc_fitness*N_REPLICATES));  
 }
 
 static int evolve_N_steps(  Genotype *resident, 
                             Genotype *mutant,
                             Mutation *mut_record, 
                             Selection *selection,
+                            Output_buffer resident_info[OUTPUT_INTERVAL],
                             int *init_step,                       
                             int *N_tot_trials,        
                             int init_mRNA[MAX_GENES],   
@@ -2008,82 +2067,67 @@ static int evolve_N_steps(  Genotype *resident,
                             int flag_burn_in)
 {
     int i,j;
-    int fixation;
+    int output_counter=0;
+    int flag_replaced; 
     int N_trials;
     float fitness1[HI_RESOLUTION_RECALC][N_REPLICATES],fitness2[HI_RESOLUTION_RECALC][N_REPLICATES];
-    float score;  
+    float selection_coefficient; 
     FILE *fp;
+#if OUTPUT_MUTANT_DETAILS
+    Output_buffer *mutant_info;  
+    int mutant_counter=0;
+    int current_mutant_info_size=OUTPUT_INTERVAL*50;
+    mutant_info=(Output_buffer *)malloc(current_mutant_info_size*sizeof(Output_buffer));
+#endif
  
     for(i=(*init_step);i<=selection->MAX_STEPS;i++)
     {             
-        fixation=0;      
+        flag_replaced=0;      
         N_trials=0;
-      
-        while(1) /*try mutations until one replaces the current genotype*/
+        
+        /*try mutations until one replaces the current genotype*/
+        while(!flag_replaced) 
         {	
             N_trials++;
             (*N_tot_trials)++;
             if(N_trials>MAX_TRIALS) /*Tried too many mutation in one step.*/
             {
+#if OUTPUT_MUTANT_DETAILS                
+                output_mutant_info(mutant_info,mutant_counter);
+#endif
+                output_resident_info(resident_info,output_counter,1);
                 fp=fopen(evo_summary,"a+");                              
-                fprintf(fp,"Tried %d mutations, yet none could fix\n",MAX_TRIALS);
+                fprintf(fp,"Tried %d mutations, yet none could fix\n",MAX_TRIALS);               
                 fclose(fp); 
-                summarize_binding_sites(resident,i);
+                summarize_binding_sites(resident,i-1);
                 return -1;
             }
 
             /*do mutation on a copy of the current genotype*/
             clone_genotype(resident,mutant);
             mutate(mutant,RS_main,mut_record);
-
-#if OUTPUT_MUTANT_DETAILS
-            /*record every mutation*/
-            fp=fopen("all_mutations.txt","a+");
-            fprintf(fp,"%d %d %c %d %d %d '%s' %d %a\n",
-                    i,
-                    *N_tot_trials,
-                    mut_record->mut_type,
-                    mut_record->which_gene,
-                    mut_record->which_nucleotide,
-                    mut_record->which_protein,
-                    mut_record->nuc_diff,
-                    mut_record->kinetic_type,
-                    mut_record->kinetic_diff);
-            fclose(fp); 
-#endif
+            
+            /*determine if we need more space to store TFBSs*/
             calc_all_binding_sites(mutant);           
-            MAXELEMENTS=mutant->N_allocated_elements;
+            MAX_TFBS_NUMBER=mutant->N_allocated_elements;
 
             /*calculate the fitness of the mutant at low resolution*/
             calc_avg_fitness(mutant, selection, init_mRNA, init_protein, RS_parallel, fitness1[0], fitness2[0]);
             calc_fitness_stats(mutant, selection, &(fitness1[0]), &(fitness2[0]), 1); // calc fitness at low resolution
 
 #if OUTPUT_MUTANT_DETAILS
-            /*record low-resolution fitness*/
-            fp=fopen("fitness_all_mutants.txt","a+");
-            fprintf(fp,"%.10f %.10f\n", mutant->avg_fitness, mutant->sq_SE_avg_fitness);
-            fclose(fp);     
+            if(mutant_counter>=current_mutant_info_size)
+            {
+                current_mutant_info_size+=OUTPUT_INTERVAL*100;
+                mutant_info=(Output_buffer *)realloc(mutant_info,current_mutant_info_size*sizeof(Output_buffer));
+            }
+            store_mutant_info(mutant,mut_record,&(mutant_info[mutant_counter]),i,*N_tot_trials);      
+            mutant_counter++;
 #endif
             /*Can the mutant replace the current genotype?*/
-            score=try_fixation(resident, mutant, N_REPLICATES*HI_RESOLUTION_RECALC, N_REPLICATES, &fixation, RS_main); 
-            /*If yes, record relevant info*/
-            if(fixation==1)
-            {                    
-                fp=fopen(evo_summary,"a+");
-                fprintf(fp,"%d %d %d %d %c %f ",i, *N_tot_trials, N_trials,mut_record->N_hit_bound,mut_record->mut_type,score);
-                fclose(fp);
-                fp=fopen(mutation_file,"a+");
-                fprintf(fp,"%c %d %d %d '%s' %d %a\n", mut_record->mut_type,    
-                                                    mut_record->which_gene,
-                                                    mut_record->which_nucleotide,
-                                                    mut_record->which_protein,
-                                                    mut_record->nuc_diff,
-                                                    mut_record->kinetic_type,
-                                                    mut_record->kinetic_diff);
-                fclose(fp);
-                break;
-            }
+            try_replacement(resident, mutant, &flag_replaced, &selection_coefficient);
         }
+        
         /*replace the current genotype by overwriting it*/
         clone_genotype(mutant,resident);        
         calc_all_binding_sites(resident); 
@@ -2096,104 +2140,84 @@ static int evolve_N_steps(  Genotype *resident,
         {
             for(j=1;j<HI_RESOLUTION_RECALC;j++)  
                 calc_avg_fitness(resident, selection, init_mRNA, init_protein, RS_parallel, fitness1[j],fitness2[j]);              
-            calc_fitness_stats(resident, selection, &(fitness1[0]), &(fitness2[0]), HI_RESOLUTION_RECALC);            
-        }
-      
-        /*calculate the number of c1-ffls every step*/
-        find_motifs(resident);        
-        print_motifs(resident); 
+            calc_fitness_stats(resident, selection, &(fitness1[0]), &(fitness2[0]), HI_RESOLUTION_RECALC);   
+        }  
+        
+        /*calculate the number of c1-ffls*/
+        find_motifs(resident);
+        /*save resident status to output buffer*/ 
+        store_resident_info(resident, mut_record, &(resident_info[output_counter]), i, N_trials, *N_tot_trials, selection_coefficient,1); //magic number 1 means store everything
+        output_counter++;
        
+        
         /*output network topology every OUTPUT_INTERVAL steps*/
-        if(i%OUTPUT_INTERVAL==0 && i!=0) 
-            summarize_binding_sites(resident,i);        
-        /*output a summary of simulation every step*/
-        if(!(i==selection->MAX_STEPS && flag_burn_in))
-            output_genotype(resident);        
+        if(i%OUTPUT_INTERVAL==0 && i!=0)
+        {  
+            summarize_binding_sites(resident,i);
+#if OUTPUT_MUTANT_DETAILS 
+            output_mutant_info(mutant_info,mutant_counter);
+            mutant_counter=0;
+#endif
+            if(!(i==selection->MAX_STEPS && flag_burn_in))
+            {
+                output_resident_info(resident_info,output_counter,1); //magic number 1 means to output everything
+                output_counter=0;
+            }
+        }
+           
         /* output rng seeds*/
 #if OUTPUT_RNG_SEEDS
         unsigned long seeds[6];
-        if(!(i==selection->MAX_STEPS && flag_burn_in) && i%SAVING_INTERVAL==0)
+        if(!(i==selection->MAX_STEPS && flag_burn_in) && i%OUTPUT_INTERVAL==0)
         {
             RngStream_GetState(RS_main,seeds);
             fp=fopen("RngSeeds.txt","a+");
-            fprintf(fp,"%lu %lu %lu %lu %lu %lu ",seeds[0],seeds[1],seeds[2],seeds[3],seeds[4],seeds[5]);            
+            fprintf(fp,"%lu %lu %lu %lu %lu %lu ",seeds[0],seeds[1],seeds[2],seeds[3],seeds[4],seeds[5]); 
             for(j=0;j<N_THREADS;j++)
             {
                 RngStream_GetState(RS_parallel[j],seeds);
-                fprintf(fp,"%lu %lu %lu %lu %lu %lu ",seeds[0],seeds[1],seeds[2],seeds[3],seeds[4],seeds[5]); 
+                fprintf(fp,"%lu %lu %lu %lu %lu %lu ",seeds[0],seeds[1],seeds[2],seeds[3],seeds[4],seeds[5]);                
             }
             fprintf(fp,"\n");
+            fflush(fp);
             fclose(fp);
         }
 #endif       
         /*output precise hi-resolution fitness*/
         if(!(i==selection->MAX_STEPS && flag_burn_in))
         {
-            fp=fopen("precise_fitness.txt","a+");           
-            fprintf(fp,"%d %d %a %a %a %a %a %a\n",*N_tot_trials, 
-                                                mut_record->N_hit_bound,
-                                                resident->avg_fitness,                                                
-                                                resident->fitness1,
-                                                resident->fitness2,
-                                                resident->sq_SE_avg_fitness,
-                                                resident->sq_SE_fitness1,
-                                                resident->sq_SE_fitness2); 
-            fclose(fp); 
-            
-            /* marks the last step at which all state of the program has been output*/
-            if(i%SAVING_INTERVAL==0)
+            if(i%OUTPUT_INTERVAL==0)
             {
                 fp=fopen("saving_point.txt","w");
-                fprintf(fp,"%d\n",i);
+                fprintf(fp,"%d %d\n",i,*N_tot_trials);
+                fflush(fp);
                 fclose(fp);
             }    
         }
     } 
     *init_step=i;
+#if OUTPUT_MUTANT_DETAILS
+    free(mutant_info);
+#endif
     return 0;
-}
-
-static void output_genotype(Genotype *genotype)
-{
-    FILE *OUTPUT;
-    OUTPUT=fopen(evo_summary,"a+");
-    fprintf(OUTPUT,"%.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d \n",  
-            genotype->avg_fitness,            
-            genotype->fitness1,
-            genotype->fitness2,
-            sqrt(genotype->sq_SE_avg_fitness),
-            sqrt(genotype->sq_SE_fitness1),
-            sqrt(genotype->sq_SE_fitness2),
-            genotype->ngenes,
-            genotype->nproteins,
-            genotype->N_act,
-            genotype->N_rep);
-    fclose(OUTPUT);   
 }
 
 static void print_motifs(Genotype *genotype)
 {
     FILE *fp; 
+    int i;
     fp=fopen("N_motifs.txt","a+");
-    fprintf(fp,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
-            genotype->N_motifs[0],          
-            genotype->N_motifs[1],
-            genotype->N_motifs[2],
-            genotype->N_motifs[3],
-            genotype->N_motifs[4],
-            genotype->N_motifs[5],
-            genotype->N_motifs[6],
-            genotype->N_motifs[7],
-            genotype->N_motifs[8],
-            genotype->N_motifs[9],
-            genotype->N_motifs[10], 
-            genotype->N_motifs[11],
-            genotype->N_motifs[12],
-            genotype->N_motifs[13],
-            genotype->N_motifs[14],
-            genotype->N_motifs[15],
-            genotype->N_motifs[16],);                                                                                                
+    for(i=0;i<36;i++)
+        fprintf(fp,"%d ",genotype->N_motifs[i]);    
+    fprintf(fp,"\n");
     fclose(fp); 
+#if COUNT_NEAR_AND
+    fp=fopen("N_near_AND_gate_motifs.txt","a+");
+    for(i=0;i<12;i++)    
+        fprintf(fp,"%d ",genotype->N_near_AND_gated_motifs[i]);
+    fprintf(fp,"\n");    
+    fclose(fp);    
+#endif
 }
 
 static void summarize_binding_sites(Genotype *genotype,int step_i)
@@ -2736,23 +2760,37 @@ static void who_regulates_effector( Genotype *genotype,
     } 
 }
 
-static void tidy_evo_summaries(char *file_genotype_summary, char *file_mutations)
+static void tidy_output_files(char *file_genotype_summary, char *file_mutations)
 {
-    int i,replay_N_steps;
-    char buffer[600];    
+    int i,replay_N_steps,N_tot_mutations;
+    char buffer[2000];    
     FILE *fp1,*fp2;
     
     fp1=fopen("saving_point.txt","r");
-    fscanf(fp1,"%d",&replay_N_steps);
+    fscanf(fp1,"%d %d",&replay_N_steps,&N_tot_mutations);
     fclose(fp1);
     
     /*Basically delete the last line of the file if it is not complete*/
+    fp1=fopen("RngSeeds.txt","r");
+    fp2=fopen("temp","w");
+    for(i=0;i<(replay_N_steps/OUTPUT_INTERVAL);i++)
+    {
+        fgets(buffer,2000,fp1);
+        fputs(buffer,fp2);
+        fflush(fp2);
+    }
+    fclose(fp1);
+    fclose(fp2);
+    remove("RngSeeds.txt");
+    rename("temp","RngSeeds.txt");
+    
     fp1=fopen(file_genotype_summary,"r");
     fp2=fopen("temp","w");
     for(i=0;i<replay_N_steps+2;i++)
     {
-        fgets(buffer,600,fp1);
+        fgets(buffer,2000,fp1);
         fputs(buffer,fp2);
+        fflush(fp2);
     }
     fclose(fp1);
     fclose(fp2);
@@ -2763,8 +2801,9 @@ static void tidy_evo_summaries(char *file_genotype_summary, char *file_mutations
     fp2=fopen("temp","w");
     for(i=0;i<replay_N_steps;i++)
     {
-        fgets(buffer,600,fp1);
+        fgets(buffer,2000,fp1);
         fputs(buffer,fp2);
+        fflush(fp2);
     }
     fclose(fp1);
     fclose(fp2);
@@ -2775,46 +2814,48 @@ static void tidy_evo_summaries(char *file_genotype_summary, char *file_mutations
     fp2=fopen("temp","w");
     for(i=0;i<replay_N_steps;i++)
     {
-        fgets(buffer,600,fp1);
-        fputs(buffer,fp2);
+        fgets(buffer,2000,fp1);
+        fputs(buffer,fp2);       
     }
     fclose(fp1);
     fclose(fp2);
     remove("N_motifs.txt");
     rename("temp","N_motifs.txt");
     
-#if OUTPUT_MUTANT_DETAILS    
-    fp1=fopen("all_mutants.txt","r");
+#if OUTPUT_MUTANT_DETAILS 
+    fp1=fopen("all_mutations.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<N_tot_mutations;i++)
     {
-        fgets(buffer,600,fp1);
+        fgets(buffer,2000,fp1);
         fputs(buffer,fp2);
+        fflush(fp2);
     }
     fclose(fp1);
     fclose(fp2);
-    remove("all_mutants.txt");
-    rename("temp","all_mutants.txt");
+    remove("all_mutations.txt");
+    rename("temp","all_mutations.txt");
     
     fp1=fopen("fitness_all_mutants.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<N_tot_mutations;i++)
     {
-        fgets(buffer,600,fp1);
+        fgets(buffer,2000,fp1);
         fputs(buffer,fp2);
+        fflush(fp2);
     }
     fclose(fp1);
     fclose(fp2);
     remove("fitness_all_mutants.txt");
     rename("temp","fitness_all_mutants.txt");
 #endif
-    
     fp1=fopen("precise_fitness.txt","r");
     fp2=fopen("temp","w");
     for(i=0;i<replay_N_steps;i++)
     {
-        fgets(buffer,600,fp1);
+        fgets(buffer,2000,fp1);
         fputs(buffer,fp2);
+        fflush(fp2);
     }
     fclose(fp1);
     fclose(fp2);
@@ -2980,7 +3021,7 @@ static void remove_binding_sites(Genotype *genotype, int gene_id, int likely_anc
                                       genotype->max_hindered_sites[gene_id] : genotype->all_binding_sites[gene_id][i].N_hindered;           
     }    
    
-    int act_BS[MAXELEMENTS][2],rep_BS[MAXELEMENTS][2];
+    int act_BS[MAX_TFBS_NUMBER][2],rep_BS[MAX_TFBS_NUMBER][2];
     int N_act_BS,N_rep_BS;    
     N_act_BS=1;
     N_rep_BS=1;
@@ -3018,3 +3059,188 @@ static void remove_binding_sites(Genotype *genotype, int gene_id, int likely_anc
 }
 
 #endif
+
+static void store_resident_info(Genotype *resident, 
+                                Mutation *mut_record, 
+                                Output_buffer *resident_info, 
+                                int evo_step, 
+                                int N_mutations_at_current_step, 
+                                int N_tot_mutations, 
+                                float selection_coefficient, 
+                                int flag)
+{  
+    int i;
+ 
+   /*always store network motifs*/
+    for(i=0;i<36;i++)
+        resident_info->n_motifs[i]=resident->N_motifs[i];
+    for(i=0;i<12;i++)        
+        resident_info->n_near_AND_gated_motifs[i]=resident->N_near_AND_gated_motifs[i];
+    
+    /*if not called by replay_mutation, store other info*/
+    if(flag!=-1) 
+    {    
+        resident_info->avg_f=resident->avg_fitness;
+        resident_info->f1=resident->fitness1;
+        resident_info->f2=resident->fitness2;
+        resident_info->se_avg_f=resident->SE_avg_fitness;
+        resident_info->se_f1=resident->SE_avg_fitness;
+        resident_info->se_f2=resident->SE_avg_fitness;
+    
+        if(flag==1) //if stores everthing
+        {
+            resident_info->step=evo_step;
+            resident_info->n_mut_at_the_step=N_mutations_at_current_step;
+            resident_info->n_tot_mut=N_tot_mutations;
+            resident_info->n_hit_bound=mut_record->N_hit_bound;
+            resident_info->selection_coefficient=selection_coefficient;
+
+            resident_info->n_gene=resident->ngenes;
+            resident_info->n_output_genes=resident->n_output_genes;
+            resident_info->n_act=resident->N_act;
+            resident_info->n_rep=resident->N_rep;
+         
+            resident_info->mut_type=mut_record->mut_type;
+            resident_info->which_gene=mut_record->which_gene;
+            resident_info->which_nuc=mut_record->which_nucleotide;
+            resident_info->which_kinetic=mut_record->kinetic_type;            
+            resident_info->new_nuc[0]=mut_record->nuc_diff[0];
+            resident_info->new_nuc[1]=mut_record->nuc_diff[1];
+            resident_info->new_nuc[2]=mut_record->nuc_diff[2];
+            resident_info->new_kinetic=mut_record->kinetic_diff;
+        }
+    }
+}
+
+static void store_mutant_info(Genotype *mutant, Mutation *mut_record, Output_buffer *mutant_info, int step, int N_tot_mutations)
+{
+    mutant_info->avg_f=mutant->avg_fitness;
+    mutant_info->f1=mutant->fitness1;
+    mutant_info->f2=mutant->fitness2;
+    mutant_info->se_avg_f=mutant->SE_avg_fitness;
+    mutant_info->se_f1=mutant->SE_avg_fitness;
+    mutant_info->se_f2=mutant->SE_avg_fitness;
+    mutant_info->step=step;
+    mutant_info->n_tot_mut=N_tot_mutations;
+    mutant_info->mut_type=mut_record->mut_type;
+    mutant_info->which_gene=mut_record->which_gene;
+    mutant_info->which_nuc=mut_record->which_nucleotide;
+    mutant_info->which_kinetic=mut_record->kinetic_type;
+    mutant_info->new_nuc[0]=mut_record->nuc_diff[0];
+    mutant_info->new_nuc[1]=mut_record->nuc_diff[1];
+    mutant_info->new_nuc[2]=mut_record->nuc_diff[2];
+    mutant_info->new_kinetic=mut_record->kinetic_diff;
+}
+
+static void output_mutant_info(Output_buffer *mutant_info, int N_mutant)
+{
+    int i;
+    FILE *fp;    
+    /*output mutation*/
+    fp=fopen("all_mutations.txt","a+");
+    for(i=0;i<N_mutant;i++)        
+        fprintf(fp,"%d %d %c %d %d '%s' %d %a\n",
+                mutant_info[i].step,
+                mutant_info[i].n_tot_mut,
+                mutant_info[i].mut_type,
+                mutant_info[i].which_gene,
+                mutant_info[i].which_nuc,
+                mutant_info[i].new_nuc,
+                mutant_info[i].which_kinetic,
+                mutant_info[i].new_kinetic);
+    fflush(fp);
+    fclose(fp);
+    
+    /*output mutant fitness, which is low-resolution*/  
+    fp=fopen("fitness_all_mutants.txt","a+");
+    for(i=0;i<N_mutant;i++) 
+        fprintf(fp,"%.10f %.10f %.10f %.10f %.10f %.10f\n", 
+            mutant_info[i].avg_f,
+            mutant_info[i].f1,
+            mutant_info[i].f2,
+            mutant_info[i].se_avg_f,
+            mutant_info[i].se_f1,
+            mutant_info[i].se_f2);
+    fflush(fp);
+    fclose(fp); 
+}
+
+static void output_resident_info(Output_buffer resident_info[OUTPUT_INTERVAL], int output_counter, int flag)
+{
+    int i,j;
+    FILE *fp;   
+    
+    /*output motifs*/
+    fp=fopen("N_motifs.txt","a+");
+    for(j=0;j<output_counter;j++)
+    {
+        for(i=0;i<36;i++)
+            fprintf(fp,"%d ",resident_info[j].n_motifs[i]);    
+        fprintf(fp,"\n");        
+    }
+    fflush(fp);
+    fclose(fp); 
+#if COUNT_NEAR_AND
+    fp=fopen("N_near_AND_gated_motifs.txt","a+");
+    for(j=0;j<output_counter;j++)
+    {
+        for(i=0;i<12;i++)    
+            fprintf(fp,"%d ",resident_info[j].n_near_AND_gated_motifs[i]);
+        fprintf(fp,"\n");   
+    }
+    fflush(fp);
+    fclose(fp);    
+#endif
+    if(flag==1) //if function is not called by replay_mutation
+    {
+                        
+        /*output mutation info*/
+        fp=fopen(mutation_file,"a+");
+        for(i=0;i<output_counter;i++)
+            fprintf(fp,"%c %d %d '%s' %d %a\n", resident_info[i].mut_type,    
+                                                resident_info[i].which_gene,
+                                                resident_info[i].which_nuc,
+                                                resident_info[i].new_nuc,
+                                                resident_info[i].which_kinetic,
+                                                resident_info[i].new_kinetic);
+        fflush(fp);
+        fclose(fp);
+
+        /*output precise fitness */
+        fp=fopen("precise_fitness.txt","a+"); 
+        for(i=0;i<output_counter;i++)
+            fprintf(fp,"%d %d %a %a %a %a %a %a\n",resident_info[i].n_tot_mut, 
+                                                    resident_info[i].n_hit_bound,
+                                                    resident_info[i].avg_f,                                                
+                                                    resident_info[i].f1,
+                                                    resident_info[i].f2,
+                                                    resident_info[i].se_avg_f,
+                                                    resident_info[i].se_f1,
+                                                    resident_info[i].se_f2); 
+        fflush(fp);
+        fclose(fp);  
+
+        /*output a summary*/
+        fp=fopen(evo_summary,"a+");
+        for(i=0;i<output_counter;i++)
+            fprintf(fp,"%d %d %d %d %c %f %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d\n",
+                    resident_info[i].step, 
+                    resident_info[i].n_tot_mut, 
+                    resident_info[i].n_mut_at_the_step,
+                    resident_info[i].n_hit_bound,
+                    resident_info[i].mut_type,
+                    resident_info[i].selection_coefficient,
+                    resident_info[i].avg_f,                                                
+                    resident_info[i].f1,
+                    resident_info[i].f2,
+                    resident_info[i].se_avg_f,
+                    resident_info[i].se_f1,
+                    resident_info[i].se_f2,
+                    resident_info[i].n_gene,
+                    resident_info[i].n_output_genes,                  
+                    resident_info[i].n_act,
+                    resident_info[i].n_rep);
+        fflush(fp);
+        fclose(fp);
+    }
+}

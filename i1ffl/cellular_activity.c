@@ -16,6 +16,7 @@
 
 #define DO_NOTHING -2
 #define INITIALIZATION -1
+#define SUDDEN_SIGNAL_CHANGE 1
 
 /*expression rate parameters*/
 static const float TRANSCRIPTINIT=6.75; 
@@ -65,17 +66,17 @@ static void Gillespie_event_active_to_intermediate(Genotype *, CellState *, Gill
 
 static void Gillespie_event_transcription_init(GillespieRates *, CellState *, Genotype *, float, RngStream);
 
-static int fixed_event_end_translation_init(Genotype *, CellState *, GillespieRates *, Environment *, float *);
+static int fixed_event_end_translation_init(Genotype *, CellState *, GillespieRates *, float *);
 
-static void fixed_event_end_transcription(float *, CellState *, GillespieRates *, Genotype *, Environment *);
+static void fixed_event_end_transcription(float *, CellState *, GillespieRates *, Genotype *);
 
 static int does_fixed_event_end(CellState*, float);
 
 static int do_fixed_event(Genotype *, CellState *, GillespieRates *, Environment *, Phenotype *, float *, int);
 
-static void calc_fitness(float *, Genotype *, CellState *, Environment *, float [MAX_OUTPUT_GENES], float [MAX_OUTPUT_GENES], float);
+static void calc_fitness(float *, Genotype *, CellState *, float [MAX_OUTPUT_GENES], float [MAX_OUTPUT_GENES], float);
 
-static void update_protein_number_and_fitness(Genotype *, CellState *, GillespieRates *, Environment *, float);
+static void update_protein_number_and_fitness(Genotype *, CellState *, GillespieRates *, float);
 
 static int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, RngStream);
 
@@ -93,6 +94,7 @@ static int do_Gillespie_event(Genotype*, CellState *, GillespieRates *, float, R
 void initialize_cell(   Genotype *genotype,
                         CellState *state, 
                         Environment *env,
+                        float t_burn_in,
                         int init_mRNA_number[MAX_GENES],
                         float init_protein_number[MAX_PROTEINS])
 {
@@ -228,6 +230,8 @@ void calc_all_rates(Genotype *genotype,
                     CellState *state,
                     GillespieRates *rates,
                     Environment *env,
+                    Phenotype *phenotype,
+                    float t_burn_in,
                     int UPDATE_WHAT)
 {
     int i,cluster_id,gene_id;
@@ -342,6 +346,11 @@ void calc_all_rates(Genotype *genotype,
             interval_to_update_probability_of_binding=DEFAULT_UPDATE_INTERVAL;
         else
             interval_to_update_probability_of_binding=MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING/diff_max*(state->t-state->last_event_t);
+#if PHENOTYPE
+        /*record the maximum change in probability of binding except when it is a sudden change in the signal*/
+        if(UPDATE_WHAT!=SUDDEN_SIGNAL_CHANGE)
+            phenotype->max_change_in_probability_of_binding=(diff_max>phenotype->max_change_in_probability_of_binding)?diff_max:phenotype->max_change_in_probability_of_binding;
+#endif
         if(UPDATE_WHAT!=DO_NOTHING)          
             calc_leaping_interval(genotype,state,&interval_to_update_probability_of_binding,env->t_development,UPDATE_WHAT);  
     
@@ -372,7 +381,8 @@ void calc_all_rates(Genotype *genotype,
 void do_single_timestep(Genotype *genotype, 
                         CellState *state,                         
                         GillespieRates *rates,                        
-                        Environment *env,   
+                        Environment *env, 
+                        float t_burn_in,
                         Phenotype *timecourse,
                         RngStream RS) 
 {    
@@ -380,12 +390,13 @@ void do_single_timestep(Genotype *genotype,
     float fixed_time; 
     float dt;
     float x; 
+    float developmental_time=env->t_development+t_burn_in;
     
     /* draw random number */
     x = expdev(RS);       
     dt = x/rates->total_Gillespie_rate;    
     /* check if a fixed event occurs during dt, or in tdevelopment if running for a fixed development time */
-    fixed_time = (state->t+dt<env->t_development)?(state->t+dt):env->t_development;
+    fixed_time = (state->t+dt<developmental_time)?(state->t+dt):developmental_time;
     event = does_fixed_event_end(state, fixed_time);
     while(event!=0)
     {           
@@ -396,7 +407,7 @@ void do_single_timestep(Genotype *genotype,
         /* we've been running with rates->total_Gillespie_rate for dt, so substract it from x*/   
         x -= dt*rates->total_Gillespie_rate;  
         /* update rates->total_Gillespie_rate and compute a new dt */  
-        calc_all_rates(genotype, state, rates, env, UPDATE_WHAT);      
+        calc_all_rates(genotype, state, rates, env, timecourse, t_burn_in, UPDATE_WHAT);      
         dt = x/rates->total_Gillespie_rate;
         /*deal with rounding error*/
         if(dt<0.0)
@@ -406,30 +417,30 @@ void do_single_timestep(Genotype *genotype,
 #endif 
             dt=TIME_OFFSET; 
         }
-        fixed_time = (state->t+dt<env->t_development)?(state->t+dt):env->t_development;
+        fixed_time = (state->t+dt<developmental_time)?(state->t+dt):developmental_time;
         /* check to see there aren't more fixed events to do */
         event = does_fixed_event_end(state, fixed_time);                                    
     } 
     /* no remaining fixed events to do in dt, now do stochastic events */  
     /* if we haven't already reached end of development with last delta-t*/          
-    if (state->t+dt < env->t_development)
+    if (state->t+dt < developmental_time)
     {        
         /*update protein concentration and fitness after dt*/
-        update_protein_number_and_fitness(genotype, state, rates, env, dt); 
+        update_protein_number_and_fitness(genotype, state, rates, dt); 
         /*do Gillespie event*/
         UPDATE_WHAT=do_Gillespie_event(genotype, state, rates, dt, RS);       
         /* Gillespie step: advance time to next event at dt */
         state->t += dt;
-        calc_all_rates(genotype,state,rates,env,UPDATE_WHAT);        
+        calc_all_rates(genotype,state,rates,env,timecourse, t_burn_in, UPDATE_WHAT);        
     } 
     else 
     { 
         /* do remaining dt */
-        dt = env->t_development - state->t;
+        dt = developmental_time - state->t;
         /* the final update of protein concentration */
-        update_protein_number_and_fitness(genotype, state, rates, env, dt);
+        update_protein_number_and_fitness(genotype, state, rates, dt);
         /* advance to end of development (this exits the outer while loop) */
-        state->t = env->t_development;
+        state->t = developmental_time;
 #if SELECT_SENSITIVITY_AND_PRECISION
         state->t = env->tdevelopment;
 		state->sensitivity[2] = state->sensitivity[0];
@@ -505,8 +516,7 @@ static float calc_integral(Genotype *genotype, CellState *state, float initial_p
  */
 static void calc_fitness(float *integrated_fitness,
                         Genotype *genotype,
-                        CellState *state,
-                        Environment *env,
+                        CellState *state,                        
                         float number_of_selection_protein_bf_dt[MAX_OUTPUT_GENES],
                         float number_of_selection_protein_aft_dt[MAX_OUTPUT_GENES],
                         float dt)
@@ -608,7 +618,7 @@ static void calc_fitness(float *integrated_fitness,
     }
     
 #elif REALLY_COMPLETECATE
-    switch (effect_of_effector)/* effector is beneficial!*/
+    switch (state->effect_of_effector)/* effector is beneficial!*/
     {
         case 'b': /* effector is beneficial!*/
             if(Ne>Ne_next)//decrease in effector protein
@@ -930,8 +940,7 @@ static void calc_fitness(float *integrated_fitness,
 //                instantaneous_fitness = bmax;
 //            break;
 //    
-//        case 'd': /* effector is deleterious! */      
-//#if !NO_PENALTY
+//        case 'd': /* effector is deleterious! */  
 //            if(Ne>Ne_next)//decrease in effector protein
 //            {
 //                if(Ne_next>=Ne_saturate) //too many effector throughout
@@ -972,12 +981,12 @@ static void calc_fitness(float *integrated_fitness,
 //            if(Ne_next<Ne_saturate)
 //                instantaneous_fitness = bmax - bmax/Ne_saturate*Ne_next;
 //            else
-//                instantaneous_fitness = 0.0;            
-//#else
+//                instantaneous_fitness = 0.0;   
+//            break;
+//            
+//        case 'l':
 //            *integrated_fitness=(bmax-cost_of_expression)*dt;
-//            instantaneous_fitness=bmax;            
-//#endif
-//            break; 
+//            instantaneous_fitness=bmax;
 //    } 
 //    /* and instantaneous integrated rate */
 //    instantaneous_fitness -= cost_of_expression;
@@ -1127,8 +1136,7 @@ static void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int g
  */
 static void update_protein_number_and_fitness( Genotype *genotype,
                                                 CellState *state,                                   
-                                                GillespieRates *rates,
-                                                Environment *env,                                                
+                                                GillespieRates *rates,                                                                                            
                                                 float dt)
 {
     int i,j,counter;
@@ -1171,8 +1179,7 @@ static void update_protein_number_and_fitness( Genotype *genotype,
     /* now find out the protein numbers at end of dt interval and compute instantaneous and cumulative fitness */   
     calc_fitness(&integrated_fitness, 
                     genotype, 
-                    state, 
-                    env,
+                    state,                     
                     N_output_molecules_bf_dt, 
                     N_output_molecules_aft_dt,
                     dt);  
@@ -1360,15 +1367,15 @@ static int do_fixed_event(Genotype *genotype,
     switch (event) 
     {
         case 1:     /* a transcription event ends */
-            fixed_event_end_transcription(dt, state, rates, genotype, env); 
+            fixed_event_end_transcription(dt, state, rates, genotype); 
             break;
         case 2:     /* a translation initialization event ends */ 
-            return_value=fixed_event_end_translation_init(genotype, state, rates, env, dt);
+            return_value=fixed_event_end_translation_init(genotype, state, rates, dt);
             state->cell_activated=1;
             break;
         case 3:     /* turn signal off*/ 
             *dt = state->signal_off_head->time - state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, env, *dt); 
+            update_protein_number_and_fitness(genotype, state, rates, *dt); 
             delete_fixed_event_from_head(&(state->signal_off_head),&(state->signal_off_tail));
 #if SELECT_SENSITIVITY_AND_PRECISION
 			state->precision[0] = state->protein_number[genotype->nproteins - 1]; //reset running precision
@@ -1377,11 +1384,12 @@ static int do_fixed_event(Genotype *genotype,
 //                state->effect_of_effector=env->initial_effect_of_effector;
 //            else
 //                state->effect_of_effector='d';
-//            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;         
+//            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;     
+            return_value=SUDDEN_SIGNAL_CHANGE;
             break;
         case 4:     /*turn signal on*/
             *dt = state->signal_on_head->time - state->t;   
-            update_protein_number_and_fitness(genotype, state, rates, env, *dt);  
+            update_protein_number_and_fitness(genotype, state, rates, *dt);  
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
             state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
             state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
@@ -1398,28 +1406,36 @@ static int do_fixed_event(Genotype *genotype,
 //            if(env->fixed_effector_effect)                               
 //                state->effect_of_effector=env->initial_effect_of_effector;            
 //            else                 
-//                state->effect_of_effector='b';            
+//                state->effect_of_effector='b';   
+            return_value=SUDDEN_SIGNAL_CHANGE;
             break;	
         case 5: /* finishing burn-in developmental simulation*/
             *dt=env->duration_of_burn_in_growth_rate-state->t;     
-            update_protein_number_and_fitness(genotype, state, rates, env, *dt);
+            update_protein_number_and_fitness(genotype, state, rates, *dt);
             for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
                 state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
+            if(env->signal_on_aft_burn_in==1)
+                state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
+            else
+                state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;
+            state->effect_of_effector=env->effect_of_effector_aft_burn_in;   
+            return_value=SUDDEN_SIGNAL_CHANGE;
             break;
         case 6: /* mandatorily updating Pact and Prep*/
             *dt=state->t_to_update_probability_of_binding-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, env, *dt);          
+            update_protein_number_and_fitness(genotype, state, rates, *dt);          
             break;
         case 7: /* update signal strength */
             *dt=state->change_signal_strength_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, env, *dt);
+            update_protein_number_and_fitness(genotype, state, rates, *dt);
             state->protein_number[N_SIGNAL_TF-1]=env->external_signal[state->change_signal_strength_head->event_id];
             delete_fixed_event_from_head(&(state->change_signal_strength_head),&(state->change_signal_strength_tail));
+            return_value=SUDDEN_SIGNAL_CHANGE;
             break;     
         case 8: /* record expression levels*/
             *dt=state->sampling_point_end_head->time-state->t;
-            update_protein_number_and_fitness(genotype, state, rates, env, *dt);
+            update_protein_number_and_fitness(genotype, state, rates, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
 #if PHENOTYPE
             for(i=0;i<genotype->N_node_families;i++)
@@ -1595,8 +1611,7 @@ static int does_fixed_event_end(CellState *state, float t)
 static void fixed_event_end_transcription( float *dt,                                     
                                             CellState *state,
                                             GillespieRates *rates,
-                                            Genotype *genotype,
-                                            Environment *env)
+                                            Genotype *genotype)
 {
     int gene_id;
     float concurrent;
@@ -1604,7 +1619,7 @@ static void fixed_event_end_transcription( float *dt,
     /* recompute the delta-t based on difference between now and the time of transcription end */
     *dt = state->mRNA_transcr_time_end_head->time - state->t;   
     /* update fitness and protein concentration during dt*/
-    update_protein_number_and_fitness(genotype, state, rates, env, *dt);
+    update_protein_number_and_fitness(genotype, state, rates, *dt);
     /* get the gene which is ending transcription */
     gene_id = state->mRNA_transcr_time_end_head->event_id;    
     /* increase number of mRNAs that are initializing translation*/
@@ -1638,15 +1653,14 @@ static void fixed_event_end_transcription( float *dt,
  */
 static int fixed_event_end_translation_init(Genotype *genotype, 
                                             CellState *state, 
-                                            GillespieRates *rates, 
-                                            Environment *env,
+                                            GillespieRates *rates,                                            
                                             float *dt)
 {
     int gene_id;    
     /* calc the remaining time till translation initiation ends */
     *dt = state->mRNA_transl_init_time_end_head->time - state->t;         
     /* update fitness and protein concentration during dt*/
-    update_protein_number_and_fitness(genotype, state, rates, env, *dt);
+    update_protein_number_and_fitness(genotype, state, rates, *dt);
     /* get identity of gene that has just finished translating */
     gene_id=state->mRNA_transl_init_time_end_head->event_id; 
     /* there is one less mRNA that is initializing translation */
