@@ -2207,7 +2207,7 @@ static void print_motifs(Genotype *genotype)
     FILE *fp; 
     int i;
     fp=fopen("N_motifs.txt","a+");
-    for(i=0;i<36;i++)
+    for(i=0;i<17;i++)
         fprintf(fp,"%d ",genotype->N_motifs[i]);    
     fprintf(fp,"\n");
     fclose(fp); 
@@ -2347,6 +2347,7 @@ static void find_motifs(Genotype *genotype)
     }     
     for(i=0;i<17;i++)    
         genotype->N_motifs[i]=0;  
+    
     /*begin searching motifs*/    
     for(i=N_SIGNAL_TF;i<genotype->ngenes;i++)
     {
@@ -3072,7 +3073,7 @@ static void store_resident_info(Genotype *resident,
     int i;
  
    /*always store network motifs*/
-    for(i=0;i<36;i++)
+    for(i=0;i<17;i++)
         resident_info->n_motifs[i]=resident->N_motifs[i];
     for(i=0;i<12;i++)        
         resident_info->n_near_AND_gated_motifs[i]=resident->N_near_AND_gated_motifs[i];
@@ -3174,7 +3175,7 @@ static void output_resident_info(Output_buffer resident_info[OUTPUT_INTERVAL], i
     fp=fopen("N_motifs.txt","a+");
     for(j=0;j<output_counter;j++)
     {
-        for(i=0;i<36;i++)
+        for(i=0;i<17;i++)
             fprintf(fp,"%d ",resident_info[j].n_motifs[i]);    
         fprintf(fp,"\n");        
     }

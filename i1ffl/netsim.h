@@ -297,7 +297,7 @@ struct Output_buffer
     char new_nuc[3];
     int which_kinetic;
     float new_kinetic;   
-    int n_motifs[36];
+    int n_motifs[17];
     int n_near_AND_gated_motifs[12];    
 };
 
