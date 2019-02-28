@@ -1014,15 +1014,13 @@ static void calc_TF_dist_from_all_BS(Genotype *genotype, CellState *state, int g
     
     BS_info=genotype->all_binding_sites[gene_id];
     
-    /* initializing matrices to all zeros */
-    for(i=0;i<genotype->max_hindered_sites[gene_id]+1;i++)
+    /* initializing matrices to all zeros */    
+    for(j=0;j<max_N_binding_rep;j++) 
     {
-        for(j=0;j<max_N_binding_rep;j++) 
-        {
-            for(k=0;k<max_N_binding_act;k++)
-                ratio_matrices[i][j][k]=0.0;
-        }
-    }   
+        for(k=0;k<max_N_binding_act;k++)
+            ratio_matrices[0][j][k]=0.0;
+    }
+       
     /* body of the forward algorithm*/    
     pos_next_record=0; //where in the ratio_matrices to put the next record
     ratio_matrices[pos_next_record][0][0]=BS_info[0].Kd;   
