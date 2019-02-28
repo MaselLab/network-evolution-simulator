@@ -1,1 +1,1 @@
-Folder **c1ffl** contains the code used in the manuscript and samples of output files.
+Scripts to evolve I1-FFLs (developing).
