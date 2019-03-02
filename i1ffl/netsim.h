@@ -22,8 +22,7 @@
 #define HI_RESOLUTION_RECALC 5
 #define N_THREADS 5
 #define N_REPLICATES 100
-#define OUTPUT_INTERVAL 10
-#define SAVING_INTERVAL 10
+#define OUTPUT_INTERVAL 20
 #define N_TIMEPOINTS 900 // for plotting
 #define OUTPUT_MUTANT_DETAILS 0
 
@@ -34,15 +33,29 @@
 #define TIME_OFFSET 0.01
 #define CAUTIOUS 0
 
+#define CUT_OFF_MISMATCH_TF2TF 2
+
 /*Biology and evolution settings*/
 #define EFFECTOR_NOT_TF 0
 #define POOL_EFFECTORS 1
-#define FAST_SS 0
-#define SELECT_SENSITIVITY_AND_PRECISION 0
-#define SELECT_ON_DURATION 0
-#define REALLY_COMPLETECATE 0
-#define PEAK_SEARCH 1
-#define CHEMOTAXIS 0
+#define EVOLVE_I1FFL 1
+#if EVOLVE_I1FFL
+#define SELECTION 0 //0 for acceleration, 1 pulse generation, 2 adaptation, 3 for fold-change detection
+#endif
+
+#if PHENOTYPE
+#define SAMPLE_PARAMETERS 0 //randomly sample parameters of networks motifs
+#define SAMPLE_SIZE 100 //number of samples to take
+#define START_STEP_OF_SAMPLING 41001 //sample from the genotypes at the start step and afterwards 
+#define TARGET_MOTIF 2 // 0 means sampling genes regardless of motifs
+                       // 1 samples from c1-FFLs under direction regulation
+                       // 2 samples from isolated AND-gated C1-FFLs
+                       // 3 samples from isolated AND-gated FFL-in-diamonds
+#define REPRODUCE_GENOTYPES 1 // output N_motifs and networks of all accepted mutations, 
+                              // can be used together with options in section 6
+#define SAMPLE_GENE_EXPRESSION 0 //output expression of genes
+#endif
+
 #define DIRECT_REG 1
 #define NO_PENALTY 0
 #define IGNORE_BS 1
@@ -137,22 +150,16 @@ struct Environment
     int fixed_effector_effect;  
     float *external_signal;
     float duration_of_burn_in_growth_rate;
-//    float benefit;
-    float response_amplification;
-    float minimal_peak_response;
-    float opt_pulse_amplitude_fold;
-//    float max_t_in_bias;    
-    float opt_pulse_duration;
-    float fitness_factor_of_duration;
-    float fitness_factor_of_amplitude;
-    float opt_ss_response;
-    float fitness_factor_of_ss_response;
-    float fitness_factor_of_diff_in_ss;
-    float opt_peak_response;
-    float fitness_factor_of_peak_response;    
-    int window_size;
     float max_duration_of_burn_in_growth_rate;    
     float avg_duration_of_burn_in_growth_rate;
+    
+/*selection condition for I1-FFL*/
+    float min_peak_response;
+    float min_reduction_relative_to_peak;
+    float min_response_aft_signal_change;
+    float max_response_bf_signal_change;  
+    float max_relative_deviation_from_mean;
+    int window_size;
 };
 
 struct Selection
@@ -293,6 +300,7 @@ struct Output_buffer
     int n_rep;    
     char mut_type;
     int which_gene;
+    int which_protein;
     int which_nuc;
     char new_nuc[3];
     int which_kinetic;

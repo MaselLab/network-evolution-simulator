@@ -98,30 +98,9 @@ struct CellState {
     float protein_synthesis_index[MAX_GENES];  /*this is N_mRNA*protein_syn_rate/degradation rate.*/
     int transcriptional_state[MAX_GENES];       /*can be REPRESSED, INTERMEDIATE, or ACTIVE */
     
-    /*measurement of pulse*/   
-    float Duration_pulse;
-    float T_pulse_on;
-    float T_pulse_off;
-    int first_pulse;
-    int Pulse_is_on; 
+    /*measurement of pulse*/  
     float *sampled_response;
     int N_samples;
-    float cumulative_basal_benefit;
-    float cumulative_advanced_benefit;
-    float cumulative_damage;   
-    /*chemotaxis*/
-    float cumulative_benefit;    
-    int recording_basal_response;
-    int found_gradient;
-    int moving;
-    int position;                       /*0: in poor media, 1: in rich media, 2: rich to poor*/
-    float cumulative_t_in_bias;
-    float threshold_response_to_bias[MAX_OUTPUT_PROTEINS];
-    float basal_response[MAX_OUTPUT_PROTEINS];
-//    float response_amplification;
-    /***/
-    float sensitivity[3]; /* element 1 is a running record, 2 is the sensitivity for singal change 1, 3 is the sensitivity for signal change 2*/
-    float precision[3];  
 };
 
 void initialize_cell(Genotype *, CellState *, Environment *, float, int [MAX_GENES], float [MAX_PROTEINS]);

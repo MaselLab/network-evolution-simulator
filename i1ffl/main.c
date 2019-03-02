@@ -5,7 +5,6 @@
  */
 #include <stdio.h>
 #include <unistd.h>
-#include <math.h>
 #include "netsim.h"
 #include "RngStream.h"
 #include "lib.h"
@@ -24,7 +23,7 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-	seed=1;
+	seed=8;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
@@ -93,43 +92,39 @@ int main()
     Selection selection;     
     
     /*set duration of developmental simulation*/
-    selection.env1.t_development=119.9; //minutes
-    selection.env2.t_development=119.9;
+    selection.env1.t_development=120.1; //minutes
+    selection.env2.t_development=120.1;
     
     /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
     selection.env1.avg_duration_of_burn_in_growth_rate=10.0;
     selection.env2.avg_duration_of_burn_in_growth_rate=10.0;
-    selection.env1.max_duration_of_burn_in_growth_rate=0.0;
-    selection.env2.max_duration_of_burn_in_growth_rate=0.0;
+    selection.env1.max_duration_of_burn_in_growth_rate=30.0;
+    selection.env2.max_duration_of_burn_in_growth_rate=30.0;
     
     /*The code below creates signals under env1 and env2. The signal is consecutive "ONs" and "OFFs" and always starts with "ON". 
      *Use t_signal_on and t_signal_off to specify the duration of "on" and "off"*/ 
-    selection.env1.signal_on_strength=500.0;    
-    selection.env1.signal_off_strength=50.0;
-    selection.env2.signal_on_strength=500.0;
-    selection.env2.signal_off_strength=50.0;    
+    selection.env1.signal_on_strength=100.0;    
+    selection.env1.signal_off_strength=10.0;
+    selection.env2.signal_on_strength=100.0;
+    selection.env2.signal_off_strength=10.0;    
     selection.env1.signal_on_aft_burn_in=0; //turn on signal after burn-in growth
     selection.env2.signal_on_aft_burn_in=0;
     selection.env1.t_signal_on=200.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
     selection.env1.t_signal_off=60.0; 
     selection.env2.t_signal_on=200.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
     selection.env2.t_signal_off=60.0; //after being "on" for the initial 10 minutes, the signal is off for 200 minutes, i.e. remains off in env2.    selection.env1.fitness_factor_of_amplitude=
-    selection.env1.opt_pulse_amplitude_fold=(selection.env1.signal_on_strength-selection.env1.signal_off_strength)/selection.env1.signal_off_strength;
-    selection.env2.opt_pulse_amplitude_fold=(selection.env2.signal_on_strength-selection.env2.signal_off_strength)/selection.env2.signal_off_strength;
-    selection.env1.fitness_factor_of_amplitude=selection.env1.opt_pulse_amplitude_fold/sqrt(2.0);
-    selection.env2.fitness_factor_of_amplitude=selection.env2.opt_pulse_amplitude_fold/sqrt(2.0);
-    selection.env1.opt_ss_response=100.0;
-    selection.env2.opt_ss_response=100.0;
-    selection.env1.fitness_factor_of_ss_response=0.05;//sqrt(2.0);
-    selection.env2.fitness_factor_of_ss_response=0.05;//sqrt(2.0);
-    selection.env1.fitness_factor_of_diff_in_ss=0.8;
-    selection.env2.fitness_factor_of_diff_in_ss=0.8;
-    selection.env1.opt_peak_response=10000.0;
-    selection.env2.opt_peak_response=10000.0;    
-    selection.env1.fitness_factor_of_peak_response=selection.env1.fitness_factor_of_diff_in_ss/sqrt(4.0);
-    selection.env2.fitness_factor_of_peak_response=selection.env2.fitness_factor_of_diff_in_ss/sqrt(4.0);
-    selection.env1.window_size=10;
-    selection.env2.window_size=10;
+
+    /*selection condition of pulse*/
+    selection.env1.min_peak_response=10000.0;
+    selection.env2.min_peak_response=10000.0;    
+    selection.env1.max_response_bf_signal_change=10.0;
+    selection.env2.max_response_bf_signal_change=10.0;
+    selection.env1.min_reduction_relative_to_peak=0.05;
+    selection.env2.min_reduction_relative_to_peak=0.05;
+    selection.env1.min_response_aft_signal_change=10.0;
+    selection.env1.min_response_aft_signal_change=10.0;
+    selection.env1.window_size=5;
+    selection.env2.window_size=5;
     /*Alternatively, an irregular signal can be specified with an extra file*/    
 #if IRREG_SIGNAL
     int j,k;  
@@ -158,17 +153,7 @@ int main()
         }
         fclose(fp);
     } 
-#endif    
-    
-    /*selection condition of pulse*/
-    selection.env1.opt_pulse_duration=20.0;
-    selection.env2.opt_pulse_duration=20.0;
-    selection.env1.fitness_factor_of_duration=selection.env1.opt_pulse_duration/sqrt(2.0);
-    selection.env2.fitness_factor_of_duration=selection.env2.opt_pulse_duration/sqrt(2.0);
-    selection.env1.minimal_peak_response=10000.0;
-    selection.env2.minimal_peak_response=10000.0;   
-    selection.env1.response_amplification=100.0;
-    selection.env2.response_amplification=100.0;        
+#endif   
     
     /*Set when the effector is beneficial and when it is deleterious*/
     selection.env1.initial_effect_of_effector='d'; //effector is beneficial in the beginning of env1
