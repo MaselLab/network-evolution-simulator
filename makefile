@@ -1,16 +1,24 @@
 #compiling option
-CFLAGS = -O3 -fp-model source -fp-model precise #the default is performance release, and accurate arithematics on floating numbers 
+CFLAGS = -O3 # the default is performance release
+CFLAGS_INTEL = -fp-model source -fp-model precise # enable accurate arithematics on floating numbers in intel C compiler
 
-#simulation mode
-#CPPFLAGS #the default is full simulation.   
+#other flags go here
+#CPPFLAGS =   
 
 #objects
 objects=main.o numerical.o netsim.o lib.o RngStream.o mutation.o cellular_activity.o
 
+%.o: %.c
+ifeq ($(CC),icc) 
+	$(CC) $(CFLAGS) $(CFLAGS_INTEL) $(CPPFLAGS) -c $< -o $@ -qopenmp
+else
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@ -fopenmp
+endif
+
 #target
 simulator: $(objects)	
 ifeq ($(CC),icc)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o simulator $(objects) -qopenmp
+	$(CC) $(CFLAGS) $(CFLAGS_INTEL) $(CPPFLAGS) -o simulator $(objects) -qopenmp
 else
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o simulator $(objects) -fopenmp -lm
 endif
@@ -28,11 +36,6 @@ cellular_activity.o: cellular_activity.h lib.h numerical.h
 lib.o: lib.h
 
 netsim.o: netsim.c
-ifeq ($(CC),icc) 
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c netsim.c -qopenmp
-else
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c netsim.c -fopenmp
-endif
 
 #clean
 .PHONY:clean
