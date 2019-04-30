@@ -27,7 +27,7 @@ static const float MUT_protein_syn_rate=9.5e-12; //per codon
 static const float MUT_GENE_LENGTH_RATE=1.2e-11; //per codon
 static const float MUT_cooperation=0.0;
 static const float MUT_effector_to_TF=3.5e-9;
-static const float MUT_locus_specific_tf_behavior=3.5e-9; 
+static const float MUT_locus_specific_tf_behavior=5.25e-10; 
 
 /*Mutational effect*/
 float miu_ACT_TO_INT_RATE=1.57;
@@ -90,7 +90,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)
     {
         /*calculate and store the distribution of binding sites before mutation*/
-        calc_all_binding_sites_copy(genotype,which_gene);
+        calc_all_binding_sites_copy(genotype,which_gene,NMIN);
         container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
@@ -110,7 +110,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)   
     {
         /*compare binding site bf and aft substitution to decide whether to update cisreg_cluster_pool*/
-        calc_all_binding_sites_copy(genotype,which_gene);    
+        calc_all_binding_sites_copy(genotype,which_gene,NMIN);    
         if(N_BS_bf_mutation!=genotype->binding_sites_num[which_gene])    
             update_cisreg_cluster_pool(genotype,which_gene,'s');
         else
@@ -154,7 +154,7 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)
     {
         /*calculate and store the distribution of binding sites before mutation*/
-        calc_all_binding_sites_copy(genotype,which_gene);
+        calc_all_binding_sites_copy(genotype,which_gene,NMIN);
         container = malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
@@ -170,7 +170,7 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)
     {
         /*compare binding site bf and aft substitution to decide whether to update cisreg_cluster_pool*/
-        calc_all_binding_sites_copy(genotype,which_gene); 
+        calc_all_binding_sites_copy(genotype,which_gene,NMIN); 
         if(N_BS_bf_mutation!=genotype->binding_sites_num[which_gene])
             update_cisreg_cluster_pool(genotype,which_gene,'s'); 
         else
@@ -1463,7 +1463,7 @@ static void update_output_protein_pool(Genotype *genotype, int which_gene, char 
             /*remove which_gene from output_protein_ids*/
             i=0;
             while(genotype->output_protein_ids[i]!=which_gene) i++;
-            for(i=0;i<genotype->n_output_genes;i++)
+            for(;i<genotype->n_output_genes;i++)
                 genotype->output_protein_ids[i]=genotype->output_protein_ids[i+1];
             genotype->n_output_genes--;
             genotype->is_output[which_gene]=NON_OUTPUT_PROTEIN;     
@@ -1568,7 +1568,7 @@ static void regroup_cisreg_clusters(Genotype *genotype)
     int genes_to_be_sorted[genotype->ngenes];
     int new_cluster_id;   
     int no_difference;    
-    calc_all_binding_sites(genotype); 
+    calc_all_binding_sites(genotype,NMIN); 
     
     for(i=0;i<genotype->ngenes-1;i++)
         genes_to_be_sorted[i]=i+1;
