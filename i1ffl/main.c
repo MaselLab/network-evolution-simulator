@@ -23,7 +23,7 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-	seed=8;
+	seed=11;
     for(i=0;i<6;i++)
         seeds[i]=seed;
     RngStream_SetPackageSeed(seeds);    
@@ -92,8 +92,8 @@ int main()
     Selection selection;     
     
     /*set duration of developmental simulation*/
-    selection.env1.t_development=120.1; //minutes
-    selection.env2.t_development=120.1;
+    selection.env1.t_development=420.1; //minutes
+    selection.env2.t_development=420.1;
     
     /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
     selection.env1.avg_duration_of_burn_in_growth_rate=10.0;
@@ -103,28 +103,36 @@ int main()
     
     /*The code below creates signals under env1 and env2. The signal is consecutive "ONs" and "OFFs" and always starts with "ON". 
      *Use t_signal_on and t_signal_off to specify the duration of "on" and "off"*/ 
-    selection.env1.signal_on_strength=100.0;    
-    selection.env1.signal_off_strength=10.0;
-    selection.env2.signal_on_strength=100.0;
-    selection.env2.signal_off_strength=10.0;    
+    selection.env1.signal_on_strength=50000.0;    
+    selection.env1.signal_off_strength=500.0;
+    selection.env2.signal_on_strength=50000.0;
+    selection.env2.signal_off_strength=500.0;    
     selection.env1.signal_on_aft_burn_in=0; //turn on signal after burn-in growth
     selection.env2.signal_on_aft_burn_in=0;
-    selection.env1.t_signal_on=200.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
-    selection.env1.t_signal_off=60.0; 
-    selection.env2.t_signal_on=200.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
-    selection.env2.t_signal_off=60.0; //after being "on" for the initial 10 minutes, the signal is off for 200 minutes, i.e. remains off in env2.    selection.env1.fitness_factor_of_amplitude=
+    selection.env1.t_signal_on=1000.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
+    selection.env1.t_signal_off=300.0; 
+    selection.env2.t_signal_on=1000.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
+    selection.env2.t_signal_off=300.0; //after being "on" for the initial 10 minutes, the signal is off for 200 minutes, i.e. remains off in env2.    selection.env1.fitness_factor_of_amplitude=
 
     /*selection condition of pulse*/
-    selection.env1.min_peak_response=10000.0;
-    selection.env2.min_peak_response=10000.0;    
-    selection.env1.max_response_bf_signal_change=10.0;
-    selection.env2.max_response_bf_signal_change=10.0;
+    selection.env1.min_peak_response=500.0;
+    selection.env2.min_peak_response=500.0;  
+    selection.env1.max_ss_response=10.0;
+    selection.env2.max_ss_response=10.0;
+    selection.env1.ss_fitness_constant=3.5e3;
+    selection.env2.ss_fitness_constant=3.5e3;
+    selection.env1.fitness_decay_constant=3.5e4;
+    selection.env2.fitness_decay_constant=3.5e4; 
     selection.env1.min_reduction_relative_to_peak=0.05;
     selection.env2.min_reduction_relative_to_peak=0.05;
-    selection.env1.min_response_aft_signal_change=10.0;
-    selection.env1.min_response_aft_signal_change=10.0;
-    selection.env1.window_size=5;
-    selection.env2.window_size=5;
+    selection.env1.min_ss_response=10000.0;
+    selection.env2.min_ss_response=10000.0;
+    selection.env1.width=60.0;
+    selection.env2.width=60.0;
+    selection.env1.width_sd=1.56e3;
+    selection.env2.width_sd=1.56e3;
+    selection.env1.window_size=0;
+    selection.env2.window_size=0;
     /*Alternatively, an irregular signal can be specified with an extra file*/    
 #if IRREG_SIGNAL
     int j,k;  
@@ -165,12 +173,8 @@ int main()
     selection.env1_weight=0.5;
     selection.env2_weight=0.5;
     
-    /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
-    selection.env1.duration_of_burn_in_growth_rate=0.0; //zero means do not burn-in developmental simulation
-    selection.env2.duration_of_burn_in_growth_rate=0.0;  
-    
     /*Maximum evolutionary steps*/
-    selection.MAX_STEPS=50000; 
+    selection.MAX_STEPS=10000; 
     
     /*Default values of */
     selection.temporary_DUPLICATION=1.5e-7;
@@ -197,21 +201,19 @@ int main()
                 selection.temporary_miu_ACT_TO_INT_RATE,
                 selection.temporary_miu_Kd,
                 selection.temporary_miu_protein_syn_rate);
-        fprintf(fp,"env weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
-        fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
+        fprintf(fp,"env weight dev_time t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
+        fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n",
                 selection.env1_weight,
-                selection.env1.t_development,
-                selection.env1.duration_of_burn_in_growth_rate,
+                selection.env1.t_development,               
                 selection.env1.t_signal_on,
                 selection.env1.t_signal_off,
                 selection.env1.signal_on_strength,
                 selection.env1.signal_off_strength,
                 selection.env1.initial_effect_of_effector,
                 selection.env1.fixed_effector_effect);
-        fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
+        fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
                 selection.env2_weight,
-                selection.env2.t_development,
-                selection.env2.duration_of_burn_in_growth_rate,
+                selection.env2.t_development,               
                 selection.env2.t_signal_on,
                 selection.env2.t_signal_off,
                 selection.env2.signal_on_strength,
@@ -246,9 +248,8 @@ int main()
     burn_in.env1.fixed_effector_effect=1;
     burn_in.env2.fixed_effector_effect=1;
     burn_in.env1_weight=0.67;
-    burn_in.env2_weight=0.33;   
-    burn_in.env1.duration_of_burn_in_growth_rate=0.0;
-    burn_in.env2.duration_of_burn_in_growth_rate=0.0;
+    burn_in.env2_weight=0.33;  
+  
     burn_in.MAX_STEPS=0; // set it to 1000 if DIRECT_REG=0    
     burn_in.temporary_DUPLICATION=5.25e-9;
     burn_in.temporary_SILENCING=5.25e-9;
@@ -275,21 +276,19 @@ int main()
                     burn_in.temporary_miu_ACT_TO_INT_RATE,
                     burn_in.temporary_miu_Kd,
                     burn_in.temporary_miu_protein_syn_rate);
-            fprintf(fp,"env weight dev_time burn_in_growth t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
-            fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n",
+            fprintf(fp,"env weight dev_time t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
+            fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n",
                     burn_in.env1_weight,
-                    burn_in.env1.t_development,
-                    burn_in.env1.duration_of_burn_in_growth_rate,
+                    burn_in.env1.t_development,                
                     burn_in.env1.t_signal_on,
                     burn_in.env1.t_signal_off,
                     burn_in.env1.signal_on_strength,
                     burn_in.env1.signal_off_strength,
                     burn_in.env1.initial_effect_of_effector,
                     burn_in.env1.fixed_effector_effect);
-            fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
+            fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
                     burn_in.env2_weight,
-                    burn_in.env2.t_development,
-                    burn_in.env2.duration_of_burn_in_growth_rate,
+                    burn_in.env2.t_development,                  
                     burn_in.env2.t_signal_on,
                     burn_in.env2.t_signal_off,
                     burn_in.env2.signal_on_strength,
