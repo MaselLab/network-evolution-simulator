@@ -165,12 +165,12 @@ void initialize_cell(   Genotype *genotype,
     else
         add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));                  
     /*plot protein concentration and fitness vs time*/    
-#if !PHENOTYPE
+//#if !PHENOTYPE
 #if EVOLVE_I1FFL
     float t;
     int N_data_points; 
-    t=env->t_signal_off+t_burn_in-TIME_OFFSET;
-    N_data_points=(int)((env->t_development-env->t_signal_off)/sampling_interval);
+    t=env->t_signal_off+t_burn_in-(float)env->window_size+TIME_OFFSET;
+    N_data_points=(int)((env->t_development-env->t_signal_off+(float)env->window_size)/sampling_interval);
     for(i=0;i<N_data_points;i++)
     {
         add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
@@ -178,17 +178,17 @@ void initialize_cell(   Genotype *genotype,
     } 
     state->sampled_response=(float*)calloc(N_data_points,sizeof(float));
 #endif 
-#else
-    float t;
-    int N_data_points; 
-    t=0.0+TIME_OFFSET;
-    N_data_points=(int)(env->t_development+t_burn_in);
-    for(i=0;i<N_data_points;i++)
-    {
-        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
-        t+=1.0;            
-    } 
-#endif    
+//#else
+//    float t;
+//    int N_data_points; 
+//    t=0.0+TIME_OFFSET;
+//    N_data_points=(int)(env->t_development+t_burn_in);
+//    for(i=0;i<N_data_points;i++)
+//    {
+//        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
+//        t+=1.0;            
+//    } 
+//#endif    
 }
 
 /*
@@ -322,7 +322,7 @@ void calc_all_rates(Genotype *genotype,
         if(UPDATE_WHAT!=DO_NOTHING)          
             calc_leaping_interval(genotype,state,&interval_to_update_probability_of_binding,env->t_development+t_burn_in,UPDATE_WHAT);  
     
-        /*Update the next time that Pact will be updated mandatorily*/
+        /*calculate the next time that Pact will be updated mandatorily*/
         t_to_update_probability_of_binding=state->t+interval_to_update_probability_of_binding;
         concurrent=check_concurrence(state, t_to_update_probability_of_binding);
         while(concurrent)//if the time to update overlaps with existing events, add a tiny offset
@@ -367,9 +367,9 @@ void do_single_timestep(Genotype *genotype,
     fixed_time = (state->t+dt<developmental_time)?(state->t+dt):developmental_time;
     event = does_fixed_event_end(state, fixed_time);
     while(event!=0)
-    {           
+    {
         /*after doing fixed event, return a flag to indicate whether mandatorily update Pact or Prep*/
-        UPDATE_WHAT=do_fixed_event(genotype, state, rates, env, timecourse, &dt, event);       
+        UPDATE_WHAT=do_fixed_event(genotype, state, rates, env, timecourse, &dt, event);  
         /* advance time by the dt */  
         state->t += dt;    
         /* we've been running with rates->total_Gillespie_rate for dt, so substract it from x*/   
@@ -388,7 +388,7 @@ void do_single_timestep(Genotype *genotype,
         fixed_time = (state->t+dt<developmental_time)?(state->t+dt):developmental_time;
         /* check to see there aren't more fixed events to do */
         event = does_fixed_event_end(state, fixed_time);                                    
-    } 
+    }
     /* no remaining fixed events to do in dt, now do stochastic events */  
     /* if we haven't already reached end of development with last delta-t*/          
     if (state->t+dt < developmental_time)
@@ -1128,7 +1128,8 @@ static int do_fixed_event(Genotype *genotype,
                 state->effect_of_effector=env->initial_effect_of_effector;
             else
                 state->effect_of_effector='d';
-            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;     
+            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;    
+            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;   
             return_value=SUDDEN_SIGNAL_CHANGE;
             break;
         case 4:     /*turn signal on*/
@@ -1144,15 +1145,21 @@ static int do_fixed_event(Genotype *genotype,
             return_value=SUDDEN_SIGNAL_CHANGE;
             break;	
         case 5: /* finishing burn-in developmental simulation*/
-            *dt=env->duration_of_burn_in_growth_rate-state->t;     
+            *dt=state->burn_in_growth_rate_head->time-state->t;    
             update_protein_number_and_fitness(genotype, state, rates, *dt);
             for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
                 state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
             if(env->signal_on_aft_burn_in==1)
+            {
                 state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
+                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;  
+            }
             else
+            {
                 state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;
+                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;  
+            }
             state->effect_of_effector=env->effect_of_effector_aft_burn_in;   
             return_value=SUDDEN_SIGNAL_CHANGE;
             break;
@@ -1179,14 +1186,13 @@ static int do_fixed_event(Genotype *genotype,
             }
             for(i=0;i<genotype->ngenes;i++)
                 timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
-            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
+//            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
             timecourse->timepoint++;   
-#else
+#endif
             state->sampled_response[state->N_samples]=0.0;
             for(i=0;i<genotype->n_output_genes;i++)
                 state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
-            state->N_samples++;  
-#endif
+            state->N_samples++; 
             break;
     }  
     return return_value;

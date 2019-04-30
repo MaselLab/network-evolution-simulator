@@ -80,6 +80,7 @@ struct CellState {
 
     char effect_of_effector;
     int cell_activated;
+//    float t_burn_in;
     float t_to_update_probability_of_binding;
     float P_A[MAX_GENES];
     float P_R[MAX_GENES];
