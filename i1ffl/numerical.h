@@ -11,5 +11,5 @@ extern float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, flo
 		    int, float, float *, float*, float*, float, float, int);
 
 /*find max or min*/
-extern void find_max(float*, int, int, float*, int*);
+extern void find_max(float*, int, int, float*, int*, float);
 extern void find_x(float*, int, int, float, float*, int);

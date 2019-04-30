@@ -118,19 +118,41 @@ float rtsafe(void (*funcd)(float, int, float, float*, float*, float*, float*, fl
     return 0.0;
 }
 
-void find_max(float *data, int start, int end, float *max, int *id_max)
+void find_max(float *data, int start, int end, float *max, int *id_max, float min)
 {
     int i;    
-    *max=data[start];
-    *id_max=start;
-    for(i=0;i<end-start;i++)
+    *max=data[start];   
+    if(min!=-1.0)
     {
-        if(*max<data[i])
+        for(i=start;i<end;i++)
         {
-            *max=data[i];
-            *id_max=start+i;
-        }            
-    }      
+            if(data[i]>=min)
+            {
+                *max=data[i];
+                *id_max=i;
+                return;
+            }
+            else
+            {
+                if(*max<data[i])
+                {
+                    *max=data[i];
+                    *id_max=i;
+                }  
+            }
+        }   
+    }
+    else
+    {
+        for(i=start;i<end;i++)
+        {            
+            if(*max<data[i])
+            {
+                *max=data[i];
+                *id_max=i;
+            } 
+        }   
+    }
 }
 
 void find_x(float *data, int start, int end, float x, float *id_x, int find_x_near_start)
