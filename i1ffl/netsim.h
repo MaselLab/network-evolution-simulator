@@ -21,7 +21,7 @@
 #define MAX_TRIALS 2000
 #define HI_RESOLUTION_RECALC 5
 #define N_THREADS 5
-#define N_REPLICATES 100
+#define N_REPLICATES 50
 #define OUTPUT_INTERVAL 20
 #define N_TIMEPOINTS 900 // for plotting
 #define OUTPUT_MUTANT_DETAILS 0
@@ -33,27 +33,32 @@
 #define TIME_OFFSET 0.01
 #define CAUTIOUS 0
 
-#define CUT_OFF_MISMATCH_TF2TF 2
+
+#define CUT_OFF_MISMATCH_SIG2EFFECTOR 2 //the maximum number of mismatches in TFBSs of the signal in effector genes
+#define CUT_OFF_MISMATCH_TF2EFFECTOR 2 //the maximum number of mismatches in TFBSs of TFs in effector genes
+#define CUT_OFF_MISMATCH_SIGNAL2TF 2 //the maximum number of mismatches in TFBSs of the signal in TF genes
+#define CUT_OFF_MISMATCH_TF2TF 1 //the maximum number of mismatches in TFBSs of TFs in TF genes
 
 /*Biology and evolution settings*/
 #define EFFECTOR_NOT_TF 0
 #define POOL_EFFECTORS 1
 #define EVOLVE_I1FFL 1
 #if EVOLVE_I1FFL
-#define SELECTION 0 //0 for acceleration, 1 pulse generation, 2 adaptation, 3 for fold-change detection
+#define SELECTION 2 //0 for acceleration, 1 pulse generation, 2 adaptation
 #endif
 
 #if PHENOTYPE
 #define SAMPLE_PARAMETERS 0 //randomly sample parameters of networks motifs
 #define SAMPLE_SIZE 100 //number of samples to take
-#define START_STEP_OF_SAMPLING 41001 //sample from the genotypes at the start step and afterwards 
+#define START_STEP_OF_SAMPLING 40001 //sample from the genotypes at the start step and afterwards 
 #define TARGET_MOTIF 2 // 0 means sampling genes regardless of motifs
                        // 1 samples from c1-FFLs under direction regulation
                        // 2 samples from isolated AND-gated C1-FFLs
                        // 3 samples from isolated AND-gated FFL-in-diamonds
 #define REPRODUCE_GENOTYPES 1 // output N_motifs and networks of all accepted mutations, 
                               // can be used together with options in section 6
-#define SAMPLE_GENE_EXPRESSION 0 //output expression of genes
+#define SAMPLE_GENE_EXPRESSION 1 //output expression of genes
+#define RESPONSE_SCAN 0//response vs signal strength
 #endif
 
 #define DIRECT_REG 1
@@ -149,16 +154,19 @@ struct Environment
     char effect_of_effector_aft_burn_in;
     int fixed_effector_effect;  
     float *external_signal;
-    float duration_of_burn_in_growth_rate;
     float max_duration_of_burn_in_growth_rate;    
     float avg_duration_of_burn_in_growth_rate;
     
 /*selection condition for I1-FFL*/
+    float width;
+    float width_sd;
     float min_peak_response;
     float min_reduction_relative_to_peak;
-    float min_response_aft_signal_change;
-    float max_response_bf_signal_change;  
+    float min_ss_response;
+    float max_ss_response;  
+    float ss_fitness_constant;
     float max_relative_deviation_from_mean;
+    float fitness_decay_constant;
     int window_size;
 };
 
@@ -341,9 +349,9 @@ char set_base_pair(float);
 
 void initialize_genotype(Genotype *, int, int, int, int, RngStream) ;
 
-void calc_all_binding_sites_copy(Genotype *, int);
+void calc_all_binding_sites_copy(Genotype *, int, int);
 
-void calc_all_binding_sites(Genotype *); 
+void calc_all_binding_sites(Genotype *, int); 
 
 void initialize_cache(Genotype *);
 
