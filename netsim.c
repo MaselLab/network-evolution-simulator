@@ -3192,8 +3192,8 @@ static void store_resident_info(Genotype *resident,
         resident_info->f1=resident->fitness1;
         resident_info->f2=resident->fitness2;
         resident_info->se_avg_f=resident->SE_avg_fitness;
-        resident_info->se_f1=resident->SE_avg_fitness;
-        resident_info->se_f2=resident->SE_avg_fitness;
+        resident_info->se_f1=resident->SE_fitness1;
+        resident_info->se_f2=resident->SE_fitness2;
     
         if(flag==1) //if stores everthing
         {
@@ -3226,8 +3226,8 @@ static void store_mutant_info(Genotype *mutant, Mutation *mut_record, Output_buf
     mutant_info->f1=mutant->fitness1;
     mutant_info->f2=mutant->fitness2;
     mutant_info->se_avg_f=mutant->SE_avg_fitness;
-    mutant_info->se_f1=mutant->SE_avg_fitness;
-    mutant_info->se_f2=mutant->SE_avg_fitness;
+    mutant_info->se_f1=mutant->SE_fitness1;
+    mutant_info->se_f2=mutant->SE_fitness2;
     mutant_info->step=step;
     mutant_info->n_tot_mut=N_tot_mutations;
     mutant_info->mut_type=mut_record->mut_type;
