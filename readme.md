@@ -13,9 +13,9 @@ We suggest using a Linux system to facilitate the installation. To run the progr
 ```
     make simulator CC=icc
 ```
-This command will create several files with suffix .o and an executable program named simulator. “CC=icc” compiles the source files with icc. By default, the compiling is done with -O3 for simulation speed, and -fp-model precise -fp-model source to ensure arithmetic operations are accurate and reproducible.
+This command will create several files with suffix .o and an executable program named simulator. “CC=icc” compiles the source files with icc. By default, the compiling is done with -O3 for simulation speed. When compiling with icc, two compiling options, -fp-model precise -fp-model source, are automatically enabled to ensure arithmetic operations are accurate and reproducible.
 
-To compile with gcc, change “CC=icc” to “CC=gcc” and comment out -fp-model precise -fp-model source in *makefile*. We have noticed that when compiled with gcc, the simulation produces result different from when compiled with icc, even for the same random number seed. Enabling safe arithmetic options in gcc may solve the problem, but we haven’t tested it.
+To compile with gcc, change “CC=icc” to “CC=gcc”. Note that when compiling with gcc, the makefile does not add extra compiling options to increase the accuracy of math. We have noticed that when compiled with gcc, the simulation produces result different from when compiled with icc, even for the same random number seed. Enabling safe arithmetic options in gcc may solve the problem, but we haven’t tested it.
 
 4. Execute simulator to start. On Linux, this is done with the following command
 ```
