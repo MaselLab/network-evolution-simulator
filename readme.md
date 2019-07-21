@@ -1,4 +1,6 @@
-﻿The program is written in C and is provided as source files. The source files must be compiled to produce the simulation program. We mainly used Intel C compiler (icc, version 16.0.4), but the GNU C compiler (gcc) will also work (although the outcome of a simulation will change due to different optimization to numerical calculations). 
+# After the publication of Xiong, Kun, Alex K. Lancaster, Mark L. Siegal, and Joanna Masel. 2019. “Feed-Forward Regulation Adaptively Evolves via Dynamics Rather than Topology When There Is Intrinsic Noise.” Nature Communications 10 (1): 2418, we found a bug that prevents gene length from mutating downwards. The bug is now fixed.  Re-running all simulations, Figures 4-10, Supplementary Figures 5-11, and Supplementary Tables 3-6 remain nearly identical, and are available in **Erratum**.  
+
+The program is written in C and is provided as source files. The source files must be compiled to produce the simulation program. We mainly used Intel C compiler (icc, version 16.0.4), but the GNU C compiler (gcc) will also work (although the outcome of a simulation will change due to different optimization to numerical calculations). 
 
 # Installation (Run the default mode)
 By default, the program evolves TRNs under selection for filtering out a short spurious signal, and allows the signal to regulate the effector directly. The program runs on 10 CPU cores (Haswell V3 28 core processor), and takes 1-2 days. 
@@ -40,10 +42,10 @@ selection.env1.signal_off_strength=0.0;
 selection.env2.signal_on_strength=1000.0;
 selection.env2.signal_off_strength=0.0;
 selection.env1.signal_on_aft_burn_in=1; 
-selection.env2.signal_on_aft_burn_in=1;
+selection.env2.signal_on_aft_burn_in=0;
 selection.env1.t_signal_on=200.0;
 selection.env1.t_signal_off=0.0; 
-selection.env2.t_signal_on=10.0;
+selection.env2.t_signal_on=0.0;
 selection.env2.t_signal_off=200.0;
 ```
 If the signal is not allowed to directly regulate the effector (see Additional settings), a burn-in condition of evolution is required. To enable burn-in, set line 260 of main.c to 
@@ -61,10 +63,10 @@ burn_in.env1.signal_off_strength=0.0;
 burn_in.env2.signal_on_strength=1000.0;
 burn_in.env2.signal_off_strength=0.0;
 burn_in.env1.signal_on_aft_burn_in=1; 
-burn_in.env2.signal_on_aft_burn_in=1;
+burn_in.env2.signal_on_aft_burn_in=0;
 burn_in.env1.t_signal_on=200.0; 
 burn_in.env1.t_signal_off=0.0;
-burn_in.env2.t_signal_on=10.0;
+burn_in.env2.t_signal_on=0.0;
 burn_in.env2.t_signal_off=200.0;
 ```
 # Output expression levels of genes over time
