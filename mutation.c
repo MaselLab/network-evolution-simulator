@@ -1040,7 +1040,7 @@ void mut_locus_length(Genotype *genotype, Mutation *mut_record, RngStream RS)
     
     if(genotype->locus_length[which_gene]>=MAX_GENE_LENGTH)
         genotype->locus_length[which_gene]-=1;
-    else if(genotype->locus_length[which_gene]<=MAX_GENE_LENGTH)
+    else if(genotype->locus_length[which_gene]<=MIN_GENE_LENGTH)
         genotype->locus_length[which_gene]+=1;
     else                            
         genotype->locus_length[which_gene]+=(RngStream_RandU01(RS)<0.5)?1:-1;  
