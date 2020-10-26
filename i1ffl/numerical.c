@@ -1,3 +1,23 @@
+/* 
+ * This file contains functions to generate random numbers of different distributions,
+ * and Newton-Raphson root-finding function.
+ 
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents on behalf of the University of Arizona
+ 
+ * This file is part of network-evolution-simulator.
+ * network-evolution-simulator is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * network-evolution-simulator is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with network-evolution-simulator. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include <stdlib.h>
 #include <math.h>
 #include "RngStream.h" /*replace ran1 with parallel RNG*/
@@ -164,9 +184,9 @@ void find_x(float *data, int start, int end, float x, float *id_x, int find_x_ne
         i=start;
         while(i<end-1)
         {
-            if(data[i]>=x)
+            if(data[i]<=x)
             {
-                if(data[i+1]<=x)
+                if(data[i+1]>=x)
                 {
                     *id_x=(x-data[i+1])/(data[i]-data[i+1])+(float)(i);
                     return;
