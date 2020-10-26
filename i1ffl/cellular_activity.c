@@ -1,11 +1,24 @@
 /* 
- * Simulator of yeast transcriptional regulatory network evolution
- * 
  * This file contains the functions to simulate gene expression and
  * instantaneous fitness during development. 
  * 
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents on behalf of the University of Arizona
+ 
+ * This file is part of network-evolution-simulator.
+
+ * network-evolution-simulator is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+
+ * network-evolution-simulator is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+
+ * You should have received a copy of the GNU Affero General Public License
+ * along with network-evolution-simulator. If not, see <https://www.gnu.org/licenses/>.
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -169,7 +182,7 @@ void initialize_cell(   Genotype *genotype,
 #if EVOLVE_I1FFL
     float t;
     int N_data_points; 
-    t=env->t_signal_off+t_burn_in-(float)env->window_size+TIME_OFFSET;
+    t=env->t_signal_off+t_burn_in-(float)env->window_size+1.0+TIME_OFFSET;
     N_data_points=(int)((env->t_development-env->t_signal_off+(float)env->window_size)/sampling_interval);
     for(i=0;i<N_data_points;i++)
     {
@@ -237,7 +250,7 @@ void calc_all_rates(Genotype *genotype,
      * and use it to update other rates*/
     for(i=N_SIGNAL_TF; i < genotype->ngenes; i++) 
     {    
-        cluster_id=genotype->which_cluster[i];        
+        cluster_id=genotype->which_cluster[i];  
         if(genotype->cisreg_cluster_pool[cluster_id][1][0]!=i)  /*if this gene does not have a unique cis-reg sequence*/
         {                
             state->P_A[i]=state->P_A[genotype->cisreg_cluster_pool[cluster_id][1][0]]; /* copy TF distribution from elsewhere*/
@@ -314,11 +327,11 @@ void calc_all_rates(Genotype *genotype,
             interval_to_update_probability_of_binding=DEFAULT_UPDATE_INTERVAL;
         else
             interval_to_update_probability_of_binding=MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING/diff_max*(state->t-state->last_event_t);
-#if PHENOTYPE
-        /*record the maximum change in probability of binding except when it is a sudden change in the signal*/
-        if(UPDATE_WHAT!=SUDDEN_SIGNAL_CHANGE)
-            phenotype->max_change_in_probability_of_binding=(diff_max>phenotype->max_change_in_probability_of_binding)?diff_max:phenotype->max_change_in_probability_of_binding;
-#endif
+//#if PHENOTYPE
+//        /*record the maximum change in probability of binding except when it is a sudden change in the signal*/
+//        if(UPDATE_WHAT!=SUDDEN_SIGNAL_CHANGE)
+//            phenotype->max_change_in_probability_of_binding=(diff_max>phenotype->max_change_in_probability_of_binding)?diff_max:phenotype->max_change_in_probability_of_binding;
+//#endif
         if(UPDATE_WHAT!=DO_NOTHING)          
             calc_leaping_interval(genotype,state,&interval_to_update_probability_of_binding,env->t_development+t_burn_in,UPDATE_WHAT);  
     
@@ -896,7 +909,7 @@ static void update_protein_number_and_fitness( Genotype *genotype,
     counter=0;
     for(i=0;i<genotype->n_output_genes;i++)
     {      
-        N_output_molecules_bf_dt[counter]=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
+        N_output_molecules_bf_dt[counter]=state->gene_specific_protein_number[genotype->output_gene_ids[i]];
         counter++;        
     }
     /* update protein numbers*/
@@ -912,7 +925,7 @@ static void update_protein_number_and_fitness( Genotype *genotype,
     /* now, use protein_pool to pool gene specific protein number*/
     for(i=N_SIGNAL_TF;i<genotype->nproteins;i++)
     {
-        state->protein_number[i]=0.0;        
+        state->protein_number[i]=0.0;     
         for(j=0;j<genotype->protein_pool[i][0][0];j++)
             state->protein_number[i]+=state->gene_specific_protein_number[genotype->protein_pool[i][1][j]];
     } 
@@ -920,7 +933,7 @@ static void update_protein_number_and_fitness( Genotype *genotype,
     counter=0;
     for(i=0;i<genotype->n_output_genes;i++)
     { 
-        N_output_molecules_aft_dt[counter]=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
+        N_output_molecules_aft_dt[counter]=state->gene_specific_protein_number[genotype->output_gene_ids[i]];
         counter++;        
     }    
     /* now find out the protein numbers at end of dt interval and compute instantaneous and cumulative fitness */   
@@ -1137,12 +1150,12 @@ static int do_fixed_event(Genotype *genotype,
             update_protein_number_and_fitness(genotype, state, rates, *dt);  
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
             state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
-            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;         
+            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;             
             if(env->fixed_effector_effect)                               
                 state->effect_of_effector=env->initial_effect_of_effector;            
             else                 
                 state->effect_of_effector='b';   
-            return_value=SUDDEN_SIGNAL_CHANGE;
+            return_value=SUDDEN_SIGNAL_CHANGE;            
             break;	
         case 5: /* finishing burn-in developmental simulation*/
             *dt=state->burn_in_growth_rate_head->time-state->t;    
@@ -1150,18 +1163,19 @@ static int do_fixed_event(Genotype *genotype,
             for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
                 state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
-            if(env->signal_on_aft_burn_in==1)
-            {
-                state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
-                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;  
-            }
-            else
-            {
-                state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;
-                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;  
-            }
+//            if(env->signal_on_aft_burn_in==1)
+//            {
+//                state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
+//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;  
+//            }
+//            else
+//            {
+//                state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;
+//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;  
+//            }
             state->effect_of_effector=env->effect_of_effector_aft_burn_in;   
-            return_value=SUDDEN_SIGNAL_CHANGE;
+            return_value=SUDDEN_SIGNAL_CHANGE;  
+            state->cumulative_cost=0.0;
             break;
         case 6: /* mandatorily updating Pact and Prep*/
             *dt=state->t_to_update_probability_of_binding-state->t;
@@ -1178,20 +1192,22 @@ static int do_fixed_event(Genotype *genotype,
             *dt=state->sampling_point_end_head->time-state->t;
             update_protein_number_and_fitness(genotype, state, rates, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
-#if SAMPLE_GENE_EXPRESSION
-            for(i=0;i<genotype->N_node_families;i++)
-            {                
-                for(j=0;j<genotype->node_family_pool[i][0][0];j++)
-                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->node_family_pool[i][1][j]];
-            }
-            for(i=0;i<genotype->ngenes;i++)
-                timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
-//            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
-            timecourse->timepoint++;   
-#endif
+//#if SAMPLE_GENE_EXPRESSION
+//            for(i=0;i<genotype->N_node_families;i++)
+//            {       
+////                for(j=0;j<genotype->gene_to_node.N_genes_per_item[i];j++)
+////                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->gene_to_node.which_genes[i][j]];
+//                for(j=0;j<genotype->node_family_pool[i][0][0];j++)
+//                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->node_family_pool[i][1][j]];
+//            }
+//            for(i=0;i<genotype->ngenes;i++)
+//                timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
+////            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
+//            timecourse->timepoint++;   
+//#endif
             state->sampled_response[state->N_samples]=0.0;
             for(i=0;i<genotype->n_output_genes;i++)
-                state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->output_protein_ids[i]];
+                state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->output_gene_ids[i]];
             state->N_samples++; 
             break;
     }  
@@ -1441,10 +1457,10 @@ static void calc_leaping_interval(Genotype *genotype, CellState *state, float *m
         gene_ids[j]=genotype->protein_pool[protein_id][1][j];
 
     /*determine whether the protein tends to increase or decrease concentration*/
-    overall_rate=0.0;
+    overall_rate=0.0; 
     for(j=0;j<genotype->protein_pool[protein_id][0][0];j++) 
         overall_rate+=(state->protein_synthesis_index[gene_ids[j]]-state->gene_specific_protein_number[gene_ids[j]])*genotype->protein_decay_rate[gene_ids[j]];
-    
+            
     if(overall_rate>0.0) //tend to increase
     {            
         if(P_binding>=(1.0-MAX_TOLERABLE_CHANGE_IN_PROBABILITY_OF_BINDING)) //concentration already very high
