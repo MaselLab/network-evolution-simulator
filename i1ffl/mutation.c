@@ -101,7 +101,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)
     {
         /*calculate and store the distribution of binding sites before mutation*/
-        calc_all_binding_sites_copy(genotype,which_gene,NMIN);
+        calc_all_binding_sites_copy(genotype,which_gene);
         container=malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
@@ -121,7 +121,7 @@ void mut_substitution(Genotype *genotype, Mutation *mut_record, RngStream RS)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)   
     {
         /*compare binding site bf and aft substitution to decide whether to update cisreg_cluster_pool*/
-        calc_all_binding_sites_copy(genotype,which_gene,NMIN);    
+        calc_all_binding_sites_copy(genotype,which_gene);    
         if(N_BS_bf_mutation!=genotype->binding_sites_num[which_gene])    
             update_cisreg_cluster_pool(genotype,which_gene,'s');
         else
@@ -165,7 +165,7 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)
     {
         /*calculate and store the distribution of binding sites before mutation*/
-        calc_all_binding_sites_copy(genotype,which_gene,NMIN);
+        calc_all_binding_sites_copy(genotype,which_gene);
         container=malloc(genotype->N_allocated_elements*sizeof(AllTFBindingSites));
         N_BS_bf_mutation=genotype->binding_sites_num[which_gene];
         for(i=0;i<N_BS_bf_mutation;i++)
@@ -181,7 +181,7 @@ void reproduce_substitution(Genotype *genotype, Mutation *mut_record)
     if(genotype->cisreg_cluster_pool[cluster_id][0][0]>1)
     {
         /*compare binding site bf and aft substitution to decide whether to update cisreg_cluster_pool*/
-        calc_all_binding_sites_copy(genotype,which_gene,NMIN); 
+        calc_all_binding_sites_copy(genotype,which_gene); 
         if(N_BS_bf_mutation!=genotype->binding_sites_num[which_gene])
             update_cisreg_cluster_pool(genotype,which_gene,'s'); 
         else
@@ -1631,7 +1631,7 @@ static void regroup_cisreg_clusters(Genotype *genotype)
     /* recalculate the binding sites on every promoter*/
     for(i=0;i<genotype->ngenes;i++)    
         genotype->recalc_TFBS[i]=YES; 
-    calc_all_binding_sites(genotype,NMIN); 
+    calc_all_binding_sites(genotype); 
     
     /*sort genes into new cisreg clusters based on TFBSs distribution*/
     for(i=0;i<genotype->ngenes-1;i++)

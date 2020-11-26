@@ -176,32 +176,19 @@ void initialize_cell(   Genotype *genotype,
     if(t_burn_in!=0.0)
         add_fixed_event(-1,t_burn_in,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail)); 
     else
-        add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));                  
-    /*plot protein concentration and fitness vs time*/    
-//#if !PHENOTYPE
-#if EVOLVE_I1FFL
+        add_fixed_event(-1,(float)TIME_INFINITY,&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));  
+    
+    /*Set time to sample expression levels for calculating fitness*/ 
     float t;
     int N_data_points; 
-    t=env->t_signal_off+t_burn_in-(float)env->window_size+1.0+TIME_OFFSET;
-    N_data_points=(int)((env->t_development-env->t_signal_off+(float)env->window_size)/sampling_interval);
+    t=env->t_stage1+t_burn_in-(float)env->window_size+1.0+TIME_OFFSET;
+    N_data_points=(int)((env->t_development-env->t_stage1+(float)env->window_size)/sampling_interval);
     for(i=0;i<N_data_points;i++)
     {
         add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
         t+=sampling_interval;            
     } 
-    state->sampled_response=(float*)calloc(N_data_points,sizeof(float));
-#endif 
-//#else
-//    float t;
-//    int N_data_points; 
-//    t=0.0+TIME_OFFSET;
-//    N_data_points=(int)(env->t_development+t_burn_in);
-//    for(i=0;i<N_data_points;i++)
-//    {
-//        add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
-//        t+=1.0;            
-//    } 
-//#endif    
+    state->sampled_response=(float*)calloc(N_data_points,sizeof(float));   
 }
 
 /*
@@ -422,11 +409,6 @@ void do_single_timestep(Genotype *genotype,
         update_protein_number_and_fitness(genotype, state, rates, dt);
         /* advance to end of development (this exits the outer while loop) */
         state->t = developmental_time;
-#if SELECT_SENSITIVITY_AND_PRECISION
-        state->t = env->tdevelopment;
-		state->sensitivity[2] = state->sensitivity[0];
-		state->precision[2] = state->precision[0];
-#endif
     }
 }
 
@@ -495,6 +477,9 @@ static float calc_integral(Genotype *genotype, CellState *state, float initial_p
  * return the instantaneous fitness given the current cell state and environment,
  * also return the integrated fitness
  */
+/*TODO: working on a version that allow fitness to be calculated from several 
+ * different effectors.
+ */
 static void calc_fitness(float *integrated_fitness,
                         Genotype *genotype,
                         CellState *state,                        
@@ -532,7 +517,7 @@ static void calc_fitness(float *integrated_fitness,
     state->cumulative_cost+=cost_of_expression*dt;
     
     /*list the genes that encode effectors*/
-    counter=0;
+//    counter=0;
 //    for(i=0;i<genotype->n_output_proteins;i++)
 //    {        
 //        protein_id=genotype->output_protein_ids[i];            
@@ -542,14 +527,14 @@ static void calc_fitness(float *integrated_fitness,
 //            counter++;
 //        }
 //    }    
-#if POOL_EFFECTORS 
-    N_output=1;
-    N_gene_copies[0]=genotype->n_output_genes;    
-#else
-    N_output=genotype->n_output_proteins;
-    for(i=0;i<genotype->n_output_proteins;i++)     
-        N_gene_copies[i]=genotype->protein_pool[genotype->output_protein_ids[i]][0][0];    
-#endif
+//#if POOL_EFFECTORS 
+//    N_output=1;
+//    N_gene_copies[0]=genotype->n_output_genes;    
+//#else
+//    N_output=genotype->n_output_proteins;
+//    for(i=0;i<genotype->n_output_proteins;i++)     
+//        N_gene_copies[i]=genotype->protein_pool[genotype->output_protein_ids[i]][0][0];    
+//#endif
     
 #if !EVOLVE_I1FFL
     counter=0;
@@ -936,7 +921,10 @@ static void update_protein_number_and_fitness( Genotype *genotype,
         N_output_molecules_aft_dt[counter]=state->gene_specific_protein_number[genotype->output_gene_ids[i]];
         counter++;        
     }    
-    /* now find out the protein numbers at end of dt interval and compute instantaneous and cumulative fitness */   
+    /* now find out the protein numbers at end of dt interval and compute instantaneous and cumulative fitness */  
+    /* NOTE: when select for pulse generation, fitness is calculated by function calc_replicate_fitness. Calc_fitness only update the cumulative cost 
+     * of gene expression.
+     */
     calc_fitness(&integrated_fitness, 
                     genotype, 
                     state,                     
@@ -983,7 +971,7 @@ static int Gillespie_event_mRNA_decay(GillespieRates *rates, CellState *state, G
         (state->mRNA_aft_transl_delay_num[gene_id])--;  
         /*update protein synthesis rate*/
         state->protein_synthesis_index[gene_id] = (float)state->mRNA_aft_transl_delay_num[gene_id]*genotype->protein_syn_rate[gene_id]/genotype->protein_decay_rate[gene_id];
-//        if(genotype->which_protein[gene_id]==genotype->nproteins-1)
+//      if(genotype->which_protein[gene_id]==genotype->nproteins-1)
 //        	return DO_NOTHING;
 //    	else // an mRNA of transcription factor is degraded, which can cause fluctuation in transcription factor concentrations.
         	return gene_id;    
@@ -1141,16 +1129,16 @@ static int do_fixed_event(Genotype *genotype,
                 state->effect_of_effector=env->initial_effect_of_effector;
             else
                 state->effect_of_effector='d';
-            state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;    
-            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;   
+            state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;    
+            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;   
             return_value=SUDDEN_SIGNAL_CHANGE;
             break;
         case 4:     /*turn signal on*/
             *dt = state->signal_on_head->time - state->t;   
             update_protein_number_and_fitness(genotype, state, rates, *dt);  
             delete_fixed_event_from_head(&(state->signal_on_head),&(state->signal_on_tail));
-            state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
-            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;             
+            state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage2;
+            state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage2;             
             if(env->fixed_effector_effect)                               
                 state->effect_of_effector=env->initial_effect_of_effector;            
             else                 
@@ -1165,13 +1153,13 @@ static int do_fixed_event(Genotype *genotype,
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
 //            if(env->signal_on_aft_burn_in==1)
 //            {
-//                state->protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;
-//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_on_strength;  
+//                state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage2;
+//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage2;  
 //            }
 //            else
 //            {
-//                state->protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;
-//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_off_strength;  
+//                state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;
+//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;  
 //            }
             state->effect_of_effector=env->effect_of_effector_aft_burn_in;   
             return_value=SUDDEN_SIGNAL_CHANGE;  

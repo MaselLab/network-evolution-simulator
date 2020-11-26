@@ -22,8 +22,6 @@
 #include "RngStream.h"
 #include "netsim.h"
 
-#define SIMPLE_SUBSTITUTION 1
-
 /*mutation rate*/
 extern float DUPLICATION;   
 extern float SILENCING;  
