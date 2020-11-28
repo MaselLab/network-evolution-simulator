@@ -181,8 +181,13 @@ void initialize_cell(   Genotype *genotype,
     /*Set time to sample expression levels for calculating fitness*/ 
     float t;
     int N_data_points; 
+#if PHENOTYPE
+    t=TIME_OFFSET;
+    N_data_points=(int)(env->t_development);
+#else    
     t=env->t_stage1+t_burn_in-(float)env->window_size+1.0+TIME_OFFSET;
     N_data_points=(int)((env->t_development-env->t_stage1+(float)env->window_size)/sampling_interval);
+#endif
     for(i=0;i<N_data_points;i++)
     {
         add_fixed_event(-1,t,&(state->sampling_point_end_head),&(state->sampling_point_end_tail)); //get a timepoint each minute
@@ -1151,16 +1156,6 @@ static int do_fixed_event(Genotype *genotype,
             for(i=0;i<MAX_OUTPUT_PROTEINS;i++)
                 state->cumulative_fitness_after_burn_in[i]=state->cumulative_fitness[i];           
             delete_fixed_event_from_head(&(state->burn_in_growth_rate_head),&(state->burn_in_growth_rate_tail));
-//            if(env->signal_on_aft_burn_in==1)
-//            {
-//                state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage2;
-//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage2;  
-//            }
-//            else
-//            {
-//                state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;
-//                state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;  
-//            }
             state->effect_of_effector=env->effect_of_effector_aft_burn_in;   
             return_value=SUDDEN_SIGNAL_CHANGE;  
             state->cumulative_cost=0.0;
@@ -1180,24 +1175,23 @@ static int do_fixed_event(Genotype *genotype,
             *dt=state->sampling_point_end_head->time-state->t;
             update_protein_number_and_fitness(genotype, state, rates, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
-//#if SAMPLE_GENE_EXPRESSION
-//            for(i=0;i<genotype->N_node_families;i++)
-//            {       
-////                for(j=0;j<genotype->gene_to_node.N_genes_per_item[i];j++)
-////                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->gene_to_node.which_genes[i][j]];
-//                for(j=0;j<genotype->node_family_pool[i][0][0];j++)
-//                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->node_family_pool[i][1][j]];
-//            }
-//            for(i=0;i<genotype->ngenes;i++)
-//                timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];                
-////            timecourse->instantaneous_fitness[timecourse->timepoint]=state->instantaneous_fitness;
-//            timecourse->timepoint++;   
-//#endif
+#if PHENOTYPE
+            for(i=0;i<genotype->N_node_families;i++)
+            {
+                timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]=0.0;
+                for(j=0;j<genotype->node_family_pool[i][0][0];j++)
+                    timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]+=state->gene_specific_protein_number[genotype->node_family_pool[i][1][j]];
+            }
+            for(i=0;i<genotype->ngenes;i++)
+                timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];     
+            timecourse->timepoint++;   
+#else
             state->sampled_response[state->N_samples]=0.0;
             for(i=0;i<genotype->n_output_genes;i++)
                 state->sampled_response[state->N_samples]+=state->gene_specific_protein_number[genotype->output_gene_ids[i]];
             state->N_samples++; 
             break;
+#endif
     }  
     return return_value;
 }
