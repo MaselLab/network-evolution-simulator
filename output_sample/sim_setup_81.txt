@@ -1,0 +1,16 @@
+Rng seed: 81
+Max effector gene number=4, max gene number=26
+initial output ACT number=1, initial output REP number=0
+initial non-output ACT number=3, initial non-output REP number=3
+
+
+Selection condition:
+steps dup_rate del_rate miu_A2I miu_Kd miu_protein_syn
+50000 1.50e-07 2.25e-07 1.570 -5.000 0.021
+
+dev_time t_stage1 t_stage2 s_sig_stage1 s_sig_stage2
+360.10 120.0 2000.0 100.0 1000.0
+P_opt sigma2 lvl_before_peak lvl_after_peak t_mid window_size
+10000.0 0.100 0.7 0.2 60.0 5
+weight_f1 weight_f2 weight_f3 weight_f4
+1.0 1.0 1.0 1.0
