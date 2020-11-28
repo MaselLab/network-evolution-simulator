@@ -1,7 +1,18 @@
 /*
- * Simulator of yeast transcriptional regulatory network evolution
  * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
- * Copyright (c) 2007-2018 Arizona Board of Regents (University of Arizona)
+ * Copyright (c) 2018 Arizona Board of Regents on behalf of the University of Arizona
+ 
+ * This file is part of network-evolution-simulator.
+ * network-evolution-simulator is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * network-evolution-simulator is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with network-evolution-simulator. If not, see <https://www.gnu.org/licenses/>.
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -23,9 +34,9 @@ int main()
     unsigned long int seeds[6];
     int i, seed; 
     RngStream RS_main, RS_parallel[N_THREADS];
-	seed=11;
+	seed=81; //set random number here
     for(i=0;i<6;i++)
-        seeds[i]=seed;
+        seeds[i]=seed; 
     RngStream_SetPackageSeed(seeds);    
     RS_main=RngStream_CreateStream("Main");
     /*create rng streams*/    
@@ -38,9 +49,9 @@ int main()
     snprintf(setup_summary,sizeof(char)*32,"sim_setup_%i.txt",seed);    
     
     /* initialize genotype */  
-    int init_N_output_act=1;
+    int init_N_output_act=1; //number of effector genes that are activator at initialization
     int init_N_output_rep=0;
-    int init_N_non_output_act=3;
+    int init_N_non_output_act=3; //number of non-effector genes that are activator at initialization
     int init_N_non_output_rep=3;  
     Genotype resident, mutant;    
     initialize_cache(&resident);    
@@ -59,8 +70,9 @@ int main()
     {
         fp=fopen(setup_summary,"w");
         fprintf(fp,"Rng seed: %d\n",seed);
-//        fprintf(fp,"Max effector gene number=%d, max tf gene number=%d\n",MAX_EFFECTOR_GENES,MAX_TF_GENES);    
-//        fprintf(fp,"initial TF number=%d, initial ACT number=%d, initial REP number=%d\n\n\n",init_TF_genes,init_N_act,init_N_rep);   
+        fprintf(fp,"Max effector gene number=%d, max gene number=%d\n",MAX_OUTPUT_GENES,MAX_GENES);    
+        fprintf(fp,"initial output ACT number=%d, initial output REP number=%d\n",init_N_output_act,init_N_output_rep);   
+        fprintf(fp,"initial non-output ACT number=%d, initial non-output REP number=%d\n\n\n",init_N_non_output_act,init_N_non_output_rep);   
         fclose(fp);       
     }
     else
@@ -92,95 +104,50 @@ int main()
     Selection selection;     
     
     /*set duration of developmental simulation*/
-    selection.env1.t_development=420.1; //minutes
-    selection.env2.t_development=420.1;
+    selection.env1.t_development=360.1; //minutes    
     
     /*burn-in developmental simulation (this isn't burn-in evolution) will ignore the fitness in the first couple minutes*/    
-    selection.env1.avg_duration_of_burn_in_growth_rate=10.0;
-    selection.env2.avg_duration_of_burn_in_growth_rate=10.0;
-    selection.env1.max_duration_of_burn_in_growth_rate=30.0;
-    selection.env2.max_duration_of_burn_in_growth_rate=30.0;
+    selection.env1.avg_duration_of_burn_in_growth_rate=10.0;  
+    selection.env1.max_duration_of_burn_in_growth_rate=30.0; 
     
-    /*The code below creates signals under env1 and env2. The signal is consecutive "ONs" and "OFFs" and always starts with "ON". 
-     *Use t_signal_on and t_signal_off to specify the duration of "on" and "off"*/ 
-    selection.env1.signal_on_strength=50000.0;    
-    selection.env1.signal_off_strength=500.0;
-    selection.env2.signal_on_strength=50000.0;
-    selection.env2.signal_off_strength=500.0;    
-    selection.env1.signal_on_aft_burn_in=0; //turn on signal after burn-in growth
-    selection.env2.signal_on_aft_burn_in=0;
-    selection.env1.t_signal_on=1000.0; //the signal starts with "on" and last for 200 minutes, longer than the duration of developmental simulation, which means the signal is effective constant "on" 
-    selection.env1.t_signal_off=300.0; 
-    selection.env2.t_signal_on=1000.0; //the signal is "on" for the first 10 minutes in a developmental simulation of env2     
-    selection.env2.t_signal_off=300.0; //after being "on" for the initial 10 minutes, the signal is off for 200 minutes, i.e. remains off in env2.    selection.env1.fitness_factor_of_amplitude=
-
-    /*selection condition of pulse*/
-    selection.env1.min_peak_response=500.0;
-    selection.env2.min_peak_response=500.0;  
-    selection.env1.max_ss_response=10.0;
-    selection.env2.max_ss_response=10.0;
-    selection.env1.ss_fitness_constant=3.5e3;
-    selection.env2.ss_fitness_constant=3.5e3;
-    selection.env1.fitness_decay_constant=3.5e4;
-    selection.env2.fitness_decay_constant=3.5e4; 
-    selection.env1.min_reduction_relative_to_peak=0.05;
-    selection.env2.min_reduction_relative_to_peak=0.05;
-    selection.env1.min_ss_response=10000.0;
-    selection.env2.min_ss_response=10000.0;
-    selection.env1.width=60.0;
-    selection.env2.width=60.0;
-    selection.env1.width_sd=1.56e3;
-    selection.env2.width_sd=1.56e3;
-    selection.env1.window_size=0;
-    selection.env2.window_size=0;
-    /*Alternatively, an irregular signal can be specified with an extra file*/    
-#if IRREG_SIGNAL
-    int j,k;  
-    /*The signal will be stored in signal_profile_matrix[A][B][C] (see netsim.h). 
-     *1. The signal is specified by signal strength at each of the C time points. C is 90 by default, corresponding 
-     *to the 90 minutes of simulation time.
-     *2. B is the number of signals that must be provided; each developmental simulation will chooses one from the B signals.
-     *The signals don't have to be different. The default value of B is 100.  
-     *3. A is the number of parallel threads; each thread needs a copy of the 100 signals.   
-    */  
-    /*This is the default external signal profile*/
-    /*The file should have 90*100 rows. Every 90 rows are the strength of a signal at each time point.*/
-    fp=fopen("signal.txt","r"); 
+    /*Signal strength under the two stages*/ 
+    selection.env1.signal_strength_stage1=100.0;    
+    selection.env1.signal_strength_stage2=1000.0;
+    selection.env1.t_stage1=120.0; //the duration of stage1
+    selection.env1.t_stage2=2000.0; //the duration of stage2
     
-    /*load signal*/
-    if(fp!=NULL)
-    {        
-        for(j=0;j<100;j++)
-        {
-            for(k=0;k<90;k++)
-            {           
-                fscanf(fp,"%f\n",&(signal_profile_matrix[0][j][k]));
-                for(i=1;i<N_THREADS;i++)
-                    signal_profile_matrix[i][j][k]=signal_profile_matrix[0][j][k];                    
-            }
-        }
-        fclose(fp);
-    } 
-#endif   
-    
-    /*Set when the effector is beneficial and when it is deleterious*/
-    selection.env1.initial_effect_of_effector='d'; //effector is beneficial in the beginning of env1
-    selection.env2.initial_effect_of_effector='d'; //deleterious in the beginning of env2 
+    /*default parameter about signal dynamics -- these are useless when select for a pulse generator, but don't change them */
+    selection.env1.signal_on_aft_burn_in=0; //turn on signal after burn-in growth  
+    selection.env1.initial_effect_of_effector='d'; //effector is beneficial in the beginning of env1 
     selection.env1.fixed_effector_effect=1; //the effector maintains the initial fitness effect. Making it 0 allows effector to be beneficial when signal is on and deleterious when signal is off
-    selection.env2.fixed_effector_effect=1;
+        
+    /*selection condition of pulse generation*/
+    selection.env1.opt_peak_response=10000.0; //optimal peak expression level of the effector
+    selection.env1.effector_level_before_stage2=0.1;  // target effector expression level (as a fraction of the peak level) at the end of stage 1. 
+    selection.env1.fitness_decay_constant=0.693; // this is the sigma squared in Eq. 1
+    selection.env1.min_reduction_relative_to_peak=0.2;  // minimal reduction in the effector expression level (as a fraction of the peak level) at the end of simulation  
+    selection.env1.window_size=5; // use a 5-minute window to average the expression level of the effector
+    selection.env1.max_t_mid=60.0; // this is the t_saturate in Eq. 3
+    selection.env1.w1=1.0; //weight of each fitness component
+    selection.env1.w2=1.0;
+    selection.env1.w3=1.0;
+    selection.env1.w4=1.0;
+    selection.env1_weight=1.0;
+    selection.env2_weight=0.0;   // there is not a second selection condition, so set its weight to zero. Don't change it
+    selection.env1.is_burn_in=0;  // whether env1 is burn-in selection condition. Don't change it.    
     
-    /*how to average fitness under env1 and fitness under env2*/
-    selection.env1_weight=0.5;
-    selection.env2_weight=0.5;
+    /*restrict what motif can evolve*/
+    selection.effector_is_TF=1; // whether effector is a TF. 1 means NFBLs can evolve
+    resident.flag_effector_is_TF=1; // make sure also change the resident genotype    
+    selection.signal_ctrl_repressor=1; // whether the signal can regulate repressor. 1 means I1FFLs can evolve
+    resident.flag_signal_ctrl_repressor=1;
     
     /*Maximum evolutionary steps*/
-    selection.MAX_STEPS=10000; 
+    selection.MAX_STEPS=50000; 
     
-    /*Default values of */
+    /*Default values of mutational parameters. Don't change it*/
     selection.temporary_DUPLICATION=1.5e-7;
     selection.temporary_SILENCING=2.25e-7;
-//    selection.temporary_N_effector_genes=MAX_EFFECTOR_GENES;
-//    selection.temporary_N_tf_genes=MAX_TF_GENES;
     selection.temporary_miu_ACT_TO_INT_RATE=1.57;
     selection.temporary_miu_Kd=-5.0;
     selection.temporary_miu_protein_syn_rate=0.021; 
@@ -191,123 +158,51 @@ int main()
     {
         fp=fopen(setup_summary,"a+");
         fprintf(fp,"Selection condition:\n");
-        fprintf(fp,"steps dup_rate del_rate max_N_tf max_N_effector miu_A2I miu_Kd miu_protein_syn\n");
-        fprintf(fp,"%d %.2e %.2e %d %d %.3f %.3f %.3f\n\n",
+        fprintf(fp,"steps dup_rate del_rate miu_A2I miu_Kd miu_protein_syn\n");
+        fprintf(fp,"%d %.2e %.2e %.3f %.3f %.3f\n\n",
                 selection.MAX_STEPS,
                 selection.temporary_DUPLICATION,
-                selection.temporary_SILENCING,
-                selection.temporary_N_tf_genes,
-                selection.temporary_N_effector_genes,
+                selection.temporary_SILENCING,             
                 selection.temporary_miu_ACT_TO_INT_RATE,
                 selection.temporary_miu_Kd,
                 selection.temporary_miu_protein_syn_rate);
-        fprintf(fp,"env weight dev_time t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
-        fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n",
-                selection.env1_weight,
+        fprintf(fp,"dev_time t_stage1 t_stage2 s_sig_stage1 s_sig_stage2\n");
+        fprintf(fp,"%.2f %.1f %.1f %.1f %.1f\n",          
                 selection.env1.t_development,               
-                selection.env1.t_signal_on,
-                selection.env1.t_signal_off,
-                selection.env1.signal_on_strength,
-                selection.env1.signal_off_strength,
-                selection.env1.initial_effect_of_effector,
-                selection.env1.fixed_effector_effect);
-        fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
-                selection.env2_weight,
-                selection.env2.t_development,               
-                selection.env2.t_signal_on,
-                selection.env2.t_signal_off,
-                selection.env2.signal_on_strength,
-                selection.env2.signal_off_strength,
-                selection.env2.initial_effect_of_effector,
-                selection.env2.fixed_effector_effect);   
+                selection.env1.t_stage1,
+                selection.env1.t_stage2,
+                selection.env1.signal_strength_stage1,
+                selection.env1.signal_strength_stage2);  
+        fprintf(fp,"P_opt sigma2 lvl_before_peak lvl_after_peak t_mid window_size\n");
+        fprintf(fp,"%.1f %.3f %.1f %.1f %.1f %d\n",          
+                selection.env1.opt_peak_response, 
+                selection.env1.effector_level_before_stage2, 
+                selection.env1.fitness_decay_constant,
+                selection.env1.min_reduction_relative_to_peak, 
+                selection.env1.max_t_mid,
+                selection.env1.window_size);
+        fprintf(fp,"weight_f1 weight_f2 weight_f3 weight_f4\n");
+        fprintf(fp,"%.1f %.1f %.1f %.1f\n",          
+                selection.env1.w1,
+                selection.env1.w2,
+                selection.env1.w3,
+                selection.env1.w4);
         fclose(fp);      
     }
     else
         fclose(saving_point);  
     
     /*setting burn-in evolution is similar to setting selection condition*/
-    Selection burn_in;         
-    burn_in.env1.t_development=89.9;
-    burn_in.env2.t_development=89.9;
-    burn_in.env1.avg_duration_of_burn_in_growth_rate=10.0;
-    burn_in.env2.avg_duration_of_burn_in_growth_rate=10.0;
-    burn_in.env1.max_duration_of_burn_in_growth_rate=30.0;
-    burn_in.env2.max_duration_of_burn_in_growth_rate=30.0; 
-    burn_in.env1.signal_on_strength=1000.0;  
-    burn_in.env1.signal_off_strength=0.0;
-    burn_in.env2.signal_on_strength=1000.0;
-    burn_in.env2.signal_off_strength=0.0;
-    burn_in.env1.signal_on_aft_burn_in=0; 
-    burn_in.env2.signal_on_aft_burn_in=0;
-    burn_in.env1.t_signal_on=200.0;    
-    burn_in.env1.t_signal_off=0.0;
-    burn_in.env2.t_signal_on=10.0;
-    burn_in.env2.t_signal_off=200.0;
-    burn_in.env1.initial_effect_of_effector='b';
-    burn_in.env2.initial_effect_of_effector='d';
-    burn_in.env1.fixed_effector_effect=1;
-    burn_in.env2.fixed_effector_effect=1;
-    burn_in.env1_weight=0.67;
-    burn_in.env2_weight=0.33;  
-  
-    burn_in.MAX_STEPS=0; // set it to 1000 if DIRECT_REG=0    
-    burn_in.temporary_DUPLICATION=5.25e-9;
-    burn_in.temporary_SILENCING=5.25e-9;
-    burn_in.temporary_N_effector_genes=2;
-    burn_in.temporary_N_tf_genes=9;
-    burn_in.temporary_miu_ACT_TO_INT_RATE=0.762;
-    burn_in.temporary_miu_Kd=-7.5;
-    burn_in.temporary_miu_protein_syn_rate=0.814;   
-    
-    saving_point=fopen("saving_point.txt","r");
-    if(saving_point==NULL) //saving point not found, therefore we start from the beginning
-    {
-        if(burn_in.MAX_STEPS!=0)
-        {
-            fp=fopen(setup_summary,"a+");
-            fprintf(fp,"Burn-in evolution enabled!");
-            fprintf(fp,"steps dup_rate del_rate max_N_tf max_N_effector miu_A2I miu_Kd miu_protein_syn\n");
-            fprintf(fp,"%d %.2e %.2e %d %d %.3f %.3f %.3f\n\n",
-                    burn_in.MAX_STEPS,
-                    burn_in.temporary_DUPLICATION,
-                    burn_in.temporary_SILENCING,
-                    burn_in.temporary_N_tf_genes,
-                    burn_in.temporary_N_effector_genes,
-                    burn_in.temporary_miu_ACT_TO_INT_RATE,
-                    burn_in.temporary_miu_Kd,
-                    burn_in.temporary_miu_protein_syn_rate);
-            fprintf(fp,"env weight dev_time t_sig_on t_sig_off s_sig_on s_sig_off init_effect fixed_effect\n");
-            fprintf(fp,"1 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n",
-                    burn_in.env1_weight,
-                    burn_in.env1.t_development,                
-                    burn_in.env1.t_signal_on,
-                    burn_in.env1.t_signal_off,
-                    burn_in.env1.signal_on_strength,
-                    burn_in.env1.signal_off_strength,
-                    burn_in.env1.initial_effect_of_effector,
-                    burn_in.env1.fixed_effector_effect);
-            fprintf(fp,"2 %.2f %.1f %.1f %.1f %.1f %.1f %c %d\n\n\n",
-                    burn_in.env2_weight,
-                    burn_in.env2.t_development,                  
-                    burn_in.env2.t_signal_on,
-                    burn_in.env2.t_signal_off,
-                    burn_in.env2.signal_on_strength,
-                    burn_in.env2.signal_off_strength,
-                    burn_in.env2.initial_effect_of_effector,
-                    burn_in.env2.fixed_effector_effect);   
-            fclose(fp);           
-        }    
-    }
-    else
-        fclose(saving_point);  
-    
+    Selection burn_in;   
+    burn_in.MAX_STEPS=0; // Do not burn-in evolution when select for pulse generation
+       
     /*Different simulation mode can be enabled from netsim.h*/
-#if NEUTRAL //netural evolution
+#if NEUTRAL //netural evolution -- USELESS when select for pulse generation
     evolve_neutrally(&resident, &mutant, &mut_record, &burn_in, &selection, RS_main); 
-#elif PHENOTYPE //output timecourse of expression levels of genes     
-    show_phenotype(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel);
+#elif PHENOTYPE //output timecourse of expression levels of genes -- USELESS when select for pulse generation    
+    show_phenotype(&resident, &mut_record, &selection, init_mRNA, init_protein, 50000, RS_parallel);
 #elif PERTURB //pertubation analysis
-    modify_network(&resident, &mutant, &mut_record, &selection, init_mRNA, init_protein, RS_parallel); 
+    modify_network(&resident, &mutant, &mut_record, &selection, &burn_in, init_mRNA, init_protein, RS_parallel); 
 #else //the default is to evolve a network under selection conditions specfied above   
     evolve_under_selection(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
 #endif        

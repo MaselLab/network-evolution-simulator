@@ -1,8 +1,18 @@
-/* -*- Mode: C; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-  */
-/* 
- * Yeast transcriptional network simulator
- * Authors: Joanna Masel, Alex Lancaster, Jasmin Uribe
- * Copyright (c) 2007, 2008, 2009 Arizona Board of Regents (University of Arizona)
+/*
+ * Authors: Joanna Masel, Alex Lancaster, Kun Xiong
+ * Copyright (c) 2018 Arizona Board of Regents on behalf of the University of Arizona
+ 
+ * This file is part of network-evolution-simulator.
+ * network-evolution-simulator is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * network-evolution-simulator is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with network-evolution-simulator. If not, see <https://www.gnu.org/licenses/>.
  */
 #ifndef FILE_NETSIM_SEEN
 #define FILE_NETSIM_SEEN
@@ -13,18 +23,18 @@
 /*Simulation mode*/
 #define PHENOTYPE 0
 #define PERTURB 0
-#define NEUTRAL 0
-#define IRREG_SIGNAL 0
+#define NEUTRAL 0 //useless
 
 /*Runtime control*/  
 #define MAX_MUTATIONS 1600000
 #define MAX_TRIALS 2000
 #define HI_RESOLUTION_RECALC 5
-#define N_THREADS 5
-#define N_REPLICATES 50
-#define OUTPUT_INTERVAL 20
-#define N_TIMEPOINTS 900 // for plotting
-#define OUTPUT_MUTANT_DETAILS 0
+#define LOW_RESOLUTION_RECALC 1
+#define N_THREADS 10
+#define N_REPLICATES 200
+#define OUTPUT_INTERVAL 50
+#define OUTPUT_MUTANT_DETAILS 1
+#define MAX_RECALC_FITNESS 10
 
 /*Miscellaneous settings*/
 #define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
@@ -33,84 +43,33 @@
 #define TIME_OFFSET 0.01
 #define CAUTIOUS 0
 
+#define CUT_OFF_NONADAPTIVE_TFBS -0.01
+#define CUT_OFF_NONADAPTIVE_TFBS_2 -0.02
 
-#define CUT_OFF_MISMATCH_SIG2EFFECTOR 2 //the maximum number of mismatches in TFBSs of the signal in effector genes
-#define CUT_OFF_MISMATCH_TF2EFFECTOR 2 //the maximum number of mismatches in TFBSs of TFs in effector genes
-#define CUT_OFF_MISMATCH_SIGNAL2TF 2 //the maximum number of mismatches in TFBSs of the signal in TF genes
-#define CUT_OFF_MISMATCH_TF2TF 1 //the maximum number of mismatches in TFBSs of TFs in TF genes
-
-/*Biology and evolution settings*/
-#define EFFECTOR_NOT_TF 0
-#define POOL_EFFECTORS 1
-#define EVOLVE_I1FFL 1
-#if EVOLVE_I1FFL
-#define SELECTION 2 //0 for acceleration, 1 pulse generation, 2 adaptation
-#endif
+#define MAX_MISMATCH_SIGNAL2GENES  2 //the maximum number of mismatches in TFBSs of the signal
+#define MAX_MISMATCH_EFFECTOR2GENES  2 //the maximum number of mismatches in TFBSs of the effector
+#define MAX_MISMATCH_NONEFFECTOR2GENES  2 //the maximum number of mismatches in TFBSs of the non-effector TFs
 
 #if PHENOTYPE
-#define SAMPLE_PARAMETERS 0 //randomly sample parameters of networks motifs
-#define SAMPLE_SIZE 100 //number of samples to take
-#define START_STEP_OF_SAMPLING 40001 //sample from the genotypes at the start step and afterwards 
-#define TARGET_MOTIF 2 // 0 means sampling genes regardless of motifs
-                       // 1 samples from c1-FFLs under direction regulation
-                       // 2 samples from isolated AND-gated C1-FFLs
-                       // 3 samples from isolated AND-gated FFL-in-diamonds
-#define REPRODUCE_GENOTYPES 1 // output N_motifs and networks of all accepted mutations, 
-                              // can be used together with options in section 6
-#define SAMPLE_GENE_EXPRESSION 1 //output expression of genes
-#define RESPONSE_SCAN 0//response vs signal strength
+#define SAMPLE_GENE_EXPRESSION 1 //output expression timecourse of all genes at particular evolutionary step 
+#define SAMPLE_EFFECTOR_EXPRESSION_LVL 1 //output expression timecourse of the effector during the first N evolutionary steps 
 #endif
 
-#define DIRECT_REG 1
-#define NO_PENALTY 0
-#define IGNORE_BS 1
-#define RM_PF 0
-#define RM_I1FFL 0
-#define RM_NFBL 0
-#define RM_PF_NFBL 1
-#define MERGE_PROTEIN 0
-#define ADD_2_PATHWAYS 0
-#define FORCE_OR_GATE 0
-#define RANDOM_COOPERATION_LOGIC 0
-#define N_SIGNAL_TF 1 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
-#define NO_REGULATION_COST 0
-#define NO_REGULATION 0 // this locks the state of transcription factors to NUC_NO_PIC
-#define REGRESSIVE_MUTATION 1
-#define IGNORE_BS_OVERLAPPING 0
-#define SIMPLE_SUBSTITUTION 1
-#define RANDOMIZE_SIGNAL2 0
-#define MAX_RECALC_FITNESS 10
-#define minimal_selection_coefficient 1.0e-8
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
-//#ifndef MAX_NON_OUTPUT_GENES             /* number of genes encoding TFs */
 #define MIN_NON_OUTPUT_GENES 2         /* the initial value is set in initiate_genotype*/
 #define MAX_COPIES_PER_NON_OUTPUT_GENE 4
-//#endif
-//#ifndef MAX_NON_OUTPUT_PROTEINS
-//#define MIN_NON_OUTPUT_PROTEINS 4
-//#endif
-//#ifndef MAX_OUTPUT_GENES
 #define MAX_OUTPUT_GENES 4  /* this is the upper limit of effector gene copies*/
-//#endif
-//#ifndef MAX_OUTPUT_PROTEINS
 #define MAX_OUTPUT_PROTEINS 4
-//#endif
-//#ifndef MAX_GENES
-#define MAX_GENES 26//MIN_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1+N_SIGNAL_TF  /* total number of genes: add the (non-TF) selection gene to the total (default case) */
-//#endif
-//#ifndef MAX_PROTEINS           
+#define MAX_GENES 26 //MIN_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1+N_SIGNAL_TF  /* total number of genes: add the (non-TF) selection gene to the total (default case) */        
 #define MAX_PROTEINS 26//MIN_NON_OUTPUT_GENES+MAX_OUTPUT_PROTEINS+1+N_SIGNAL_TF
-//#endif
+
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
 #define NMIN 6                /* minimal number of nucleotide that matches the binding sequence of a TF in its binding site*/
-                              /* DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake*/  
-//#define NUM_K_DISASSEMBLY 131 /* number of differents for PIC disassembly from data file  */
-//#ifndef HIND_LENGTH
+                              /* DO NOT MAKE NMIN<TF_ELEMENT_LEN/2, OTHERWISE calc_all_binding_sites_copy will make mistake*/ 
 #define HIND_LENGTH 3         /* default length of hindrance on each side of the binding site,i.e. a tf occupies TF_ELEMENT_LEN+2*HIND_LENGTH */
                               /* the binding of Lac repressor blockes 12 bp. Record MT 1981*/
-//#endif
 #define MAX_BINDING 10  /* MAX_MODE is the max number of tf that can bind to a promoter plus 1*/
 
 /* 
@@ -121,11 +80,23 @@
   #define LOG(...) { fprintf(fperrors, "%s: ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); } 
 #endif
 
+/*don't change these parameters*/
+#define EVOLVE_I1FFL 1
+#define DIRECT_REG 1
+#define NO_PENALTY 0
+#define N_SIGNAL_TF 1 // the 1st TF enables basal activity in TFN. The 2nd is the actual signal TF. 
+#define POOL_EFFECTORS 1 //useless
+#define N_OUTPUT 1 //useless
+#define MERGE_PROTEIN 0  //useless
+#define FORCE_OR_GATE 0 //useless
+#define IGNORE_BS 1 //useless
+
 /*
  * primary data structures for model
  */
-enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_OUTPUT_PROTEIN=-1,OUTPUT_PROTEIN=-2,NON_TF=-3};
+enum PROTEIN_IDENTITY {ACTIVATOR=1, REPRESSOR=0, NON_OUTPUT_PROTEIN=-1,OUTPUT_PROTEIN=-2, NON_TF=-3};
 enum BOOLEAN {NA=-1, NO=0, YES=1};
+enum PERTURBATION {RM_NONE=0, RM_T2E=50, RM_E2T=100, RM_S2T=200, RM_ES2T=300, RM_E2E=400, RM_ES2ET=600, RM_EE2ET=500, RM_EES2ETT=700, RM_TE2ET=150, RM_TS2ET=250, RM_TE2E=450, RM_EST2TTE=350, RM_EET2TEE=550, RM_SET2TEE=650, RM_ESET2TTEE=750};
 
 typedef struct AllTFBindingSites AllTFBindingSites;
 struct AllTFBindingSites {
@@ -145,10 +116,10 @@ typedef struct Environment Environment;
 struct Environment
 {
     float t_development;
-    float signal_on_strength;
-    float signal_off_strength;
-    float t_signal_on;
-    float t_signal_off;
+    float signal_strength_stage1;
+    float signal_strength_stage2;
+    float t_stage1;
+    float t_stage2;
     int signal_on_aft_burn_in;
     char initial_effect_of_effector;
     char effect_of_effector_aft_burn_in;
@@ -156,18 +127,19 @@ struct Environment
     float *external_signal;
     float max_duration_of_burn_in_growth_rate;    
     float avg_duration_of_burn_in_growth_rate;
+    int is_burn_in;
     
 /*selection condition for I1-FFL*/
-    float width;
-    float width_sd;
-    float min_peak_response;
+    float max_t_mid; 
+    float opt_peak_response;
     float min_reduction_relative_to_peak;
-    float min_ss_response;
-    float max_ss_response;  
-    float ss_fitness_constant;
-    float max_relative_deviation_from_mean;
+    float effector_level_before_stage2; 
     float fitness_decay_constant;
-    int window_size;
+    int window_size; // size of windows used to average effector levels
+    float w1; //weight of fitness component
+    float w2;
+    float w3;
+    float w4;
 };
 
 struct Selection
@@ -184,32 +156,39 @@ struct Selection
     int temporary_N_effector_genes;
     int temporary_N_tf_genes;
     int MAX_STEPS;
+    int effector_is_TF;
+    int signal_ctrl_repressor;
+    int aux_is_TF;    
 };
 
 
 typedef struct Genotype Genotype;
 struct Genotype {
+    int flag_effector_is_TF;
+    int flag_rm_which_TFBS;
+    int flag_signal_ctrl_repressor;
     int ngenes;                                             /* the number of loci */
     int nproteins;                                          /* because of gene duplication, the number of proteins and mRNAs can be different 
                                                                from the number of loci. nprotein is the number of elements in protein_pool*/
     int n_output_genes;    
     int N_node_families;
-    int N_cisreg_clusters;
+    int N_cisreg_clusters;    
     int which_protein[MAX_GENES];                              /* in case of gene duplication, this array tells the protein corresponding to a given gene id */ 
     
     char cisreg_seq[MAX_GENES][CISREG_LEN];    
     
-    /*these apply to protein, not loci*/
+    /*these apply to protein, not loci. Genes encode the same protein if they only differ in expression kinetics*/
     int N_act;                                              /* number of activators*/
     int N_rep;                                              /* number of repressors*/    
-    int protein_identity[MAX_PROTEINS];                  /* entry 1 marks activator (1) or repressor (0)*/        
+    int protein_identity[MAX_PROTEINS];                  /* entry marks activator (1) or repressor (0)*/        
     char tf_binding_seq[MAX_PROTEINS][TF_ELEMENT_LEN];
     char tf_binding_seq_rc[MAX_PROTEINS][TF_ELEMENT_LEN];       /* reversed complementary sequence of BS. Used to identify BS on the non-template strand*/
     int protein_pool[MAX_PROTEINS][2][MAX_GENES];               /* element 1 record how many genes/mRNAs producing this protein,ele 2 stores which genes/mRNAs*/
     float Kd[MAX_PROTEINS];
+    int N_min_match[MAX_PROTEINS];                              /* minimal number of nucleotides that need to match the consensus binding sequence*/
     
     /*group genes into node family*/
-    int which_node_family[MAX_GENES];                          /* motifs must be made of genes from different node family.
+    int which_node_family[MAX_GENES];                          /* a node family include genes that are effectively the same TF (node).
                                                                 * In a node family, genes
                                                                 * are either all activators or all repressors
                                                                 * are either all output protein or non-output protein
@@ -219,8 +198,8 @@ struct Genotype {
     
     
     /*these apply to loci*/
-    int output_protein_ids[MAX_OUTPUT_GENES];
-    int is_output[MAX_GENES];                                   /*is an output protein (id in output_protein_id) or non-output protein (-1)   */
+    int output_gene_ids[MAX_OUTPUT_GENES];
+    int is_output[MAX_GENES];                                   /*is an output protein (-2) or non-output protein (-1)   */
     int locus_length[MAX_GENES];
     int total_loci_length;
     float mRNA_decay_rate[MAX_GENES];                                /* kinetic rates*/
@@ -255,7 +234,7 @@ struct Genotype {
     float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
     
     /*measurement of network topology*/
-    int N_motifs[17]; 
+    int N_motifs[33]; 
     int N_near_AND_gated_motifs[12];
     int TF_in_core_C1ffl[MAX_GENES][MAX_PROTEINS];
     int gene_in_core_C1ffl[MAX_GENES];
@@ -272,6 +251,7 @@ struct Phenotype
     float *gene_specific_concentration;
     float *instantaneous_fitness;   
     float max_change_in_probability_of_binding;
+    float peak_lvl;
 };   
 
 typedef struct Mutation Mutation;
@@ -313,7 +293,7 @@ struct Output_buffer
     char new_nuc[3];
     int which_kinetic;
     float new_kinetic;   
-    int n_motifs[17];
+    int n_motifs[33];
     int n_near_AND_gated_motifs[12];    
 };
 
@@ -349,20 +329,20 @@ char set_base_pair(float);
 
 void initialize_genotype(Genotype *, int, int, int, int, RngStream) ;
 
-void calc_all_binding_sites_copy(Genotype *, int, int);
+void calc_all_binding_sites_copy(Genotype *, int);
 
-void calc_all_binding_sites(Genotype *, int); 
+void calc_all_binding_sites(Genotype *); 
 
 void initialize_cache(Genotype *);
 
 int evolve_under_selection(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream, RngStream [N_THREADS]);
 
-void show_phenotype( Genotype *,
-                    Genotype *,
+void show_phenotype( Genotype *,                    
                     Mutation *,
                     Selection *,
                     int [MAX_GENES],
-                    float [MAX_GENES],                  
+                    float [MAX_GENES], 
+                    int,
                     RngStream [N_THREADS]);
 
 void evolve_neutrally(  Genotype *,
@@ -375,6 +355,7 @@ void evolve_neutrally(  Genotype *,
 void modify_network(Genotype *,
                     Genotype *,
                     Mutation *,
+                    Selection *,
                     Selection *,
                     int [MAX_GENES],
                     float [MAX_GENES],
