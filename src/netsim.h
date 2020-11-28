@@ -284,6 +284,7 @@ struct Output_buffer
     float se_f2;
     int n_gene;
     int n_output_genes;
+    int n_node_families;
     int n_act;
     int n_rep;    
     char mut_type;

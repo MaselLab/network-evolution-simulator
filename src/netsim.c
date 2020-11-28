@@ -213,8 +213,8 @@ int evolve_under_selection(Genotype *resident,
        
         /* make title of the output file*/
         fp=fopen(evo_summary,"w");
-        fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_proteins N_activator N_repressor\n");
-        fprintf(fp,"0 0 0 0 na na %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d \n",  
+        fprintf(fp,"step N_tot_mut_tried N_mut_tried_this_step N_hit_bound accepted_mut selection_coeff avg_fitness fitness1 fitness2 se_avg_fitness se_fitness1 se_fitness2 N_genes N_effector_genes N_proteins\n");
+        fprintf(fp,"0 0 0 0 na na %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d\n",  
                 resident->avg_fitness,               
                 resident->fitness1,
                 resident->fitness2,           
@@ -222,9 +222,8 @@ int evolve_under_selection(Genotype *resident,
                 resident->SE_fitness1,
                 resident->SE_fitness2,        
                 resident->ngenes,
-                resident->nproteins,
-                resident->N_act,
-                resident->N_rep);
+                resident->n_output_genes,
+                resident->N_node_families);
         fclose(fp);
         run_simulation( resident, 
                         mutant, 
@@ -396,7 +395,7 @@ void modify_network(Genotype *resident,
     omp_set_num_threads(N_THREADS);
         
     /*determine non-adaptive weak TFBSs in the initial genotype*/
-    fscanf(fitness_record,"%d %d %d %d %s %s %f %f %f %f %f %f %d %d %d %d\n",
+    fscanf(fitness_record,"%d %d %d %d %s %s %f %f %f %f %f %f %d %d %d\n",
             &int_buffer,
             &int_buffer,
             &int_buffer,
@@ -409,7 +408,6 @@ void modify_network(Genotype *resident,
             &se_fitness_bf_perturbation, // and the se of fitness
             &float_buffer,
             &float_buffer,
-            &int_buffer,
             &int_buffer,
             &int_buffer,
             &int_buffer);  
@@ -455,7 +453,7 @@ void modify_network(Genotype *resident,
         clone_genotype(mutant,resident);
         
         /*load the orignal fitness*/
-        fscanf(fitness_record,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d %d\n",
+        fscanf(fitness_record,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d\n",
                 &int_buffer,
                 &int_buffer,
                 &int_buffer,
@@ -468,7 +466,6 @@ void modify_network(Genotype *resident,
                 &se_fitness_bf_perturbation,
                 &float_buffer,
                 &float_buffer,
-                &int_buffer,
                 &int_buffer,
                 &int_buffer,
                 &int_buffer);        
@@ -1517,7 +1514,7 @@ static void classify_all_mutations(Genotype *resident,
         fgets(buffer,600,fp); // skip header, the initial genotype, and the first 30000 evolved genotype 
     
     /* get total number of mutations that were trialed during the first 30001 evolutionary steps*/
-    fscanf(fp,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d %d\n",
+    fscanf(fp,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d\n",
                 &int_buffer,
                 &N_total_mutations, 
                 &int_buffer,
@@ -1530,7 +1527,6 @@ static void classify_all_mutations(Genotype *resident,
                 &float_buffer,
                 &float_buffer,
                 &float_buffer,            
-                &int_buffer,
                 &int_buffer,
                 &int_buffer,
                 &int_buffer); 
@@ -2478,14 +2474,17 @@ static void print_motifs(Genotype *genotype)
 static void summarize_binding_sites(Genotype *genotype,int step_i)
 {
     FILE *OUTPUT1;
-    int i,j,k,which_gene,cut_off;
-    int table[MAX_GENES][MAX_GENES];  
+    int i,j,k,which_target_gene,which_TF_gene,cut_off, which_node, which_protein;
+    int table[MAX_GENES][MAX_GENES],table_cp[MAX_GENES][MAX_GENES];  
     
     /* store the number of TFBSs in a matrix.*/
     for(i=0;i<genotype->ngenes;i++)
     {
         for(j=0;j<genotype->ngenes;j++)
-            table[i][j]=0;     
+        {
+            table[i][j]=0;  
+            table_cp[i][j]=0;  
+        }
     }
    
     /*loop through cis-reg clusters. Genes with the same cis-reg sequence must
@@ -2493,16 +2492,17 @@ static void summarize_binding_sites(Genotype *genotype,int step_i)
      */
     for(i=N_SIGNAL_TF;i<genotype->N_cisreg_clusters;i++)
     {
-        which_gene=genotype->cisreg_cluster_pool[i][1][0];
+        which_target_gene=genotype->cisreg_cluster_pool[i][1][0];
        
-        for(j=0;j<genotype->nproteins;j++)    
+        for(j=0;j<genotype->N_node_families;j++)    
         {           
+            which_TF_gene=genotype->node_family_pool[j][1][0];            
             /*exclude weak TFBS?*/
-            if(genotype->is_output[genotype->protein_pool[j][1][0]]==OUTPUT_PROTEIN) 
+            if(genotype->is_output[which_TF_gene]==OUTPUT_PROTEIN) 
             {
                 cut_off=MAX_MISMATCH_EFFECTOR2GENES;  
             }
-            else if(j==N_SIGNAL_TF-1)
+            else if(which_TF_gene==N_SIGNAL_TF-1)
             {
                 cut_off=MAX_MISMATCH_SIGNAL2GENES;
             }
@@ -2512,11 +2512,11 @@ static void summarize_binding_sites(Genotype *genotype,int step_i)
             }
             
             /*count number of TFBSs*/
-            for(k=0;k<genotype->binding_sites_num[which_gene];k++)
+            for(k=0;k<genotype->binding_sites_num[which_target_gene];k++)
             { 
-                if(genotype->all_binding_sites[which_gene][k].tf_id==j 
-                   && genotype->all_binding_sites[which_gene][k].mis_match<=cut_off)
-                    table[which_gene][j]++; 
+                which_node=genotype->which_node_family[genotype->protein_pool[genotype->all_binding_sites[which_target_gene][k].tf_id][1][0]];
+                if(which_node==j && genotype->all_binding_sites[which_target_gene][k].mis_match<=cut_off)
+                    table_cp[which_target_gene][j]++; 
             }             
         }
         
@@ -2524,7 +2524,7 @@ static void summarize_binding_sites(Genotype *genotype,int step_i)
         for(j=0;j<genotype->cisreg_cluster_pool[i][0][0];j++)
         { 
             for(k=0;k<genotype->nproteins;k++)
-                table[genotype->cisreg_cluster_pool[i][1][j]][k]=table[which_gene][k];
+                table[genotype->cisreg_cluster_pool[i][1][j]][k]=table_cp[which_target_gene][k];
         }
     }   
     
@@ -2532,41 +2532,42 @@ static void summarize_binding_sites(Genotype *genotype,int step_i)
     OUTPUT1=fopen("networks.txt","a+");
     fprintf(OUTPUT1,"step %d\n",step_i);
     fprintf(OUTPUT1,"Gene   ");    
-    for(i=0;i<genotype->nproteins;i++)
+    for(i=0;i<genotype->N_node_families;i++)
     {
-        which_gene=genotype->protein_pool[i][0][1];
+        which_TF_gene=genotype->node_family_pool[i][1][0];  
+        which_protein=genotype->which_protein[which_TF_gene];
         if(i<10)
         {
-            if(genotype->protein_identity[i]==ACTIVATOR)
+            if(genotype->protein_identity[which_protein]==ACTIVATOR)
             {
-                if(genotype->is_output[which_gene]==OUTPUT_PROTEIN)
-                    fprintf(OUTPUT1,"A%d(%d)  ",i,genotype->which_node_family[which_gene]);
+                if(genotype->is_output[which_TF_gene]==OUTPUT_PROTEIN)
+                    fprintf(OUTPUT1,"A%d     ",i);
                 else
-                    fprintf(OUTPUT1,"a%d(%d)  ",i,genotype->which_node_family[which_gene]);
+                    fprintf(OUTPUT1,"a%d     ",i);
             }
-            if(genotype->protein_identity[i]==REPRESSOR)
+            if(genotype->protein_identity[which_protein]==REPRESSOR)
             {
-                if(genotype->is_output[which_gene]==OUTPUT_PROTEIN)
-                    fprintf(OUTPUT1,"R%d(%d)  ",i,genotype->which_node_family[which_gene]);
+                if(genotype->is_output[which_TF_gene]==OUTPUT_PROTEIN)
+                    fprintf(OUTPUT1,"R%d     ",i);
                 else
-                    fprintf(OUTPUT1,"r%d(%d)  ",i,genotype->which_node_family[which_gene]);
+                    fprintf(OUTPUT1,"r%d     ",i);
             }
         }
         else
         {
-            if(genotype->protein_identity[i]==ACTIVATOR)
+            if(genotype->protein_identity[which_protein]==ACTIVATOR)
             {
-                if(genotype->is_output[which_gene]==OUTPUT_PROTEIN)
-                    fprintf(OUTPUT1,"A%d(%d) ",i,genotype->which_node_family[which_gene]);
+                if(genotype->is_output[which_TF_gene]==OUTPUT_PROTEIN)
+                    fprintf(OUTPUT1,"A%d    ",i);
                 else
-                    fprintf(OUTPUT1,"a%d(%d) ",i,genotype->which_node_family[which_gene]);
+                    fprintf(OUTPUT1,"a%d    ",i);
             }
-            if(genotype->protein_identity[i]==REPRESSOR)
+            if(genotype->protein_identity[which_protein]==REPRESSOR)
             {
-                if(genotype->is_output[which_gene]==OUTPUT_PROTEIN)
-                    fprintf(OUTPUT1,"R%d(%d) ",i,genotype->which_node_family[which_gene]);
+                if(genotype->is_output[which_TF_gene]==OUTPUT_PROTEIN)
+                    fprintf(OUTPUT1,"R%d    ",i);
                 else
-                    fprintf(OUTPUT1,"r%d(%d) ",i,genotype->which_node_family[which_gene]);
+                    fprintf(OUTPUT1,"r%d    ",i);
             }
         }
     }
@@ -2579,7 +2580,7 @@ static void summarize_binding_sites(Genotype *genotype,int step_i)
         else
             fprintf(OUTPUT1,"%d    ",i);
         
-        for(j=0;j<genotype->nproteins;j++)
+        for(j=0;j<genotype->N_node_families;j++)
         {
             if(table[i][j]<10)
                 fprintf(OUTPUT1," %d     ",table[i][j]);
@@ -2587,7 +2588,12 @@ static void summarize_binding_sites(Genotype *genotype,int step_i)
                 fprintf(OUTPUT1," %d    ",table[i][j]);
         }
         if(genotype->is_output[i]==OUTPUT_PROTEIN)
-            fprintf(OUTPUT1,"      E%d",genotype->which_node_family[i]);
+        {
+            if(genotype->protein_identity[genotype->which_protein[i]]==ACTIVATOR)
+                fprintf(OUTPUT1,"      a%d",genotype->which_node_family[i]); 
+            if(genotype->protein_identity[genotype->which_protein[i]]==REPRESSOR)
+                fprintf(OUTPUT1,"      r%d",genotype->which_node_family[i]);
+        }
         else
         {
             if(genotype->protein_identity[genotype->which_protein[i]]==ACTIVATOR)
@@ -3103,6 +3109,7 @@ static void store_resident_info(Genotype *resident,
 
             resident_info->n_gene=resident->ngenes;
             resident_info->n_output_genes=resident->n_output_genes;
+            resident_info->n_node_families=resident->N_node_families;
             resident_info->n_act=resident->N_act;
             resident_info->n_rep=resident->N_rep;
          
@@ -3233,7 +3240,7 @@ static void output_resident_info(Output_buffer resident_info[OUTPUT_INTERVAL], i
         /*output a summary*/
         fp=fopen(evo_summary,"a+");
         for(i=0;i<output_counter;i++)
-            fprintf(fp,"%d %d %d %d %c %f %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d %d\n",
+            fprintf(fp,"%d %d %d %d %c %f %.10f %.10f %.10f %.10f %.10f %.10f %d %d %d\n",
                     resident_info[i].step, 
                     resident_info[i].n_tot_mut, 
                     resident_info[i].n_mut_at_the_step,
@@ -3248,8 +3255,7 @@ static void output_resident_info(Output_buffer resident_info[OUTPUT_INTERVAL], i
                     resident_info[i].se_f2,
                     resident_info[i].n_gene,
                     resident_info[i].n_output_genes,                  
-                    resident_info[i].n_act,
-                    resident_info[i].n_rep);
+                    resident_info[i].n_node_families);
         fflush(fp);
         fclose(fp);
     }
