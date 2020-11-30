@@ -93,8 +93,6 @@ static void summarize_binding_sites(Genotype *,int);
 
 static void set_signal(CellState *, Environment *, float, RngStream, int);
 
-//static void output_genotype(Genotype *);
-
 static int evolve_N_steps(Genotype *, Genotype *,  Mutation *, Selection *, Output_buffer [OUTPUT_INTERVAL], int *, int *, int [MAX_GENES], float [MAX_PROTEINS], RngStream, RngStream [N_THREADS], int);
 
 static void run_simulation(Genotype *, Genotype *, Mutation *, Selection *, Selection *, int [MAX_GENES], float [MAX_PROTEINS], int, int, RngStream, RngStream [N_THREADS]);
@@ -107,7 +105,9 @@ static float calc_replicate_fitness(CellState *, Environment *);
 
 static void replay_mutations(Genotype *, Mutation *, int);
 
-static void classify_all_mutations(Genotype *, Mutation *, int, int, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream [N_THREADS]);
+static void classify_all_mutations(Genotype *, Mutation *, Selection *, int, int [MAX_GENES], float [MAX_GENES], RngStream [N_THREADS]);
+
+static void modify_network(Genotype *, Genotype *, Mutation *, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream [N_THREADS]);
 
 static void find_motifs(Genotype *);
 
@@ -136,9 +136,7 @@ static int determine_adaptive_TFBSs(Genotype *, Selection *, float, float, int [
 static void sample_expression_lvl(Genotype *, Selection *, int [MAX_GENES], float [MAX_GENES], RngStream [N_THREADS]);
 
 static void sample_effector_expression_lvl(Genotype *, Selection *, Mutation *, int [MAX_GENES], float [MAX_GENES], int, RngStream[N_THREADS]);
-                               
-static void rm_which_TFBS(Genotype *, int);
-
+  
 static void restore_all_TFBS(Genotype *);
 
 static void ignore_TFBS(Genotype*, int, int, int, int*);
@@ -344,161 +342,20 @@ void show_phenotype(Genotype *resident, Mutation *mut_record, Selection *selecti
 #endif
 
 #if PERTURB
-void modify_network(Genotype *resident,
-                    Genotype *mutant, 
-                    Mutation *mut_record,  
-                    Selection *selection,
-                    Selection *burn_in,
-                    int init_mRNA[MAX_GENES],
-                    float init_protein[MAX_PROTEINS],
-                    RngStream RS_parallel[N_THREADS])
+void characterize_network(Genotype *resident,
+                            Genotype *mutant, 
+                            Mutation *mut_record,  
+                            Selection *selection,
+                            int max_evolutionary_steps,
+                            int init_mRNA[MAX_GENES],
+                            float init_protein[MAX_PROTEINS],
+                            RngStream RS_parallel[N_THREADS])
 {
-    int i,j;  
-    char buffer[600],char_buffer,char_buffer[2];
-    int int_buffer;
-    float float_buffer;
-    float fitness_after_perturbation[10],fitness_bf_perturbation,se_fitness_bf_perturbation;
-    FILE *file_mutation,*f_aft_perturbation,*fitness_record;
+    if(CLEAN_UP_NETWORK)
+        modify_network(resident, mutant, mut_record, selection, init_mRNA, init_protein, RS_parallel); 
     
-    /*remove previous output*/  
-    remove("N_motifs.txt");
-    remove("networks.txt");
-    
-    /*load mutation record*/
-    file_mutation=fopen(mutation_file,"r");    
-    if(file_mutation!=NULL)        
-        printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
-    else
-    {
-        printf("Loading mutation record failed! Quit program!");
-#if LOG
-        LOG("Loading mutation record failed!");
-#endif
-        exit(-2);
-    }     
-    
-    /*load the original fitness*/
-    fitness_record=fopen(evo_summary,"r");
-    if(fitness_record!=NULL)        
-        printf("LOAD FITNESS SUCCESSFUL!\n");
-    else
-    {
-        printf("Loading fitness record failed! Quit program!");
-#if LOG
-        LOG("Loading fitness record failed!");
-#endif
-        exit(-2);
-    } 
-    fgets(buffer,600,fitness_record); // skip the header    
-    
-    /*create threads*/
-    omp_set_num_threads(N_THREADS);
-        
-    /*determine non-adaptive weak TFBSs in the initial genotype*/
-    fscanf(fitness_record,"%d %d %d %d %s %s %f %f %f %f %f %f %d %d %d\n",
-            &int_buffer,
-            &int_buffer,
-            &int_buffer,
-            &int_buffer,
-            &(char_buffer2[0]),
-            &(char_buffer2[0]),
-            &fitness_bf_perturbation,     // load the original fitness           
-            &float_buffer,
-            &float_buffer,
-            &se_fitness_bf_perturbation, // and the se of fitness
-            &float_buffer,
-            &float_buffer,
-            &int_buffer,
-            &int_buffer,
-            &int_buffer);  
-    
-    clone_genotype(resident,mutant); // do perturbation on a copy of the initial genotype
-    mutant->flag_rm_which_TFBS=determine_adaptive_TFBSs(mutant,
-                                                        selection,
-                                                        fitness_bf_perturbation,
-                                                        se_fitness_bf_perturbation,
-                                                        init_mRNA,
-                                                        init_protein,
-                                                        RS_parallel,
-                                                        HI_RESOLUTION_RECALC,
-                                                        fitness_after_perturbation,
-                                                        CUT_OFF_NONADAPTIVE_TFBS); 
-    /*output the result*/
-    f_aft_perturbation=fopen("after_perturbation.txt","a+");
-    fprintf(f_aft_perturbation,"0 %d ", mutant->flag_rm_which_TFBS);            
-    for(j=0;j<10;j++)           
-        fprintf(f_aft_perturbation,"%.10f ", fitness_after_perturbation[j]);                               
-    fprintf(f_aft_perturbation,"\n");
-    fclose(f_aft_perturbation); 
-
-    /*use the perturbation result to exclude non-adaptive 2-mismatch TFBSs and count motifs*/
-    calc_all_binding_sites(mutant);
-    find_motifs(mutant);
-    print_motifs(mutant);
-    summarize_binding_sites(mutant,0); 
-    
-    /*repeat above for the evolved genotypes*/
-    for(i=1;i<=selection->MAX_STEPS;i++)
-    {  
-        /*reproduce mutation*/
-        clone_genotype(resident,mutant);
-        fscanf(file_mutation,"%c %d %d %d %s %d %a\n",&(mut_record->mut_type),
-                                                        &(mut_record->which_gene),
-                                                        &(mut_record->which_nucleotide), 
-                                                        &(mut_record->which_protein),
-                                                        mut_record->nuc_diff,               
-                                                        &(mut_record->kinetic_type),
-                                                        &(mut_record->kinetic_diff));
-        reproduce_mutate(mutant,mut_record); 
-        clone_genotype(mutant,resident);
-        
-        /*load the orignal fitness*/
-        fscanf(fitness_record,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d\n",
-                &int_buffer,
-                &int_buffer,
-                &int_buffer,
-                &int_buffer,
-                &char_buffer,
-                &float_buffer,
-                &fitness_bf_perturbation,                
-                &float_buffer,
-                &float_buffer,
-                &se_fitness_bf_perturbation,
-                &float_buffer,
-                &float_buffer,
-                &int_buffer,
-                &int_buffer,
-                &int_buffer);        
-               
-        /*perturb and determine adaptive 2-mismatch TFBSs*/
-        mutant->flag_rm_which_TFBS=determine_adaptive_TFBSs(mutant,
-                                                            selection,
-                                                            fitness_bf_perturbation,
-                                                            se_fitness_bf_perturbation,
-                                                            init_mRNA,
-                                                            init_protein,
-                                                            RS_parallel,
-                                                            HI_RESOLUTION_RECALC,
-                                                            fitness_after_perturbation,
-                                                            CUT_OFF_NONADAPTIVE_TFBS);
-
-        /*output the result*/
-        f_aft_perturbation=fopen("after_perturbation.txt","a+");
-        fprintf(f_aft_perturbation,"%d %d ",i, mutant->flag_rm_which_TFBS);            
-        for(j=0;j<10;j++)           
-            fprintf(f_aft_perturbation,"%.10f ", fitness_after_perturbation[j]);                               
-        fprintf(f_aft_perturbation,"\n");
-        fclose(f_aft_perturbation); 
-
-        /*use the perturbation result to exclude non-adaptive 2-mismatch TFBSs and count motifs*/
-        calc_all_binding_sites(mutant);
-        find_motifs(mutant);
-        print_motifs(mutant);
-        if(i%OUTPUT_INTERVAL==0 && i!=0)
-            summarize_binding_sites(mutant,i);       
-    }     
-    fclose(file_mutation);
-    fclose(fitness_record);
+    if(CLASSIFY_MUTATION)
+        classify_all_mutations(resident, mut_record, selection, max_evolutionary_steps, init_mRNA, init_protein, RS_parallel);
 }
 #endif
 
@@ -1484,12 +1341,169 @@ static void replay_mutations(Genotype *resident, Mutation *mut_record, int repla
     fclose(fp);
 }
 
-#if PHENOTYPE
+#if PERTURB
+static void modify_network(Genotype *resident,
+                    Genotype *mutant, 
+                    Mutation *mut_record,  
+                    Selection *selection,                   
+                    int init_mRNA[MAX_GENES],
+                    float init_protein[MAX_PROTEINS],
+                    RngStream RS_parallel[N_THREADS])
+{
+    int i,j;  
+    char buffer[600],char_buffer,char_buffer2[2];
+    int int_buffer;
+    float float_buffer;
+    float fitness_after_perturbation[10],fitness_bf_perturbation,se_fitness_bf_perturbation;
+    FILE *file_mutation,*f_aft_perturbation,*fitness_record;
+    
+    /*remove previous output*/  
+    remove("N_motifs.txt");
+    remove("networks.txt");
+    
+    /*load mutation record*/
+    file_mutation=fopen(mutation_file,"r");    
+    if(file_mutation!=NULL)        
+        printf("LOAD MUTATION RECORD SUCCESSFUL!\n");
+    else
+    {
+        printf("Loading mutation record failed! Quit program!");
+#if LOG
+        LOG("Loading mutation record failed!");
+#endif
+        exit(-2);
+    }     
+    
+    /*load the original fitness*/
+    fitness_record=fopen(evo_summary,"r");
+    if(fitness_record!=NULL)        
+        printf("LOAD FITNESS SUCCESSFUL!\n");
+    else
+    {
+        printf("Loading fitness record failed! Quit program!");
+#if LOG
+        LOG("Loading fitness record failed!");
+#endif
+        exit(-2);
+    } 
+    fgets(buffer,600,fitness_record); // skip the header    
+    
+    /*create threads*/
+    omp_set_num_threads(N_THREADS);
+        
+    /*determine non-adaptive weak TFBSs in the initial genotype*/
+    fscanf(fitness_record,"%d %d %d %d %s %s %f %f %f %f %f %f %d %d %d\n",
+            &int_buffer,
+            &int_buffer,
+            &int_buffer,
+            &int_buffer,
+            &(char_buffer2[0]),
+            &(char_buffer2[0]),
+            &fitness_bf_perturbation,     // load the original fitness           
+            &float_buffer,
+            &float_buffer,
+            &se_fitness_bf_perturbation, // and the se of fitness
+            &float_buffer,
+            &float_buffer,
+            &int_buffer,
+            &int_buffer,
+            &int_buffer);  
+    
+    clone_genotype(resident,mutant); // do perturbation on a copy of the initial genotype
+    mutant->flag_rm_which_TFBS=determine_adaptive_TFBSs(mutant,
+                                                        selection,
+                                                        fitness_bf_perturbation,
+                                                        se_fitness_bf_perturbation,
+                                                        init_mRNA,
+                                                        init_protein,
+                                                        RS_parallel,
+                                                        HI_RESOLUTION_RECALC,
+                                                        fitness_after_perturbation,
+                                                        CUT_OFF_NONADAPTIVE_TFBS); 
+    /*output the result*/
+    f_aft_perturbation=fopen("after_perturbation.txt","a+");
+    fprintf(f_aft_perturbation,"0 %d ", mutant->flag_rm_which_TFBS);            
+    for(j=0;j<10;j++)           
+        fprintf(f_aft_perturbation,"%.10f ", fitness_after_perturbation[j]);                               
+    fprintf(f_aft_perturbation,"\n");
+    fclose(f_aft_perturbation); 
+
+    /*use the perturbation result to exclude non-adaptive 2-mismatch TFBSs and count motifs*/
+    calc_all_binding_sites(mutant);
+    find_motifs(mutant);
+    print_motifs(mutant);
+    summarize_binding_sites(mutant,0); 
+    
+    /*repeat above for the evolved genotypes*/
+    for(i=1;i<=selection->MAX_STEPS;i++)
+    {  
+        /*reproduce mutation*/
+        clone_genotype(resident,mutant);
+        fscanf(file_mutation,"%c %d %d %d %s %d %a\n",&(mut_record->mut_type),
+                                                        &(mut_record->which_gene),
+                                                        &(mut_record->which_nucleotide), 
+                                                        &(mut_record->which_protein),
+                                                        mut_record->nuc_diff,               
+                                                        &(mut_record->kinetic_type),
+                                                        &(mut_record->kinetic_diff));
+        reproduce_mutate(mutant,mut_record); 
+        clone_genotype(mutant,resident);
+        
+        /*load the orignal fitness*/
+        fscanf(fitness_record,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d\n",
+                &int_buffer,
+                &int_buffer,
+                &int_buffer,
+                &int_buffer,
+                &char_buffer,
+                &float_buffer,
+                &fitness_bf_perturbation,                
+                &float_buffer,
+                &float_buffer,
+                &se_fitness_bf_perturbation,
+                &float_buffer,
+                &float_buffer,
+                &int_buffer,
+                &int_buffer,
+                &int_buffer);        
+       
+        /*perturb and determine adaptive 2-mismatch TFBSs*/
+        mutant->flag_rm_which_TFBS=determine_adaptive_TFBSs(mutant,
+                                                            selection,
+                                                            fitness_bf_perturbation,
+                                                            se_fitness_bf_perturbation,
+                                                            init_mRNA,
+                                                            init_protein,
+                                                            RS_parallel,
+                                                            HI_RESOLUTION_RECALC,
+                                                            fitness_after_perturbation,
+                                                            CUT_OFF_NONADAPTIVE_TFBS);
+
+        /*output the result*/
+        f_aft_perturbation=fopen("after_perturbation.txt","a+");
+        fprintf(f_aft_perturbation,"%d %d ",i, mutant->flag_rm_which_TFBS);            
+        for(j=0;j<10;j++)           
+            fprintf(f_aft_perturbation,"%.10f ", fitness_after_perturbation[j]);                               
+        fprintf(f_aft_perturbation,"\n");
+        fclose(f_aft_perturbation); 
+
+        /*use the perturbation result to exclude non-adaptive 2-mismatch TFBSs and count motifs*/
+        for(j=0;j<mutant->ngenes;j++)
+            mutant->recalc_TFBS[j]=YES;
+        calc_all_binding_sites(mutant);
+        find_motifs(mutant);
+        print_motifs(mutant);
+        if(i%OUTPUT_INTERVAL==0 && i!=0)
+            summarize_binding_sites(mutant,i);       
+    }         
+    fclose(file_mutation);
+    fclose(fitness_record);
+}
+
 static void classify_all_mutations(Genotype *resident, 
-                            Mutation *mut_record, 
-                            int replay_N_steps, 
-                            int burn_in_max_steps,
+                            Mutation *mut_record,  
                             Selection *selection, 
+                            int max_evolutionary_steps,
                             int init_mRNA[MAX_GENES], 
                             float init_protein[MAX_GENES], 
                             RngStream RS_parallel[N_THREADS])
@@ -1505,15 +1519,16 @@ static void classify_all_mutations(Genotype *resident,
     Genotype resident_copy;
     initialize_cache(&resident_copy);
     int N_I1_bf_mut,N_I1_aft_mut,N_NFBL_bf_mut,N_NFBL_aft_mut;
-    int output_buffer[50][4];
+    int N_II_bf_mut,N_II_aft_mut,N_IN_bf_mut,N_IN_aft_mut;
+    int output_buffer[50][6];
     float output_buffer2[50][10];   
      
     /*load mutation record*/    
     fp=fopen(evo_summary,"r");
-    for(i=0;i<30002;i++)   
-        fgets(buffer,600,fp); // skip header, the initial genotype, and the first 30000 evolved genotype 
+    for(i=0;i<(max_evolutionary_steps+1);i++)   
+        fgets(buffer,600,fp); // skip header, the initial genotype, and 1 to (max_evolutionary_steps-1) evolved genotype 
     
-    /* get total number of mutations that were trialed during the first 30001 evolutionary steps*/
+    /* get total number of mutations that were trialed during the first max_evolutionary_steps */
     fscanf(fp,"%d %d %d %d %c %f %f %f %f %f %f %f %d %d %d\n",
                 &int_buffer,
                 &N_total_mutations, 
@@ -1554,10 +1569,14 @@ static void classify_all_mutations(Genotype *resident,
                         &float_buffer,
                         &float_buffer,
                         &float_buffer); 
+    for(j=0;j<resident->ngenes;j++)
+        resident->recalc_TFBS[j]=YES;
     calc_all_binding_sites(resident);
     find_motifs(resident); 
     N_I1_bf_mut=resident->N_motifs[3]+resident->N_motifs[4]+resident->N_motifs[11]+resident->N_motifs[12];           
-    N_NFBL_bf_mut=resident->N_motifs[5]+resident->N_motifs[6]+resident->N_motifs[13]+resident->N_motifs[14];    
+    N_NFBL_bf_mut=resident->N_motifs[5]+resident->N_motifs[6]+resident->N_motifs[13]+resident->N_motifs[14];   
+    N_II_bf_mut=resident->N_motifs[7]+resident->N_motifs[8]+resident->N_motifs[15]+resident->N_motifs[16];           
+    N_IN_bf_mut=resident->N_motifs[1]+resident->N_motifs[2]+resident->N_motifs[9]+resident->N_motifs[10]; 
     restore_all_TFBS(resident);   
     
     /*reset output counter*/
@@ -1614,7 +1633,7 @@ static void classify_all_mutations(Genotype *resident,
             reproduce_mutate(resident,&mut_record_copy);  
             fscanf(fp_which_TFBS,"%d %d %f %f %f %f %f %f %f %f %f %f \n",
                         &int_buffer,                
-                        &(resident->flag_rm_which_TFBS), // load non-adaptive TFBSs
+                        &which_TFBS, // load non-adaptive TFBSs
                         &float_buffer,
                         &float_buffer,
                         &float_buffer,
@@ -1624,15 +1643,20 @@ static void classify_all_mutations(Genotype *resident,
                         &float_buffer, 
                         &float_buffer,
                         &float_buffer,
-                        &float_buffer);            
+                        &float_buffer);  
+            resident->flag_rm_which_TFBS=which_TFBS;
+            for(j=0;j<resident->ngenes;j++)
+                resident->recalc_TFBS[j]=YES;
             calc_all_binding_sites(resident);
             find_motifs(resident); 
             N_I1_aft_mut=(resident->N_motifs[3]+resident->N_motifs[4]+resident->N_motifs[11]+resident->N_motifs[12]);
             N_NFBL_aft_mut=(resident->N_motifs[5]+resident->N_motifs[6]+resident->N_motifs[13]+resident->N_motifs[14]);
+            N_II_aft_mut=resident->N_motifs[7]+resident->N_motifs[8]+resident->N_motifs[15]+resident->N_motifs[16];           
+            N_IN_aft_mut=resident->N_motifs[1]+resident->N_motifs[2]+resident->N_motifs[9]+resident->N_motifs[10]; 
             restore_all_TFBS(resident);     
             
             /*reset output buffer*/
-            for(j=0;j<5;j++)
+            for(j=0;j<6;j++)
                 output_buffer[output_counter][j]=0;
             
             if(N_I1_bf_mut==0 && N_I1_aft_mut>0) // I1-creating mutation
@@ -1643,10 +1667,22 @@ static void classify_all_mutations(Genotype *resident,
             if(N_NFBL_bf_mut==0 && N_NFBL_aft_mut>0)   // NFBL-creating mutation       
                 output_buffer[output_counter][3]=1;   
             else if(N_NFBL_bf_mut>0 && N_NFBL_aft_mut==0)    // NFBL-destroying mutation      
-                output_buffer[output_counter][3]=-1;   
+                output_buffer[output_counter][3]=-1;  
+            
+            if(N_II_bf_mut==0 && N_II_aft_mut>0) // overlapping-I1-creating mutation
+                output_buffer[output_counter][4]=1;            
+            else if(N_II_bf_mut>0 && N_II_aft_mut==0) // overlapping-I1-destroying mutation
+                output_buffer[output_counter][4]=-1;   
+            
+            if(N_IN_bf_mut==0 && N_IN_aft_mut>0)   // I+N-conjugate-creating mutation       
+                output_buffer[output_counter][5]=1;   
+            else if(N_IN_bf_mut>0 && N_IN_aft_mut==0)    // I+N-conjugate-destroying mutation      
+                output_buffer[output_counter][5]=-1;  
             
             N_I1_bf_mut=N_I1_aft_mut;
             N_NFBL_bf_mut=N_NFBL_aft_mut;
+            N_II_bf_mut=N_II_aft_mut;
+            N_IN_bf_mut=N_IN_aft_mut;
             output_buffer[output_counter][0]=1;    // means accepted mutation 
             output_buffer[output_counter][1]=which_TFBS; 
             /*already recorded the effect of perturbing accepted mutations in purbation analysis, so set fitness record to -1.0 here*/
@@ -1654,8 +1690,7 @@ static void classify_all_mutations(Genotype *resident,
                 output_buffer2[output_counter][j]=-1.0;           
         }
         else // mutations not accepted
-        {                       
-            which_TFBS=-1; 
+        {            
             clone_genotype(resident,&resident_copy);    
             reproduce_mutate(&resident_copy,&mut_record_copy);
             which_TFBS=determine_adaptive_TFBSs(&resident_copy,
@@ -1668,12 +1703,16 @@ static void classify_all_mutations(Genotype *resident,
                                                 LOW_RESOLUTION_RECALC,
                                                 output_buffer2[output_counter],
                                                 CUT_OFF_NONADAPTIVE_TFBS_2); // use a different cutoff because fitness resolution is low     
+            for(j=0;j<resident_copy.ngenes;j++)
+                resident_copy.recalc_TFBS[j]=YES;
             calc_all_binding_sites(&resident_copy);
             find_motifs(&resident_copy); 
             N_I1_aft_mut=(resident_copy.N_motifs[3]+resident_copy.N_motifs[4]+resident_copy.N_motifs[11]+resident_copy.N_motifs[12]);
-            N_NFBL_aft_mut=(resident_copy.N_motifs[5]+resident_copy.N_motifs[6]+resident_copy.N_motifs[13]+resident_copy.N_motifs[14]);   
+            N_NFBL_aft_mut=(resident_copy.N_motifs[5]+resident_copy.N_motifs[6]+resident_copy.N_motifs[13]+resident_copy.N_motifs[14]);  
+            N_II_aft_mut=(resident_copy.N_motifs[7]+resident_copy.N_motifs[8]+resident_copy.N_motifs[15]+resident_copy.N_motifs[16]);
+            N_IN_aft_mut=(resident_copy.N_motifs[1]+resident_copy.N_motifs[2]+resident_copy.N_motifs[9]+resident_copy.N_motifs[10]);
 
-            for(j=0;j<5;j++)
+            for(j=0;j<6;j++)
                 output_buffer[output_counter][j]=0;
 
             if(N_I1_bf_mut==0 && N_I1_aft_mut>0)
@@ -1686,9 +1725,18 @@ static void classify_all_mutations(Genotype *resident,
             else if(N_NFBL_bf_mut>0 && N_NFBL_aft_mut==0)          
                 output_buffer[output_counter][3]=-1;  
 
+            if(N_II_bf_mut==0 && N_II_aft_mut>0) // overlapping-I1-creating mutation
+                output_buffer[output_counter][4]=1;            
+            else if(N_II_bf_mut>0 && N_II_aft_mut==0) // overlapping-I1-destroying mutation
+                output_buffer[output_counter][4]=-1;   
+            
+            if(N_IN_bf_mut==0 && N_IN_aft_mut>0)   // I+N-conjugate-creating mutation       
+                output_buffer[output_counter][5]=1;   
+            else if(N_IN_bf_mut>0 && N_IN_aft_mut==0)    // I+N-conjugate-destroying mutation      
+                output_buffer[output_counter][5]=-1;
+            
             output_buffer[output_counter][0]=0;             
-            output_buffer[output_counter][1]=which_TFBS;     
-                       
+            output_buffer[output_counter][1]=which_TFBS;    
         }     
         evo_step_copy=evo_step;
         mut_record_copy.mut_type=mut_record->mut_type;
@@ -1715,7 +1763,7 @@ static void classify_all_mutations(Genotype *resident,
             
             fp_output=fopen("mutation_classification.txt","a+");
             for(j=0;j<OUTPUT_INTERVAL;j++)                             
-                fprintf(fp_output,"%d %d %d %d\n",output_buffer[j][0],output_buffer[j][1],output_buffer[j][2],output_buffer[j][3]);
+                fprintf(fp_output,"%d %d %d %d\n",output_buffer[j][0],output_buffer[j][1],output_buffer[j][2],output_buffer[j][3],output_buffer[j][4],output_buffer[j][5]);
             fclose(fp_output);            
 
             output_counter=0;
@@ -1737,7 +1785,7 @@ static void classify_all_mutations(Genotype *resident,
 
         fp_output=fopen("mutation_classification.txt","a+");
         for(j=0;j<output_counter;j++)                             
-            fprintf(fp_output,"%d %d %d %d\n",output_buffer[j][0],output_buffer[j][1],output_buffer[j][2],output_buffer[j][3]);
+            fprintf(fp_output,"%d %d %d %d\n",output_buffer[j][0],output_buffer[j][1],output_buffer[j][2],output_buffer[j][3],output_buffer[j][4],output_buffer[j][5]);
         fclose(fp_output);        
     }   
 }
@@ -1943,96 +1991,10 @@ static int determine_adaptive_TFBSs(Genotype *resident,
     return rm_what;
 }
 
-static void rm_which_TFBS(Genotype *resident, int which_TFBS)
-{
-    int j;
-    resident->flag_rm_which_TFBS=RM_NONE;
-    switch(which_TFBS)
-    {
-        case 0: //no non-adaptive weak TFBSs
-            break;
-        case 1:
-            resident->flag_rm_which_TFBS=RM_S2T;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                resident->recalc_TFBS[j]=YES;
-            break;
-        case 2:
-            resident->flag_rm_which_TFBS=RM_E2T;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                resident->recalc_TFBS[j]=YES;
-            break;
-        case 3:
-            resident->flag_rm_which_TFBS=RM_ES2T;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                resident->recalc_TFBS[j]=YES;
-            break;  
-        case 4:
-            resident->flag_rm_which_TFBS=RM_E2E;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 5:
-            resident->flag_rm_which_TFBS=RM_ES2ET;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 6:
-            resident->flag_rm_which_TFBS=RM_EE2ET;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 7:
-            resident->flag_rm_which_TFBS=RM_EES2ETT;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;  
-        case 8:
-            resident->flag_rm_which_TFBS=RM_T2E;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 9:
-            resident->flag_rm_which_TFBS=RM_TS2ET;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 10:
-            resident->flag_rm_which_TFBS=RM_TE2ET;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 11:
-            resident->flag_rm_which_TFBS=RM_EST2TTE;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 12:
-            resident->flag_rm_which_TFBS=RM_TE2E;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 13:
-            resident->flag_rm_which_TFBS=RM_SET2TEE;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 14:
-            resident->flag_rm_which_TFBS=RM_EET2TEE;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;
-        case 15:
-            resident->flag_rm_which_TFBS=RM_ESET2TTEE;
-            for(j=N_SIGNAL_TF;j<resident->ngenes;j++)
-                        resident->recalc_TFBS[j]=YES;
-            break;                
-    }    
-}
-
 static void restore_all_TFBS(Genotype *resident)
 {
     int i;    
-    resident->flag_rm_which_TFBS=YES;
+    resident->flag_rm_which_TFBS=RM_NONE;
     for(i=N_SIGNAL_TF;i<resident->ngenes;i++)
         resident->recalc_TFBS[i]=YES;
     calc_all_binding_sites(resident);

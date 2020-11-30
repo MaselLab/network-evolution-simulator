@@ -22,7 +22,7 @@
 
 /*Simulation mode*/
 #define PHENOTYPE 0
-#define PERTURB 0
+#define PERTURB 1
 #define NEUTRAL 0 //useless
 
 /*Runtime control*/  
@@ -53,6 +53,11 @@
 #if PHENOTYPE
 #define SAMPLE_GENE_EXPRESSION 1 //output expression timecourse of all genes at particular evolutionary step 
 #define SAMPLE_EFFECTOR_EXPRESSION_LVL 1 //output expression timecourse of the effector during the first N evolutionary steps 
+#endif
+
+#if PERTURB
+#define CLEAN_UP_NETWORK 0 //identify and exclude non-adaptive 2-mismatch TFBSs 
+#define CLASSIFY_MUTATION 1 //classify all mutations into motif-creating and motif-destroying
 #endif
 
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
@@ -353,14 +358,14 @@ void evolve_neutrally(  Genotype *,
                         Selection *,
                         RngStream);
 
-void modify_network(Genotype *,
-                    Genotype *,
-                    Mutation *,
-                    Selection *,
-                    Selection *,
-                    int [MAX_GENES],
-                    float [MAX_GENES],
-                    RngStream [N_THREADS]);
+void characterize_network(Genotype *,
+                            Genotype *,
+                            Mutation *,                            
+                            Selection *,
+                            int,
+                            int [MAX_GENES],
+                            float [MAX_GENES],
+                            RngStream [N_THREADS]);
 
 void calc_genotype_fitness( Genotype *,
                             Selection *,

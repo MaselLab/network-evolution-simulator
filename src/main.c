@@ -201,8 +201,8 @@ int main()
     evolve_neutrally(&resident, &mutant, &mut_record, &burn_in, &selection, RS_main); 
 #elif PHENOTYPE //output timecourse of expression levels of genes -- USELESS when select for pulse generation    
     show_phenotype(&resident, &mut_record, &selection, init_mRNA, init_protein, 50000, RS_parallel);
-#elif PERTURB //pertubation analysis
-    modify_network(&resident, &mutant, &mut_record, &selection, &burn_in, init_mRNA, init_protein, RS_parallel); 
+#elif PERTURB //perturb network to exclude non-adaptive weak TFBSs
+    characterize_network(&resident, &mutant, &mut_record, &selection, 30000, init_mRNA, init_protein, RS_parallel);    
 #else //the default is to evolve a network under selection conditions specfied above   
     evolve_under_selection(&resident, &mutant, &mut_record, &burn_in, &selection, init_mRNA, init_protein, RS_main, RS_parallel);
 #endif        
