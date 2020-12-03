@@ -182,8 +182,8 @@ void initialize_cell(   Genotype *genotype,
     float t;
     int N_data_points; 
 #if PHENOTYPE
-    t=TIME_OFFSET;
-    N_data_points=(int)(env->t_development);
+    t=t_burn_in+TIME_OFFSET;
+    N_data_points=(int)(env->t_development/sampling_interval)+1;
 #else    
     t=env->t_stage1+t_burn_in-(float)env->window_size+1.0+TIME_OFFSET;
     N_data_points=(int)((env->t_development-env->t_stage1+(float)env->window_size)/sampling_interval);
@@ -1175,7 +1175,7 @@ static int do_fixed_event(Genotype *genotype,
             *dt=state->sampling_point_end_head->time-state->t;
             update_protein_number_and_fitness(genotype, state, rates, *dt);
             delete_fixed_event_from_head(&(state->sampling_point_end_head),&(state->sampling_point_end_tail));
-#if PHENOTYPE
+#if SAMPLE_GENE_EXPRESSION
             for(i=0;i<genotype->N_node_families;i++)
             {
                 timecourse->protein_concentration[i*timecourse->total_time_points+timecourse->timepoint]=0.0;
@@ -1185,6 +1185,14 @@ static int do_fixed_event(Genotype *genotype,
             for(i=0;i<genotype->ngenes;i++)
                 timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];     
             timecourse->timepoint++;   
+#elif SAMPLE_EFFECTOR_EXPRESSION_LVL
+            timecourse->protein_concentration[timecourse->timepoint]=0.0;
+            for(i=0;i<genotype->ngenes;i++)
+            {
+                if(genotype->is_output[i]==OUTPUT_PROTEIN)
+                    timecourse->protein_concentration[timecourse->timepoint]+=state->gene_specific_protein_number[i];
+            }
+            timecourse->timepoint++;
 #else
             state->sampled_response[state->N_samples]=0.0;
             for(i=0;i<genotype->n_output_genes;i++)

@@ -332,11 +332,13 @@ void show_phenotype(Genotype *resident, Mutation *mut_record, Selection *selecti
     if(SAMPLE_GENE_EXPRESSION)
     {
         replay_mutations(resident, mut_record, replay_N_steps); 
+        remove("N_motifs.txt");
+        remove("networks.txt");
         sample_expression_lvl(resident, selection, init_mRNA, init_protein, RS_parallel);
     }
     
     /*show expression timecourse of effector protein during the first N evolutionary steps*/   
-    if(SAMPLE_EFFECTOR_EXPRESSION_LVL)
+    if(SAMPLE_EFFECTOR_EXPRESSION)
         sample_effector_expression_lvl(resident, selection, mut_record, init_mRNA, init_protein, replay_N_steps, RS_parallel);
 }
 #endif
@@ -877,6 +879,7 @@ static void set_signal(CellState *state, Environment *env, float t_burn_in, RngS
     {
         /*always start a burn-in with signal off*/       
         state->protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;
+        state->gene_specific_protein_number[N_SIGNAL_TF-1]=env->signal_strength_stage1;
         if(t_burn_in!=0.0)
             t=t+t_burn_in; //the completion of burn_in is a fixed event, which is added in initialize_cell       
         /*after burn-in, signal should be turned "o"n*/
@@ -1309,7 +1312,7 @@ static void replay_mutations(Genotype *resident, Mutation *mut_record, int repla
     remove("N_motifs.txt");
     calc_all_binding_sites(resident);
     summarize_binding_sites(resident,0); //make new file and record initial network
-    
+      
     output_counter=0;   
     for(i=1;i<=replay_N_steps;i++)
     {  
@@ -1495,7 +1498,9 @@ static void modify_network(Genotype *resident,
         print_motifs(mutant);
         if(i%OUTPUT_INTERVAL==0 && i!=0)
             summarize_binding_sites(mutant,i);       
-    }         
+    } 
+    rename("networks.txt","networks_clean.txt");
+    rename("N_motifs.txt","N_motifs_clean.txt");
     fclose(file_mutation);
     fclose(fitness_record);
 }
@@ -1806,7 +1811,7 @@ static void sample_expression_lvl(Genotype *resident,
     /*initialize phenotype*/
     for (i=0;i<N_REPLICATES;i++)
     {
-        phenotype[i].total_time_points=(int)(selection->env1.t_development)+1;
+        phenotype[i].total_time_points=(int)(selection->env1.t_development/sampling_interval)+1;
         phenotype[i].gene_specific_concentration=(float *)calloc(phenotype[i].total_time_points,resident->ngenes*sizeof(float));
         phenotype[i].protein_concentration=(float *)calloc(phenotype[i].total_time_points,resident->N_node_families*sizeof(float));    
         phenotype[i].timepoint=0;         
@@ -1819,7 +1824,7 @@ static void sample_expression_lvl(Genotype *resident,
     /*protein concentration: each protein has its own file, in which each row is a replicate*/    
     for(i=0;i<resident->N_node_families;i++)
     {
-        snprintf(filename,sizeof(char)*32,"protein%i",i);
+        snprintf(filename,sizeof(char)*32,"protein_%i.txt",i);
         fp=fopen(filename,"w");
         for(j=0;j<N_REPLICATES;j++)
         {
@@ -1832,7 +1837,7 @@ static void sample_expression_lvl(Genotype *resident,
     /*gene-specific concentration: each gene has its own file, in which each row is a replicate*/
     for(i=0;i<resident->ngenes;i++)
     {
-        snprintf(filename,sizeof(char)*32,"gene%i",i);
+        snprintf(filename,sizeof(char)*32,"gene_%i.txt",i);
         fp=fopen(filename,"w");
         for(j=0;j<N_REPLICATES;j++)
         {
@@ -1846,7 +1851,12 @@ static void sample_expression_lvl(Genotype *resident,
     fp=fopen("gene_and_protein.txt","w");
     fprintf(fp,"gene protein is_effector\n");
     for(i=0;i<resident->ngenes;i++)
-        fprintf(fp,"%d %d %d\n",i,resident->which_node_family[i],resident->is_output[i]);
+    {
+        if(resident->is_output[i]==OUTPUT_PROTEIN)
+            fprintf(fp,"%d %d Y\n",i,resident->which_node_family[i]);
+        else
+            fprintf(fp,"%d %d N\n",i,resident->which_node_family[i]);
+    }
     fclose(fp);   
     /*release memory*/
     for(i=0;i<N_THREADS;i++)
@@ -1864,10 +1874,10 @@ static void sample_effector_expression_lvl(Genotype *resident,
                                             int replay_N_steps,
                                             RngStream RS_parallel[N_THREADS])
 {
-    int i, j;
+    int i, j, k;
     float fitness1[N_REPLICATES],fitness2[N_REPLICATES];  
     Phenotype phenotype[N_REPLICATES];
-    float mean_expression_lvl[(int)selection->env1.t_development];
+    float mean_expression_lvl[(int)(selection->env1.t_development/sampling_interval)+1];
     FILE *fp,*fp2;
 
     /*load mutation record*/
@@ -1886,28 +1896,31 @@ static void sample_effector_expression_lvl(Genotype *resident,
     /*initialize phenotype*/
     for (i=0;i<N_REPLICATES;i++)
     {
-        phenotype[i].total_time_points=(int)(selection->env1.t_development)+1;       
-        phenotype[i].protein_concentration=(float *)calloc(phenotype[i].total_time_points,sizeof(float));    
+        phenotype[i].total_time_points=(int)(selection->env1.t_development/sampling_interval)+1;       
+        phenotype[i].protein_concentration=(float *)malloc(phenotype[i].total_time_points*sizeof(float));    
         phenotype[i].timepoint=0;         
     }    
    
     /*expression in the initial genotype*/
     calc_avg_fitness(resident, selection, phenotype, init_mRNA, init_protein, RS_parallel, fitness1, fitness2, RM_NONE);    
-    for(i=0;i<(int)selection->env1.t_development;i++)
+    for(i=0;i<(int)(selection->env1.t_development/sampling_interval)+1;i++)
     {
         mean_expression_lvl[i]=0.0;
         for(j=0;j<N_REPLICATES;j++)
             mean_expression_lvl[i]+=phenotype[j].protein_concentration[i];
-        mean_expression_lvl[i]/=selection->env1.t_development;
+        mean_expression_lvl[i]/=(float)N_REPLICATES;
     }    
     fp2=fopen("effector_expression_lvl.txt","w");
-    for(i=0;i<(int)selection->env1.t_development;i++)
+    fprintf(fp2,"0 ");
+    for(i=0;i<(int)(selection->env1.t_development/sampling_interval)+1;i++)
         fprintf(fp2,"%.10f ",mean_expression_lvl[i]);
     fprintf(fp2,"\n");
     fclose(fp2);
     /*the evolved genotypes*/
     for(i=1;i<=replay_N_steps;i++)
     {  
+        for(j=0;j<N_REPLICATES;j++)
+            phenotype[j].timepoint=0;
         fscanf(fp,"%c %d %d %d %s %d %a\n",&(mut_record->mut_type),
                                             &(mut_record->which_gene),                                                    
                                             &(mut_record->which_nucleotide), 
@@ -1917,16 +1930,17 @@ static void sample_effector_expression_lvl(Genotype *resident,
                                             &(mut_record->kinetic_diff));
         reproduce_mutate(resident,mut_record);
         calc_avg_fitness(resident, selection, phenotype, init_mRNA, init_protein, RS_parallel, fitness1, fitness2, RM_NONE);
-        for(i=0;i<(int)selection->env1.t_development;i++)
+        for(j=0;j<(int)(selection->env1.t_development/sampling_interval)+1;j++)
         {
-            mean_expression_lvl[i]=0.0;
-            for(j=0;j<N_REPLICATES;j++)
-                mean_expression_lvl[i]+=phenotype[j].protein_concentration[i];
-            mean_expression_lvl[i]/=selection->env1.t_development;
+            mean_expression_lvl[j]=0.0;
+            for(k=0;k<N_REPLICATES;k++)
+                mean_expression_lvl[j]+=phenotype[k].protein_concentration[j];
+            mean_expression_lvl[j]/=(float)N_REPLICATES;
         }    
         fp2=fopen("effector_expression_lvl.txt","a+");
-        for(i=0;i<(int)selection->env1.t_development;i++)
-            fprintf(fp2,"%.10f ",mean_expression_lvl[i]);
+        fprintf(fp2,"%d ",i);
+        for(j=0;j<(int)(selection->env1.t_development/sampling_interval)+1;j++)
+            fprintf(fp2,"%.10f ",mean_expression_lvl[j]);
         fprintf(fp2,"\n");
         fclose(fp2);
     }
