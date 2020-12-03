@@ -22,53 +22,50 @@
 
 /*Simulation mode*/
 #define PHENOTYPE 0
-#define PERTURB 1
+#define PERTURB 0
 #define NEUTRAL 0 //useless
 
 /*Runtime control*/  
-#define MAX_MUTATIONS 1600000
-#define MAX_TRIALS 2000
-#define HI_RESOLUTION_RECALC 5
-#define LOW_RESOLUTION_RECALC 1
-#define N_THREADS 10
-#define N_REPLICATES 200
-#define OUTPUT_INTERVAL 50
-#define OUTPUT_MUTANT_DETAILS 1
-#define MAX_RECALC_FITNESS 10
+#define MAX_MUTATIONS 1600000 // try at most 1600000 mutants during evolution before shut down anyway 
+#define MAX_TRIALS 2000 //try at most 2000 mutants at an evolutionary step before shut down anyway 
+#define N_REPLICATES 200 //calculate the fitness of a mutant with 200 replicates
+#define HI_RESOLUTION_RECALC 5 //calcualte the high-resolution fitness of a resident with 5*N_REPLICATES replicates
+#define LOW_RESOLUTION_RECALC 1 //calcualte the low-resolution fitness of a resident with N_REPLICATES replicates
+#define N_THREADS 10 //the number of parallel OpenMP threads
+#define OUTPUT_INTERVAL 50 //pool results from evolutionary steps before writing to disk
+#define OUTPUT_MUTANT_DETAILS 1 //output every mutant genotype and its fitness, whetehr the mutant is accepted. Don't change it if need to characterize mutations
 
-/*Miscellaneous settings*/
-#define EPSILON 1.0e-6       /* original code used EPSILON 10^-6 */
-#define OUTPUT_RNG_SEEDS 1
-#define TIME_INFINITY 9.99e10
-#define TIME_OFFSET 0.01
-#define CAUTIOUS 0
-
-#define CUT_OFF_NONADAPTIVE_TFBS -0.01
-#define CUT_OFF_NONADAPTIVE_TFBS_2 -0.02
-
-#define MAX_MISMATCH_SIGNAL2GENES  2 //the maximum number of mismatches in TFBSs of the signal
-#define MAX_MISMATCH_EFFECTOR2GENES  2 //the maximum number of mismatches in TFBSs of the effector
-#define MAX_MISMATCH_NONEFFECTOR2GENES  2 //the maximum number of mismatches in TFBSs of the non-effector TFs
-
+/*simulation mode under PHENOTYPE*/
 #if PHENOTYPE
-#define SAMPLE_GENE_EXPRESSION 1 //output expression timecourse of all genes at particular evolutionary step 
-#define SAMPLE_EFFECTOR_EXPRESSION_LVL 1 //output expression timecourse of the effector during the first N evolutionary steps 
+#define SAMPLE_GENE_EXPRESSION 0 //output expression timecourse of all genes at particular evolutionary step 
+#define SAMPLE_EFFECTOR_EXPRESSION 0 //output expression timecourse of the effector during the first N evolutionary steps 
 #endif
 
+/*simulation mode under PHENOTYPE*/
 #if PERTURB
 #define CLEAN_UP_NETWORK 0 //identify and exclude non-adaptive 2-mismatch TFBSs 
-#define CLASSIFY_MUTATION 1 //classify all mutations into motif-creating and motif-destroying
+#define CLASSIFY_MUTATION 0 //classify all mutations into motif-creating and motif-destroying
 #endif
+
+/*parameters used by PERTURB to call 2-mismatch TFBSs*/
+#define CUT_OFF_NONADAPTIVE_TFBS -0.01 // fitness cutoff used to call non-adaptive 2-mismatch TFBSs when fitness is calculated at high resolution 
+#define CUT_OFF_NONADAPTIVE_TFBS_2 -0.02 // fitness cutoff used to call non-adaptive 2-mismatch TFBSs when fitness is calculated at low resolution 
+
+/*or manually remove 2-mismatch TFBSs in networks.txt and N_motifs.txt*/
+#define MAX_MISMATCH_SIGNAL2GENES  2 // set to 1 to remove 2-mismatch TFBSs of the signal in all genes
+#define MAX_MISMATCH_EFFECTOR2GENES  2 // set to 1 to remove 2-mismatch TFBSs of the effector in all genes
+#define MAX_MISMATCH_NONEFFECTOR2GENES  2 // set to 1 to remove 2-mismatch TFBSs of the non-effector (excluding the signal) in all genes
 
 /* Because mutation can change the number of genes, the numbers defined here are used to allocate storage space only.
  * Set the numbers to be 8 folds of the initial ngenes and ntfgenes, so that we can have two whole genome duplications*/
-#define MIN_NON_OUTPUT_GENES 2         /* the initial value is set in initiate_genotype*/
-#define MAX_COPIES_PER_NON_OUTPUT_GENE 4
-#define MAX_OUTPUT_GENES 4  /* this is the upper limit of effector gene copies*/
+#define MIN_NON_OUTPUT_GENES 2         // the initial value is set in initiate_genotype
+#define MAX_COPIES_PER_NON_OUTPUT_GENE 4 // this is the upper limit of non-effector gene copies
+#define MAX_OUTPUT_GENES 4  // this is the upper limit of effector gene copies
 #define MAX_OUTPUT_PROTEINS 4
-#define MAX_GENES 26 //MIN_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1+N_SIGNAL_TF  /* total number of genes: add the (non-TF) selection gene to the total (default case) */        
-#define MAX_PROTEINS 26//MIN_NON_OUTPUT_GENES+MAX_OUTPUT_PROTEINS+1+N_SIGNAL_TF
+#define MAX_GENES 26 // This is the total number of genes = MIN_NON_OUTPUT_GENES+MAX_OUTPUT_GENES+1+N_SIGNAL_TF.        
+#define MAX_PROTEINS 26
 
+/* parameters that control TFBSs */
 #define CISREG_LEN 150        /* length of cis-regulatory region in base-pairs */
 #define TF_ELEMENT_LEN 8      /* length of binding element on TF */
 #define NMIN 6                /* minimal number of nucleotide that matches the binding sequence of a TF in its binding site*/
@@ -84,6 +81,13 @@
 #if MAKE_LOG
   #define LOG(...) { fprintf(fperrors, "%s: ", __func__); fprintf (fperrors, __VA_ARGS__) ; fflush(fperrors); } 
 #endif
+
+/*Miscellaneous settings*/
+#define EPSILON 1.0e-6       
+#define OUTPUT_RNG_SEEDS 1
+#define TIME_INFINITY 9.99e10
+#define TIME_OFFSET 0.01
+#define CAUTIOUS 0
 
 /*don't change these parameters*/
 #define EVOLVE_I1FFL 1
@@ -236,7 +240,7 @@ struct Genotype {
     float SE_fitness2;
     float avg_fitness;
     float SE_avg_fitness;
-    float fitness_measurement[MAX_RECALC_FITNESS*N_REPLICATES];
+    float fitness_measurement[HI_RESOLUTION_RECALC*N_REPLICATES];
     
     /*measurement of network topology*/
     int N_motifs[33]; 
