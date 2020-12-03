@@ -105,6 +105,7 @@ Col3 – Col8 are the same as Col - Col6 of accepted_mutation_81.txt
 Lists the low-resolution genotype fitness of every mutant, regardless of whether the mutant is accepted. 
 
 **Under CLEAN_UP_NETWORK mode**
+
 ` 13. after_perturbation.txt`
 Fitness of a network after removing 2-mismatch TFBSs. The columns are :
 Col1: evolutionary step
@@ -137,6 +138,7 @@ Topology of TRNs after non-adaptive 2-mismatch TFBSs are removed. The format is 
 Number of network motifs after non-adaptive 2-mismatch TFBSs are removed. The format is identical to that of ‘N_motifs.txt’.
 
 ** Under CLASSIFY_MUTATION**
+
 `16. after_perturbation_all_mutations.txt`
 Lists fitness before and after 2-mismatch TFBSs are removed. Each row is a mutation, starting from the first mutation that is trialed. The columns are:
 Col1: original fitness of the network
@@ -162,11 +164,13 @@ Col5: 1 means the mutation creates one or more overlapping I1FFLs (the ancestral
 
 Col6: 1 means the mutation creates one or more I1FFL+NFBL conjugates (the ancestral genotype has no I1FFL+NFBL conjugate). -1 means the mutation removes all I1FFL+NFBL conjugates.
 
-**Under SAMPLE_EFFECTOR_EXPRESSION_LVL**
+**Under SAMPLE_EFFECTOR_EXPRESSION**
+
 `18. effector_expression_lvl.txt`
 Each line is a time course of the effector’s expression levels that is observed at an evolutionary step. The first number of each row marks the evolutionary step, followed by expression levels at each time point.  The time course starts from the beginning of stage 1 and lasts till the end of growth simulation, which is 360 minutes in total by default. The default sampling interval is 1 minute, therefore a time course contains 360 time points plus one more point that is sampled at time 0. At each time point, we average the expression levels of the effector from multiple replicates (200, by default). Note that the expression level is the total expression levels of all effector genes. Note that github limits file size, so the sample file only list time course in the initial genotype and the first 9999 evolved gentoypes.
  
 **Under SAMPLE_GENE_EXRESSION**
+
 `19. gene_i.txt`
 Each row of the file is the time course of the expression levels of gene i that is observed in a replicate. See effector_expression_lvl.txt for the number of time points. 
 
