@@ -1768,7 +1768,7 @@ static void classify_all_mutations(Genotype *resident,
             
             fp_output=fopen("mutation_classification.txt","a+");
             for(j=0;j<OUTPUT_INTERVAL;j++)                             
-                fprintf(fp_output,"%d %d %d %d\n",output_buffer[j][0],output_buffer[j][1],output_buffer[j][2],output_buffer[j][3],output_buffer[j][4],output_buffer[j][5]);
+                fprintf(fp_output,"%d %d %d %d %d %d\n",output_buffer[j][0],output_buffer[j][1],output_buffer[j][2],output_buffer[j][3],output_buffer[j][4],output_buffer[j][5]);
             fclose(fp_output);            
 
             output_counter=0;
