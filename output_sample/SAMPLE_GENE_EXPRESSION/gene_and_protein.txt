@@ -1,0 +1,8 @@
+gene protein is_effector
+0 0 N
+1 1 N
+2 2 Y
+3 4 Y
+4 3 Y
+5 5 Y
+6 6 N
