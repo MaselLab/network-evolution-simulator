@@ -1758,7 +1758,7 @@ static void classify_all_mutations(Genotype *resident,
         /*output OUTPUT_INTERVAL mutations at a time*/
         if(output_counter%OUTPUT_INTERVAL==0 && output_counter!=0)
         {
-            fp_output=fopen("fitness_aft_perturbation2.txt","a+");
+            fp_output=fopen("after_perturbation_all_mutations.txt","a+");
             for(j=0;j<OUTPUT_INTERVAL;j++)   
             {   
                 for(k=0;k<10;k++)                
