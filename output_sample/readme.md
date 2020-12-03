@@ -164,7 +164,7 @@ Col6: 1 means the mutation creates one or more I1FFL+NFBL conjugates (the ancest
 
 **Under SAMPLE_EFFECTOR_EXPRESSION_LVL**
 `18. effector_expression_lvl.txt`
-Each line is a time course of the effector’s expression levels that is observed at an evolutionary step. The first number of each row marks the evolutionary step, followed by expression levels at each time point.  The time course starts from the beginning of stage 1 and lasts till the end of growth simulation, which is 360 minutes in total by default. The default sampling interval is 1 minute, therefore a time course contains 360 time points plus one more point that is sampled at time 0. At each time point, we average the expression levels of the effector from multiple replicates (200, by default). Note that the expression level is the total expression levels of all effector genes. 
+Each line is a time course of the effector’s expression levels that is observed at an evolutionary step. The first number of each row marks the evolutionary step, followed by expression levels at each time point.  The time course starts from the beginning of stage 1 and lasts till the end of growth simulation, which is 360 minutes in total by default. The default sampling interval is 1 minute, therefore a time course contains 360 time points plus one more point that is sampled at time 0. At each time point, we average the expression levels of the effector from multiple replicates (200, by default). Note that the expression level is the total expression levels of all effector genes. Note that github limits file size, so the sample file only list time course in the initial genotype and the first 9999 evolved gentoypes.
  
 **Under SAMPLE_GENE_EXRESSION**
 `19. gene_i.txt`
