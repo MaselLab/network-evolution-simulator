@@ -1185,7 +1185,7 @@ static int do_fixed_event(Genotype *genotype,
             for(i=0;i<genotype->ngenes;i++)
                 timecourse->gene_specific_concentration[i*timecourse->total_time_points+timecourse->timepoint]=state->gene_specific_protein_number[i];     
             timecourse->timepoint++;   
-#elif SAMPLE_EFFECTOR_EXPRESSION_LVL
+#elif SAMPLE_EFFECTOR_EXPRESSION
             timecourse->protein_concentration[timecourse->timepoint]=0.0;
             for(i=0;i<genotype->ngenes;i++)
             {
