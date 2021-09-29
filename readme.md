@@ -1,3 +1,5 @@
+# Update 9/29/2021: The raw simulation output have been moved to https://github.com/kunxiong/Xiong-et-al-2019_original_data
+
 # After the publication of Xiong, Kun, Alex K. Lancaster, Mark L. Siegal, and Joanna Masel. 2019. “Feed-Forward Regulation Adaptively Evolves via Dynamics Rather than Topology When There Is Intrinsic Noise.” Nature Communications 10 (1): 2418, we found a bug that prevents gene length from mutating downwards. The bug is now fixed.  Re-running all simulations, Figures 4-10, Supplementary Figures 5-11, and Supplementary Tables 3-6 remain nearly identical, and are available in Corrigendum.pdf.  
 
 The program is written in C and is provided as source files. The source files must be compiled to produce the simulation program. We mainly used Intel C compiler (icc, version 16.0.4), but the GNU C compiler (gcc) will also work (although the outcome of a simulation will change due to different optimization to numerical calculations). 
